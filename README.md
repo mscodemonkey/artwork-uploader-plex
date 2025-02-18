@@ -54,7 +54,7 @@ The script supports various command-line arguments for flexible use.
 ```bash
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
-   ### Additional arguments
+   **Additional command line arguments**
    - **--add_sets** will also parse any additional sets  
    - **--add_posterss** will also parse the additional posters section of the set
    - **--force** will force the artwork to be updated even if it's the same as the one on plex already
