@@ -56,10 +56,13 @@ The script supports various command-line arguments for flexible use.
    ```
    **Additional command line arguments**
    - **--add_sets** will also parse any additional sets  
-   - **--add_posterss** will also parse the additional posters section of the set
+   - **--add_posters** will also parse the additional posters section of the set
    - **--force** will force the artwork to be updated even if it's the same as the one on plex already
 
-   These options can also be used in the bulk file, just add them straight after the URL in each line
+   These options can also be used in the bulk file, just add them straight after the URL in each line, for example 
+   ```
+   https://theposterdb.com/set/71510 --add_posters
+   ```
    
 4. **Bulk Import**  
    Import multiple links from a .txt file using the bulk argument:
