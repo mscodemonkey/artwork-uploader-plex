@@ -51,7 +51,7 @@ The script supports various command-line arguments for flexible use.
 2. **Single Link Import**  
    Provide a link directly to set posters from a single MediUX or ThePosterDB set:
    
-   ```bash
+```bash
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
    ### Additional arguments
@@ -59,6 +59,8 @@ The script supports various command-line arguments for flexible use.
    **--add_posterss** will also parse the additional posters section of the set 
    **--force** will force the artwork to be updated even if it's the same as the one on plex already
 
+   These options can also be used in the bulk file, just add them straight after the URL in each line
+   
 4. **Bulk Import**  
    Import multiple links from a .txt file using the bulk argument:
    
