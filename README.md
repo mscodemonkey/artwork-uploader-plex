@@ -3,6 +3,9 @@
 
 plex-poster-set-helper is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
+This version will store the poster ID in a label, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI. 
+
+
 ## Installation
 
 1. [Install Python](https://www.python.org/downloads/) (if not installed already)
@@ -55,9 +58,9 @@ The script supports various command-line arguments for flexible use.
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
    **Additional command line arguments**
-   - **--add_sets** will also parse any additional sets  
-   - **--add_posters** will also parse the additional posters section of the set
-   - **--force** will force the artwork to be updated even if it's the same as the one on plex already
+   - **--add_sets** will also parse any additional sets when using the Poster DB 
+   - **--add_posters** will also parse the additional posters section of the set, when using the Poster DB
+   - **--force** will force the artwork to be updated even if it's the same as the one on plex already (only for movies and collections at the moment)
 
    These options can also be used in the bulk file, just add them straight after the URL in each line, for example 
    ```
