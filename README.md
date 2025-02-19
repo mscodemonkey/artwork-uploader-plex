@@ -3,7 +3,10 @@
 
 plex-poster-set-helper is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
-This version will store the poster ID in a Plex label against each movie or collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.  TV show support is coming!
+# What's different in this fork?
+My version will store the poster ID in a Plex label against each movie or collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
+
+There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
 
 
 ## Installation
