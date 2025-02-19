@@ -58,13 +58,13 @@ The script supports various command-line arguments for flexible use.
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
    **Additional command line arguments**
-   - **--add_sets** will also parse any additional sets when using the Poster DB 
-   - **--add_posters** will also parse the additional posters section of the set, when using the Poster DB
-   - **--force** will force the artwork to be updated even if it's the same as the one on plex already (only for movies and collections at the moment)
+   - **--add-sets** will also parse any additional sets when using the Poster DB 
+   - **--add-posters** will also parse the additional posters section of the set, when using the Poster DB
+   - **--force** will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
 
-   These options can also be used in the bulk file, just add them straight after the URL in each line, for example 
+   These options can also be used in the URL scraper GUI, and in your bulk file, just add them straight after the URL in each line, for example 
    ```
-   https://theposterdb.com/set/71510 --add_posters
+   https://theposterdb.com/set/71510 --add_posters --force
    ```
    
 4. **Bulk Import**  
