@@ -1,45 +1,26 @@
 import requests
-import math
-import hashlib
 import os
-import sys
 import json
 import sys
-import argparse
-from bs4 import BeautifulSoup
 from plexapi.server import PlexServer
 import plexapi.exceptions
-import time
-import re
 import customtkinter as ctk
 import tkinter as tk
 import threading
 import xml.etree.ElementTree
 import atexit
+import sys
 from PIL import Image
+
+import arguments
+import scraper
+import soup_utils
+import utils
 
 # ! Interactive CLI mode flag
 interactive_cli = True  # Set to False when building the executable with PyInstaller for it launches the GUI by default
 
-# ---------------------- HELPER CLASSES ----------------------
 
-# Command line or bulk file arguments, just a container to pass them around easily
-class Options:
-    def __init__(self, add_posters=False, add_sets=False, force=False):
-        self.add_posters = add_posters
-        self.add_sets = add_sets
-        self.force = force
-
-# A URL item stored with its options (force, add sets, add posters)
-class URLItem:
-    def __init__(self, url, options):
-
-        """
-        :rtype: object
-        """
-
-        self.url = url
-        self.options = options
 
 
 # @ ---------------------- CORE FUNCTIONS ----------------------
@@ -148,698 +129,8 @@ def plex_setup(gui_mode=False):
     return tv, movies
 
 
-def cook_soup(url):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': 'Windows'
-    }
 
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200 or (response.status_code == 500 and "mediux.pro" in url):
-        soup = BeautifulSoup(response.text, 'html.parser')
-        return soup
-    else:
-        sys.exit(f"Failed to retrieve the page. Status code: {response.status_code}")
-
-
-def title_cleaner(string):
-    if " (" in string:
-        title = string.split(" (")[0]
-    elif " -" in string:
-        title = string.split(" -")[0]
-    else:
-        title = string
-
-    title = title.strip()
-
-    return title
-
-
-def parse_string_to_dict(input_string):
-    # Remove unnecessary replacements
-    input_string = input_string.replace('\\\\\\\"', "")
-    input_string = input_string.replace("\\", "")
-    input_string = input_string.replace("u0026", "&")
-
-    # Find JSON data in the input string
-    json_start_index = input_string.find('{')
-    json_end_index = input_string.rfind('}')
-    json_data = input_string[json_start_index:json_end_index + 1]
-
-    # Parse JSON data into a dictionary
-    parsed_dict = json.loads(json_data)
-    return parsed_dict
-
-
-def find_in_library(library, poster):
-    items = []
-
-    # print(f"Searching for item in Plex {poster}")
-
-    for lib in library:
-        try:
-            if poster["year"] is not None:
-                library_item = lib.get(poster["title"], year=poster["year"])
-            else:
-                library_item = lib.get(poster["title"])
-
-            if library_item:
-                items.append(library_item)
-        except:
-            pass
-
-    if items:
-        # print(f"Found {items}")
-        return items
-
-    # print(f"x {poster['title']} not found, skipping.")
-    return None
-
-
-def find_collection(library, poster):
-    collections = []
-    for lib in library:
-        try:
-            movie_collections = lib.collections()
-            for plex_collection in movie_collections:
-                if plex_collection.title == poster["title"]:
-                    collections.append(plex_collection)
-        except:
-            pass
-
-    if collections:
-        return collections
-
-    # print(f"{poster['title']} not found, skipping.")
-    return None
-
-
-def upload_tv_poster(poster, tv, options):
-    tv_show_items = find_in_library(tv, poster)
-    if tv_show_items:
-        for tv_show in tv_show_items:
-
-            try:
-                if poster["season"] == "Cover":
-                    upload_target = tv_show
-                    artwork_type = "cover"
-                    description = f"{poster['title']}"
-
-#                elif poster["season"] == 0:
-#                    upload_target = tv_show.season("Specials")
-#                    artwork_type = "season cover"
-#                    description = f"{poster['title']}, specials"
-
-                elif poster["season"] == "Backdrop":
-                    upload_target = tv_show
-                    artwork_type = "background"
-                    description = f"{poster['title']}"
-
-                elif poster["season"] >= 0:
-                    if poster["episode"] == "Cover":
-                        upload_target = tv_show.season(poster["season"])
-                        artwork_type = "season cover"
-                        description = f"{poster['title']}, season {poster['season']}"
-
-                    elif poster["episode"] is None:
-                        upload_target = tv_show.season(poster["season"])
-                        artwork_type = "season cover"
-                        description = f"{poster['title']} - season {poster['season']}"
-
-                    elif poster["episode"] is not None:
-                        try:
-                            upload_target = tv_show.season(poster["season"]).episode(poster["episode"])
-                            artwork_type = "episode card"
-                            description = f"{poster['title']} - season {poster['season']}, episode {poster['episode']}"
-                        except:
-                            description = f"{poster['title']}, season {poster['season']}, episode {poster['episode']}, not found"
-
-
-                try:
-                    existing_artwork, new_label = find_existing_artwork(upload_target, artwork_type, poster)
-
-                    if existing_artwork == False or options.force:
-                        # Upload the new poster
-                        if artwork_type != "background":
-                            upload_target.uploadPoster(url = poster["url"])
-                        else:
-                            upload_target.uploadArt(url=poster["url"])
-                            upload_target.addLabel(new_label)
-                        print(f"✓ Uploaded {artwork_type} for {description} in {tv_show.librarySectionTitle}")
-
-                        if poster["source"] == "posterdb":
-                            time.sleep(6)  # too many requests prevention
-
-                        # update_status(f"✓ Uploaded {artwork_type} for {description}", color="#32CD32")
-
-                    else:
-                        print(f"- No change of {artwork_type} for {description} in {tv_show.librarySectionTitle}")
-
-                except:
-                    print(f"x Failed on {artwork_type} for {description} in {tv_show.librarySectionTitle}")
-
-
-
-            except:
-                description = f"{poster['title']} - season {poster['season']}, episode {poster['episode']}"
-                if poster['episode'] is None:
-                    description = f"{poster['title']} - season {poster['season']}"
-                    if poster['season'] is None:
-                        description = f"{poster['title']}"
-
-                print(f"x No media found on Plex for {description} in {tv_show.librarySectionTitle}")
-    else:
-        print(f"∙ {poster['title']} not found in any library.")
-
-# Calculate the MD5 of a string - used for artwork IDs stored in labels
-def calculate_md5(input_string):
-    # Create an MD5 hash object
-    md5_hash = hashlib.md5()
-
-    # Update the hash object with the bytes of the input string
-    md5_hash.update(input_string.encode('utf-8'))
-
-    # Return the hexadecimal representation of the hash
-    return md5_hash.hexdigest()
-
-
-def find_existing_artwork(target_item, artwork_type, poster):
-
-    existing_artwork = False
-
-    artwork_id = artwork_type[:1].upper() + "ID:"  # This will be BID, CID, EID, PID, SID for backgrounds, covers, episode cards, posters or season covers
-    new_label = artwork_id + calculate_md5(poster["url"])
-
-    # print(f"Looking for {new_label}")
-
-    for label in target_item.labels:
-
-        existing_label = str(label)  # Convert the label object to a string if it's not already
-
-        if existing_label.startswith(artwork_id):
-
-            if existing_label == new_label:
-                existing_artwork = True
-            else:
-                target_item.removeLabel(existing_label, False)  # Remove the label as we're replacing the artwork
-
-    return existing_artwork, new_label
-
-def upload_movie_poster(poster, movies, options):
-    movie_items = find_in_library(movies, poster)
-
-    if movie_items:
-        for movie_item in movie_items:
-            try:
-                existing_artwork, new_label = find_existing_artwork(movie_item, "poster", poster)
-
-                if existing_artwork == False or options.force:
-                    # Upload the new poster
-                    movie_item.uploadPoster(poster["url"])
-                    movie_item.addLabel(new_label)
-                    print(f'✓ Uploaded art for {poster["title"]} ({movie_item.year}) in {movie_item.librarySectionTitle} library.')
-
-                    # Rate limit if source is "posterdb"
-                    if poster["source"] == "posterdb":
-                        time.sleep(6)  # Too many requests prevention
-
-                else:
-                    print(f'- No change for {poster["title"]} ({movie_item.year}) in {movie_item.librarySectionTitle} library.')
-
-
-            except Exception as e:
-                print(
-                    f'x Unable to upload art for {poster["title"]} ({movie_item.year}) in {movie_item.librarySectionTitle} library. Error: {e}')
-    else:
-        print(f'∙ {poster["title"]} ({poster["year"]}) not found in any library.')
-
-
-def upload_collection_poster(poster, movies, options):
-    collection_items = find_collection(movies, poster)
-    if collection_items:
-        for collection in collection_items:
-            try:
-
-                existing_artwork, new_label = find_existing_artwork(collection, "poster", poster)
-
-                if existing_artwork == False or options.force:
-                    # Upload the new poster
-                    collection.uploadPoster(poster["url"])
-                    collection.addLabel(new_label)
-
-                    print(f'✓ Uploaded art for {poster["title"]} in {collection.librarySectionTitle} library.')
-                    if poster["source"] == "posterdb":
-                        time.sleep(6)  # too many requests prevention
-
-                else:
-                    print(f'- No change for {poster["title"]} in {collection.librarySectionTitle} library.')
-
-            except:
-                print(f'x Unable to upload art for {poster["title"]} in {collection.librarySectionTitle} library.')
-    else:
-        collection_title = poster["title"].replace(" Collection","")
-        print(f'∙ {collection_title} collection not found in any library.')
-
-
-def set_posters(url, options, tv, movies):
-    movieposters, showposters, collectionposters = scrape(url, options)
-
-    # Get additional posters
-
-    for poster in collectionposters:
-        upload_collection_poster(poster, movies, options)
-
-    for poster in movieposters:
-        upload_movie_poster(poster, movies, options)
-
-    for poster in showposters:
-        upload_tv_poster(poster, tv, options)
-
-
-# ---------------------- STUFF FOR THEPOSTERDB ----------------------
-
-def scrape_posterdb_set_link(soup):
-    try:
-        view_all_div = soup.find('a', class_='rounded view_all')['href']
-    except:
-        return None
-    return view_all_div
-
-
-def scrape_posterd_user_info(soup):
-    try:
-        span_tag = soup.find('span', class_='numCount')
-        number_str = span_tag['data-count']
-
-        upload_count = int(number_str)
-        pages = math.ceil(upload_count / 24)
-        return pages
-    except:
-        return None
-
-
-def scrape_posterdb_additional_sets(soup):
-    movieposters_sets = []
-    showposters_sets = []
-    collectionposters_sets = []
-
-    print("⚲ Looking for additional sets...")
-
-    mt4s = soup.find('main').find_all('div', class_='mt-4')
-
-    for mt4 in mt4s:
-
-        additional_set = mt4.find('p').find('span').getText()
-
-        if additional_set[:16] == "Additional Set -":
-
-            print(f"+ {additional_set}")
-
-            # find the poster grid
-            poster_divs = mt4.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
-            poster_div = poster_divs[-1]
-
-            set_url = scrape_posterdb_set_link(poster_div)
-
-            if set_url is not None:
-                some_more_soup = cook_soup(set_url)
-                more_movieposters, more_showposters, more_collectionposters = scrape_posterdb(some_more_soup)
-
-                movieposters_sets = movieposters_sets + more_movieposters
-                showposters_sets = showposters_sets + more_showposters
-                collectionposters_sets = collectionposters_sets + more_collectionposters
-
-    return movieposters_sets, showposters_sets, collectionposters_sets
-
-
-def scrape_posterdb_additional(soup):
-    movieposters_additional = []
-    showposters_additional = []
-    collectionposters_additional = []
-
-    print("⚲ Looking for additional posters...")
-
-    # find the poster grid
-    poster_divs = soup.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
-    poster_div = poster_divs[-1]
-
-    mt4s = soup.find('main').find_all('div', class_='mt-4')
-    if len(mt4s) > 0:
-        last_mt4 = mt4s[-1]
-        additional_posters = last_mt4.find('p').find('span').getText()
-
-        if additional_posters == "Additional Posters":
-            movieposters_additional, showposters_additional, collectionposters_additional = get_posters_from_posterdb(
-                poster_div)
-
-    return movieposters_additional, showposters_additional, collectionposters_additional
-
-
-def get_posters_from_posterdb(poster_div):
-    movieposters = []
-    showposters = []
-    collectionposters = []
-
-    # find all poster divs
-    posters = poster_div.find_all('div', class_='col-6 col-lg-2 p-1')
-
-    if posters[-1].find('a', class_='rounded view_all'):
-        posters.pop()
-
-    # loop through the poster divs
-    for poster in posters:
-
-        # get if poster is for a show or movie
-        media_type = poster.find('a', class_="text-white", attrs={'data-toggle': 'tooltip', 'data-placement': 'top'})[
-            'title']
-
-        # get high resolution poster image
-        overlay_div = poster.find('div', class_='overlay')
-        poster_id = overlay_div.get('data-poster-id')
-        poster_url = "https://theposterdb.com/api/assets/" + poster_id
-        # get metadata
-        title_p = poster.find('p', class_='p-0 mb-1 text-break').string
-
-        if media_type == "Show":
-            title = title_p.split(" (")[0]
-            try:
-                year = int(title_p.split(" (")[1].split(")")[0])
-            except:
-                year = None
-
-            if " - " in title_p:
-                split_season = title_p.split(" - ")[-1]
-                if split_season == "Specials":
-                    season = 0
-                elif "Season" in split_season:
-                    season = int(split_season.split(" ")[1])
-            else:
-                season = "Cover"
-
-            showposter = {}
-            showposter["title"] = title
-            showposter["url"] = poster_url
-            showposter["season"] = season
-            showposter["episode"] = None
-            showposter["year"] = year
-            showposter["source"] = "posterdb"
-            showposters.append(showposter)
-
-        elif media_type == "Movie":
-            title_split = title_p.split(" (")
-            if len(title_split[1]) != 5:
-                title = title_split[0] + " (" + title_split[1]
-            else:
-                title = title_split[0]
-            year = title_split[-1].split(")")[0]
-
-            movieposter = {}
-            movieposter["title"] = title
-            movieposter["url"] = poster_url
-            movieposter["year"] = int(year)
-            movieposter["source"] = "posterdb"
-            movieposters.append(movieposter)
-
-        elif media_type == "Collection":
-            collectionposter = {}
-            collectionposter["title"] = title_p
-            collectionposter["url"] = poster_url
-            collectionposter["source"] = "posterdb"
-            collectionposters.append(collectionposter)
-
-    return movieposters, showposters, collectionposters
-
-
-def scrape_posterdb(soup):
-    movieposters = []
-    showposters = []
-    collectionposters = []
-
-    # find the poster grid
-    poster_div = soup.find('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
-
-    return get_posters_from_posterdb(poster_div)
-
-
-# ---------------------- STUFF FOR MEDIUX ----------------------
-
-def get_mediux_filters():
-    config = json.load(open("config.json"))
-    return config.get("mediux_filters", None)
-
-
-def check_mediux_filter(mediux_filters, filter):
-    return filter in mediux_filters if mediux_filters else True
-
-
-def scrape_mediux(soup):
-    base_url = "https://mediux.pro/_next/image?url=https%3A%2F%2Fapi.mediux.pro%2Fassets%2F"
-    quality_suffix = "&w=3840&q=80"
-    scripts = soup.find_all('script')
-    media_type = None
-    showposters = []
-    movieposters = []
-    collectionposters = []
-    mediux_filters = get_mediux_filters()
-    year = 0  # Default year value
-    title = "Untitled"  # Default title value
-
-    for script in scripts:
-        if 'files' in script.text:
-            if 'set' in script.text:
-                if 'Set Link\\' not in script.text:
-                    data_dict = parse_string_to_dict(script.text)
-                    poster_data = data_dict["set"]["files"]
-
-    for data in poster_data:
-        if data["show_id"] is not None or data["show_id_backdrop"] is not None or data["episode_id"] is not None or \
-                data["season_id"] is not None or data["show_id"] is not None:
-            media_type = "Show"
-        else:
-            media_type = "Movie"
-
-    for data in poster_data:
-        if media_type == "Show":
-
-            episodes = data_dict["set"]["show"]["seasons"]
-            show_name = data_dict["set"]["show"]["name"]
-            try:
-                year = int(data_dict["set"]["show"]["first_air_date"][:4])
-            except:
-                year = None
-
-            if data["fileType"] == "title_card":
-                episode_id = data["episode_id"]["id"]
-                season = data["episode_id"]["season_id"]["season_number"]
-                title = data["title"]
-                try:
-                    episode = int(title.rsplit(" E", 1)[1])
-                except:
-                    print(f"Error getting episode number for {title}.")
-                file_type = "title_card"
-
-
-            elif data["fileType"] == "backdrop":
-                season = "Backdrop"
-                episode = None
-                file_type = "background"
-            elif data["season_id"] is not None:
-                season_id = data["season_id"]["id"]
-                season_data = [episode for episode in episodes if episode["id"] == season_id][0]
-                episode = "Cover"
-                season = season_data["season_number"]
-                file_type = "season_cover"
-            elif data["show_id"] is not None:
-                season = "Cover"
-                episode = None
-                file_type = "show_cover"
-
-        elif media_type == "Movie":
-
-            if data["movie_id"]:
-                if data_dict["set"]["movie"]:
-                    title = data_dict["set"]["movie"]["title"]
-                    year = int(data_dict["set"]["movie"]["release_date"][:4])
-                elif data_dict["set"]["collection"]:
-                    movie_id = data["movie_id"]["id"]
-                    movies = data_dict["set"]["collection"]["movies"]
-                    movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
-                    title = movie_data["title"]
-                    year = int(movie_data["release_date"][:4])
-            elif data["collection_id"]:
-                title = data_dict["set"]["collection"]["collection_name"]
-
-        image_stub = data["id"]
-        poster_url = f"{base_url}{image_stub}{quality_suffix}"
-
-        if media_type == "Show":
-            showposter = {}
-            showposter["title"] = show_name
-            showposter["season"] = season
-            showposter["episode"] = episode
-            showposter["url"] = poster_url
-            showposter["source"] = "mediux"
-            showposter["year"] = year
-
-            if check_mediux_filter(mediux_filters=mediux_filters, filter=file_type):
-                showposters.append(showposter)
-            else:
-                print(f"{show_name} - skipping. '{file_type}' is not in 'mediux_filters'")
-
-        elif media_type == "Movie":
-            if "Collection" in title:
-                collectionposter = {}
-                collectionposter["title"] = title
-                collectionposter["url"] = poster_url
-                collectionposter["source"] = "mediux"
-                collectionposters.append(collectionposter)
-
-            else:
-                movieposter = {}
-                movieposter["title"] = title
-                movieposter["year"] = int(year)
-                movieposter["url"] = poster_url
-                movieposter["source"] = "mediux"
-                movieposters.append(movieposter)
-
-
-    return movieposters, showposters, collectionposters
-
-
-
-
-
-
-def remove_duplicates(lst):
-    # Create an empty list to store unique elements
-    unique = []
-    # Create a set to track already seen elements
-    seen = set()
-
-    for item in lst:
-        # Convert dictionaries to a tuple of items for comparison
-        item_tuple = tuple(item.items()) if isinstance(item, dict) else item
-        # Only add to unique list if it has not been seen before
-        if item_tuple not in seen:
-            seen.add(item_tuple)
-            unique.append(item)
-
-    return unique
-
-
-def parse_arguments():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('command', help="Run mode (leave blank for interactive)", nargs='?', default=None)
-    parser.add_argument('bulk_file', help="Bulk file (when using bulk as run mode)", nargs='?', default=None)
-    parser.add_argument('--add-sets', action='store_true', help="Scrape additional sets from same page - TPDb only")
-    parser.add_argument('--add-posters', action='store_true', help="Scrape additional posters from same page - TPDb only")
-    parser.add_argument('--force', action='store_true', help="Force upload even if its the same artwork")
-    return parser.parse_args()
-
-
-def scrape(url, options):
-    movie_posters = []
-    show_posters = []
-    collection_posters = []
-
-    if ("theposterdb.com" in url):
-        if ("/set/" in url or "/user/" in url):
-            soup = cook_soup(url)
-
-            # Get the standard set of posters
-            movies, shows, collections = scrape_posterdb(soup)
-            movie_posters.extend(movies)
-            show_posters.extend(shows)
-            collection_posters.extend(collections)
-
-            # Get the additional posters if required
-            if options.add_posters:
-                movies, shows, collections = scrape_posterdb_additional(soup)
-                movie_posters.extend(movies)
-                show_posters.extend(shows)
-                collection_posters.extend(collections)
-
-            # Get the additional sets if required
-            if options.add_sets:
-                movies, shows, collections = scrape_posterdb_additional_sets(soup)
-                movie_posters.extend(movies)
-                show_posters.extend(shows)
-                collection_posters.extend(collections)
-
-            return movie_posters, show_posters, collection_posters
-
-        elif ("/poster/" in url):
-            soup = cook_soup(url)
-            set_url = scrape_posterdb_set_link(soup)
-            if set_url is not None:
-                set_soup = cook_soup(set_url)
-                return scrape_posterdb(set_soup)
-            else:
-                sys.exit("Poster set not found. Check the link you are inputting.")
-    elif ("mediux.pro" in url) and ("sets" in url):
-        soup = cook_soup(url)
-        return scrape_mediux(soup)
-    elif (".html" in url):
-        with open(url, 'r', encoding='utf-8') as file:
-            html_content = file.read()
-        soup = BeautifulSoup(html_content, 'html.parser')
-        return scrape_posterdb(soup)
-    else:
-        sys.exit("Poster set not found. Check the link you are inputting.")
-
-
-def scrape_entire_user(url):
-    '''Scrape all pages of a user's uploads.'''
-    soup = cook_soup(url)
-    pages = scrape_posterd_user_info(soup)
-
-    if not pages:
-        print(f"Could not determine the number of pages for {url}")
-        return
-
-    if "?" in url:
-        cleaned_url = url.split("?")[0]
-        url = cleaned_url
-
-    for page in range(pages):
-        print(f"Scraping page {page + 1}.")
-        page_url = f"{url}?section=uploads&page={page + 1}"
-        set_posters(page_url, tv, movies)
-
-
-# Check if the URL is not a comment or empty line.
-def is_not_comment(url):
-
-    """Check if the URL is not a comment or empty line."""
-
-    regex = r"^(?!\/\/|#|^$)"
-    pattern = re.compile(regex)
-    return True if re.match(pattern, url) else False
-
-
-# Parse a line from the bulk URL file, containing the URL and options
-# @todo add validation for the URL
-def parse_line(line):
-
-    # Split the line by spaces
-    parts = line.strip().split()
-
-    # The first part should be the URL
-    url = parts[0]
-
-    # The rest are optional flags
-    options = Options(
-        add_posters='--add-posters' in parts,
-        add_sets='--add-sets' in parts,
-        force='--force' in parts
-    )
-
-    return URLItem(url, options)
-
-
-def parse_urls(bulk_import_list):
+def parse_bulk_import_file(bulk_import_list):
 
     """ Parse the URLs from a bulk import list and scrape them """
 
@@ -849,8 +140,8 @@ def parse_urls(bulk_import_list):
     # Ignoring any lines containing comments using # or //
 
     for line in bulk_import_list:
-        if is_not_comment(line):
-            url_item_details = parse_line(line)
+        if utils.is_not_comment(line):
+            url_item_details = utils.parse_line(line)
             valid_urls.append(url_item_details)
 
     for valid_url in valid_urls:
@@ -860,7 +151,7 @@ def parse_urls(bulk_import_list):
         # @todo Check the logic for the else, doesn't really make sense to return the whole list here, surely it should scrape the URL for posters?
         if "/user/" in valid_url.url:
             print(f"Scraping user data from: {valid_url.url}")
-            scrape_entire_user(valid_url.url)
+            scraper.scrape_entire_user_portfolio(valid_url.url, valid_url.options)
         else:
             print(f"Returning non-user URL: {valid_url.url}")
             # If it's not a /user/ URL (should theoretically be a poster set), return it
@@ -870,19 +161,24 @@ def parse_urls(bulk_import_list):
 
 
 def parse_cli_urls(file_path, tv, movies):
-    '''Parse the URLs from a file and scrape them.'''
+
+    """Parse the URLs from a file and scrape them."""
+
     try:
+
         with open(file_path, 'r', encoding='utf-8') as file:
             urls = file.readlines()
+
         for line in urls:
-            if is_not_comment(line):
 
-                url_with_options = parse_line(line)
+            if utils.is_not_comment(line):
 
-                if "/user/" in url_with_options.url:
-                    scrape_entire_user(url_with_options.url)
+                url_details = utils.parse_line(line)
+
+                if "/user/" in url_details.url:
+                    scraper.scrape_entire_user_portfolio(url_details.url, url_details.options, tv, movies)
                 else:
-                    set_posters(url_with_options.url, url_with_options.options, tv, movies)
+                    scraper.process_url_and_upload_scraped_posters(url_details.url, url_details.options, tv, movies)
 
     except FileNotFoundError:
         print("File not found. Please enter a valid file path.")
@@ -1110,7 +406,7 @@ def run_bulk_import_scrape_thread():
     '''Run the bulk import scrape in a separate thread.'''
     global bulk_import_button
     bulk_import_list = bulk_import_text.get(1.0, ctk.END).strip().split("\n")
-    valid_urls = parse_urls(bulk_import_list)
+    valid_urls = parse_bulk_import_file(bulk_import_list)
 
     if not valid_urls:
         app.after(0, lambda: update_status("No bulk import entries found.", color="red"))
@@ -1136,13 +432,13 @@ def process_scrape_url(url):
             update_status("Plex setup incomplete. Please configure your settings.", color="red")
             return
 
-        soup = cook_soup(url)
+        soup = soup_utils.cook_soup(url)
         update_status(f"Scraping: {url}", color="#E5A00D")
 
-        url_with_options = parse_line(url)
+        url_with_options = utils.parse_line(url)
 
         # Proceed with setting posters
-        set_posters(url_with_options.url, url_with_options.options, tv, movies)
+        scraper.process_url_and_upload_scraped_posters(url_with_options.url, url_with_options.options, tv, movies)
         update_status(f"Posters successfully set for: {url}", color="#E5A00D")
 
     except Exception as e:
@@ -1169,7 +465,7 @@ def process_bulk_import(valid_urls):
         for i, valid_url in enumerate(valid_urls):
             status_text = f"Processing item {i + 1} of {len(valid_urls)}: {valid_url.url}"
             update_status(status_text, color="#E5A00D")
-            set_posters(valid_url.url, valid_url.options, tv, movies)
+            scraper.process_url_and_upload_scraped_posters(valid_url.url, valid_url.options, tv, movies)
             update_status(f"Completed: {valid_url.url}", color="#E5A00D")
 
         update_status("Bulk import scraping completed.", color="#E5A00D")
@@ -1579,10 +875,10 @@ def interactive_cli_loop(tv, movies, bulk_txt):
             url = input("Enter the URL: ")
             if check_libraries(tv, movies):
                 if "/user/" in url.lower():
-                    scrape_entire_user(url)
+                    scraper.scrape_entire_user_portfolio(url)
                 else:
                     options = url_args
-                    set_posters(url, options, tv, movies)
+                    scraper.process_url_and_upload_scraped_posters(url, options, tv, movies)
 
         elif choice == '2':
             file_path = input(f"Enter the path to the bulk import .txt file, or press [Enter] to use '{bulk_txt}': ")
@@ -1618,9 +914,9 @@ def check_libraries(tv, movies):
 # * Main Initialization ---
 if __name__ == "__main__":
 
-    args = parse_arguments()  # Command line arguments
+    args = arguments.parse_arguments()  # Command line arguments
 
-    url_args = Options(add_posters=args.add_posters, add_sets=args.add_sets,
+    url_args = utils.Options(add_posters=args.add_posters, add_sets=args.add_sets,
                        force=args.force)  # Arguments per url to process
 
     config = load_config()
@@ -1645,11 +941,11 @@ if __name__ == "__main__":
                 parse_cli_urls(bulk_txt, tv, movies)
 
         elif "/user/" in command:
-            scrape_entire_user(command)
+            tv, movies = plex_setup(gui_mode=False)
+            scraper.scrape_entire_user_portfolio(command, url_args, tv, movies)
         else:
             tv, movies = plex_setup(gui_mode=False)
-            options = url_args
-            set_posters(command, options, tv, movies)
+            scraper.process_url_and_upload_scraped_posters(command, url_args, tv, movies)
 
     else:
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
