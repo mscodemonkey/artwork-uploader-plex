@@ -51,7 +51,8 @@ def tv_artwork(poster, tv, options):
                             upload_target.uploadPoster(url = poster["url"])
                         else:
                             upload_target.uploadArt(url=poster["url"])
-                            upload_target.addLabel(new_label)
+
+                        upload_target.addLabel(new_label)
                         print(f"✓ Uploaded {artwork_type} for {description} in {tv_show.librarySectionTitle}")
 
                         if poster["source"] == "posterdb":
