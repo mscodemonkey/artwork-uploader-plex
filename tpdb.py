@@ -1,9 +1,19 @@
 import math
+from html.parser import HTMLParser
 
 import soup_utils
 
+# ---------------------------------------------------------
+# The main scraping functionality for ThePosterDB
+# ---------------------------------------------------------
+#
+#
+#
+#
 
-def scrape_link_to_set(soup):
+# Look for a link to a fiv with a class of view_all
+def find_link_to_poster_set(soup):
+
     try:
         view_all_div = soup.find('a', class_='rounded view_all')['href']
     except:
@@ -24,9 +34,9 @@ def scrape_user_info(soup):
 
 
 def scrape_additional_sets(soup):
-    movieposters_sets = []
-    showposters_sets = []
-    collectionposters_sets = []
+    movie_posters_sets = []
+    show_posters_sets = []
+    collection_posters_sets = []
 
     print("⚲ Looking for additional sets...")
 
@@ -44,23 +54,23 @@ def scrape_additional_sets(soup):
             poster_divs = mt4.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
             poster_div = poster_divs[-1]
 
-            set_url = scrape_link_to_set(poster_div)
+            set_url = find_link_to_poster_set(poster_div)
 
             if set_url is not None:
                 some_more_soup = soup_utils.cook_soup(set_url)
-                more_movieposters, more_showposters, more_collectionposters = scrape_posters(some_more_soup)
+                more_movie_posters, more_show_posters, more_collection_posters = scrape_posters(some_more_soup)
 
-                movieposters_sets = movieposters_sets + more_movieposters
-                showposters_sets = showposters_sets + more_showposters
-                collectionposters_sets = collectionposters_sets + more_collectionposters
+                movie_posters_sets = movie_posters_sets + more_movie_posters
+                show_posters_sets = show_posters_sets + more_show_posters
+                collection_posters_sets = collection_posters_sets + more_collection_posters
 
-    return movieposters_sets, showposters_sets, collectionposters_sets
+    return movie_posters_sets, show_posters_sets, collection_posters_sets
 
 
 def scrape_additional_posters(soup):
-    movieposters_additional = []
-    showposters_additional = []
-    collectionposters_additional = []
+    movie_posters_additional = []
+    show_posters_additional = []
+    collection_posters_additional = []
 
     print("⚲ Looking for additional posters...")
 
@@ -74,16 +84,17 @@ def scrape_additional_posters(soup):
         additional_posters = last_mt4.find('p').find('span').getText()
 
         if additional_posters == "Additional Posters":
-            movieposters_additional, showposters_additional, collectionposters_additional = get_posters(
+            movie_posters_additional, show_posters_additional, collection_posters_additional = get_posters(
                 poster_div)
 
-    return movieposters_additional, showposters_additional, collectionposters_additional
+    return movie_posters_additional, show_posters_additional, collection_posters_additional
 
 
 def get_posters(poster_div):
-    movieposters = []
-    showposters = []
-    collectionposters = []
+
+    movie_posters = []
+    show_posters = []
+    collection_posters = []
 
     # find all poster divs
     posters = poster_div.find_all('div', class_='col-6 col-lg-2 p-1')
@@ -121,14 +132,15 @@ def get_posters(poster_div):
             else:
                 season = "Cover"
 
-            showposter = {}
-            showposter["title"] = title
-            showposter["url"] = poster_url
-            showposter["season"] = season
-            showposter["episode"] = None
-            showposter["year"] = year
-            showposter["source"] = "posterdb"
-            showposters.append(showposter)
+            show_poster = {
+                "title": title,
+                "url": poster_url,
+                "season": season,
+                "episode": None,
+                "year": year,
+                "source": "posterdb"
+            }
+            show_posters.append(show_poster)
 
         elif media_type == "Movie":
             title_split = title_p.split(" (")
@@ -138,21 +150,23 @@ def get_posters(poster_div):
                 title = title_split[0]
             year = title_split[-1].split(")")[0]
 
-            movieposter = {}
-            movieposter["title"] = title
-            movieposter["url"] = poster_url
-            movieposter["year"] = int(year)
-            movieposter["source"] = "posterdb"
-            movieposters.append(movieposter)
+            movie_poster = {
+                "title": title,
+                "url": poster_url,
+                "year": int(year),
+                "source": "posterdb"
+            }
+            movie_posters.append(movie_poster)
 
         elif media_type == "Collection":
-            collectionposter = {}
-            collectionposter["title"] = title_p
-            collectionposter["url"] = poster_url
-            collectionposter["source"] = "posterdb"
-            collectionposters.append(collectionposter)
+            collection_poster = {
+                "title": title_p,
+                "url": poster_url,
+                "source": "posterdb"
+            }
+            collection_posters.append(collection_poster)
 
-    return movieposters, showposters, collectionposters
+    return movie_posters, show_posters, collection_posters
 
 
 def scrape_posters(soup):

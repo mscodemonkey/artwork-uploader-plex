@@ -1,8 +1,10 @@
 import sys
-
 import requests
 from bs4 import BeautifulSoup
 
+# -------------------------------------------------
+# Cook Soup - Implements Beautiful Soup HTML Parser
+# -------------------------------------------------
 
 def cook_soup(url):
     headers = {
@@ -17,4 +19,4 @@ def cook_soup(url):
         soup = BeautifulSoup(response.text, 'html.parser')
         return soup
     else:
-        sys.exit(f"Failed to retrieve the page. Status code: {response.status_code}")
+        sys.exit(f"x Failed to retrieve the page. Status code: {response.status_code}")

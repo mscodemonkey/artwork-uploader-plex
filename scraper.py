@@ -24,7 +24,7 @@ def scrape_single_url(url, options):
 
             print(f"★ Got a poster URL {url}, looking up the correct set URL...")
             soup = soup_utils.cook_soup(url)
-            url = tpdb.scrape_link_to_set(soup)
+            url = tpdb.find_link_to_poster_set(soup)
 
         if url and ("/set/" in url or "/user/" in url):
 

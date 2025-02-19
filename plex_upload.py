@@ -2,6 +2,11 @@ import plex_utils
 import time
 
 def tv_artwork(poster, tv, options):
+
+    upload_target = None
+    artwork_type = None
+    description = None
+
     tv_show_items = plex_utils.find_in_library(tv, poster)
     if tv_show_items:
         for tv_show in tv_show_items:
@@ -11,11 +16,6 @@ def tv_artwork(poster, tv, options):
                     upload_target = tv_show
                     artwork_type = "cover"
                     description = f"{poster['title']}"
-
-#                elif poster["season"] == 0:
-#                    upload_target = tv_show.season("Specials")
-#                    artwork_type = "season cover"
-#                    description = f"{poster['title']}, specials"
 
                 elif poster["season"] == "Backdrop":
                     upload_target = tv_show
@@ -43,26 +43,29 @@ def tv_artwork(poster, tv, options):
 
 
                 try:
-                    existing_artwork, new_label = plex_utils.find_existing_artwork(upload_target, artwork_type, poster)
+                    if upload_target is not None:
+                        existing_artwork, new_label = plex_utils.find_existing_artwork(upload_target, artwork_type, poster)
 
-                    if existing_artwork == False or options.force:
-                        # Upload the new poster
-                        if artwork_type != "background":
-                            upload_target.uploadPoster(url = poster["url"])
+                        if existing_artwork == False or options.force:
+                            # Upload the new poster
+                            if artwork_type != "background":
+                                upload_target.uploadPoster(url = poster["url"])
+                            else:
+                                upload_target.uploadArt(url=poster["url"])
+
+                            upload_target.addLabel(new_label)
+
+                            print(f"✓ Uploaded {artwork_type} for {description} in {tv_show.librarySectionTitle}")
+
+                            if poster["source"] == "posterdb":
+                                time.sleep(6)  # too many requests prevention
+
+                            # update_status(f"✓ Uploaded {artwork_type} for {description}", color="#32CD32")
+
                         else:
-                            upload_target.uploadArt(url=poster["url"])
-
-                        upload_target.addLabel(new_label)
-                        print(f"✓ Uploaded {artwork_type} for {description} in {tv_show.librarySectionTitle}")
-
-                        if poster["source"] == "posterdb":
-                            time.sleep(6)  # too many requests prevention
-
-                        # update_status(f"✓ Uploaded {artwork_type} for {description}", color="#32CD32")
-
+                            print(f"- No change of {artwork_type} for {description} in {tv_show.librarySectionTitle}")
                     else:
-                        print(f"- No change of {artwork_type} for {description} in {tv_show.librarySectionTitle}")
-
+                        print(f"x Failed, no details found for artwork in {tv_show.librarySectionTitle}")
                 except:
                     print(f"x Failed on {artwork_type} for {description} in {tv_show.librarySectionTitle}")
 
