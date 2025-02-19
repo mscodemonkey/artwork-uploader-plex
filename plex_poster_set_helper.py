@@ -1,8 +1,11 @@
 import requests
 import math
+import hashlib
 import os
 import sys
 import json
+import sys
+import argparse
 from bs4 import BeautifulSoup
 from plexapi.server import PlexServer
 import plexapi.exceptions
@@ -15,17 +18,36 @@ import xml.etree.ElementTree
 import atexit
 from PIL import Image
 
+# ! Interactive CLI mode flag
+interactive_cli = True  # Set to False when building the executable with PyInstaller for it launches the GUI by default
 
-#! Interactive CLI mode flag
-interactive_cli = True   # Set to False when building the executable with PyInstaller for it launches the GUI by default
+# ---------------------- HELPER CLASSES ----------------------
+
+# Command line or bulk file arguments, just a container to pass them around easily
+class Options:
+    def __init__(self, add_posters=False, add_sets=False, force=False):
+        self.add_posters = add_posters
+        self.add_sets = add_sets
+        self.force = force
+
+# A URL item stored with its options (force, add sets, add posters)
+class URLItem:
+    def __init__(self, url, options):
+
+        """
+        :rtype: object
+        """
+
+        self.url = url
+        self.options = options
 
 
-#@ ---------------------- CORE FUNCTIONS ----------------------
+# @ ---------------------- CORE FUNCTIONS ----------------------
 
 def plex_setup(gui_mode=False):
     global plex
     plex = None
-    
+
     # Check if config.json exists
     if os.path.exists("config.json"):
         try:
@@ -47,7 +69,8 @@ def plex_setup(gui_mode=False):
     # Validate the fields
     if not base_url or not token:
         if gui_mode:
-            app.after(100, update_error, "Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.")
+            app.after(100, update_error,
+                      "Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.")
         else:
             print('Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.')
         return None, None
@@ -85,7 +108,7 @@ def plex_setup(gui_mode=False):
 
     # Continue with the setup (assuming plex server is successfully initialized)
     if isinstance(tv_library, str):
-        tv_library = [tv_library] 
+        tv_library = [tv_library]
     elif not isinstance(tv_library, list):
         if gui_mode:
             app.after(100, update_error, "tv_library must be either a string or a list")
@@ -100,10 +123,11 @@ def plex_setup(gui_mode=False):
             if gui_mode:
                 app.after(100, update_error, f'TV library named "{tv_lib}" not found: {str(e)}')
             else:
-                sys.exit(f'TV library named "{tv_lib}" not found. Please check the "tv_library" in config.json or provide one.')
+                sys.exit(
+                    f'TV library named "{tv_lib}" not found. Please check the "tv_library" in config.json or provide one.')
 
     if isinstance(movie_library, str):
-        movie_library = [movie_library] 
+        movie_library = [movie_library]
     elif not isinstance(movie_library, list):
         if gui_mode:
             app.after(100, update_error, "movie_library must be either a string or a list")
@@ -118,18 +142,18 @@ def plex_setup(gui_mode=False):
             if gui_mode:
                 app.after(100, update_error, f'Movie library named "{movie_lib}" not found: {str(e)}')
             else:
-                sys.exit(f'Movie library named "{movie_lib}" not found. Please check the "movie_library" in config.json or provide one.')
+                sys.exit(
+                    f'Movie library named "{movie_lib}" not found. Please check the "movie_library" in config.json or provide one.')
 
     return tv, movies
 
 
-
-def cook_soup(url):  
-    headers = { 
-               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', 
-               'Sec-Ch-Ua-Mobile': '?0', 
-               'Sec-Ch-Ua-Platform': 'Windows' 
-            }
+def cook_soup(url):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': 'Windows'
+    }
 
     response = requests.get(url, headers=headers)
 
@@ -137,7 +161,7 @@ def cook_soup(url):
         soup = BeautifulSoup(response.text, 'html.parser')
         return soup
     else:
-        sys.exit(f"Failed to retrieve the page. Status code: {response.status_code}")    
+        sys.exit(f"Failed to retrieve the page. Status code: {response.status_code}")
 
 
 def title_cleaner(string):
@@ -156,13 +180,13 @@ def title_cleaner(string):
 def parse_string_to_dict(input_string):
     # Remove unnecessary replacements
     input_string = input_string.replace('\\\\\\\"', "")
-    input_string = input_string.replace("\\","")
+    input_string = input_string.replace("\\", "")
     input_string = input_string.replace("u0026", "&")
 
     # Find JSON data in the input string
     json_start_index = input_string.find('{')
     json_end_index = input_string.rfind('}')
-    json_data = input_string[json_start_index:json_end_index+1]
+    json_data = input_string[json_start_index:json_end_index + 1]
 
     # Parse JSON data into a dictionary
     parsed_dict = json.loads(json_data)
@@ -171,22 +195,26 @@ def parse_string_to_dict(input_string):
 
 def find_in_library(library, poster):
     items = []
+
+    # print(f"Searching for item in Plex {poster}")
+
     for lib in library:
         try:
             if poster["year"] is not None:
                 library_item = lib.get(poster["title"], year=poster["year"])
             else:
                 library_item = lib.get(poster["title"])
-            
+
             if library_item:
                 items.append(library_item)
         except:
             pass
-    
+
     if items:
+        # print(f"Found {items}")
         return items
-    
-    print(f"{poster['title']} not found, skipping.")
+
+    # print(f"x {poster['title']} not found, skipping.")
     return None
 
 
@@ -204,96 +232,193 @@ def find_collection(library, poster):
     if collections:
         return collections
 
-    #print(f"{poster['title']} collection not found, skipping.")
+    # print(f"{poster['title']} not found, skipping.")
     return None
 
 
-def upload_tv_poster(poster, tv):
+def upload_tv_poster(poster, tv, options):
     tv_show_items = find_in_library(tv, poster)
     if tv_show_items:
         for tv_show in tv_show_items:
+
             try:
                 if poster["season"] == "Cover":
                     upload_target = tv_show
-                    print(f"Uploaded cover art for {poster['title']} - {poster['season']} in {tv_show.librarySectionTitle} library.")
-                elif poster["season"] == 0:
-                    upload_target = tv_show.season("Specials")
-                    print(f"Uploaded art for {poster['title']} - Specials in {tv_show.librarySectionTitle} library.")
+                    artwork_type = "cover"
+                    description = f"{poster['title']}"
+
+#                elif poster["season"] == 0:
+#                    upload_target = tv_show.season("Specials")
+#                    artwork_type = "season cover"
+#                    description = f"{poster['title']}, specials"
+
                 elif poster["season"] == "Backdrop":
                     upload_target = tv_show
-                    print(f"Uploaded background art for {poster['title']} in {tv_show.librarySectionTitle} library.")
-                elif poster["season"] >= 1:
+                    artwork_type = "background"
+                    description = f"{poster['title']}"
+
+                elif poster["season"] >= 0:
                     if poster["episode"] == "Cover":
                         upload_target = tv_show.season(poster["season"])
-                        print(f"Uploaded art for {poster['title']} - Season {poster['season']} in {tv_show.librarySectionTitle} library.")
+                        artwork_type = "season cover"
+                        description = f"{poster['title']}, season {poster['season']}"
+
                     elif poster["episode"] is None:
                         upload_target = tv_show.season(poster["season"])
-                        print(f"Uploaded art for {poster['title']} - Season {poster['season']} in {tv_show.librarySectionTitle} library.")
+                        artwork_type = "season cover"
+                        description = f"{poster['title']} - season {poster['season']}"
+
                     elif poster["episode"] is not None:
                         try:
                             upload_target = tv_show.season(poster["season"]).episode(poster["episode"])
-                            print(f"Uploaded art for {poster['title']} - Season {poster['season']} Episode {poster['episode']} in {tv_show.librarySectionTitle} library..")
+                            artwork_type = "episode card"
+                            description = f"{poster['title']} - season {poster['season']}, episode {poster['episode']}"
                         except:
-                            print(f"{poster['title']} - {poster['season']} Episode {poster['episode']} not found in {tv_show.librarySectionTitle} library, skipping.")
-                if poster["season"] == "Backdrop":
-                    try:
-                        upload_target.uploadArt(url=poster['url'])
-                    except:
-                        print("Unable to upload last poster.")
-                else:
-                    try:
-                        upload_target.uploadPoster(url=poster['url'])
-                    except:
-                        print("Unable to upload last poster.")
-                if poster["source"] == "posterdb":
-                    time.sleep(6)  # too many requests prevention
+                            description = f"{poster['title']}, season {poster['season']}, episode {poster['episode']}, not found"
+
+
+                try:
+                    existing_artwork, new_label = find_existing_artwork(upload_target, artwork_type, poster)
+
+                    if existing_artwork == False or options.force:
+                        # Upload the new poster
+                        if artwork_type != "background":
+                            upload_target.uploadPoster(url = poster["url"])
+                        else:
+                            upload_target.uploadArt(url=poster["url"])
+                            upload_target.addLabel(new_label)
+                        print(f"✓ Uploaded {artwork_type} for {description} in {tv_show.librarySectionTitle}")
+
+                        if poster["source"] == "posterdb":
+                            time.sleep(6)  # too many requests prevention
+
+                        # update_status(f"✓ Uploaded {artwork_type} for {description}", color="#32CD32")
+
+                    else:
+                        print(f"- No change of {artwork_type} for {description} in {tv_show.librarySectionTitle}")
+
+                except:
+                    print(f"x Failed on {artwork_type} for {description} in {tv_show.librarySectionTitle}")
+
+
+
             except:
-                print(f"{poster['title']} - Season {poster['season']} not found in {tv_show.librarySectionTitle} library, skipping.")
+                description = f"{poster['title']} - season {poster['season']}, episode {poster['episode']}"
+                if poster['episode'] is None:
+                    description = f"{poster['title']} - season {poster['season']}"
+                    if poster['season'] is None:
+                        description = f"{poster['title']}"
+
+                print(f"x No media found on Plex for {description} in {tv_show.librarySectionTitle}")
     else:
-        print(f"{poster['title']} not found in any library.")
+        print(f"∙ {poster['title']} not found in any library.")
+
+# Calculate the MD5 of a string - used for artwork IDs stored in labels
+def calculate_md5(input_string):
+    # Create an MD5 hash object
+    md5_hash = hashlib.md5()
+
+    # Update the hash object with the bytes of the input string
+    md5_hash.update(input_string.encode('utf-8'))
+
+    # Return the hexadecimal representation of the hash
+    return md5_hash.hexdigest()
 
 
-def upload_movie_poster(poster, movies):
+def find_existing_artwork(target_item, artwork_type, poster):
+
+    existing_artwork = False
+
+    artwork_id = artwork_type[:1].upper() + "ID:"  # This will be BID, CID, EID, PID, SID for backgrounds, covers, episode cards, posters or season covers
+    new_label = artwork_id + calculate_md5(poster["url"])
+
+    # print(f"Looking for {new_label}")
+
+    for label in target_item.labels:
+
+        existing_label = str(label)  # Convert the label object to a string if it's not already
+
+        if existing_label.startswith(artwork_id):
+
+            if existing_label == new_label:
+                existing_artwork = True
+            else:
+                target_item.removeLabel(existing_label, False)  # Remove the label as we're replacing the artwork
+
+    return existing_artwork, new_label
+
+def upload_movie_poster(poster, movies, options):
     movie_items = find_in_library(movies, poster)
+
     if movie_items:
         for movie_item in movie_items:
             try:
-                movie_item.uploadPoster(poster["url"])
-                print(f'Uploaded art for {poster["title"]} in {movie_item.librarySectionTitle} library.')
-                if poster["source"] == "posterdb":
-                    time.sleep(6)  # too many requests prevention
-            except:
-                print(f'Unable to upload art for {poster["title"]} in {movie_item.librarySectionTitle} library.')
+                existing_artwork, new_label = find_existing_artwork(movie_item, "poster", poster)
+
+                if existing_artwork == False or options.force:
+                    # Upload the new poster
+                    movie_item.uploadPoster(poster["url"])
+                    movie_item.addLabel(new_label)
+                    print(f'✓ Uploaded art for {poster["title"]} ({movie_item.year}) in {movie_item.librarySectionTitle} library.')
+
+                    # Rate limit if source is "posterdb"
+                    if poster["source"] == "posterdb":
+                        time.sleep(6)  # Too many requests prevention
+
+                else:
+                    print(f'- No change for {poster["title"]} ({movie_item.year}) in {movie_item.librarySectionTitle} library.')
+
+
+            except Exception as e:
+                print(
+                    f'x Unable to upload art for {poster["title"]} ({movie_item.year}) in {movie_item.librarySectionTitle} library. Error: {e}')
     else:
-        print(f'{poster["title"]} not found in any library.')
+        print(f'∙ {poster["title"]} ({poster["year"]}) not found in any library.')
 
 
-def upload_collection_poster(poster, movies):
+def upload_collection_poster(poster, movies, options):
     collection_items = find_collection(movies, poster)
     if collection_items:
         for collection in collection_items:
             try:
-                collection.uploadPoster(poster["url"])
-                print(f'Uploaded art for {poster["title"]} in {collection.librarySectionTitle} library.')
-                if poster["source"] == "posterdb":
-                    time.sleep(6)  # too many requests prevention
+
+                existing_artwork, new_label = find_existing_artwork(collection, "poster", poster)
+
+                if existing_artwork == False or options.force:
+                    # Upload the new poster
+                    collection.uploadPoster(poster["url"])
+                    collection.addLabel(new_label)
+
+                    print(f'✓ Uploaded art for {poster["title"]} in {collection.librarySectionTitle} library.')
+                    if poster["source"] == "posterdb":
+                        time.sleep(6)  # too many requests prevention
+
+                else:
+                    print(f'- No change for {poster["title"]} in {collection.librarySectionTitle} library.')
+
             except:
-                print(f'Unable to upload art for {poster["title"]} in {collection.librarySectionTitle} library.')
+                print(f'x Unable to upload art for {poster["title"]} in {collection.librarySectionTitle} library.')
     else:
-        print(f'{poster["title"]} collection not found in any library.')
+        collection_title = poster["title"].replace(" Collection","")
+        print(f'∙ {collection_title} collection not found in any library.')
 
 
-def set_posters(url, tv, movies):
-    movieposters, showposters, collectionposters = scrape(url)
+def set_posters(url, options, tv, movies):
+    movieposters, showposters, collectionposters = scrape(url, options)
+
+    # Get additional posters
 
     for poster in collectionposters:
-        upload_collection_poster(poster, movies)
-        
+        upload_collection_poster(poster, movies, options)
+
     for poster in movieposters:
-        upload_movie_poster(poster, movies)
-    
+        upload_movie_poster(poster, movies, options)
+
     for poster in showposters:
-        upload_tv_poster(poster, tv)
+        upload_tv_poster(poster, tv, options)
+
+
+# ---------------------- STUFF FOR THEPOSTERDB ----------------------
 
 def scrape_posterdb_set_link(soup):
     try:
@@ -303,39 +428,93 @@ def scrape_posterdb_set_link(soup):
     return view_all_div
 
 
-def scrape_posterdb_set_link(soup):
-    try:
-        view_all_div = soup.find("a", class_="rounded view_all")["href"]
-    except:
-        return None
-    return view_all_div
-
 def scrape_posterd_user_info(soup):
     try:
         span_tag = soup.find('span', class_='numCount')
         number_str = span_tag['data-count']
-        
+
         upload_count = int(number_str)
-        pages = math.ceil(upload_count/24)
+        pages = math.ceil(upload_count / 24)
         return pages
     except:
         return None
 
-def scrape_posterdb(soup):
+
+def scrape_posterdb_additional_sets(soup):
+    movieposters_sets = []
+    showposters_sets = []
+    collectionposters_sets = []
+
+    print("⚲ Looking for additional sets...")
+
+    mt4s = soup.find('main').find_all('div', class_='mt-4')
+
+    for mt4 in mt4s:
+
+        additional_set = mt4.find('p').find('span').getText()
+
+        if additional_set[:16] == "Additional Set -":
+
+            print(f"+ {additional_set}")
+
+            # find the poster grid
+            poster_divs = mt4.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
+            poster_div = poster_divs[-1]
+
+            set_url = scrape_posterdb_set_link(poster_div)
+
+            if set_url is not None:
+                some_more_soup = cook_soup(set_url)
+                more_movieposters, more_showposters, more_collectionposters = scrape_posterdb(some_more_soup)
+
+                movieposters_sets = movieposters_sets + more_movieposters
+                showposters_sets = showposters_sets + more_showposters
+                collectionposters_sets = collectionposters_sets + more_collectionposters
+
+    return movieposters_sets, showposters_sets, collectionposters_sets
+
+
+def scrape_posterdb_additional(soup):
+    movieposters_additional = []
+    showposters_additional = []
+    collectionposters_additional = []
+
+    print("⚲ Looking for additional posters...")
+
+    # find the poster grid
+    poster_divs = soup.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
+    poster_div = poster_divs[-1]
+
+    mt4s = soup.find('main').find_all('div', class_='mt-4')
+    if len(mt4s) > 0:
+        last_mt4 = mt4s[-1]
+        additional_posters = last_mt4.find('p').find('span').getText()
+
+        if additional_posters == "Additional Posters":
+            movieposters_additional, showposters_additional, collectionposters_additional = get_posters_from_posterdb(
+                poster_div)
+
+    return movieposters_additional, showposters_additional, collectionposters_additional
+
+
+def get_posters_from_posterdb(poster_div):
     movieposters = []
     showposters = []
     collectionposters = []
-    
-    # find the poster grid
-    poster_div = soup.find('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
 
     # find all poster divs
     posters = poster_div.find_all('div', class_='col-6 col-lg-2 p-1')
 
+    if posters[-1].find('a', class_='rounded view_all'):
+        posters.pop()
+
     # loop through the poster divs
     for poster in posters:
+
         # get if poster is for a show or movie
-        media_type = poster.find('a', class_="text-white", attrs={'data-toggle': 'tooltip', 'data-placement': 'top'})['title']
+        media_type = poster.find('a', class_="text-white", attrs={'data-toggle': 'tooltip', 'data-placement': 'top'})[
+            'title']
+
         # get high resolution poster image
         overlay_div = poster.find('div', class_='overlay')
         poster_id = overlay_div.get('data-poster-id')
@@ -349,7 +528,7 @@ def scrape_posterdb(soup):
                 year = int(title_p.split(" (")[1].split(")")[0])
             except:
                 year = None
-                
+
             if " - " in title_p:
                 split_season = title_p.split(" - ")[-1]
                 if split_season == "Specials":
@@ -358,7 +537,7 @@ def scrape_posterdb(soup):
                     season = int(split_season.split(" ")[1])
             else:
                 season = "Cover"
-            
+
             showposter = {}
             showposter["title"] = title
             showposter["url"] = poster_url
@@ -375,22 +554,36 @@ def scrape_posterdb(soup):
             else:
                 title = title_split[0]
             year = title_split[-1].split(")")[0]
-                
+
             movieposter = {}
             movieposter["title"] = title
             movieposter["url"] = poster_url
             movieposter["year"] = int(year)
             movieposter["source"] = "posterdb"
             movieposters.append(movieposter)
-        
+
         elif media_type == "Collection":
             collectionposter = {}
             collectionposter["title"] = title_p
             collectionposter["url"] = poster_url
             collectionposter["source"] = "posterdb"
             collectionposters.append(collectionposter)
-    
+
     return movieposters, showposters, collectionposters
+
+
+def scrape_posterdb(soup):
+    movieposters = []
+    showposters = []
+    collectionposters = []
+
+    # find the poster grid
+    poster_div = soup.find('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
+
+    return get_posters_from_posterdb(poster_div)
+
+
+# ---------------------- STUFF FOR MEDIUX ----------------------
 
 def get_mediux_filters():
     config = json.load(open("config.json"))
@@ -399,6 +592,7 @@ def get_mediux_filters():
 
 def check_mediux_filter(mediux_filters, filter):
     return filter in mediux_filters if mediux_filters else True
+
 
 def scrape_mediux(soup):
     base_url = "https://mediux.pro/_next/image?url=https%3A%2F%2Fapi.mediux.pro%2Fassets%2F"
@@ -409,23 +603,24 @@ def scrape_mediux(soup):
     movieposters = []
     collectionposters = []
     mediux_filters = get_mediux_filters()
-    year = 0    # Default year value
-    title = "Untitled" # Default title value
-        
+    year = 0  # Default year value
+    title = "Untitled"  # Default title value
+
     for script in scripts:
         if 'files' in script.text:
             if 'set' in script.text:
                 if 'Set Link\\' not in script.text:
                     data_dict = parse_string_to_dict(script.text)
-                    poster_data = data_dict["set"]["files"]              
+                    poster_data = data_dict["set"]["files"]
 
     for data in poster_data:
-        if data["show_id"] is not None or data["show_id_backdrop"] is not None or data["episode_id"] is not None or data["season_id"] is not None or data["show_id"] is not None:
+        if data["show_id"] is not None or data["show_id_backdrop"] is not None or data["episode_id"] is not None or \
+                data["season_id"] is not None or data["show_id"] is not None:
             media_type = "Show"
         else:
             media_type = "Movie"
-                    
-    for data in poster_data:        
+
+    for data in poster_data:
         if media_type == "Show":
 
             episodes = data_dict["set"]["show"]["seasons"]
@@ -440,11 +635,12 @@ def scrape_mediux(soup):
                 season = data["episode_id"]["season_id"]["season_number"]
                 title = data["title"]
                 try:
-                    episode = int(title.rsplit(" E",1)[1])
+                    episode = int(title.rsplit(" E", 1)[1])
                 except:
                     print(f"Error getting episode number for {title}.")
                 file_type = "title_card"
-                
+
+
             elif data["fileType"] == "backdrop":
                 season = "Backdrop"
                 episode = None
@@ -474,10 +670,10 @@ def scrape_mediux(soup):
                     year = int(movie_data["release_date"][:4])
             elif data["collection_id"]:
                 title = data_dict["set"]["collection"]["collection_name"]
-            
+
         image_stub = data["id"]
         poster_url = f"{base_url}{image_stub}{quality_suffix}"
-        
+
         if media_type == "Show":
             showposter = {}
             showposter["title"] = show_name
@@ -491,7 +687,7 @@ def scrape_mediux(soup):
                 showposters.append(showposter)
             else:
                 print(f"{show_name} - skipping. '{file_type}' is not in 'mediux_filters'")
-        
+
         elif media_type == "Movie":
             if "Collection" in title:
                 collectionposter = {}
@@ -499,7 +695,7 @@ def scrape_mediux(soup):
                 collectionposter["url"] = poster_url
                 collectionposter["source"] = "mediux"
                 collectionposters.append(collectionposter)
-            
+
             else:
                 movieposter = {}
                 movieposter["title"] = title
@@ -507,16 +703,74 @@ def scrape_mediux(soup):
                 movieposter["url"] = poster_url
                 movieposter["source"] = "mediux"
                 movieposters.append(movieposter)
-            
+
+
     return movieposters, showposters, collectionposters
 
 
-def scrape(url):
+
+
+
+
+def remove_duplicates(lst):
+    # Create an empty list to store unique elements
+    unique = []
+    # Create a set to track already seen elements
+    seen = set()
+
+    for item in lst:
+        # Convert dictionaries to a tuple of items for comparison
+        item_tuple = tuple(item.items()) if isinstance(item, dict) else item
+        # Only add to unique list if it has not been seen before
+        if item_tuple not in seen:
+            seen.add(item_tuple)
+            unique.append(item)
+
+    return unique
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('command', help="Run mode (leave blank for interactive)", nargs='?', default=None)
+    parser.add_argument('bulk_file', help="Bulk file (when using bulk as run mode)", nargs='?', default=None)
+    parser.add_argument('--add-sets', action='store_true', help="Scrape additional sets from same page - TPDb only")
+    parser.add_argument('--add-posters', action='store_true', help="Scrape additional posters from same page - TPDb only")
+    parser.add_argument('--force', action='store_true', help="Force upload even if its the same artwork")
+    return parser.parse_args()
+
+
+def scrape(url, options):
+    movie_posters = []
+    show_posters = []
+    collection_posters = []
+
     if ("theposterdb.com" in url):
-        if("/set/" in url or "/user/" in url):
+        if ("/set/" in url or "/user/" in url):
             soup = cook_soup(url)
-            return scrape_posterdb(soup)
-        elif("/poster/" in url):
+
+            # Get the standard set of posters
+            movies, shows, collections = scrape_posterdb(soup)
+            movie_posters.extend(movies)
+            show_posters.extend(shows)
+            collection_posters.extend(collections)
+
+            # Get the additional posters if required
+            if options.add_posters:
+                movies, shows, collections = scrape_posterdb_additional(soup)
+                movie_posters.extend(movies)
+                show_posters.extend(shows)
+                collection_posters.extend(collections)
+
+            # Get the additional sets if required
+            if options.add_sets:
+                movies, shows, collections = scrape_posterdb_additional_sets(soup)
+                movie_posters.extend(movies)
+                show_posters.extend(shows)
+                collection_posters.extend(collections)
+
+            return movie_posters, show_posters, collection_posters
+
+        elif ("/poster/" in url):
             soup = cook_soup(url)
             set_url = scrape_posterdb_set_link(soup)
             if set_url is not None:
@@ -524,7 +778,6 @@ def scrape(url):
                 return scrape_posterdb(set_soup)
             else:
                 sys.exit("Poster set not found. Check the link you are inputting.")
-            #menu_selection = input("You've provided the link to a single poster, rather than a set. \n \t 1. Upload entire set\n \t 2. Upload single poster \nType your selection: ")
     elif ("mediux.pro" in url) and ("sets" in url):
         soup = cook_soup(url)
         return scrape_mediux(soup)
@@ -539,9 +792,9 @@ def scrape(url):
 
 def scrape_entire_user(url):
     '''Scrape all pages of a user's uploads.'''
-    soup = cook_soup(url) 
+    soup = cook_soup(url)
     pages = scrape_posterd_user_info(soup)
-    
+
     if not pages:
         print(f"Could not determine the number of pages for {url}")
         return
@@ -549,35 +802,68 @@ def scrape_entire_user(url):
     if "?" in url:
         cleaned_url = url.split("?")[0]
         url = cleaned_url
-    
+
     for page in range(pages):
         print(f"Scraping page {page + 1}.")
         page_url = f"{url}?section=uploads&page={page + 1}"
         set_posters(page_url, tv, movies)
 
 
+# Check if the URL is not a comment or empty line.
 def is_not_comment(url):
-    '''Check if the URL is not a comment or empty line.'''
+
+    """Check if the URL is not a comment or empty line."""
+
     regex = r"^(?!\/\/|#|^$)"
     pattern = re.compile(regex)
     return True if re.match(pattern, url) else False
 
 
-def parse_urls(bulk_import_list):
-    '''Parse the URLs from a list and scrape them.'''
-    valid_urls = []
-    for line in bulk_import_list:
-        url = line.strip()
-        if url and not url.startswith(("#", "//")):
-            valid_urls.append(url)
+# Parse a line from the bulk URL file, containing the URL and options
+# @todo add validation for the URL
+def parse_line(line):
 
-    for url in valid_urls:
-        if "/user/" in url: 
-            print(f"Scraping user data from: {url}")
-            scrape_entire_user(url)
+    # Split the line by spaces
+    parts = line.strip().split()
+
+    # The first part should be the URL
+    url = parts[0]
+
+    # The rest are optional flags
+    options = Options(
+        add_posters='--add-posters' in parts,
+        add_sets='--add-sets' in parts,
+        force='--force' in parts
+    )
+
+    return URLItem(url, options)
+
+
+def parse_urls(bulk_import_list):
+
+    """ Parse the URLs from a bulk import list and scrape them """
+
+    valid_urls = []
+
+    # Loop through the import file and build a list of URLs and options
+    # Ignoring any lines containing comments using # or //
+
+    for line in bulk_import_list:
+        if is_not_comment(line):
+            url_item_details = parse_line(line)
+            valid_urls.append(url_item_details)
+
+    for valid_url in valid_urls:
+
+        # If it's a ThePosterDB user then scrape the URL
+        # @todo Pass the line options to this function too
+        # @todo Check the logic for the else, doesn't really make sense to return the whole list here, surely it should scrape the URL for posters?
+        if "/user/" in valid_url.url:
+            print(f"Scraping user data from: {valid_url.url}")
+            scrape_entire_user(valid_url.url)
         else:
-            print(f"Returning non-user URL: {url}")
-            # If it's not a /user/ URL, return it as before
+            print(f"Returning non-user URL: {valid_url.url}")
+            # If it's not a /user/ URL (should theoretically be a poster set), return it
             return valid_urls
 
     return valid_urls
@@ -588,13 +874,16 @@ def parse_cli_urls(file_path, tv, movies):
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             urls = file.readlines()
-        for url in urls:
-            url = url.strip()
-            if is_not_comment(url):
-                if "/user/" in url:
-                    scrape_entire_user(url)
+        for line in urls:
+            if is_not_comment(line):
+
+                url_with_options = parse_line(line)
+
+                if "/user/" in url_with_options.url:
+                    scrape_entire_user(url_with_options.url)
                 else:
-                    set_posters(url, tv, movies)
+                    set_posters(url_with_options.url, url_with_options.options, tv, movies)
+
     except FileNotFoundError:
         print("File not found. Please enter a valid file path.")
 
@@ -604,21 +893,23 @@ def cleanup():
     if plex:
         print("Closing Plex server connection...")
     print("Exiting application. Cleanup complete.")
-    
+
+
 atexit.register(cleanup)
 
-#@ ---------------------- GUI FUNCTIONS ----------------------
 
+# @ ---------------------- GUI FUNCTIONS ----------------------
 
 
 # * UI helper functions ---
 
 def get_exe_dir():
     """Get the directory of the executable or script file."""
-    if getattr(sys, 'frozen', False):  
+    if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)  # Path to executable
     else:
         return os.path.dirname(__file__)  # Path to script file
+
 
 def resource_path(relative_path):
     """Get the absolute path to resource, works for dev and for PyInstaller bundle."""
@@ -631,49 +922,57 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
+
 def get_full_path(relative_path):
     '''Helper function to get the absolute path based on the script's location.'''
     print("relative_path", relative_path)
-    script_dir = os.path.dirname(os.path.abspath(__file__)) 
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(script_dir, relative_path)
+
 
 def update_status(message, color="white"):
     '''Update the status label with a message and color.'''
     app.after(0, lambda: status_label.configure(text=message, text_color=color))
 
+
 def update_error(message):
     '''Update the error label with a message, with a small delay.'''
     # app.after(500, lambda: status_label.configure(text=message, text_color="red"))
     status_label.configure(text=message, text_color="red")
-      
+
+
 def clear_url():
     '''Clear the URL entry field.'''
     url_entry.delete(0, ctk.END)
-    status_label.configure(text="URL cleared.", text_color="orange")      
-     
+    status_label.configure(text="URL cleared.", text_color="orange")
+
+
 def set_default_tab(tabview):
     '''Set the default tab to the Settings tab.'''
     plex_base_url = base_url_entry.get()
     plex_token = token_entry.get()
-    
+
     if plex_base_url and plex_token:
-        tabview.set("Bulk Import") 
+        tabview.set("Bulk Import")
     else:
         tabview.set("Settings")
-        
+
+
 def bind_context_menu(widget):
     '''Bind the right-click context menu to the widget.'''
     widget.bind("<Button-3>", clear_placeholder_on_right_click)
     widget.bind("<Control-1>", clear_placeholder_on_right_click)
-        
+
+
 def clear_placeholder_on_right_click(event):
     """Clears placeholder text and sets focus before showing the context menu."""
     widget = event.widget
     if isinstance(widget, ctk.CTkEntry) and widget.get() == "":
-        widget.delete(0, tk.END) 
-    widget.focus() 
-    show_global_context_menu(event) 
-    
+        widget.delete(0, tk.END)
+    widget.focus()
+    show_global_context_menu(event)
+
+
 def show_global_context_menu(event):
     '''Show the global context menu at the cursor position.'''
     widget = event.widget
@@ -681,8 +980,8 @@ def show_global_context_menu(event):
     global_context_menu.entryconfigure("Copy", command=lambda: widget.event_generate("<<Copy>>"))
     global_context_menu.entryconfigure("Paste", command=lambda: widget.event_generate("<<Paste>>"))
     global_context_menu.tk_popup(event.x_root, event.y_root)
-      
-      
+
+
 # * Configuration file I/O functions  ---
 
 def load_config(config_path="config.json"):
@@ -730,6 +1029,7 @@ def load_config(config_path="config.json"):
         update_error(f"Error loading config: {str(e)}")
         return {}
 
+
 def save_config():
     '''Save the configuration from the UI fields to the file and update the in-memory config.'''
 
@@ -738,23 +1038,24 @@ def save_config():
         "token": token_entry.get().strip(),
         "tv_library": [item.strip() for item in tv_library_text.get().strip().split(",")],
         "movie_library": [item.strip() for item in movie_library_text.get().strip().split(",")],
-        "mediux_filters": mediux_filters_text.get().strip().split(", "), 
+        "mediux_filters": mediux_filters_text.get().strip().split(", "),
         "bulk_txt": bulk_txt_entry.get().strip()
     }
 
     try:
         with open("config.json", "w") as f:
             json.dump(new_config, f, indent=4)
-            
+
         # Update the in-memory config dictionary
         global config
         config = new_config
-        
+
         load_and_update_ui()
-        
+
         update_status("Configuration saved successfully!", color="#E5A00D")
     except Exception as e:
         update_status(f"Error saving config: {str(e)}", color="red")
+
 
 def load_and_update_ui():
     '''Load the configuration and update the UI fields.'''
@@ -773,7 +1074,7 @@ def load_and_update_ui():
         bulk_txt_entry.insert(0, config.get("bulk_txt", "bulk_import.txt"))
 
     if tv_library_text is not None:
-        tv_library_text.delete(0, ctk.END) 
+        tv_library_text.delete(0, ctk.END)
         tv_library_text.insert(0, ", ".join(config.get("tv_library", [])))
 
     if movie_library_text is not None:
@@ -781,14 +1082,13 @@ def load_and_update_ui():
         movie_library_text.insert(0, ", ".join(config.get("movie_library", [])))
 
     if mediux_filters_text is not None:
-        mediux_filters_text.delete(0, ctk.END) 
-        mediux_filters_text.insert(0, ", ".join(config.get("mediux_filters", []))) 
-        
+        mediux_filters_text.delete(0, ctk.END)
+        mediux_filters_text.insert(0, ", ".join(config.get("mediux_filters", [])))
+
     load_bulk_import_file()
-    
 
 
-# * Threaded functions for scraping and setting posters ---  
+# * Threaded functions for scraping and setting posters ---
 
 def run_url_scrape_thread():
     '''Run the URL scrape in a separate thread.'''
@@ -804,7 +1104,8 @@ def run_url_scrape_thread():
     bulk_import_button.configure(state="disabled")
 
     threading.Thread(target=process_scrape_url, args=(url,)).start()
-    
+
+
 def run_bulk_import_scrape_thread():
     '''Run the bulk import scrape in a separate thread.'''
     global bulk_import_button
@@ -822,7 +1123,6 @@ def run_bulk_import_scrape_thread():
     threading.Thread(target=process_bulk_import, args=(valid_urls,)).start()
 
 
-
 # * Processing functions for scraping and setting posters ---
 
 def process_scrape_url(url):
@@ -838,9 +1138,11 @@ def process_scrape_url(url):
 
         soup = cook_soup(url)
         update_status(f"Scraping: {url}", color="#E5A00D")
-        
+
+        url_with_options = parse_line(url)
+
         # Proceed with setting posters
-        set_posters(url, tv, movies)
+        set_posters(url_with_options.url, url_with_options.options, tv, movies)
         update_status(f"Posters successfully set for: {url}", color="#E5A00D")
 
     except Exception as e:
@@ -853,6 +1155,7 @@ def process_scrape_url(url):
             bulk_import_button.configure(state="normal"),
         ])
 
+
 def process_bulk_import(valid_urls):
     '''Process the bulk import scrape.'''
     try:
@@ -863,11 +1166,11 @@ def process_bulk_import(valid_urls):
             update_status("Plex setup incomplete. Please configure your settings.", color="red")
             return
 
-        for i, url in enumerate(valid_urls):
-            status_text = f"Processing item {i+1} of {len(valid_urls)}: {url}"
+        for i, valid_url in enumerate(valid_urls):
+            status_text = f"Processing item {i + 1} of {len(valid_urls)}: {valid_url.url}"
             update_status(status_text, color="#E5A00D")
-            set_posters(url, tv, movies)
-            update_status(f"Completed: {url}", color="#E5A00D")
+            set_posters(valid_url.url, valid_url.options, tv, movies)
+            update_status(f"Completed: {valid_url.url}", color="#E5A00D")
 
         update_status("Bulk import scraping completed.", color="#E5A00D")
     except Exception as e:
@@ -880,7 +1183,6 @@ def process_bulk_import(valid_urls):
         ])
 
 
-
 # * Bulk import file I/O functions ---
 
 def load_bulk_import_file():
@@ -888,7 +1190,7 @@ def load_bulk_import_file():
     try:
         # Get the current bulk_txt value from the config
         bulk_txt_path = config.get("bulk_txt", "bulk_import.txt")
-        
+
         # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
         bulk_txt_path = os.path.join(get_exe_dir(), bulk_txt_path)
 
@@ -898,13 +1200,13 @@ def load_bulk_import_file():
             bulk_import_text.insert(ctk.END, "Bulk import file path is not set or file does not exist.")
             status_label.configure(text="Bulk import file path not set or file not found.", text_color="red")
             return
-        
+
         with open(bulk_txt_path, "r", encoding="utf-8") as file:
             content = file.read()
-        
+
         bulk_import_text.delete(1.0, ctk.END)
         bulk_import_text.insert(ctk.END, content)
-    
+
     except FileNotFoundError:
         bulk_import_text.delete(1.0, ctk.END)
         bulk_import_text.insert(ctk.END, "File not found or empty.")
@@ -931,41 +1233,40 @@ def save_bulk_import_file():
         )
 
 
-
 # * Button Creation ---
 
 def create_button(container, text, command, color=None, primary=False, height=35):
     """Create a custom button with hover effects for a CustomTkinter GUI."""
-    
-    button_height = height 
+
+    button_height = height
     button_fg = "#2A2B2B" if color else "#1C1E1E"
     button_border = "#484848"
     button_text_color = "#CECECE" if color else "#696969"
     plex_orange = "#E5A00D"
-    
 
     if primary:
-        button_fg = plex_orange 
+        button_fg = plex_orange
         button_text_color, button_border = "#1C1E1E", "#1C1E1E"
-    
+
     button = ctk.CTkButton(
         container,
         text=text,
         command=command,
         border_width=1,
-        text_color=button_text_color, 
+        text_color=button_text_color,
         fg_color=button_fg,
-        border_color=button_border, 
-        hover_color="#333333", 
+        border_color=button_border,
+        hover_color="#333333",
         width=80,
         height=button_height,
         font=("Roboto", 13, "bold"),
     )
-    
+
     def on_enter(event):
         """Change button appearance when mouse enters."""
         if color:
-            button.configure(fg_color="#2A2B2B", text_color=lighten_color(color, 0.3), border_color=lighten_color(color, 0.5))
+            button.configure(fg_color="#2A2B2B", text_color=lighten_color(color, 0.3),
+                             border_color=lighten_color(color, 0.5))
         else:
             button.configure(fg_color="#1C1E1E", text_color=plex_orange, border_color=plex_orange)
 
@@ -978,12 +1279,12 @@ def create_button(container, text, command, color=None, primary=False, height=35
                 button.configure(fg_color=plex_orange, text_color="#1C1E1E", border_color="#1C1E1E")
             else:
                 button.configure(fg_color="#1C1E1E", text_color="#696969", border_color=button_border)
-                
+
     def lighten_color(color, amount=0.5):
         """Lighten a color by blending it with white."""
-        hex_to_rgb = lambda c: tuple(int(c[i:i+2], 16) for i in (1, 3, 5))
+        hex_to_rgb = lambda c: tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
         r, g, b = hex_to_rgb(color)
-            
+
         r = int(r + (255 - r) * amount)
         g = int(g + (255 - g) * amount)
         b = int(b + (255 - b) * amount)
@@ -992,9 +1293,8 @@ def create_button(container, text, command, color=None, primary=False, height=35
 
     button.bind("<Enter>", on_enter)
     button.bind("<Leave>", on_leave)
-    
-    return button
 
+    return button
 
 
 # * Main UI Creation function ---
@@ -1005,27 +1305,26 @@ def create_ui():
 
     app = ctk.CTk()
     ctk.set_appearance_mode("dark")
-    
+
     app.title("Plex Poster Upload Helper")
     app.geometry("850x600")
     app.iconbitmap(resource_path("icons/Plex.ico"))
     app.configure(fg_color="#2A2B2B")
-    
+
     global_context_menu = tk.Menu(app, tearoff=0)
     global_context_menu.add_command(label="Cut")
     global_context_menu.add_command(label="Copy")
     global_context_menu.add_command(label="Paste")
-    
+
     def open_url(url):
         '''Open a URL in the default web browser.'''
         import webbrowser
         webbrowser.open(url)
 
-
     # ! Create a frame for the link bar --
     link_bar = ctk.CTkFrame(app, fg_color="transparent")
     link_bar.pack(fill="x", pady=5, padx=10)
-    
+
     # ? Link to Plex Media Server from the base URL
     base_url = config.get("base_url", None)
     target_url = base_url if base_url else "https://www.plex.tv"
@@ -1033,7 +1332,7 @@ def create_ui():
     plex_icon = ctk.CTkImage(light_image=Image.open(resource_path("icons/Plex.ico")), size=(24, 24))
     plex_icon_image = Image.open(resource_path("icons/Plex.ico"))
 
-    icon_label = ctk.CTkLabel(link_bar, image=plex_icon, text="", anchor="w") 
+    icon_label = ctk.CTkLabel(link_bar, image=plex_icon, text="", anchor="w")
     icon_label.pack(side="left", padx=0, pady=0)
     url_text = base_url if base_url else "Plex Media Server"
     url_label = ctk.CTkLabel(link_bar, text=url_text, anchor="w", font=("Roboto", 14, "bold"), text_color="#CECECE")
@@ -1044,7 +1343,7 @@ def create_ui():
         rotated_image = plex_icon_image.rotate(15, expand=True)
         rotated_ctk_icon = ctk.CTkImage(light_image=rotated_image, size=(24, 24))
         icon_label.configure(image=rotated_ctk_icon)
-        
+
     def on_hover_leave(event):
         app.config(cursor="")
         icon_label.configure(image=plex_icon)
@@ -1059,8 +1358,8 @@ def create_ui():
 
     # ? Links to Mediux and ThePosterDB
     mediux_button = create_button(
-        link_bar, 
-        text="MediUX.pro", 
+        link_bar,
+        text="MediUX.pro",
         command=lambda: open_url("https://mediux.pro"),
         color="#945af2",
         height=30
@@ -1068,16 +1367,15 @@ def create_ui():
     mediux_button.pack(side="right", padx=5)
 
     posterdb_button = create_button(
-        link_bar, 
-        text="ThePosterDB", 
+        link_bar,
+        text="ThePosterDB",
         command=lambda: open_url("https://theposterdb.com"),
         color="#FA6940",
         height=30
     )
     posterdb_button.pack(side="right", padx=5)
 
-
-    #! Create Tabview --
+    # ! Create Tabview --
     tabview = ctk.CTkTabview(app)
     tabview.pack(fill="both", expand=True, padx=10, pady=0)
 
@@ -1093,16 +1391,18 @@ def create_ui():
         border_color="#484848",
         border_width=1,
     )
-    
-    #! Form row label hover
+
+    # ! Form row label hover
     LABEL_HOVER = "#878787"
+
     def on_hover_in(label):
         label.configure(text_color=LABEL_HOVER)
 
     def on_hover_out(label):
-        label.configure(text_color="#696969") 
-    
-    #! Settings Tab --
+        label.configure(text_color="#696969")
+
+        # ! Settings Tab --
+
     settings_tab = tabview.add("Settings")
     settings_tab.grid_columnconfigure(0, weight=0)
     settings_tab.grid_columnconfigure(1, weight=1)
@@ -1110,7 +1410,8 @@ def create_ui():
     # Plex Base URL
     base_url_label = ctk.CTkLabel(settings_tab, text="Plex Base URL", text_color="#696969", font=("Roboto", 15))
     base_url_label.grid(row=0, column=0, pady=5, padx=10, sticky="w")
-    base_url_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter Plex Base URL", fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
+    base_url_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter Plex Base URL", fg_color="#1C1E1E",
+                                  text_color="#A1A1A1", border_width=0, height=40)
     base_url_entry.grid(row=0, column=1, pady=5, padx=10, sticky="ew")
     base_url_entry.bind("<Enter>", lambda event: on_hover_in(base_url_label))
     base_url_entry.bind("<Leave>", lambda event: on_hover_out(base_url_label))
@@ -1119,7 +1420,8 @@ def create_ui():
     # Plex Token
     token_label = ctk.CTkLabel(settings_tab, text="Plex Token", text_color="#696969", font=("Roboto", 15))
     token_label.grid(row=1, column=0, pady=5, padx=10, sticky="w")
-    token_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter Plex Token", fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
+    token_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter Plex Token", fg_color="#1C1E1E",
+                               text_color="#A1A1A1", border_width=0, height=40)
     token_entry.grid(row=1, column=1, pady=5, padx=10, sticky="ew")
     token_entry.bind("<Enter>", lambda event: on_hover_in(token_label))
     token_entry.bind("<Leave>", lambda event: on_hover_out(token_label))
@@ -1128,7 +1430,8 @@ def create_ui():
     # Bulk Import File
     bulk_txt_label = ctk.CTkLabel(settings_tab, text="Bulk Import File", text_color="#696969", font=("Roboto", 15))
     bulk_txt_label.grid(row=2, column=0, pady=5, padx=10, sticky="w")
-    bulk_txt_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter bulk import file path", fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
+    bulk_txt_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter bulk import file path", fg_color="#1C1E1E",
+                                  text_color="#A1A1A1", border_width=0, height=40)
     bulk_txt_entry.grid(row=2, column=1, pady=5, padx=10, sticky="ew")
     bulk_txt_entry.bind("<Enter>", lambda event: on_hover_in(bulk_txt_label))
     bulk_txt_entry.bind("<Leave>", lambda event: on_hover_out(bulk_txt_label))
@@ -1144,7 +1447,8 @@ def create_ui():
     bind_context_menu(tv_library_text)
 
     # Movie Library Names
-    movie_library_label = ctk.CTkLabel(settings_tab, text="Movie Library Names", text_color="#696969", font=("Roboto", 15))
+    movie_library_label = ctk.CTkLabel(settings_tab, text="Movie Library Names", text_color="#696969",
+                                       font=("Roboto", 15))
     movie_library_label.grid(row=4, column=0, pady=5, padx=10, sticky="w")
     movie_library_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
     movie_library_text.grid(row=4, column=1, pady=5, padx=10, sticky="ew")
@@ -1155,7 +1459,8 @@ def create_ui():
     # Mediux Filters
     mediux_filters_label = ctk.CTkLabel(settings_tab, text="Mediux Filters", text_color="#696969", font=("Roboto", 15))
     mediux_filters_label.grid(row=5, column=0, pady=5, padx=10, sticky="w")
-    mediux_filters_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
+    mediux_filters_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0,
+                                       height=40)
     mediux_filters_text.grid(row=5, column=1, pady=5, padx=10, sticky="ew")
     mediux_filters_text.bind("<Enter>", lambda event: on_hover_in(mediux_filters_label))
     mediux_filters_text.bind("<Leave>", lambda event: on_hover_out(mediux_filters_label))
@@ -1166,8 +1471,8 @@ def create_ui():
     settings_tab.grid_rowconfigure(2, weight=0)
     settings_tab.grid_rowconfigure(3, weight=0)
     settings_tab.grid_rowconfigure(4, weight=0)
-    settings_tab.grid_rowconfigure(5, weight=0) 
-    settings_tab.grid_rowconfigure(6, weight=1) 
+    settings_tab.grid_rowconfigure(5, weight=0)
+    settings_tab.grid_rowconfigure(6, weight=1)
 
     # ? Load and Save Buttons (Anchored to the bottom)
     load_button = create_button(settings_tab, text="Reload", command=load_and_update_ui)
@@ -1177,13 +1482,12 @@ def create_ui():
 
     settings_tab.grid_rowconfigure(7, weight=0, minsize=40)
 
-
-    #! Bulk Import Tab --
+    # ! Bulk Import Tab --
     bulk_import_tab = tabview.add("Bulk Import")
 
-    bulk_import_tab.grid_columnconfigure(0, weight=0) 
-    bulk_import_tab.grid_columnconfigure(1, weight=3) 
-    bulk_import_tab.grid_columnconfigure(2, weight=0) 
+    bulk_import_tab.grid_columnconfigure(0, weight=0)
+    bulk_import_tab.grid_columnconfigure(1, weight=3)
+    bulk_import_tab.grid_columnconfigure(2, weight=0)
 
     # bulk_import_label = ctk.CTkLabel(bulk_import_tab, text=f"Bulk Import Text", text_color="#CECECE")
     # bulk_import_label.grid(row=0, column=0, pady=5, padx=10, sticky="w")
@@ -1192,7 +1496,7 @@ def create_ui():
         height=15,
         wrap="none",
         state="normal",
-        fg_color="#1C1E1E", 
+        fg_color="#1C1E1E",
         text_color="#A1A1A1",
         font=("Courier", 14)
     )
@@ -1200,21 +1504,21 @@ def create_ui():
     bind_context_menu(bulk_import_text)
 
     bulk_import_tab.grid_rowconfigure(0, weight=0)
-    bulk_import_tab.grid_rowconfigure(1, weight=1) 
+    bulk_import_tab.grid_rowconfigure(1, weight=1)
     bulk_import_tab.grid_rowconfigure(2, weight=0)
 
     # Button row: Load, Save, Run buttons
     load_bulk_button = create_button(bulk_import_tab, text="Reload", command=load_bulk_import_file)
-    load_bulk_button.grid(row=2, column=0, pady=5, padx=5, ipadx=30, sticky="ew") 
+    load_bulk_button.grid(row=2, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
 
     save_bulk_button = create_button(bulk_import_tab, text="Save", command=save_bulk_import_file)
-    save_bulk_button.grid(row=2, column=1, pady=5, padx=5, sticky="ew", columnspan=2) 
+    save_bulk_button.grid(row=2, column=1, pady=5, padx=5, sticky="ew", columnspan=2)
 
-    bulk_import_button = create_button(bulk_import_tab, text="Run Bulk Import", command=run_bulk_import_scrape_thread, primary=True)
+    bulk_import_button = create_button(bulk_import_tab, text="Run Bulk Import", command=run_bulk_import_scrape_thread,
+                                       primary=True)
     bulk_import_button.grid(row=3, column=0, pady=5, padx=5, sticky="ew", columnspan=3)
 
-
-    #! Poster Scrape Tab --
+    # ! Poster Scrape Tab --
     poster_scrape_tab = tabview.add("Poster Scrape")
 
     poster_scrape_tab.grid_columnconfigure(0, weight=0)
@@ -1223,13 +1527,16 @@ def create_ui():
 
     poster_scrape_tab.grid_rowconfigure(0, weight=0)
     poster_scrape_tab.grid_rowconfigure(1, weight=0)
-    poster_scrape_tab.grid_rowconfigure(2, weight=1) 
-    poster_scrape_tab.grid_rowconfigure(3, weight=0) 
+    poster_scrape_tab.grid_rowconfigure(2, weight=1)
+    poster_scrape_tab.grid_rowconfigure(3, weight=0)
 
-    url_label = ctk.CTkLabel(poster_scrape_tab, text="Enter a ThePosterDB set URL, MediUX set URL, or ThePosterDB user URL", text_color="#696969", font=("Roboto", 15))
+    url_label = ctk.CTkLabel(poster_scrape_tab,
+                             text="Enter a ThePosterDB set URL, MediUX set URL, or ThePosterDB user URL",
+                             text_color="#696969", font=("Roboto", 15))
     url_label.grid(row=0, column=0, columnspan=2, pady=5, padx=5, sticky="w")
 
-    url_entry = ctk.CTkEntry(poster_scrape_tab, placeholder_text="e.g., https://mediux.pro/sets/6527", fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
+    url_entry = ctk.CTkEntry(poster_scrape_tab, placeholder_text="e.g., https://mediux.pro/sets/6527",
+                             fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
     url_entry.grid(row=1, column=0, columnspan=2, pady=5, padx=5, sticky="ew")
     url_entry.bind("<Enter>", lambda event: on_hover_in(url_label))
     url_entry.bind("<Leave>", lambda event: on_hover_out(url_label))
@@ -1243,18 +1550,17 @@ def create_ui():
 
     poster_scrape_tab.grid_rowconfigure(2, weight=1)
 
-
-    #! Status and Error Labels --
+    # ! Status and Error Labels --
     status_label = ctk.CTkLabel(app, text="", text_color="#E5A00D")
     status_label.pack(side="bottom", fill="x", pady=(5))
 
-
-    #! Load configuration and bulk import data at start, set default tab
+    # ! Load configuration and bulk import data at start, set default tab
     load_and_update_ui()
     load_bulk_import_file()
-    
-    set_default_tab(tabview) # default tab will be 'Settings' if base_url and token are not set, otherwise 'Bulk Import'
-    
+
+    set_default_tab(
+        tabview)  # default tab will be 'Settings' if base_url and token are not set, otherwise 'Bulk Import'
+
     app.mainloop()
 
 
@@ -1275,7 +1581,8 @@ def interactive_cli_loop(tv, movies, bulk_txt):
                 if "/user/" in url.lower():
                     scrape_entire_user(url)
                 else:
-                    set_posters(url, tv, movies)
+                    options = url_args
+                    set_posters(url, options, tv, movies)
 
         elif choice == '2':
             file_path = input(f"Enter the path to the bulk import .txt file, or press [Enter] to use '{bulk_txt}': ")
@@ -1305,14 +1612,23 @@ def check_libraries(tv, movies):
     return bool(tv) and bool(movies)
 
 
+
+
+
 # * Main Initialization ---
 if __name__ == "__main__":
-    config = load_config() 
+
+    args = parse_arguments()  # Command line arguments
+
+    url_args = Options(add_posters=args.add_posters, add_sets=args.add_sets,
+                       force=args.force)  # Arguments per url to process
+
+    config = load_config()
     bulk_txt = config.get("bulk_txt", "bulk_import.txt")
-    
+
     # Check for CLI arguments regardless of interactive_cli flag
     if len(sys.argv) > 1:
-        command = sys.argv[1].lower()
+        command = args.command
 
         # Handle command-line arguments
         if command == 'gui':
@@ -1321,8 +1637,8 @@ if __name__ == "__main__":
 
         elif command == 'bulk':
             tv, movies = plex_setup(gui_mode=False)
-            if len(sys.argv) > 2:
-                file_path = sys.argv[2]
+            if args.bulk_file:
+                file_path = args.bulk_file
                 parse_cli_urls(file_path, tv, movies)
             else:
                 print(f"Using bulk import file: {bulk_txt}")
@@ -1332,15 +1648,16 @@ if __name__ == "__main__":
             scrape_entire_user(command)
         else:
             tv, movies = plex_setup(gui_mode=False)
-            set_posters(command, tv, movies)
-    
+            options = url_args
+            set_posters(command, options, tv, movies)
+
     else:
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
         if not interactive_cli:
-            create_ui() 
+            create_ui()
             tv, movies = plex_setup(gui_mode=True)
         else:
-            sys.stdout.reconfigure(encoding='utf-8') 
+            sys.stdout.reconfigure(encoding='utf-8')
             gui_flag = (len(sys.argv) > 1 and sys.argv[1].lower() == 'gui')
 
             # Perform CLI plex_setup if GUI flag is not present
