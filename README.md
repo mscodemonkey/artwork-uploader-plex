@@ -3,7 +3,16 @@
 
 plex-poster-set-helper is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
-This version will store the poster ID in a Plex label against each movie or collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.  TV show support is coming!
+## What's different in this fork?
+My update will store the poster ID in a Plex label against each movie or collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
+
+There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
+
+## Why did I fork it?
+Because i've never coded in Python before so am using it to learn at the same time.  I'm sure my code is probably a bit scrappy at the moment!
+
+## Thanks
+Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time and it's made my Plex beautiful!
 
 
 ## Installation
@@ -58,13 +67,13 @@ The script supports various command-line arguments for flexible use.
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
    **Additional command line arguments**
-   - **--add_sets** will also parse any additional sets when using the Poster DB 
-   - **--add_posters** will also parse the additional posters section of the set, when using the Poster DB
-   - **--force** will force the artwork to be updated even if it's the same as the one on plex already (only for movies and collections at the moment)
+   - **--add-sets** will also parse any additional sets when using the Poster DB 
+   - **--add-posters** will also parse the additional posters section of the set, when using the Poster DB
+   - **--force** will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
 
-   These options can also be used in the bulk file, just add them straight after the URL in each line, for example 
+   These options can also be used in the URL scraper GUI, and in your bulk file, just add them straight after the URL in each line, for example 
    ```
-   https://theposterdb.com/set/71510 --add_posters
+   https://theposterdb.com/set/71510 --add_posters --force
    ```
    
 4. **Bulk Import**  
