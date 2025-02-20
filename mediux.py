@@ -1,6 +1,8 @@
 import json
 import utils
 
+# Disclaimer : I don't have a clue how this stuff works
+
 def get_mediux_filters():
     config = json.load(open("config.json"))
     return config.get("mediux_filters", None)
@@ -119,6 +121,5 @@ def scrape_mediux(soup):
                 movieposter["url"] = poster_url
                 movieposter["source"] = "mediux"
                 movieposters.append(movieposter)
-
 
     return movieposters, showposters, collectionposters
