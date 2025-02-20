@@ -67,7 +67,7 @@ The script supports various command-line arguments for flexible use.
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
    **Additional command line arguments**
-   - **--add-sets** will also parse any additional sets when using the Poster DB 
+   - ```**--add-sets**``` will also parse any additional sets when using the Poster DB 
    - **--add-posters** will also parse the additional posters section of the set, when using the Poster DB
    - **--force** will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
    - **--filters** will only apply the selected media types, based on the options below
