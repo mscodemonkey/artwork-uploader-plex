@@ -66,18 +66,18 @@ The script supports various command-line arguments for flexible use.
 ```bash
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
-   **Additional command line arguments**
-   - ```**--add-sets**``` will also parse any additional sets when using the Poster DB 
-   - **--add-posters** will also parse the additional posters section of the set, when using the Poster DB
-   - **--force** will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
-   - **--filters** will only apply the selected media types, based on the options below
+   **Optional command line arguments**
+   - ```--add-sets``` will also parse any additional sets when using the Poster DB 
+   - ```--add-posters``` will also parse the additional posters section of the set, when using the Poster DB
+   - ```--force``` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
+   - ```--filters <filter> <filter>``` will **only** apply the selected media types, based on the options below
      - show_cover
      - background
      - season_cover
      - title_card 
      - movie_poster
      - collection_poster
-   - **--year** override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.
+   - ```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.
 
    These options can also be used in the URL scraper GUI, and in your bulk file, just add them straight after the URL in each line, for example 
    ```
