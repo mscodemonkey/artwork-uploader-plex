@@ -267,6 +267,27 @@ def run_bulk_import_scrape_thread():
     threading.Thread(target=process_bulk_import_from_gui, args=(parsed_urls,)).start()
 
 
+# UI Session Log
+def clear_log():
+    try:
+        session_log_text.delete(1.0, ctk.END)
+        update_status("Log cleared", color="#E5A00D")
+    except:
+        pass
+    finally:
+        update_status("Log cleared", color="#E5A00D")
+
+
+def update_log(update_text):
+    try:
+        print(update_text)
+        session_log_text.configure(state="normal")
+        session_log_text.insert("end",f"{update_text}\n")
+        session_log_text.configure(state="disabled")
+    except:
+        pass
+
+
 # * Processing functions for scraping and setting posters from the GUI
 
 def process_scrape_url_from_gui(url):
@@ -476,7 +497,8 @@ def create_button(container, text, command, color=None, primary=False, height=35
 
 def create_ui():
     """Create the main UI window."""
-    global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, bulk_import_text, base_url_entry, token_entry, status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry
+    global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, bulk_import_text, base_url_entry, token_entry,\
+        status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry, session_log_text, session_log_clear
 
 
     ctk.set_appearance_mode("dark")
@@ -694,7 +716,7 @@ def create_ui():
     bulk_import_button.grid(row=3, column=0, pady=5, padx=5, sticky="ew", columnspan=3)
 
     # ! Poster Scrape Tab --
-    poster_scrape_tab = tabview.add("Poster Scrape")
+    poster_scrape_tab = tabview.add("Artwork Scrape")
 
     poster_scrape_tab.grid_columnconfigure(0, weight=0)
     poster_scrape_tab.grid_columnconfigure(1, weight=1)
@@ -724,6 +746,36 @@ def create_ui():
     scrape_button.grid(row=3, column=1, pady=5, padx=5, sticky="ew", columnspan=2)
 
     poster_scrape_tab.grid_rowconfigure(2, weight=1)
+
+    # ! Session Log Tab --
+    session_log_tab = tabview.add("Session Log")
+    session_log_tab.grid_columnconfigure(0, weight=0)
+    session_log_tab.grid_columnconfigure(1, weight=3)
+    session_log_tab.grid_columnconfigure(2, weight=0)
+
+    # bulk_import_label = ctk.CTkLabel(bulk_import_tab, text=f"Bulk Import Text", text_color="#CECECE")
+    # bulk_import_label.grid(row=0, column=0, pady=5, padx=10, sticky="w")
+    session_log_text = ctk.CTkTextbox(
+        session_log_tab,
+        height=15,
+        wrap="none",
+        state="normal",
+        fg_color="#1C1E1E",
+        text_color="#A1A1A1",
+        font=("Courier", 14)
+    )
+    session_log_text.configure(state="disabled")
+    session_log_text.grid(row=1, column=0, padx=10, pady=5, sticky="nsew", columnspan=2)
+    bind_context_menu(session_log_text)
+
+    session_log_tab.grid_rowconfigure(0, weight=0)
+    session_log_tab.grid_rowconfigure(1, weight=1)
+    session_log_tab.grid_rowconfigure(2, weight=0)
+
+    # Button row: Load, Save, Run buttons
+    session_log_clear = create_button(session_log_tab, text="Clear Log", command=clear_log)
+    session_log_clear.grid(row=2, column=0, pady=5, padx=5, sticky="ew", columnspan=3)
+
 
     # ! Status and Error Labels --
     status_label = ctk.CTkLabel(app, text="", text_color="#E5A00D")
@@ -853,13 +905,14 @@ def scrape_and_upload(url, options):
         print("-----------------------------------------------------------------------------------")
         for artwork in scraper.collection_artwork:
             try:
-                processor.process_collection_artwork(artwork)
+                result = processor.process_collection_artwork(artwork)
+                update_log(result)
             except CollectionNotFound as not_found:
-                print(f"∙ {str(not_found)}")
+                update_log(f"∙ {str(not_found)}")
             except NotProcessedByFilter as not_processed:
-                print(f"- {str(not_processed)}")
+                update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
-                print(f"x Unexpected exception occurred: {str(error_unexpected)}")
+                update_log(f"x {str(error_unexpected)}")
 
     if scraper.movie_artwork:
         if not scraper.collection_artwork:
@@ -868,25 +921,27 @@ def scrape_and_upload(url, options):
             print("∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙")
         for artwork in scraper.movie_artwork:
             try:
-                processor.process_movie_artwork(artwork)
+                result = processor.process_movie_artwork(artwork)
+                update_log(result)
             except MovieNotFound as not_found:
-                print(f"∙ {str(not_found)}")
+                update_log(f"∙ {str(not_found)}")
             except NotProcessedByFilter as not_processed:
-                print(f"- {str(not_processed)}")
+                update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
-                print(f"x Unexpected exception occurred: {str(error_unexpected)}")
+                update_log(f"x {str(error_unexpected)}")
 
     if scraper.tv_artwork:
         print("-----------------------------------------------------------------------------------")
         for artwork in scraper.tv_artwork:
             try:
-                processor.process_tv_artwork(artwork)
+                result = processor.process_tv_artwork(artwork)
+                update_log(result)
             except ShowNotFound as not_found:
-                print(f"∙ {str(not_found)}")
+                update_log(f"∙ {str(not_found)}")
             except NotProcessedByFilter as not_processed:
-                print(f"- {str(not_processed)}")
+                update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
-                print(f"x Unexpected exception occurred: {str(error_unexpected)}")
+                update_log(f"x {str(error_unexpected)}")
 
 
 

@@ -15,6 +15,7 @@ class UploadProcessor:
     def process_collection_artwork(self, artwork):
 
         collection_items = self.plex.find_collection(artwork["title"])
+        result = None
 
         if collection_items:
             for collection_item in collection_items:
@@ -23,19 +24,20 @@ class UploadProcessor:
                     uploader.set_artwork(artwork)
                     uploader.set_description(f"{artwork['title']}")
                     uploader.set_options(self.options)
-                    uploader.upload_to_plex()
+                    result = uploader.upload_to_plex()
                 else:
                     raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to filtering")
         else:
             collection_title = artwork["title"].replace(" Collection", "")
             raise CollectionNotFound(f'{collection_title} | Collection not available on Plex')
-
+        return result
 
     def process_movie_artwork(self, artwork):
 
         year = self.options.year if self.options.year else artwork["year"]
 
         movie_items = self.plex.find_in_library("movie", artwork["title"], year)
+        result = None
 
         if movie_items:
             for movie_item in movie_items:
@@ -46,12 +48,12 @@ class UploadProcessor:
                     if artwork['year']:
                         uploader.set_description(f"{artwork['title']} ({artwork['year']})")
                     uploader.set_options(self.options)
-                    uploader.upload_to_plex()
+                    result = uploader.upload_to_plex()
                 else:
                     raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to filtering")
         else:
             raise MovieNotFound(f'{artwork["title"]} ({artwork["year"]}) | Movie not available on Plex')
-
+        return result
 
 
     def process_tv_artwork(self, artwork):
@@ -61,6 +63,7 @@ class UploadProcessor:
         artwork_type = None
         filter_type = None
         artwork_id = None
+        result = "none"
 
         season = artwork['season']
         if is_numeric(season) and season == 0:
@@ -118,7 +121,7 @@ class UploadProcessor:
                             uploader.set_artwork(artwork)
                             uploader.set_description(description)
                             uploader.set_options(self.options)
-                            uploader.upload_to_plex()
+                            result = uploader.upload_to_plex()
                         else:
                             raise NotProcessedByFilter(f"{description} | {artwork_type} not processed due to filtering")
                 except Exception:
@@ -126,6 +129,7 @@ class UploadProcessor:
         else:
             raise ShowNotFound(f"{artwork['title']} | Show not available on Plex")
 
+        return result
 
 
 

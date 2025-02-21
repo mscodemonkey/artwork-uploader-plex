@@ -34,11 +34,14 @@ class PlexUploader:
                 self.upload_target.addLabel(self.label)
                 if self.artwork["source"] == "posterdb":
                     time.sleep(6)
-                print(f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}')
+              #  print(f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}')
+                return f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}'
             else:
-                print(f'- {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}')
+               # print(f'- {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}')
+                return f'- {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}'
         except Exception as e:
-            print(f'x {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}')
+          #  print(f'x {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}')
+            return f'x {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}'
 
     def artwork_exists_on_plex(self):
         existing_artwork = False
