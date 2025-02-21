@@ -1,6 +1,9 @@
 import hashlib
 import json
 import re
+
+import validators
+
 from options import Options
 from url_item import URLItem
 
@@ -137,3 +140,12 @@ def parse_url_and_options(line):
 
     return URLItem(url, options)
 
+def is_valid_url(line):
+
+    # Split the line by spaces - to handle a line with an url and options
+    parts = line.strip().split()
+
+    # The first part should be the URL
+    url = parts[0]
+
+    return validators.url(url) is True

@@ -16,7 +16,7 @@ from upload_processor import UploadProcessor
 from scraper import Scraper
 import soup_utils
 import tpdb
-from utils import is_not_comment, parse_url_and_options
+from utils import is_not_comment, parse_url_and_options, is_valid_url
 from options import Options
 from plex_connector import PlexConnector
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter
@@ -26,45 +26,6 @@ interactive_cli = False  # Set to False when building the executable with PyInst
 
 
 # @ ---------------------- CORE FUNCTIONS ----------------------
-
-
-def parse_bulk_import_file(bulk_import_list):
-
-    """
-    Parse the URLs from a bulk import list and scrape them
-    """
-
-    parsed_urls = []
-
-    # Loop through the import file and build a list of URLs and options
-    # Ignoring any lines containing comments using # or //
-
-    for line in bulk_import_list:
-
-        # Skip comments
-        if is_not_comment(line):
-            parsed_url = parse_url_and_options(line)
-            parsed_urls.append(parsed_url)
-
-#    for valid_url in valid_urls:
-
-        # If it's a ThePosterDB user then scrape the URL.  I don't really understand why it's done this way to be honest!
- #       # @todo Check the logic for the else, doesn't really make sense to return the whole list here - what if there's another /user/ line further down. Shouldn't it work like the CLI bulk file processor?
-
-  #      if "/user/" in valid_url.url:
-   #         print(f"Scraping user data from: {valid_url.url}")
-
-            # Strop out options that make no sense for a user link
-    #        valid_url.options.year = None
-
-     #       scrape_tpdb_user(valid_url.url, valid_url.options)
-      #  else:
-       #     print(f"Returning non-user URL: {valid_url.url}")
-            # If it's not a /user/ URL (should theoretically be a poster set), return it
-        #    pass
-
-    return parsed_urls
-
 
 def parse_bulk_file_from_cli(file_path):
 
@@ -264,7 +225,7 @@ def run_url_scrape_thread():
     global scrape_button, clear_button, bulk_import_button
     url = url_entry.get()
 
-    if not url:
+    if not url or not is_valid_url(url):
         update_status("Please enter a valid URL.", color="red")
         return
 
@@ -272,7 +233,7 @@ def run_url_scrape_thread():
     clear_button.configure(state="disabled")
     bulk_import_button.configure(state="disabled")
 
-    threading.Thread(target=process_scrape_url, args=(url,)).start()
+    threading.Thread(target=process_scrape_url_from_gui, args=(url,)).start()
 
 
 def run_bulk_import_scrape_thread():
@@ -303,15 +264,17 @@ def run_bulk_import_scrape_thread():
     bulk_import_button.configure(state="disabled")
 
     # Pass the processing of the parsed URLs off to a thread
-    threading.Thread(target=process_bulk_import, args=(parsed_urls,)).start()
+    threading.Thread(target=process_bulk_import_from_gui, args=(parsed_urls,)).start()
 
 
-# * Processing functions for scraping and setting posters ---
+# * Processing functions for scraping and setting posters from the GUI
 
-def process_scrape_url(url):
+def process_scrape_url_from_gui(url):
 
     """
     Process the URL and any options, then scrape for posters
+    :param url:
+    :return:
     """
 
     try:
@@ -345,10 +308,13 @@ def process_scrape_url(url):
             bulk_import_button.configure(state="normal"),
         ])
 
-def process_bulk_import(parsed_urls):
+
+def process_bulk_import_from_gui(parsed_urls):
 
     """
     Process the bulk import scrape.
+    :param parsed_urls:
+    :return:
     """
 
     global plex
@@ -422,6 +388,7 @@ def load_bulk_import_file():
     except Exception as e:
         bulk_import_text.delete(1.0, ctk.END)
         bulk_import_text.insert(ctk.END, f"Error loading file: {str(e)}")
+
 
 def save_bulk_import_file():
     """Save the bulk import text area content to a file relative to the executable location."""
