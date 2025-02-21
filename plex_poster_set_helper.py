@@ -12,9 +12,10 @@ import atexit
 import sys
 from PIL import Image
 
-import plex_connector_exception
+from plex_connector_exception import PlexConnectorException
 import arguments
 import upload_processor
+from config import Config
 from upload_processor import UploadProcessor
 from scraper import Scraper
 import soup_utils
@@ -22,117 +23,13 @@ import tpdb
 import utils
 from options import Options
 from plex_connector import PlexConnector
-from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound
+from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter
 
 # ! Interactive CLI mode flag
-interactive_cli = True  # Set to False when building the executable with PyInstaller for it launches the GUI by default
+interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the GUI by default
 
 
 # @ ---------------------- CORE FUNCTIONS ----------------------
-
-def plex_setup(gui_mode=False, gui=None):
-    global plexServer
-    plexServer = None
-
-    # Check if config.json exists
-    if os.path.exists("config.json"):
-        try:
-            config = json.load(open("config.json"))
-            base_url = config.get("base_url", "")
-            token = config.get("token", "")
-            tv_library = config.get("tv_library", [])
-            movie_library = config.get("movie_library", [])
-        except Exception as e:
-            if gui_mode:
-                app.after(300, update_error, f"Error with config.json: {str(e)}")
-            else:
-                sys.exit("Error with config.json file. Please consult the readme.md.")
-            return None, None
-    else:
-        # No config file, skip setting up Plex for now
-        base_url, token, tv_library, movie_library = "", "", [], []
-
-    # Validate the fields
-    if not base_url or not token:
-        if gui_mode:
-            app.after(100, update_error,
-                      "Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.")
-        else:
-            print('Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.')
-        return None, None
-
-    try:
-        plexServer = PlexServer(base_url, token)  # Initialize the Plex server connection
-    except requests.exceptions.RequestException as e:
-        # Handle network-related errors (e.g., unable to reach the server)
-        if gui_mode:
-            app.after(100, update_error, f"Unable to connect to Plex server: {str(e)}")
-        else:
-            sys.exit('Unable to connect to Plex server. Please check the "base_url" in config.json or provide one.')
-        return None, None
-    except plexapi.exceptions.Unauthorized as e:
-        # Handle authentication-related errors (e.g., invalid token)
-        if gui_mode:
-            app.after(100, update_error, f"Invalid Plex token: {str(e)}")
-        else:
-            sys.exit('Invalid Plex token. Please check the "token" in config.json or provide one.')
-        return None, None
-    except xml.etree.ElementTree.ParseError as e:
-        # Handle XML parsing errors (e.g., invalid XML response from Plex)
-        if gui_mode:
-            app.after(100, update_error, f"Received invalid XML from Plex server: {str(e)}")
-        else:
-            print("Received invalid XML from Plex server. Check server connection.")
-        return None, None
-    except Exception as e:
-        # Handle any other unexpected errors
-        if gui_mode:
-            app.after(100, update_error, f"Unexpected error: {str(e)}")
-        else:
-            sys.exit(f"Unexpected error: {str(e)}")
-        return None, None
-
-    # Continue with the setup (assuming plex server is successfully initialized)
-    if isinstance(tv_library, str):
-        tv_library = [tv_library]
-    elif not isinstance(tv_library, list):
-        if gui_mode:
-            app.after(100, update_error, "tv_library must be either a string or a list")
-        sys.exit("tv_library must be either a string or a list")
-
-    tv = []
-    for tv_lib in tv_library:
-        try:
-            plex_tv = plexServer.library.section(tv_lib)
-            tv.append(plex_tv)
-        except plexapi.exceptions.NotFound as e:
-            if gui_mode:
-                app.after(100, update_error, f'TV library named "{tv_lib}" not found: {str(e)}')
-            else:
-                sys.exit(
-                    f'TV library named "{tv_lib}" not found. Please check the "tv_library" in config.json or provide one.')
-
-    if isinstance(movie_library, str):
-        movie_library = [movie_library]
-    elif not isinstance(movie_library, list):
-        if gui_mode:
-            app.after(100, update_error, "movie_library must be either a string or a list")
-        sys.exit("movie_library must be either a string or a list")
-
-    movies = []
-    for movie_lib in movie_library:
-        try:
-            plex_movie = plexServer.library.section(movie_lib)
-            movies.append(plex_movie)
-        except plexapi.exceptions.NotFound as e:
-            if gui_mode:
-                app.after(100, update_error, f'Movie library named "{movie_lib}" not found: {str(e)}')
-            else:
-                sys.exit(
-                    f'Movie library named "{movie_lib}" not found. Please check the "movie_library" in config.json or provide one.')
-
-    return tv, movies
-
 
 
 def parse_bulk_import_file(bulk_import_list):
@@ -165,7 +62,7 @@ def parse_bulk_import_file(bulk_import_list):
     return valid_urls
 
 
-def parse_cli_urls(plex, file_path, tv, movies):
+def parse_cli_urls(file_path):
 
     """Parse the URLs from a file and scrape them."""
 
@@ -190,10 +87,17 @@ def parse_cli_urls(plex, file_path, tv, movies):
 
 
 def cleanup():
+
     '''Function to handle cleanup tasks on exit.'''
-    if plex:
-        print("Closing Plex server connection...")
-    print("Exiting application. Cleanup complete.")
+
+    print("-----------------------------------------------------------------------------------")
+
+    try:
+        if plex:
+            print("Closing Plex server connection...")
+        print("Exiting application. Cleanup complete.")
+    except:
+        pass
 
 
 atexit.register(cleanup)
@@ -285,106 +189,60 @@ def show_global_context_menu(event):
 
 # * Configuration file I/O functions  ---
 
-def load_config(config_path="config.json"):
-    '''Load the configuration from the JSON file. If it doesn't exist, create it with default values.'''
-    default_config = {
-        "base_url": "",
-        "token": "",
-        "bulk_txt": "bulk_import.txt",
-        "tv_library": ["TV Shows", "Anime"],
-        "movie_library": ["Movies"],
-        "mediux_filters": ["title_card", "background", "season_cover", "show_cover"]
-    }
-
-    # Create the config.json file if it doesn't exist
-    if not os.path.isfile(config_path):
-        try:
-            with open(config_path, "w") as config_file:
-                json.dump(default_config, config_file, indent=4)
-            print(f"Config file '{config_path}' created with default settings.")
-        except Exception as e:
-            update_error(f"Error creating config: {str(e)}")
-            return {}
-
-    # Load the configuration from the config.json file
-    try:
-        with open(config_path, "r") as config_file:
-            config = json.load(config_file)
-
-        base_url = config.get("base_url", "")
-        token = config.get("token", "")
-        tv_library = config.get("tv_library", [])
-        movie_library = config.get("movie_library", [])
-        mediux_filters = config.get("mediux_filters", [])
-        bulk_txt = config.get("bulk_txt", "bulk_import.txt")
-
-        return {
-            "base_url": base_url,
-            "token": token,
-            "tv_library": tv_library,
-            "movie_library": movie_library,
-            "mediux_filters": mediux_filters,
-            "bulk_txt": bulk_txt
-        }
-    except Exception as e:
-        update_error(f"Error loading config: {str(e)}")
-        return {}
-
 
 def save_config():
     '''Save the configuration from the UI fields to the file and update the in-memory config.'''
+    global config
 
-    new_config = {
-        "base_url": base_url_entry.get().strip(),
-        "token": token_entry.get().strip(),
-        "tv_library": [item.strip() for item in tv_library_text.get().strip().split(",")],
-        "movie_library": [item.strip() for item in movie_library_text.get().strip().split(",")],
-        "mediux_filters": mediux_filters_text.get().strip().split(", "),
-        "bulk_txt": bulk_txt_entry.get().strip()
-    }
+    # Set new vslues for the config, from the UI
+    config.base_url = base_url_entry.get().strip()
+    config.token = token_entry.get().strip()
+    config.tv_library = [item.strip() for item in tv_library_text.get().strip().split(",")]
+    config.movie_library =  [item.strip() for item in movie_library_text.get().strip().split(",")]
+    config.mediux_filters =  mediux_filters_text.get().strip().split(", ")
+    config.bulk_txt = bulk_txt_entry.get().strip()
 
     try:
-        with open("config.json", "w") as f:
-            json.dump(new_config, f, indent=4)
-
-        # Update the in-memory config dictionary
-        global config
-        config = new_config
-
-        load_and_update_ui()
-
+        config.save()
         update_status("Configuration saved successfully!", color="#E5A00D")
     except Exception as e:
         update_status(f"Error saving config: {str(e)}", color="red")
 
+    try:
+        load_and_update_ui()
+    except Exception as e:
+        update_status(f"Error reloading config: {str(e)}", color="red")
+
+
 
 def load_and_update_ui():
     '''Load the configuration and update the UI fields.'''
-    config = load_config()
+
+    global config
 
     if base_url_entry is not None:
         base_url_entry.delete(0, ctk.END)
-        base_url_entry.insert(0, config.get("base_url", ""))
+        base_url_entry.insert(0, config.base_url if config.base_url is not None else "")
 
     if token_entry is not None:
         token_entry.delete(0, ctk.END)
-        token_entry.insert(0, config.get("token", ""))
+        token_entry.insert(0, config.token if config.token is not None else "")
 
     if bulk_txt_entry is not None:
         bulk_txt_entry.delete(0, ctk.END)
-        bulk_txt_entry.insert(0, config.get("bulk_txt", "bulk_import.txt"))
+        bulk_txt_entry.insert(0, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
 
     if tv_library_text is not None:
         tv_library_text.delete(0, ctk.END)
-        tv_library_text.insert(0, ", ".join(config.get("tv_library", [])))
+        tv_library_text.insert(0, ", ".join(config.tv_library if config.tv_library else []))
 
     if movie_library_text is not None:
         movie_library_text.delete(0, ctk.END)
-        movie_library_text.insert(0, ", ".join(config.get("movie_library", [])))
+        movie_library_text.insert(0, ", ".join(config.movie_library if config.movie_library else []))
 
     if mediux_filters_text is not None:
         mediux_filters_text.delete(0, ctk.END)
-        mediux_filters_text.insert(0, ", ".join(config.get("mediux_filters", [])))
+        mediux_filters_text.insert(0, ", ".join(config.mediux_filters if config.mediux_filters else []))
 
     load_bulk_import_file()
 
@@ -429,11 +287,9 @@ def run_bulk_import_scrape_thread():
 def process_scrape_url(url):
     '''Process the URL scrape.'''
     try:
-        # Perform plex setup
-        tv, movies = plex_setup(gui_mode=True)
 
         # Check if plex setup returned valid values
-        if tv is None or movies is None:
+        if plex.tv_libraries is None or plex.movie_libraries is None:
             update_status("Plex setup incomplete. Please configure your settings.", color="red")
             return
 
@@ -457,13 +313,12 @@ def process_scrape_url(url):
         ])
 
 
-def process_bulk_import(plex, valid_urls):
+def process_bulk_import(valid_urls):
     '''Process the bulk import scrape.'''
     try:
-        tv, movies = plex_setup(gui_mode=True)
 
         # Check if plex setup returned valid values
-        if tv is None or movies is None:
+        if plex.tv_libraries is None or plex.movie_libraries is None:
             update_status("Plex setup incomplete. Please configure your settings.", color="red")
             return
 
@@ -487,10 +342,14 @@ def process_bulk_import(plex, valid_urls):
 # * Bulk import file I/O functions ---
 
 def load_bulk_import_file():
-    '''Load the bulk import file into the text area.'''
+
+    """Load the bulk import file into the text area."""
+
+    global config
+
     try:
         # Get the current bulk_txt value from the config
-        bulk_txt_path = config.get("bulk_txt", "bulk_import.txt")
+        bulk_txt_path = config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
 
         # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
         bulk_txt_path = os.path.join(get_exe_dir(), bulk_txt_path)
@@ -520,7 +379,7 @@ def save_bulk_import_file():
     '''Save the bulk import text area content to a file relative to the executable location.'''
     try:
         exe_path = get_exe_dir()
-        bulk_txt_path = os.path.join(exe_path, config.get("bulk_txt", "bulk_import.txt"))
+        bulk_txt_path = os.path.join(exe_path, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
 
         os.makedirs(os.path.dirname(bulk_txt_path), exist_ok=True)
 
@@ -604,6 +463,7 @@ def create_ui():
     '''Create the main UI window.'''
     global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, bulk_import_text, base_url_entry, token_entry, status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry
 
+
     ctk.set_appearance_mode("dark")
 
     app.title("Plex Poster Upload Helper")
@@ -626,7 +486,7 @@ def create_ui():
     link_bar.pack(fill="x", pady=5, padx=10)
 
     # ? Link to Plex Media Server from the base URL
-    base_url = config.get("base_url", None)
+    base_url = config.base_url
     target_url = base_url if base_url else "https://www.plex.tv"
 
     plex_icon = ctk.CTkImage(light_image=Image.open(resource_path("icons/Plex.ico")), size=(24, 24))
@@ -865,37 +725,53 @@ def create_ui():
 
 
 # * CLI-based user input loop (fallback if no arguments were provided) ---
-def interactive_cli_loop(plex, tv, movies, bulk_txt):
+def interactive_cli_loop():
+
+    global cli_options
+    global config
+    global plex
+    global app
+
     while True:
         print("\n--- Poster Scraper Interactive CLI ---")
-        print("1. Enter a ThePosterDB set URL, MediUX set URL, or ThePosterDB user URL")
+        print("1. Enter a ThePosterDB set URL, MediUX set URL, or ThePosterDB user URL.")
         print("2. Run Bulk Import from a file")
         print("3. Launch GUI")
-        print("4. Stop")
+        print("4. Exit")
 
         choice = input("Select an option (1-4): ")
 
+        # Ask for the URL and then process it as appropriate
         if choice == '1':
-            url = input("Enter the URL: ")
-            if check_libraries(tv, movies):
-
-                options = url_args
+            print("\nNote, this is a basic service only - if you want to use options such as additional posters, pass the URL and arguments in the command line.")
+            url = input("Enter URL: ")
+            if check_libraries(plex):
 
                 if "/user/" in url.lower():
-                    scrape_tpdb_user(url, options)
+                    try:
+                        scrape_tpdb_user(url, cli_options)
+                    except Exception as e:
+                        print(str(e))
                 else:
-                    scrape_and_upload(url, options)
+                    try:
+                        scrape_and_upload(url, cli_options)
+                    except Exception as e:
+                        print(str(e))
 
+        # Ask for a file and then run the bulk import
         elif choice == '2':
-            file_path = input(f"Enter the path to the bulk import .txt file, or press [Enter] to use '{bulk_txt}': ")
-            file_path = file_path.strip() or bulk_txt
-            if check_libraries(tv, movies):
-                parse_cli_urls(plex, file_path, tv, movies)
+            file_path = input(f"Enter the path to the bulk import .txt file, or press [Enter] to use '{config.bulk_txt}': ")
+            file_path = file_path.strip() if file_path else config.bulk_txt
+            if check_libraries(plex):
+                parse_cli_urls(file_path)
 
         elif choice == '3':
             print("Launching GUI...")
-            tv, movies = plex_setup(gui_mode=True)
+
+            # Create the app and UI
+            app = ctk.CTk()
             create_ui()
+
             break  # Exit CLI loop to launch GUI
 
         elif choice == '4':
@@ -906,13 +782,12 @@ def interactive_cli_loop(plex, tv, movies, bulk_txt):
             print("Invalid choice. Please select an option between 1 and 4.")
 
 
-def check_libraries(tv, movies):
-    if not tv:
-        print("No TV libraries initialized. Verify the 'tv_library' in config.json.")
-    if not movies:
-        print("No Movies libraries initialized. Verify the 'movie_library' in config.json.")
-    return bool(tv) and bool(movies)
-
+def check_libraries(plex):
+    if not plex.tv_libraries:
+        print("! No TV libraries initialized. Verify the 'tv_library' in config.json.")
+    if not plex.movie_libraries:
+        print("! No Movies libraries initialized. Verify the 'movie_library' in config.json.")
+    return plex.tv_libraries and plex.movie_libraries
 
 # Scrape all pages of a TPDb user's uploaded artwork
 def scrape_tpdb_user(url, options):
@@ -938,6 +813,7 @@ def scrape_tpdb_user(url, options):
 
         scrape_and_upload(page_url, options)
 
+
 # Scraped the URL then uploads what it's scraped to Plex
 def scrape_and_upload(url, options):
 
@@ -950,30 +826,44 @@ def scrape_and_upload(url, options):
     processor = UploadProcessor(plex)
     processor.set_options(options)
 
-    for artwork in scraper.collection_artwork:
-        try:
-            processor.process_collection_artwork(artwork)
-        except CollectionNotFound as error_not_found:
-            print(f"∙ {str(error_not_found)}")
-        except Exception as error_unexpected:
-            print(f"x Unexpected exception occurred: {str(error_unexpected)}")
+    if scraper.collection_artwork:
+        print("-----------------------------------------------------------------------------------")
+        for artwork in scraper.collection_artwork:
+            try:
+                processor.process_collection_artwork(artwork)
+            except CollectionNotFound as not_found:
+                print(f"∙ {str(not_found)}")
+            except NotProcessedByFilter as not_processed:
+                print(f"- {str(not_processed)}")
+            except Exception as error_unexpected:
+                print(f"x Unexpected exception occurred: {str(error_unexpected)}")
 
-    for artwork in scraper.movie_artwork:
-        try:
-            processor.process_movie_artwork(artwork)
-        except MovieNotFound as error_not_found:
-            print(f"∙ {str(error_not_found)}")
-        except Exception as error_unexpected:
-            print(f"x Unexpected exception occurred: {str(error_unexpected)}")
+    if scraper.movie_artwork:
+        if not scraper.collection_artwork:
+            print("-----------------------------------------------------------------------------------")
+        else:
+            print("∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙")
+        for artwork in scraper.movie_artwork:
+            try:
+                processor.process_movie_artwork(artwork)
+            except MovieNotFound as not_found:
+                print(f"∙ {str(not_found)}")
+            except NotProcessedByFilter as not_processed:
+                print(f"- {str(not_processed)}")
+            except Exception as error_unexpected:
+                print(f"x Unexpected exception occurred: {str(error_unexpected)}")
 
-    for artwork in scraper.tv_artwork:
-        try:
-            processor.process_tv_artwork(artwork)
-        except ShowNotFound as error_not_found:
-            print(f"∙ {str(error_not_found)}")
-        except Exception as error_unexpected:
-            print(f"x Unexpected exception occurred: {str(error_unexpected)}")
-
+    if scraper.tv_artwork:
+        print("-----------------------------------------------------------------------------------")
+        for artwork in scraper.tv_artwork:
+            try:
+                processor.process_tv_artwork(artwork)
+            except ShowNotFound as not_found:
+                print(f"∙ {str(not_found)}")
+            except NotProcessedByFilter as not_processed:
+                print(f"- {str(not_processed)}")
+            except Exception as error_unexpected:
+                print(f"x Unexpected exception occurred: {str(error_unexpected)}")
 
 
 
@@ -981,58 +871,77 @@ def scrape_and_upload(url, options):
 # * Main Initialization ---
 if __name__ == "__main__":
 
-    PlexServer = None # temp to remove later once we've got rid of plex_setup
+    # Process command line arguments
+    args = arguments.parse_arguments()
 
-    args = arguments.parse_arguments()  # Command line arguments
+    # Store what the user wants to do.  If it's blank we'll load the GUI.
+    cli_command = args.command
 
-    url_args = Options(add_posters=args.add_posters, add_sets=args.add_sets,
-                       force=args.force)  # Arguments per url to process
+    # Store the options passed as arguments
+    cli_options = Options(add_posters=args.add_posters,
+                          add_sets=args.add_sets,
+                          force=args.force,
+                          filters=args.filters,
+                          year=args.year)  # Arguments per url to process
 
-    config = load_config()
-    bulk_txt = config.get("bulk_txt", "bulk_import.txt")
+    # Load the config into a global object
+    config = Config()
+    config.load()
 
-    plex = PlexConnector(config.get("base_url"), config.get("token"))
-
-    app = None
-    tv = None
-    movies = None
+    # Create a connector for Plex
+    plex = PlexConnector(config.base_url, config.token)
 
     # Check for CLI arguments regardless of interactive_cli flag
-    if len(sys.argv) > 1:
-
-        command = args.command
+    if cli_command:
 
         # Connect to the TV and Movie libraries
         try:
-            plex.set_tv_libraries(config.get("tv_library"))
-        except plex_connector_exception.PlexConnectorException as e:
+            plex.set_tv_libraries(config.tv_library)
+        except PlexConnectorException as e:
             sys.exit(str(e))
 
         try:
-            plex.set_movie_libraries(config.get("movie_library"))
-        except plex_connector_exception.PlexConnectorException as e:
+            plex.set_movie_libraries(config.movie_library)
+        except PlexConnectorException as e:
             sys.exit(str(e))
 
         # Create the GUI if we need to
-        if command == 'gui':
+        if cli_command == 'gui':
+
+            # Erase any arguments set in the CLI
+            cli_options = Options()
+
+            # Create the UI now
             app = ctk.CTk()
             create_ui()
 
         # Handle the CLI options if we're not using the GUI
-        elif command == 'bulk' and tv and movies:
-            if args.bulk_file:
-                file_path = args.bulk_file
-                parse_cli_urls(file_path, plex.tv_libraries, plex.movie_libraries)
-            else:
-                print(f"Using bulk import file: {bulk_txt}")
-                parse_cli_urls(bulk_txt, plex.tv_libraries, plex.movie_libraries)
+        elif cli_command == 'bulk':
 
-        elif "/user/" in command:
-            scrape_tpdb_user(command, url_args)
+            # Remove some of the command line options which should be specified per line
+            cli_options.add_posters = False
+            cli_options.add_sets = False
+            cli_options.year = None
+            cli_options.clear_filters()
+
+            # Process using the bulk filename if supplied, else the bulk file set in the config
+            parse_cli_urls(args.bulk_file if args.bulk_file else config.bulk_txt)
+
+        # Now we're looking at URLs - firstly one containing a TPDb user
+        elif "/user/" in cli_command:
+
+            # Remove some of the command line options which aren't applicable to user scraping
+            cli_options.year = None
+            cli_options.add_posters = False
+            cli_options.add_sets = False
+            scrape_tpdb_user(cli_command, cli_options)
+
+        # User passed in a poster or set URL, so let's process that
         else:
-            scrape_and_upload(command, url_args)
+            scrape_and_upload(cli_command, cli_options)
 
     else:
+
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
         if not interactive_cli:
 
@@ -1042,33 +951,34 @@ if __name__ == "__main__":
 
             # Connect to the TV and Movie libraries
             try:
-                plex.set_tv_libraries(config.get("tv_library"))
-            except plex_connector_exception.PlexConnectorException as e:
-                app.after(100, update_error, e.gui_message)
+                plex.set_tv_libraries(config.tv_library)
+            except PlexConnectorException as e:
+                app.after(500, update_error, e.gui_message)
 
             try:
-                plex.set_movie_libraries(config.get("movie_library"))
-            except plex_connector_exception.PlexConnectorException as e:
-                app.after(100, update_error, e.gui_message)
+                plex.set_movie_libraries(config.movie_library)
+            except PlexConnectorException as e:
+                app.after(500, update_error, e.gui_message)
 
         else:
+
             sys.stdout.reconfigure(encoding='utf-8')
-            gui_flag = (len(sys.argv) > 1 and sys.argv[1].lower() == 'gui')
+            gui_flag = cli_command == "gui"
 
             # Perform CLI plex_setup if GUI flag is not present
             if not gui_flag:
 
                 # Connect to the TV and Movie libraries
                 try:
-                    plex.set_tv_libraries(config.get("tv_library"))
-                except plex_connector_exception.PlexConnectorException as e:
+                    plex.set_tv_libraries(config.tv_library)
+                except PlexConnectorException as e:
                     sys.exit(str(e))
 
                 try:
-                    plex.set_movie_libraries(config.get("movie_library"))
-                except plex_connector_exception.PlexConnectorException as e:
+                    plex.set_movie_libraries(config.movie_library)
+                except PlexConnectorException as e:
                     sys.exit(str(e))
 
 
             # Handle interactive CLI
-            interactive_cli_loop(plex, plex.tv_libraries, plex.movie_libraries, bulk_txt)
+            interactive_cli_loop()

@@ -3,6 +3,7 @@ from plexapi.server import PlexServer
 import plexapi.exceptions
 import xml.etree.ElementTree
 from plex_connector_exception import PlexConnectorException, LibraryNotFound
+from options import Options
 
 class PlexConnector:
 
@@ -12,6 +13,10 @@ class PlexConnector:
         self.token = token
         self.tv_libraries = []
         self.movie_libraries = []
+        self.options = Options()
+
+    def set_options(self, options):
+        self.options = options
 
     def connect(self):
         if not self.plex:
@@ -104,7 +109,6 @@ class PlexConnector:
         items = []
 
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
-
 
         for library in libraries:
 

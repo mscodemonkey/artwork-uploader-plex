@@ -4,15 +4,17 @@
 plex-poster-set-helper is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
 ## What's different in this fork?
-My update will store the poster ID in a Plex label against each movie or collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
+I store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
 
 There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
 
+And there are other options such as filtering and year matching, fixing missing things that bugged me while I was using the tool (not from the tool itself but where I wanted to apply episode title cards but didn't like the season artwork for example)
+
 ## Why did I fork it?
-Because i've never coded in Python before so am using it to learn at the same time.  I'm sure my code is probably a bit scrappy at the moment!
+Because i've never coded in Python before so am using it to learn at the same time!  I'm sure my code is probably a bit scrappy at the moment so any help would be appreciated.  I've managed to refactor quite a lot of the code so it's not all one big script anymore.  I hope that I haven't introduced any bugs along the way...
 
 ## Thanks
-Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time and it's made my Plex beautiful!
+Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
 
 
 ## Installation
@@ -23,13 +25,13 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
 
 3. Open a terminal in the folder
 
-4. Install the required dependencies using
+4. **Install the required dependencies** using
 
    ```bash
    pip install -r requirements.txt
    ```
 
-5. Rename example_config.json to config.json, and populate with the proper information:
+5. Optionally, rename example_config.json to config.json, and populate with the proper information.  If you don't do this, a new config.json will be created when you first run the utility.
    - **"base_url"**  
      - The IP and port of your Plex server. e.g. "http://12.345.67.890:32400/".
    - **"token"**  
@@ -47,7 +49,7 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
 
 ## Usage
 
-Run python plex_poster_set_helper.py in a terminal, using one of the following options:
+In a terminal, run ```python plex_poster_set_helper.py``` (note you may need to use ```python3``` rather than ```python```, especially Mac users), using one of the following options:
 
 ### Command Line Arguments
 
@@ -77,7 +79,7 @@ The script supports various command-line arguments for flexible use.
      - title_card 
      - movie_poster
      - collection_poster
-   - ```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.
+   - ```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
 
    These options can also be used in the URL scraper GUI, and in your bulk file, just add them straight after the URL in each line, for example 
    ```

@@ -76,6 +76,7 @@ class Config:
             with open(self.path, "w", encoding="utf-8") as config_file:
                 json.dump(config_json, config_file, indent=4)
 
+
         except Exception as e:
             raise ConfigSavingError
             update_status(f"Error saving config: {str(e)}", color="red")

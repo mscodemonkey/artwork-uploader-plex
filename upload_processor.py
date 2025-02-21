@@ -1,7 +1,8 @@
-import plex_utils
+import utils
 from options import Options
 from plex_uploader import PlexUploader
-from upload_processor_exceptions import CollectionNotFound, MovieNotFound
+from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound
+from utils import is_numeric
 
 class UploadProcessor:
 
@@ -18,96 +19,113 @@ class UploadProcessor:
 
         if collection_items:
             for collection_item in collection_items:
-                uploader = PlexUploader(collection_item, "poster")
-                uploader.set_artwork(artwork)
-                uploader.set_description(f"{artwork['title']}")
-                uploader.set_options(self.options)
-                uploader.upload_to_plex()
+                if self.options.has_no_filters() or self.options.has_filter("collection_poster"):
+                    uploader = PlexUploader(collection_item, "Poster","P")
+                    uploader.set_artwork(artwork)
+                    uploader.set_description(f"{artwork['title']}")
+                    uploader.set_options(self.options)
+                    uploader.upload_to_plex()
+                else:
+                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to filtering")
         else:
             collection_title = artwork["title"].replace(" Collection", "")
-            raise CollectionNotFound(f'{collection_title}: collection not available on Plex')
+            raise CollectionNotFound(f'{collection_title} | collection not available on Plex')
 
 
     def process_movie_artwork(self, artwork):
 
-        movie_items = self.plex.find_in_library("movie", artwork["title"], artwork["year"])
+        year = self.options.year if self.options.year else artwork["year"]
+
+        movie_items = self.plex.find_in_library("movie", artwork["title"], year)
 
         if movie_items:
             for movie_item in movie_items:
-
-                uploader = PlexUploader(movie_item, "poster")
-                uploader.set_artwork(artwork)
-                uploader.set_description(f"{artwork['title']}")
-                if artwork['year']:
-                    uploader.set_description(f"{artwork['title']}({artwork['year']})")
-                uploader.set_options(self.options)
-                uploader.upload_to_plex()
-
+                if self.options.has_no_filters() or self.options.has_filter("movie_poster"):
+                    uploader = PlexUploader(movie_item, "Poster", artwork_id="P")
+                    uploader.set_artwork(artwork)
+                    uploader.set_description(f"{artwork['title']}")
+                    if artwork['year']:
+                        uploader.set_description(f"{artwork['title']} ({artwork['year']})")
+                    uploader.set_options(self.options)
+                    uploader.upload_to_plex()
+                else:
+                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to filtering")
         else:
-            raise MovieNotFound(f'∙ {artwork["title"]} ({artwork["year"]}): movie not available on Plex')
+            raise MovieNotFound(f'{artwork["title"]} ({artwork["year"]}) | Movie not available on Plex')
 
 
 
     def process_tv_artwork(self, artwork):
 
-        description = "media"
+        description = "Target media"
         upload_target = None
         artwork_type = None
+        filter_type = None
+        artwork_id = None
 
-        try:
-            description = f"{artwork['title']}, season {artwork['season']:02}, episode {artwork['episode']:02}"
-        except TypeError:
-            if artwork['episode'] is None or artwork['episode'] == "Cover":
-                try:
-                    description = f"{artwork['title']}, season {artwork['season']:02}"
-                except TypeError:
-                    if artwork['season'] is None or artwork["season"] == "Cover":
-                        description = f"{artwork['title']}"
+        season = artwork['season']
+        if is_numeric(season) and season == 0:
+            season = "Specials"
+        else:
+            season = f"Season {artwork['season']:02}"
+#
+        if is_numeric(artwork['season']) and is_numeric(artwork['episode']):
+            description = f"{artwork['title']} | {season}, Episode {artwork['episode']:02}"
+        elif (artwork['episode'] is None or artwork['episode'] == "Cover") and is_numeric(artwork['season']):
+            description = f"{artwork['title']} | {season}"
+        elif artwork['season'] is None or artwork["season"] == "Cover" or artwork["season"] == "Backdrop":
+            description = f"{artwork['title']}"
 
-        tv_show_items = self.plex.find_in_library("tv", artwork["title"], artwork["year"] )
+        year = self.options.year if self.options.year else artwork["year"]
+
+        tv_show_items = self.plex.find_in_library("tv", artwork["title"], year )
 
         if tv_show_items:
-
             for tv_show in tv_show_items:
-
                 try:
                     if artwork["season"] == "Cover":
                         upload_target = tv_show
-                        artwork_type = "cover"
-
+                        artwork_id = "C"
+                        artwork_type = "Cover"
+                        filter_type = "show_cover"
                     elif artwork["season"] == "Backdrop":
                         upload_target = tv_show
-                        artwork_type = "background"
-
+                        artwork_id = "B"
+                        artwork_type = "Background"
+                        filter_type="background"
                     elif artwork["season"] >= 0:
-
                         if artwork["episode"] == "Cover":
                             upload_target = tv_show.season(artwork["season"])
-                            artwork_type = "season cover"
-
+                            artwork_id = "S"
+                            artwork_type = "Season cover"
+                            filter_type = "season_cover"
                         elif artwork["episode"] is None:
                             upload_target = tv_show.season(artwork["season"])
-                            artwork_type = "season cover"
-
+                            artwork_id = "S"
+                            artwork_type = "Season cover"
+                            filter_type = "season_cover"
                         elif artwork["episode"] >= 0:
                             upload_target = tv_show.season(artwork["season"]).episode(artwork["episode"])
-                            artwork_type = "episode card"
+                            artwork_id = "E"
+                            artwork_type = "Title card"
+                            filter_type = "title_card"
+                except:
+                    raise ShowNotFound(f"{description} | not available on Plex")
 
-                    try:
-                        if upload_target:
-                            uploader = PlexUploader(upload_target, artwork_type)
+                try:
+                    if upload_target:
+                        if self.options.has_no_filters() or self.options.has_filter(filter_type):
+                            uploader = PlexUploader(upload_target, artwork_type, artwork_id)
                             uploader.set_artwork(artwork)
                             uploader.set_description(description)
                             uploader.set_options(self.options)
                             uploader.upload_to_plex()
-                    except Exception as e:
-                        print(f"Got an error from uploader ({e})")
-
-                except Exception as e:
-                    print(f"∙ {description}: not available in {tv_show.librarySectionTitle}")
-
+                        else:
+                            raise NotProcessedByFilter(f"{description} | {artwork_type} not processed due to filtering")
+                except Exception:
+                    raise
         else:
-            print(f"∙ {artwork['title']}: show not available on Plex")
+            raise ShowNotFound(f"{artwork['title']} | Show not available on Plex")
 
 
 

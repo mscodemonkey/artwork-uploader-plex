@@ -29,6 +29,12 @@ def calculate_md5(input_string):
     return md5_hash.hexdigest()
 
 
+def is_numeric(value):
+    if isinstance(value, (int, float)):  # Directly check if it's a number
+        return True
+    if isinstance(value, str) and value.isnumeric():  # Check if string is numeric
+        return True
+    return False  # Return False for None, non-numeric strings, or other types
 
 
 def title_cleaner(string):
@@ -95,18 +101,40 @@ def is_not_comment(url):
 # Parse a line from the bulk URL file, containing the URL and options
 # @todo add validation for the URL
 def parse_line(line):
-
     # Split the line by spaces
     parts = line.strip().split()
 
     # The first part should be the URL
     url = parts[0]
 
-    # The rest are optional flags
+    # Initialise filters list or None
+    filters = None
+    year = None
+
+    # Process optional flags
+    if '--filters' in parts:
+        index = parts.index('--filters') + 1
+        if index < len(parts) and not parts[index].startswith('--'):
+            filters = []
+            while index < len(parts) and not parts[index].startswith('--'):
+                filters.append(parts[index])
+                index += 1
+
+    if '--year' in parts:
+        index = parts.index('--year') + 1
+        if index < len(parts) and not parts[index].startswith('--'):
+            year = ""
+            while index < len(parts) and not parts[index].startswith('--'):
+                year = year + parts[index]
+                index += 1
+
     options = Options(
         add_posters='--add-posters' in parts,
         add_sets='--add-sets' in parts,
-        force='--force' in parts
+        force='--force' in parts,
+        filters=filters,  # Store the list of filters or None
+        year=year  # Store the year or None
     )
 
     return URLItem(url, options)
+

@@ -4,10 +4,10 @@ from options import Options
 
 class PlexUploader:
 
-    def __init__(self, upload_target, artwork_type):
+    def __init__(self, upload_target, artwork_type, artwork_id):
         self.upload_target = upload_target
         self.artwork_type = artwork_type
-        self.artwork_id = artwork_type[:1].upper() + "ID:"  # This will be BID, CID, EID, PID, SID for backgrounds, covers, episode cards, posters or season covers
+        self.artwork_id = artwork_id.upper() + "ID:"  # This will be BID, CID, PID, SID or EID - for [B]ackgrounds, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
         self.description = "item"
         self.label = None
         self.artwork = None
@@ -27,15 +27,18 @@ class PlexUploader:
     def upload_to_plex(self):
         try:
             if self.artwork_exists_on_plex() == False or self.options.force:
-                self.upload_target.uploadPoster(self.artwork["url"])
+                if self.artwork_id == "BID:":
+                    self.upload_target.uploadArt(self.artwork["url"])
+                else:
+                    self.upload_target.uploadPoster(self.artwork["url"])
                 self.upload_target.addLabel(self.label)
                 if self.artwork["source"] == "posterdb":
                     time.sleep(6)
-                print(f'✓ {self.description}: updated {self.artwork_type} in {self.upload_target.librarySectionTitle}')
+                print(f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}')
             else:
-                print(f'- {self.description}: {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}')
+                print(f'- {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}')
         except Exception as e:
-            print(f'x {self.description}: failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}')
+            print(f'x {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}')
 
     def artwork_exists_on_plex(self):
         existing_artwork = False
@@ -49,3 +52,4 @@ class PlexUploader:
                     self.upload_target.removeLabel(existing_label, False)  # Remove the existing label as we're replacing the artwork
 
         return existing_artwork
+

@@ -14,3 +14,6 @@ class ShowNotFound(UploadProcessorException):
 
 class MovieNotFound(UploadProcessorException):
     """ A movie was not found for the artwork provided """
+
+class NotProcessedByFilter(UploadProcessorException):
+    """ An item was not uploaded due to a filter being applied """
