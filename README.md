@@ -81,6 +81,7 @@ The script supports various command-line arguments for flexible use.
      - collection_poster
    - ```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
 
+   **Using these options in files and GUI**
    These options can also be used in the URL scraper GUI, and in your bulk file, just add them straight after the URL in each line, for example 
    ```
    https://theposterdb.com/set/71510 --add_posters --force
