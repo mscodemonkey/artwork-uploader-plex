@@ -87,6 +87,8 @@ class PlexConnector:
     # Find a specific collection in the movies library
     def find_collection(self, collection_title):
 
+        self.connect()
+
         collections = []
 
         for movie_library in self.movie_libraries:
@@ -106,13 +108,15 @@ class PlexConnector:
     # Find a specific movie or TV show in the given library
     def find_in_library(self, item_type, item_title, item_year = None):
 
+        self.connect()
+
         items = []
 
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
 
         for library in libraries:
 
-            # print(f"Searching for {item_title} ({item_year}) in {library} on Plex")
+           # print(f"Searching for {item_title} ({item_year}) in {library} on Plex")
 
             try:
                 if item_year is not None:
