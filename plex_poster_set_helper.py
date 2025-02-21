@@ -229,6 +229,7 @@ def run_url_scrape_thread():
         update_status("Please enter a valid URL.", color="red")
         return
 
+    tabview.set("Session Log")
     scrape_button.configure(state="disabled")
     clear_button.configure(state="disabled")
     bulk_import_button.configure(state="disabled")
@@ -259,6 +260,7 @@ def run_bulk_import_scrape_thread():
         app.after(0, lambda: update_status("No bulk import entries found.", color="red"))
         return
 
+    tabview.set("Session Log")
     scrape_button.configure(state="disabled")
     clear_button.configure(state="disabled")
     bulk_import_button.configure(state="disabled")
@@ -270,13 +272,14 @@ def run_bulk_import_scrape_thread():
 # UI Session Log
 def clear_log():
     try:
-        session_log_text.delete(1.0, ctk.END)
+        session_log_text.configure(state="normal")
+        session_log_text.delete(1.0, "end")
+        session_log_text.configure(state="disabled")
         update_status("Log cleared", color="#E5A00D")
     except:
         pass
     finally:
-        update_status("Log cleared", color="#E5A00D")
-
+        app.after(1000, update_status, "", "#E5A00D")
 
 def update_log(update_text):
     try:
@@ -498,7 +501,7 @@ def create_button(container, text, command, color=None, primary=False, height=35
 def create_ui():
     """Create the main UI window."""
     global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, bulk_import_text, base_url_entry, token_entry,\
-        status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry, session_log_text, session_log_clear
+        status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry, session_log_text, session_log_clear, tabview
 
 
     ctk.set_appearance_mode("dark")
@@ -574,19 +577,19 @@ def create_ui():
 
     # ! Create Tabview --
     tabview = ctk.CTkTabview(app)
-    tabview.pack(fill="both", expand=True, padx=10, pady=0)
+    tabview.pack(fill="both", expand=True, padx=20, pady=0)
 
     tabview.configure(
         fg_color="#2A2B2B",
         segmented_button_fg_color="#1C1E1E",
-        segmented_button_selected_color="#2A2B2B",
-        segmented_button_selected_hover_color="#2A2B2B",
+        segmented_button_selected_color="#915e06",
+        segmented_button_selected_hover_color="#915e06",
         segmented_button_unselected_color="#1C1E1E",
         segmented_button_unselected_hover_color="#1C1E1E",
         text_color="#CECECE",
         text_color_disabled="#777777",
         border_color="#484848",
-        border_width=1,
+        border_width=2,
     )
 
     # ! Form row label hover
