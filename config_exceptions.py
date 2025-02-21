@@ -1,13 +1,14 @@
+
 class ConfigException(Exception):
-    """ Base class for all PlexConnector exceptions. """
+    """ Base class for all config exceptions. """
     def __init__(self, message):
         super().__init__(message)
 
 class ConfigCreationError(ConfigException):
-    """ A collection was not found for the artwork provided """
+    """ The config file could not be created """
 
 class ConfigLoadError(ConfigException):
-    """ A collection was not found for the artwork provided """
+    """ The config file had a problem when loading """
 
 class ConfigSaveError(ConfigException):
-    """ A collection was not found for the artwork provided """
+    """ The config file could not be saved """

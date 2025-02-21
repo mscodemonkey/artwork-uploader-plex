@@ -8,6 +8,6 @@ class PlexConnectorException(Exception):
         self.gui_message = gui_message if gui_message is not None else message
 
 class LibraryNotFound(PlexConnectorException):
-    """ An invalid request, generally a user error. """
+    """ The requested library could not be found """
 
 
