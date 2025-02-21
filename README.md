@@ -11,10 +11,10 @@ There are also a couple of new options for thePosterDb, which will allow you to 
 And there are other options such as filtering and year matching, fixing missing things that bugged me while I was using the tool (not from the tool itself but where I wanted to apply episode title cards but didn't like the season artwork for example)
 
 ## Why did I fork it?
-Because i've never coded in Python before so am using it to learn at the same time!  I'm sure my code is probably a bit scrappy at the moment so any help would be appreciated.  I've managed to refactor quite a lot of the code so it's not all one big script anymore.  I hope that I haven't introduced any bugs along the way...
+Because I've never coded in Python before, so I'm using it to learn at the same time!  I'm sure my code is probably a bit scrappy at the moment so any help would be appreciated.  I've managed to refactor quite a lot of the code so it's not all one big script anymore.  I hope that I haven't introduced any bugs along the way...
 
 ## Thanks
-Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
+Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
 
 
 ## Installation
@@ -86,7 +86,7 @@ The script supports various command-line arguments for flexible use.
    https://theposterdb.com/set/71510 --add_posters --force
    ```
 
-4. **Bulk Import**  
+4. **Bulk Files**
    Import multiple links from a .txt file using the bulk argument:
    
    ```bash
@@ -123,6 +123,7 @@ When using bulk import, if no file path is specified, the script will default to
 The GUI provides a more user-friendly interface for managing poster uploads. Users can run the script with python plex_poster_set_helper.py gui to launch the CustomTkinter-based interface, where they can:
 - Easily enter single or bulk URLs.
 - View progress, status updates, and more in an intuitive layout.
+
 
 ### Multiple Libraries
 

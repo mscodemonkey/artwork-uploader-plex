@@ -6,8 +6,8 @@ class ConfigException(Exception):
 class ConfigCreationError(ConfigException):
     """ A collection was not found for the artwork provided """
 
-class ConfigLoadingError(ConfigException):
+class ConfigLoadError(ConfigException):
     """ A collection was not found for the artwork provided """
 
-class ConfigSavingError(ConfigException):
+class ConfigSaveError(ConfigException):
     """ A collection was not found for the artwork provided """

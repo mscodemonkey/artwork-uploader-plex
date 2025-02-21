@@ -11,7 +11,7 @@ def test_scrapeposterdb_set_tv_series():
         assert showposter["title"] == "Brooklyn Nine-Nine"
         assert showposter["year"] == 2013
         assert showposter["episode"] == None
-        assert showposter["season"] == "Cover" or (showposter["season"] >= 0 and showposter["season"] <= 8) 
+        assert showposter["season"] == "Cover" or (0 <= showposter["season"] <= 8)
         assert showposter["source"] == "posterdb"
         
 def test_scrapeposterdb_set_movie_collection():

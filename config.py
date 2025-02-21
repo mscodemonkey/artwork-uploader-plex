@@ -2,7 +2,7 @@ import json
 import os
 from typing import TextIO
 
-from config_exceptions import ConfigLoadingError, ConfigSavingError, ConfigCreationError
+from config_exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 
 
 class Config:
@@ -15,7 +15,6 @@ class Config:
         self.tv_library = ["TV Shows"]
         self.movie_library = ["Movies"]
         self.mediux_filters = ["title_card", "background", "season_cover", "show_cover"]
-
 
     def load(self):
         """ Load the configuration from the JSON file """
@@ -37,8 +36,7 @@ class Config:
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
 
         except Exception as e:
-            raise ConfigLoadingError
-
+            raise ConfigLoadError
 
     def create(self):
         config_json = {
@@ -53,15 +51,14 @@ class Config:
         # Create the config.json file if it doesn't exist
         if not os.path.isfile(self.path):
             try:
-                with open(self.path, "w", encoding="utf-8") as config_file: # type: TextIO
+                with open(self.path, "w", encoding="utf-8") as config_file:  # type: TextIO
                     json.dump(config_json, config_file, indent=4)
                 print(f"Config file '{self.path}' created with default settings.")
             except Exception as e:
                 raise ConfigCreationError
 
-
     def save(self):
-        '''Save the configuration from the UI fields to the file and update the in-memory config.'''
+        """Save the configuration from the UI fields to the file and update the in-memory config."""
 
         config_json = {
             "base_url": self.base_url,
@@ -75,8 +72,6 @@ class Config:
         try:
             with open(self.path, "w", encoding="utf-8") as config_file:
                 json.dump(config_json, config_file, indent=4)
-
-
         except Exception as e:
-            raise ConfigSavingError
-            update_status(f"Error saving config: {str(e)}", color="red")
+            raise ConfigSaveError
+

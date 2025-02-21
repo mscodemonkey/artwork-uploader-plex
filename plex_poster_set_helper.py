@@ -12,6 +12,7 @@ import atexit
 import sys
 from PIL import Image
 
+from config_exceptions import ConfigLoadError, ConfigSaveError
 from plex_connector_exception import PlexConnectorException
 import arguments
 import upload_processor
@@ -88,7 +89,7 @@ def parse_cli_urls(file_path):
 
 def cleanup():
 
-    '''Function to handle cleanup tasks on exit.'''
+    """Function to handle cleanup tasks on exit."""
 
     print("-----------------------------------------------------------------------------------")
 
@@ -129,31 +130,31 @@ def resource_path(relative_path):
 
 
 def get_full_path(relative_path):
-    '''Helper function to get the absolute path based on the script's location.'''
+    """Helper function to get the absolute path based on the script's location."""
     print("relative_path", relative_path)
     script_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(script_dir, relative_path)
 
 
 def update_status(message, color="white"):
-    '''Update the status label with a message and color.'''
+    """Update the status label with a message and color."""
     app.after(0, lambda: status_label.configure(text=message, text_color=color))
 
 
 def update_error(message):
-    '''Update the error label with a message, with a small delay.'''
+    """Update the error label with a message, with a small delay."""
     # app.after(500, lambda: status_label.configure(text=message, text_color="red"))
     status_label.configure(text=message, text_color="red")
 
 
 def clear_url():
-    '''Clear the URL entry field.'''
+    """Clear the URL entry field."""
     url_entry.delete(0, ctk.END)
     status_label.configure(text="URL cleared.", text_color="orange")
 
 
 def set_default_tab(tabview):
-    '''Set the default tab to the Settings tab.'''
+    """Set the default tab to the Settings tab."""
     plex_base_url = base_url_entry.get()
     plex_token = token_entry.get()
 
@@ -164,7 +165,7 @@ def set_default_tab(tabview):
 
 
 def bind_context_menu(widget):
-    '''Bind the right-click context menu to the widget.'''
+    """Bind the right-click context menu to the widget."""
     widget.bind("<Button-3>", clear_placeholder_on_right_click)
     widget.bind("<Control-1>", clear_placeholder_on_right_click)
 
@@ -179,7 +180,7 @@ def clear_placeholder_on_right_click(event):
 
 
 def show_global_context_menu(event):
-    '''Show the global context menu at the cursor position.'''
+    """Show the global context menu at the cursor position."""
     widget = event.widget
     global_context_menu.entryconfigure("Cut", command=lambda: widget.event_generate("<<Cut>>"))
     global_context_menu.entryconfigure("Copy", command=lambda: widget.event_generate("<<Copy>>"))
@@ -191,7 +192,9 @@ def show_global_context_menu(event):
 
 
 def save_config():
-    '''Save the configuration from the UI fields to the file and update the in-memory config.'''
+
+    """Save the configuration from the UI fields to the file and update the in-memory config."""
+
     global config
 
     # Set new vslues for the config, from the UI
@@ -205,18 +208,18 @@ def save_config():
     try:
         config.save()
         update_status("Configuration saved successfully!", color="#E5A00D")
-    except Exception as e:
-        update_status(f"Error saving config: {str(e)}", color="red")
+    except ConfigSaveError as config_save_error:
+        update_status(f"Error saving config: {str(config_save_error)}", color="red")
 
     try:
         load_and_update_ui()
-    except Exception as e:
-        update_status(f"Error reloading config: {str(e)}", color="red")
+    except Exception as config_error:
+        update_status(f"Error with config: {str(config_error)}", color="red")
 
 
 
 def load_and_update_ui():
-    '''Load the configuration and update the UI fields.'''
+    """Load the configuration and update the UI fields."""
 
     global config
 
@@ -250,7 +253,7 @@ def load_and_update_ui():
 # * Threaded functions for scraping and setting posters ---
 
 def run_url_scrape_thread():
-    '''Run the URL scrape in a separate thread.'''
+    """Run the URL scrape in a separate thread."""
     global scrape_button, clear_button, bulk_import_button
     url = url_entry.get()
 
@@ -266,7 +269,7 @@ def run_url_scrape_thread():
 
 
 def run_bulk_import_scrape_thread():
-    '''Run the bulk import scrape in a separate thread.'''
+    """Run the bulk import scrape in a separate thread."""
     global bulk_import_button
     bulk_import_list = bulk_import_text.get(1.0, ctk.END).strip().split("\n")
     valid_urls = parse_bulk_import_file(bulk_import_list)
@@ -285,7 +288,7 @@ def run_bulk_import_scrape_thread():
 # * Processing functions for scraping and setting posters ---
 
 def process_scrape_url(url):
-    '''Process the URL scrape.'''
+    """Process the URL scrape."""
     try:
 
         # Check if plex setup returned valid values
@@ -314,7 +317,7 @@ def process_scrape_url(url):
 
 
 def process_bulk_import(valid_urls):
-    '''Process the bulk import scrape.'''
+    """Process the bulk import scrape."""
     try:
 
         # Check if plex setup returned valid values
@@ -376,7 +379,7 @@ def load_bulk_import_file():
 
 
 def save_bulk_import_file():
-    '''Save the bulk import text area content to a file relative to the executable location.'''
+    """Save the bulk import text area content to a file relative to the executable location."""
     try:
         exe_path = get_exe_dir()
         bulk_txt_path = os.path.join(exe_path, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
@@ -460,7 +463,7 @@ def create_button(container, text, command, color=None, primary=False, height=35
 # * Main UI Creation function ---
 
 def create_ui():
-    '''Create the main UI window.'''
+    """Create the main UI window."""
     global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, bulk_import_text, base_url_entry, token_entry, status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry
 
 
@@ -477,7 +480,7 @@ def create_ui():
     global_context_menu.add_command(label="Paste")
 
     def open_url(url):
-        '''Open a URL in the default web browser.'''
+        """Open a URL in the default web browser."""
         import webbrowser
         webbrowser.open(url)
 
@@ -745,7 +748,7 @@ def interactive_cli_loop():
         if choice == '1':
             print("\nNote, this is a basic service only - if you want to use options such as additional posters, pass the URL and arguments in the command line.")
             url = input("Enter URL: ")
-            if check_libraries(plex):
+            if check_libraries():
 
                 if "/user/" in url.lower():
                     try:
@@ -762,7 +765,7 @@ def interactive_cli_loop():
         elif choice == '2':
             file_path = input(f"Enter the path to the bulk import .txt file, or press [Enter] to use '{config.bulk_txt}': ")
             file_path = file_path.strip() if file_path else config.bulk_txt
-            if check_libraries(plex):
+            if check_libraries():
                 parse_cli_urls(file_path)
 
         elif choice == '3':
@@ -782,7 +785,10 @@ def interactive_cli_loop():
             print("Invalid choice. Please select an option between 1 and 4.")
 
 
-def check_libraries(plex):
+def check_libraries():
+
+    global plex
+
     if not plex.tv_libraries:
         print("! No TV libraries initialized. Verify the 'tv_library' in config.json.")
     if not plex.movie_libraries:
@@ -886,7 +892,12 @@ if __name__ == "__main__":
 
     # Load the config into a global object
     config = Config()
-    config.load()
+    try:
+        config.load()
+    except ConfigLoadError:
+        sys.exit("Can't load config.json file.  Please check that the file exists and is in the correct format.")
+    except Exception as config_load_exception:
+        sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
 
     # Create a connector for Plex
     plex = PlexConnector(config.base_url, config.token)

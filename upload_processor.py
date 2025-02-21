@@ -1,4 +1,3 @@
-import utils
 from options import Options
 from plex_uploader import PlexUploader
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound
