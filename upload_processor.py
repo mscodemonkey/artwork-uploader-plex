@@ -28,7 +28,7 @@ class UploadProcessor:
                     raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to filtering")
         else:
             collection_title = artwork["title"].replace(" Collection", "")
-            raise CollectionNotFound(f'{collection_title} | collection not available on Plex')
+            raise CollectionNotFound(f'{collection_title} | Collection not available on Plex')
 
 
     def process_movie_artwork(self, artwork):
@@ -85,7 +85,7 @@ class UploadProcessor:
                     if artwork["season"] == "Cover":
                         upload_target = tv_show
                         artwork_id = "C"
-                        artwork_type = "Cover"
+                        artwork_type = "Show cover"
                         filter_type = "show_cover"
                     elif artwork["season"] == "Backdrop":
                         upload_target = tv_show

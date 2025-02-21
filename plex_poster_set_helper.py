@@ -1,13 +1,9 @@
-import requests
 import os
-import json
-import sys
-from plexapi.server import PlexServer
-import plexapi.exceptions
+import time
+
 import customtkinter as ctk
 import tkinter as tk
 import threading
-import xml.etree.ElementTree
 import atexit
 import sys
 from PIL import Image
@@ -15,13 +11,12 @@ from PIL import Image
 from config_exceptions import ConfigLoadError, ConfigSaveError
 from plex_connector_exception import PlexConnectorException
 import arguments
-import upload_processor
 from config import Config
 from upload_processor import UploadProcessor
 from scraper import Scraper
 import soup_utils
 import tpdb
-import utils
+from utils import is_not_comment, parse_url_and_options
 from options import Options
 from plex_connector import PlexConnector
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter
@@ -35,56 +30,69 @@ interactive_cli = False  # Set to False when building the executable with PyInst
 
 def parse_bulk_import_file(bulk_import_list):
 
-    """ Parse the URLs from a bulk import list and scrape them """
+    """
+    Parse the URLs from a bulk import list and scrape them
+    """
 
-    valid_urls = []
+    parsed_urls = []
 
     # Loop through the import file and build a list of URLs and options
     # Ignoring any lines containing comments using # or //
 
     for line in bulk_import_list:
-        if utils.is_not_comment(line):
-            url_item_details = utils.parse_line(line)
-            valid_urls.append(url_item_details)
 
-    for valid_url in valid_urls:
+        # Skip comments
+        if is_not_comment(line):
+            parsed_url = parse_url_and_options(line)
+            parsed_urls.append(parsed_url)
 
-        # If it's a ThePosterDB user then scrape the URL
-        # @todo Pass the line options to this function too
-        # @todo Check the logic for the else, doesn't really make sense to return the whole list here, surely it should scrape the URL for posters?
-        if "/user/" in valid_url.url:
-            print(f"Scraping user data from: {valid_url.url}")
-            scrape_tpdb_user(valid_url.url, valid_url.options)
-        else:
-            print(f"Returning non-user URL: {valid_url.url}")
+#    for valid_url in valid_urls:
+
+        # If it's a ThePosterDB user then scrape the URL.  I don't really understand why it's done this way to be honest!
+ #       # @todo Check the logic for the else, doesn't really make sense to return the whole list here - what if there's another /user/ line further down. Shouldn't it work like the CLI bulk file processor?
+
+  #      if "/user/" in valid_url.url:
+   #         print(f"Scraping user data from: {valid_url.url}")
+
+            # Strop out options that make no sense for a user link
+    #        valid_url.options.year = None
+
+     #       scrape_tpdb_user(valid_url.url, valid_url.options)
+      #  else:
+       #     print(f"Returning non-user URL: {valid_url.url}")
             # If it's not a /user/ URL (should theoretically be a poster set), return it
-            return valid_urls
+        #    pass
 
-    return valid_urls
+    return parsed_urls
 
 
-def parse_cli_urls(file_path):
+def parse_bulk_file_from_cli(file_path):
 
-    """Parse the URLs from a file and scrape them."""
+    """
+    Load and parse the URLs from a bulk file, then scrape them with any options set for that URL.
+    """
 
+    # Open the file and read the contents
     try:
-
         with open(file_path, 'r', encoding='utf-8') as file:
             urls = file.readlines()
-
-        for line in urls:
-
-            if utils.is_not_comment(line):
-
-                url_details = utils.parse_line(line)
-
-                if "/user/" in url_details.url:
-                    scrape_tpdb_user(url_details.url, url_details.options)
-                else:
-                    scrape_and_upload(url_details.url, url_details.options)
-
     except FileNotFoundError:
         print("File not found. Please enter a valid file path.")
+
+    # Loop through the file, process the URL and options, then scrape according to the URL
+    for line in urls:
+
+        # Skip comments
+        if is_not_comment(line):
+
+            # Parse the line to extract the URL and options
+            parsed_url = parse_url_and_options(line)
+
+            # Parse according to whether it's a user portfolio or poster / set URL
+            if "/user/" in parsed_url.url:
+                scrape_tpdb_user(parsed_url.url, parsed_url.options)
+            else:
+                scrape_and_upload(parsed_url.url, parsed_url.options)
 
 
 def cleanup():
@@ -105,7 +113,6 @@ atexit.register(cleanup)
 
 
 # @ ---------------------- GUI FUNCTIONS ----------------------
-
 
 # * UI helper functions ---
 
@@ -269,12 +276,25 @@ def run_url_scrape_thread():
 
 
 def run_bulk_import_scrape_thread():
-    """Run the bulk import scrape in a separate thread."""
-    global bulk_import_button
-    bulk_import_list = bulk_import_text.get(1.0, ctk.END).strip().split("\n")
-    valid_urls = parse_bulk_import_file(bulk_import_list)
 
-    if not valid_urls:
+    """Run the bulk import scrape in a separate thread."""
+
+    global bulk_import_button
+    parsed_urls = []
+
+    # Grab the bulk list from the UI
+    bulk_import_list = bulk_import_text.get(1.0, ctk.END).strip().split("\n")
+
+    # Loop through the import file and build a list of URLs and options
+    # Ignoring any lines containing comments using # or //
+    for line in bulk_import_list:
+        if is_not_comment(line):
+            parsed_url = parse_url_and_options(line)
+            parsed_urls.append(parsed_url)
+
+          # print(parsed_url.url, vars(parsed_url.options))
+
+    if not parsed_urls:
         app.after(0, lambda: update_status("No bulk import entries found.", color="red"))
         return
 
@@ -282,42 +302,57 @@ def run_bulk_import_scrape_thread():
     clear_button.configure(state="disabled")
     bulk_import_button.configure(state="disabled")
 
-    threading.Thread(target=process_bulk_import, args=(valid_urls,)).start()
+    # Pass the processing of the parsed URLs off to a thread
+    threading.Thread(target=process_bulk_import, args=(parsed_urls,)).start()
 
 
 # * Processing functions for scraping and setting posters ---
 
 def process_scrape_url(url):
-    """Process the URL scrape."""
+
+    """
+    Process the URL and any options, then scrape for posters
+    """
+
     try:
 
-        # Check if plex setup returned valid values
+        # Check if the Plex TV and movie libraries are configured
         if plex.tv_libraries is None or plex.movie_libraries is None:
             update_status("Plex setup incomplete. Please configure your settings.", color="red")
             return
 
-        soup = soup_utils.cook_soup(url)
+        # Update the UI before we start
         update_status(f"Scraping: {url}", color="#E5A00D")
 
-        url_with_options = utils.parse_line(url)
+        # Process the URL and options passed from the UI
+        parsed_line = parse_url_and_options(url)
 
-        # Proceed with setting posters
-        scrape_and_upload(url_with_options.url, url_with_options.options)
+        # Scrape the URL indicated, with the required options
+        scrape_and_upload(parsed_line.url, parsed_line.options)
+
+        # And update the UI when we're done
         update_status(f"Posters successfully set for: {url}", color="#E5A00D")
 
-    except Exception as e:
-        update_status(f"Error: {e}", color="red")
+    except Exception as scraping_error:
+        update_status(f"Error: {scraping_error}", color="red")
 
     finally:
+
+        # Reset the buttons on the UI
         app.after(0, lambda: [
             scrape_button.configure(state="normal"),
             clear_button.configure(state="normal"),
             bulk_import_button.configure(state="normal"),
         ])
 
+def process_bulk_import(parsed_urls):
 
-def process_bulk_import(valid_urls):
-    """Process the bulk import scrape."""
+    """
+    Process the bulk import scrape.
+    """
+
+    global plex
+
     try:
 
         # Check if plex setup returned valid values
@@ -325,15 +360,26 @@ def process_bulk_import(valid_urls):
             update_status("Plex setup incomplete. Please configure your settings.", color="red")
             return
 
-        for i, valid_url in enumerate(valid_urls):
-            status_text = f"Processing item {i + 1} of {len(valid_urls)}: {valid_url.url}"
+        for i, parsed_url in enumerate(parsed_urls):
+
+            status_text = f"Processing item {i + 1} of {len(parsed_urls)}: {parsed_url.url}"
             update_status(status_text, color="#E5A00D")
-            scrape_and_upload(valid_url.url, valid_url.options)
-            update_status(f"Completed: {valid_url.url}", color="#E5A00D")
+
+            # Parse according to whether it's a user portfolio or poster / set URL
+            if "/user/" in parsed_url.url:
+                scrape_tpdb_user(parsed_url.url, parsed_url.options)
+            else:
+                scrape_and_upload(parsed_url.url, parsed_url.options)
+
+            update_status(f"Completed: {parsed_url.url}", color="#E5A00D")
+
 
         update_status("Bulk import scraping completed.", color="#E5A00D")
+
     except Exception as e:
+
         update_status(f"Error during bulk import: {e}", color="red")
+
     finally:
         app.after(0, lambda: [
             scrape_button.configure(state="normal"),
@@ -376,7 +422,6 @@ def load_bulk_import_file():
     except Exception as e:
         bulk_import_text.delete(1.0, ctk.END)
         bulk_import_text.insert(ctk.END, f"Error loading file: {str(e)}")
-
 
 def save_bulk_import_file():
     """Save the bulk import text area content to a file relative to the executable location."""
@@ -766,7 +811,7 @@ def interactive_cli_loop():
             file_path = input(f"Enter the path to the bulk import .txt file, or press [Enter] to use '{config.bulk_txt}': ")
             file_path = file_path.strip() if file_path else config.bulk_txt
             if check_libraries():
-                parse_cli_urls(file_path)
+                parse_bulk_file_from_cli(file_path)
 
         elif choice == '3':
             print("Launching GUI...")
@@ -794,6 +839,7 @@ def check_libraries():
     if not plex.movie_libraries:
         print("! No Movies libraries initialized. Verify the 'movie_library' in config.json.")
     return plex.tv_libraries and plex.movie_libraries
+
 
 # Scrape all pages of a TPDb user's uploaded artwork
 def scrape_tpdb_user(url, options):
@@ -823,10 +869,14 @@ def scrape_tpdb_user(url, options):
 # Scraped the URL then uploads what it's scraped to Plex
 def scrape_and_upload(url, options):
 
+    global plex
+
     # Let's scrape the posters first
     scraper = Scraper(url)
     scraper.set_options(options)
     scraper.scrape()
+
+   # print(vars(scraper))
 
     # Now upload them to Plex
     processor = UploadProcessor(plex)
@@ -890,8 +940,10 @@ if __name__ == "__main__":
                           filters=args.filters,
                           year=args.year)  # Arguments per url to process
 
-    # Load the config into a global object
+    # Create config as a global object
     config = Config()
+
+    # Load the config from the config.json file
     try:
         config.load()
     except ConfigLoadError:
@@ -936,7 +988,7 @@ if __name__ == "__main__":
             cli_options.clear_filters()
 
             # Process using the bulk filename if supplied, else the bulk file set in the config
-            parse_cli_urls(args.bulk_file if args.bulk_file else config.bulk_txt)
+            parse_bulk_file_from_cli(args.bulk_file if args.bulk_file else config.bulk_txt)
 
         # Now we're looking at URLs - firstly one containing a TPDb user
         elif "/user/" in cli_command:
@@ -956,20 +1008,22 @@ if __name__ == "__main__":
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
         if not interactive_cli:
 
-            # Create the app and UI
-            app = ctk.CTk()
-            create_ui()
-
             # Connect to the TV and Movie libraries
             try:
                 plex.set_tv_libraries(config.tv_library)
             except PlexConnectorException as e:
-                app.after(500, update_error, e.gui_message)
+                sys.exit(str(e))
 
             try:
                 plex.set_movie_libraries(config.movie_library)
             except PlexConnectorException as e:
-                app.after(500, update_error, e.gui_message)
+                sys.exit(str(e))
+
+            # Create the app and UI
+            app = ctk.CTk()
+            create_ui()
+
+
 
         else:
 
@@ -989,7 +1043,6 @@ if __name__ == "__main__":
                     plex.set_movie_libraries(config.movie_library)
                 except PlexConnectorException as e:
                     sys.exit(str(e))
-
 
             # Handle interactive CLI
             interactive_cli_loop()

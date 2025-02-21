@@ -2,19 +2,11 @@ import hashlib
 import json
 import re
 from options import Options
+from url_item import URLItem
 
 # ---------------------- HELPER CLASSES ----------------------
 
-# A URL item stored with its options (force, add sets, add posters)
-class URLItem:
-    def __init__(self, url, options):
 
-        """
-        :rtype: object
-        """
-
-        self.url = url
-        self.options = options
 
 
 # Calculate the MD5 of a string - used for artwork IDs stored in labels
@@ -91,16 +83,23 @@ def remove_duplicates(lst):
 # Check if the URL is not a comment or empty line.
 def is_not_comment(url):
 
-    """Check if the URL is not a comment or empty line."""
+    """
+    Check if the URL is not a comment or empty line.
+    """
 
     regex = r"^(?!\/\/|#|^$)"
     pattern = re.compile(regex)
     return True if re.match(pattern, url) else False
 
 
-# Parse a line from the bulk URL file, containing the URL and options
 # @todo add validation for the URL
-def parse_line(line):
+def parse_url_and_options(line):
+
+    """
+    Parse a line from the bulk URL file or the scrape URL in the GUI
+    Each line could contain the URL and any options
+    """
+
     # Split the line by spaces
     parts = line.strip().split()
 

@@ -56,6 +56,8 @@ class Scraper:
 
         if self.url and ("/set/" in self.url or "/user/" in self.url):
 
+            # print(f"* Scraping {self.url}")
+
             soup = soup_utils.cook_soup(self.url)
 
             # Get the standard set of posters on the TPDb page
