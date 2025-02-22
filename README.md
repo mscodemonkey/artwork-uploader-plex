@@ -41,9 +41,9 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
    - **"movie_library"**  
      - The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
    - **"mediux_filters"**
-     - See the list of filter options below.  Anything not in this list will not be uploaded unless specified in the command line, in the bulk file or in the scraper URL in the GUI.
+     - See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
    - **"tpdb_filters**
-     - See the list of filter options below.  Anything not in this list will not be uploaded unless specified in the command line, in the bulk file or in the scraper URL in the GUI.
+     - See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
    
    **Filter options**
 
