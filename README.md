@@ -47,7 +47,7 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
    
    **Filter options**
 
-   Both mediux_filters and tpdb_filters specify which media types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
+   Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
       - show_cover
       - background
       - season_cover
