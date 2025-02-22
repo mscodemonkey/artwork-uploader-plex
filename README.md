@@ -40,13 +40,20 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
      - The name of your TV Shows library (e.g., "TV Shows"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
    - **"movie_library"**  
      - The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
-   - **"mediux_filters"**  
-     - Specify which media types to upload by including these flags:
-       - show_cover
-       - background
-       - season_cover
-       - title_card
-
+   - **"mediux_filters"**
+     - See the list of filter options below.  
+   - **"tpdb_filters**
+     - See the list of filter options below.  
+   
+**Filter options**
+Both mediux_filters and tpdb_filters specify which media types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
+   - show_cover
+   - background
+   - season_cover
+   - title_card
+   - movie_poster
+   - collection_poster
+       
 ## Usage
 
 In a terminal, run ```python plex_poster_set_helper.py``` (note you may need to use ```python3``` rather than ```python```, especially Mac users), using one of the following options:
