@@ -32,7 +32,7 @@ class PlexUploader:
                 else:
                     self.upload_target.uploadPoster(self.artwork["url"])
                 self.upload_target.addLabel(self.label)
-                if self.artwork["source"] == "posterdb":
+                if self.artwork["source"] == "theposterdb":
                     time.sleep(6)
               #  print(f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}')
                 return f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}'

@@ -149,3 +149,29 @@ def is_valid_url(line):
     url = parts[0]
 
     return validators.url(url) is True
+
+
+
+def get_artwork_type(artwork):
+
+    artwork_type = None
+    filter_type = None
+
+    if artwork["season"] == "Cover":
+        artwork_type = "Show cover"
+        filter_type = "show_cover"
+    elif artwork["season"] == "Backdrop":
+        artwork_type = "Background"
+        filter_type = "background"
+    elif artwork["season"] >= 0:
+        if artwork["episode"] == "Cover":
+            artwork_type = "Season cover"
+            filter_type = "season_cover"
+        elif artwork["episode"] is None:
+            artwork_type = "Season cover"
+            filter_type = "season_cover"
+        elif artwork["episode"] >= 0:
+            artwork_type = "Title card"
+            filter_type = "title_card"
+
+    return artwork_type, filter_type

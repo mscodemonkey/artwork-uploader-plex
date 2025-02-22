@@ -1,15 +1,7 @@
 import json
 import utils
 
-# Disclaimer : I don't have a clue how this stuff works
-
-def get_mediux_filters():
-    config = json.load(open("config.json"))
-    return config.get("mediux_filters", None)
-
-
-def check_mediux_filter(mediux_filters, filter):
-    return filter in mediux_filters if mediux_filters else True
+# Disclaimer : I don't have a clue how this scraper works
 
 
 def scrape_mediux(soup):
@@ -20,7 +12,6 @@ def scrape_mediux(soup):
     showposters = []
     movieposters = []
     collectionposters = []
-    mediux_filters = get_mediux_filters()
     year = 0  # Default year value
     title = "Untitled"  # Default title value
 
@@ -101,10 +92,10 @@ def scrape_mediux(soup):
             showposter["source"] = "mediux"
             showposter["year"] = year
 
-            if check_mediux_filter(mediux_filters=mediux_filters, filter=file_type):
-                showposters.append(showposter)
-            else:
-                print(f"{show_name} - skipping. '{file_type}' is not in 'mediux_filters'")
+#           if check_mediux_filter(mediux_filters=mediux_filters, filter=file_type):
+            showposters.append(showposter)
+  #          else:
+ #               print(f"{show_name} - skipping. '{file_type}' is not in 'mediux_filters'")
 
         elif media_type == "Movie":
             if "Collection" in title:

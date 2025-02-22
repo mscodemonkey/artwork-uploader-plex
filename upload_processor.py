@@ -1,3 +1,4 @@
+from config import Config
 from options import Options
 from plex_uploader import PlexUploader
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound
@@ -8,25 +9,33 @@ class UploadProcessor:
     def __init__(self, plex):
         self.plex = plex
         self.options = Options()
+        self.config = Config()
+        self.config.load()
 
     def set_options(self, options):
         self.options = options
+
+    def check_master_filters(self, check_filter, source):
+        master_filters = self.config.tpdb_filters if source == "theposterdb" else self.config.mediux_filters
+        return check_filter in master_filters if master_filters else True
 
     def process_collection_artwork(self, artwork):
 
         collection_items = self.plex.find_collection(artwork["title"])
         result = None
+        artwork_source = artwork["source"]
+        filter_type = "collection_poster"
 
         if collection_items:
             for collection_item in collection_items:
-                if self.options.has_no_filters() or self.options.has_filter("collection_poster"):
+                if (self.options.has_no_filters() and self.check_master_filters(filter_type,artwork_source)) or self.options.has_filter(filter_type):
                     uploader = PlexUploader(collection_item, "Poster","P")
                     uploader.set_artwork(artwork)
                     uploader.set_description(f"{artwork['title']}")
                     uploader.set_options(self.options)
                     result = uploader.upload_to_plex()
                 else:
-                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to filtering")
+                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
         else:
             collection_title = artwork["title"].replace(" Collection", "")
             raise CollectionNotFound(f'{collection_title} | Collection not available on Plex')
@@ -38,10 +47,12 @@ class UploadProcessor:
 
         movie_items = self.plex.find_in_library("movie", artwork["title"], year)
         result = None
+        artwork_source = artwork["source"]
+        filter_type = "movie_poster"
 
         if movie_items:
             for movie_item in movie_items:
-                if self.options.has_no_filters() or self.options.has_filter("movie_poster"):
+                if (self.options.has_no_filters() and self.check_master_filters(filter_type,artwork_source)) or self.options.has_filter(filter_type):
                     uploader = PlexUploader(movie_item, "Poster", artwork_id="P")
                     uploader.set_artwork(artwork)
                     uploader.set_description(f"{artwork['title']}")
@@ -50,7 +61,7 @@ class UploadProcessor:
                     uploader.set_options(self.options)
                     result = uploader.upload_to_plex()
                 else:
-                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to filtering")
+                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
         else:
             raise MovieNotFound(f'{artwork["title"]} ({artwork["year"]}) | Movie not available on Plex')
         return result
@@ -63,6 +74,7 @@ class UploadProcessor:
         artwork_type = None
         filter_type = None
         artwork_id = None
+        artwork_source = artwork["source"]
         result = "none"
 
         season = artwork['season']
@@ -116,14 +128,15 @@ class UploadProcessor:
 
                 try:
                     if upload_target:
-                        if self.options.has_no_filters() or self.options.has_filter(filter_type):
+#                        print(f"Filters for {filter_type} in master for {artwork_source}: {self.check_master_filters(filter_type, artwork_source)} and requested: {self.options.has_filter(filter_type)}")
+                        if (self.options.has_no_filters() and self.check_master_filters(filter_type, artwork_source)) or self.options.has_filter(filter_type):
                             uploader = PlexUploader(upload_target, artwork_type, artwork_id)
                             uploader.set_artwork(artwork)
                             uploader.set_description(description)
                             uploader.set_options(self.options)
                             result = uploader.upload_to_plex()
                         else:
-                            raise NotProcessedByFilter(f"{description} | {artwork_type} not processed due to filtering")
+                            raise NotProcessedByFilter(f"{description} | {artwork_type} not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
                 except Exception:
                     raise
         else:

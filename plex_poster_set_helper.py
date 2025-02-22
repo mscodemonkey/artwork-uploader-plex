@@ -171,6 +171,7 @@ def save_config():
     config.tv_library = [item.strip() for item in tv_library_text.get().strip().split(",")]
     config.movie_library =  [item.strip() for item in movie_library_text.get().strip().split(",")]
     config.mediux_filters =  mediux_filters_text.get().strip().split(", ")
+    config.tpdb_filters =  tpdb_filters_text.get().strip().split(", ")
     config.bulk_txt = bulk_txt_entry.get().strip()
 
     try:
@@ -215,6 +216,10 @@ def load_and_update_ui():
         mediux_filters_text.delete(0, ctk.END)
         mediux_filters_text.insert(0, ", ".join(config.mediux_filters if config.mediux_filters else []))
 
+    if tpdb_filters_text is not None:
+        tpdb_filters_text.delete(0, ctk.END)
+        tpdb_filters_text.insert(0, ", ".join(config.tpdb_filters if config.tpdb_filters else []))
+
     load_bulk_import_file()
 
 
@@ -244,7 +249,7 @@ def run_bulk_import_scrape_thread():
     global bulk_import_button
     parsed_urls = []
 
-    # Grab the bulk list from the UI
+    # Grab the bulk list from the version currently in the GUI (whether saved or not)
     bulk_import_list = bulk_import_text.get(1.0, ctk.END).strip().split("\n")
 
     # Loop through the import file and build a list of URLs and options
@@ -253,8 +258,6 @@ def run_bulk_import_scrape_thread():
         if is_not_comment(line):
             parsed_url = parse_url_and_options(line)
             parsed_urls.append(parsed_url)
-
-          # print(parsed_url.url, vars(parsed_url.options))
 
     if not parsed_urls:
         app.after(0, lambda: update_status("No bulk import entries found.", color="red"))
@@ -281,7 +284,15 @@ def clear_log():
     finally:
         app.after(1000, update_status, "", "#E5A00D")
 
-def update_log(update_text):
+def update_log(update_text: str) -> None:
+
+    """
+    Updates the session log in the GUI.  The session log only exists while the app is running.
+
+    :param  update_text:    The text to append to the session log.  Will remain until cleared.
+    :return: nothing
+    """
+
     try:
         print(update_text)
         session_log_text.configure(state="normal")
@@ -293,12 +304,14 @@ def update_log(update_text):
 
 # * Processing functions for scraping and setting posters from the GUI
 
-def process_scrape_url_from_gui(url):
+def process_scrape_url_from_gui(url: str) -> None:
 
     """
-    Process the URL and any options, then scrape for posters
-    :param url:
-    :return:
+    Process the URL and any options, then scrape for posters and updates the GUI with the results
+    Now switches to the session log tab when you hit the button so that you can see the results as they happen
+
+    :param      url: The URL to scrape.  Note that due to options, this may not be the only URL that we end up scraping!
+    :return:    nothing
     """
 
     try:
@@ -333,12 +346,15 @@ def process_scrape_url_from_gui(url):
         ])
 
 
-def process_bulk_import_from_gui(parsed_urls):
+def process_bulk_import_from_gui(parsed_urls: list) -> None:
 
     """
-    Process the bulk import scrape.
-    :param parsed_urls:
-    :return:
+    Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
+
+    The bulk import list doesn't need to have been saved, it will use the list as it exists in the GUI currently.
+
+    :param      parsed_urls:    The URLs to scrape.  These can be theposterdb poster, set or user URL or a mediux set URL.
+    :return:    nothing
     """
 
     global plex
@@ -500,7 +516,7 @@ def create_button(container, text, command, color=None, primary=False, height=35
 
 def create_ui():
     """Create the main UI window."""
-    global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, bulk_import_text, base_url_entry, token_entry,\
+    global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, tpdb_filters_text, bulk_import_text, base_url_entry, token_entry,\
         status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry, session_log_text, session_log_clear, tabview
 
 
@@ -657,7 +673,7 @@ def create_ui():
     bind_context_menu(movie_library_text)
 
     # Mediux Filters
-    mediux_filters_label = ctk.CTkLabel(settings_tab, text="Mediux Filters", text_color="#696969", font=("Roboto", 15))
+    mediux_filters_label = ctk.CTkLabel(settings_tab, text="MediuUX Filters", text_color="#696969", font=("Roboto", 15))
     mediux_filters_label.grid(row=5, column=0, pady=5, padx=10, sticky="w")
     mediux_filters_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0,
                                        height=40)
@@ -666,21 +682,32 @@ def create_ui():
     mediux_filters_text.bind("<Leave>", lambda event: on_hover_out(mediux_filters_label))
     bind_context_menu(mediux_filters_text)
 
+    # TPDb Filters
+    tpdb_filters_label = ctk.CTkLabel(settings_tab, text="TPDb Filters", text_color="#696969", font=("Roboto", 15))
+    tpdb_filters_label.grid(row=6, column=0, pady=5, padx=10, sticky="w")
+    tpdb_filters_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0,
+                                       height=40)
+    tpdb_filters_text.grid(row=6, column=1, pady=5, padx=10, sticky="ew")
+    tpdb_filters_text.bind("<Enter>", lambda event: on_hover_in(tpdb_filters_label))
+    tpdb_filters_text.bind("<Leave>", lambda event: on_hover_out(tpdb_filters_label))
+    bind_context_menu(tpdb_filters_text)
+
     settings_tab.grid_rowconfigure(0, weight=0)
     settings_tab.grid_rowconfigure(1, weight=0)
     settings_tab.grid_rowconfigure(2, weight=0)
     settings_tab.grid_rowconfigure(3, weight=0)
     settings_tab.grid_rowconfigure(4, weight=0)
     settings_tab.grid_rowconfigure(5, weight=0)
-    settings_tab.grid_rowconfigure(6, weight=1)
+    settings_tab.grid_rowconfigure(6, weight=0)
+    settings_tab.grid_rowconfigure(7, weight=1)
 
     # ? Load and Save Buttons (Anchored to the bottom)
     load_button = create_button(settings_tab, text="Reload", command=load_and_update_ui)
-    load_button.grid(row=7, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
+    load_button.grid(row=8, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
     save_button = create_button(settings_tab, text="Save", command=save_config, primary=True)
-    save_button.grid(row=7, column=1, pady=5, padx=5, sticky="ew")
+    save_button.grid(row=8, column=1, pady=5, padx=5, sticky="ew")
 
-    settings_tab.grid_rowconfigure(7, weight=0, minsize=40)
+    settings_tab.grid_rowconfigure(8, weight=0, minsize=40)
 
     # ! Bulk Import Tab --
     bulk_import_tab = tabview.add("Bulk Import")

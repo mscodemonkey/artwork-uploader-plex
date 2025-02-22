@@ -1,7 +1,10 @@
+import json
 import math
 from html.parser import HTMLParser
 
 import soup_utils
+from utils import get_artwork_type
+
 
 # ---------------------------------------------------------
 # The main scraping functionality for ThePosterDB
@@ -10,6 +13,7 @@ import soup_utils
 #
 #
 #
+
 
 # Look for a link to a fiv with a class of view_all
 def find_link_to_poster_set(soup):
@@ -113,6 +117,7 @@ def get_posters(poster_div):
         overlay_div = poster.find('div', class_='overlay')
         poster_id = overlay_div.get('data-poster-id')
         poster_url = "https://theposterdb.com/api/assets/" + poster_id
+
         # get metadata
         title_p = poster.find('p', class_='p-0 mb-1 text-break').string
 
@@ -138,9 +143,13 @@ def get_posters(poster_div):
                 "season": season,
                 "episode": None,
                 "year": year,
-                "source": "posterdb"
+                "source": "theposterdb"
             }
+
+            artwork_type, filter_type = get_artwork_type(show_poster)
+
             show_posters.append(show_poster)
+
 
         elif media_type == "Movie":
             title_split = title_p.split(" (")
@@ -154,7 +163,7 @@ def get_posters(poster_div):
                 "title": title,
                 "url": poster_url,
                 "year": int(year),
-                "source": "posterdb"
+                "source": "theposterdb"
             }
             movie_posters.append(movie_poster)
 
@@ -162,7 +171,7 @@ def get_posters(poster_div):
             collection_poster = {
                 "title": title_p,
                 "url": poster_url,
-                "source": "posterdb"
+                "source": "theposterdb"
             }
             collection_posters.append(collection_poster)
 
