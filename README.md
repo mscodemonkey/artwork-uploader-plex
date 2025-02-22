@@ -41,9 +41,9 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
    - **"movie_library"**  
      - The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
    - **"mediux_filters"**
-     - See the list of filter options below.  
+     - See the list of filter options below.  Anything not in this list will not be uploaded unless specified in the command line, in the bulk file or in the scraper URL in the GUI.
    - **"tpdb_filters**
-     - See the list of filter options below.  
+     - See the list of filter options below.  Anything not in this list will not be uploaded unless specified in the command line, in the bulk file or in the scraper URL in the GUI.
    
    **Filter options**
 
@@ -54,7 +54,7 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
       - title_card
       - movie_poster
       - collection_poster
-       
+
 ## Usage
 
 In a terminal, run ```python plex_poster_set_helper.py``` (note you may need to use ```python3``` rather than ```python```, especially Mac users), using one of the following options:
