@@ -90,19 +90,22 @@ class ThePosterDBScraper:
             media_type = \
             poster.find('a', class_="text-white", attrs={'data-toggle': 'tooltip', 'data-placement': 'top'})['title']
             poster_id = poster.find('div', class_='overlay').get('data-poster-id')
+
+           # if not self.options.is_excluded(poster_id):
+
             poster_url = f"https://theposterdb.com/api/assets/{poster_id}"
             title_p = poster.find('p', class_='p-0 mb-1 text-break').string
 
             if media_type == "Show":
                 title, season, year = media_metadata.parse_show(title_p)
-                show_poster = {"title": title, "url": poster_url, "season": season, "episode": None, "year": year, "source": "theposterdb"}
+                show_poster = {"title": title, "url": poster_url, "season": season, "episode": None, "year": year, "source": "theposterdb", "id":poster_id}
                 get_artwork_type(show_poster)
                 self.tv_artwork.append(show_poster)
             elif media_type == "Movie":
                 title, year = media_metadata.parse_movie(title_p)
-                self.movie_artwork.append({"title": title, "url": poster_url, "year": year, "source": "theposterdb"})
+                self.movie_artwork.append({"title": title, "url": poster_url, "year": year, "source": "theposterdb", "id":poster_id})
             elif media_type == "Collection":
-                self.collection_artwork.append({"title": title_p, "url": poster_url, "source": "theposterdb"})
+                self.collection_artwork.append({"title": title_p, "url": poster_url, "source": "theposterdb", "id":poster_id})
 
 
     def scrape_additional_posters(self):

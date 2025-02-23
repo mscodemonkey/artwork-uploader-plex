@@ -45,7 +45,8 @@ class PlexConnector:
 
     def set_tv_libraries(self, tv_libraries):
 
-        self.connect()
+        if not self.plex:
+            self.connect()
 
         if isinstance(tv_libraries, str):
             tv_libraries = [tv_libraries]
@@ -65,7 +66,8 @@ class PlexConnector:
 
     def set_movie_libraries(self, movie_libraries):
 
-        self.connect()
+        if not self.plex:
+            self.connect()
 
         if isinstance(movie_libraries, str):
             movie_libraries = [movie_libraries]
@@ -87,7 +89,8 @@ class PlexConnector:
     # Find a specific collection in the movies library
     def find_collection(self, collection_title):
 
-        self.connect()
+        if not self.plex:
+            self.connect()
 
         collections = []
 
@@ -108,28 +111,21 @@ class PlexConnector:
     # Find a specific movie or TV show in the given library
     def find_in_library(self, item_type, item_title, item_year = None):
 
-        self.connect()
+        if not self.plex:
+            self.connect()
 
         items = []
-
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
-
         for library in libraries:
-
-           # print(f"Searching for {item_title} ({item_year}) in {library} on Plex")
-
             try:
                 if item_year is not None:
                     library_item = library.get(item_title, year = item_year)
                 else:
                     library_item = library.get(item_title)
-
                 if library_item:
                     items.append(library_item)
             except:
                 pass
-
         if items:
             return items
-
         return None

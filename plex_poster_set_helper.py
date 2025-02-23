@@ -990,6 +990,7 @@ if __name__ == "__main__":
                           add_sets=args.add_sets,
                           force=args.force,
                           filters=args.filters,
+                          exclude=args.exclude,
                           year=args.year)  # Arguments per url to process
 
     # Create config as a global object

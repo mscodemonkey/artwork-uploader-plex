@@ -17,3 +17,6 @@ class MovieNotFound(UploadProcessorException):
 
 class NotProcessedByFilter(UploadProcessorException):
     """ An item was not uploaded due to a filter being applied """
+
+class NotProcessedByExclusion(UploadProcessorException):
+    """ An item was not uploaded due to an exception being applied """

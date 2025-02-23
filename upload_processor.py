@@ -1,7 +1,8 @@
 from config import Config
 from options import Options
 from plex_uploader import PlexUploader
-from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound
+from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound, \
+    NotProcessedByExclusion
 from utils import is_numeric
 
 class UploadProcessor:
@@ -29,16 +30,20 @@ class UploadProcessor:
         if collection_items:
             for collection_item in collection_items:
                 if (self.options.has_no_filters() and self.check_master_filters(filter_type,artwork_source)) or self.options.has_filter(filter_type):
-                    uploader = PlexUploader(collection_item, "Poster","P")
-                    uploader.set_artwork(artwork)
-                    uploader.set_description(f"{artwork['title']}")
-                    uploader.set_options(self.options)
-                    result = uploader.upload_to_plex()
+                    if not self.options.is_excluded(artwork["id"]):
+                        uploader = PlexUploader(collection_item, "Poster","P")
+                        uploader.set_artwork(artwork)
+                        uploader.set_description(f"{artwork['title']} : ID {artwork['id']}")
+                        uploader.set_options(self.options)
+                        result = uploader.upload_to_plex()
+                    else:
+                        raise NotProcessedByExclusion(
+                            f"{artwork['title']} : ID {artwork['id']} | Poster excluded")
                 else:
-                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
+                    raise NotProcessedByFilter(f"{artwork['title']} : ID {artwork['id']} | Poster not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
         else:
             collection_title = artwork["title"].replace(" Collection", "")
-            raise CollectionNotFound(f'{collection_title} | Collection not available on Plex')
+            raise CollectionNotFound(f'{collection_title}: ID {artwork["id"]} | Collection not available on Plex')
         return result
 
     def process_movie_artwork(self, artwork):
@@ -53,17 +58,20 @@ class UploadProcessor:
         if movie_items:
             for movie_item in movie_items:
                 if (self.options.has_no_filters() and self.check_master_filters(filter_type,artwork_source)) or self.options.has_filter(filter_type):
-                    uploader = PlexUploader(movie_item, "Poster", artwork_id="P")
-                    uploader.set_artwork(artwork)
-                    uploader.set_description(f"{artwork['title']}")
-                    if artwork['year']:
-                        uploader.set_description(f"{artwork['title']} ({artwork['year']})")
-                    uploader.set_options(self.options)
-                    result = uploader.upload_to_plex()
+                    if not self.options.is_excluded(artwork["id"]):
+                        uploader = PlexUploader(movie_item, "Poster", artwork_id="P")
+                        uploader.set_artwork(artwork)
+                        uploader.set_description(f"{artwork['title']} : ID {artwork['id']}")
+                        if artwork['year']:
+                            uploader.set_description(f"{artwork['title']} ({artwork['year']}) : ID {artwork['id']}")
+                        uploader.set_options(self.options)
+                        result = uploader.upload_to_plex()
+                    else:
+                        raise NotProcessedByExclusion(f"{artwork['title']} ({artwork['year']}) | ID {artwork['id']} | Poster excluded")
                 else:
-                    raise NotProcessedByFilter(f"{artwork['title']} | Poster not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
+                    raise NotProcessedByFilter(f"{artwork['title']} ({artwork['year']}) | ID {artwork['id']} | Poster filtered by {'request' if not self.options.has_filter(filter_type) else artwork_source}")
         else:
-            raise MovieNotFound(f'{artwork["title"]} ({artwork["year"]}) | Movie not available on Plex')
+            raise MovieNotFound(f'{artwork["title"]} ({artwork["year"]}) | ID {artwork["id"]} | Movie not available on Plex')
         return result
 
 
@@ -84,11 +92,11 @@ class UploadProcessor:
             season = f"Season {artwork['season']:02}"
 #
         if is_numeric(artwork['season']) and is_numeric(artwork['episode']):
-            description = f"{artwork['title']} | {season}, Episode {artwork['episode']:02}"
+            description = f"{artwork['title']} | {season}, Episode {artwork['episode']:02} : ID {artwork['id']}"
         elif (artwork['episode'] is None or artwork['episode'] == "Cover") and is_numeric(artwork['season']):
-            description = f"{artwork['title']} | {season}"
+            description = f"{artwork['title']} | {season} : ID {artwork['id']}"
         elif artwork['season'] is None or artwork["season"] == "Cover" or artwork["season"] == "Backdrop":
-            description = f"{artwork['title']}"
+            description = f"{artwork['title']} : ID {artwork['id']}"
 
         year = self.options.year if self.options.year else artwork["year"]
 
@@ -130,11 +138,14 @@ class UploadProcessor:
                     if upload_target:
 #                        print(f"Filters for {filter_type} in master for {artwork_source}: {self.check_master_filters(filter_type, artwork_source)} and requested: {self.options.has_filter(filter_type)}")
                         if (self.options.has_no_filters() and self.check_master_filters(filter_type, artwork_source)) or self.options.has_filter(filter_type):
-                            uploader = PlexUploader(upload_target, artwork_type, artwork_id)
-                            uploader.set_artwork(artwork)
-                            uploader.set_description(description)
-                            uploader.set_options(self.options)
-                            result = uploader.upload_to_plex()
+                            if not self.options.is_excluded(artwork["id"]):
+                                uploader = PlexUploader(upload_target, artwork_type, artwork_id)
+                                uploader.set_artwork(artwork)
+                                uploader.set_description(description)
+                                uploader.set_options(self.options)
+                                result = uploader.upload_to_plex()
+                            else:
+                                raise NotProcessedByExclusion(f"{description} | {artwork_type} excluded")
                         else:
                             raise NotProcessedByFilter(f"{description} | {artwork_type} not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
                 except Exception:

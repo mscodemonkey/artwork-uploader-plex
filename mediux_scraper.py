@@ -116,6 +116,7 @@ class MediuxScraper:
                     tv_artwork["url"] = poster_url
                     tv_artwork["source"] = "mediux"
                     tv_artwork["year"] = year
+                    tv_artwork["id"] = image_stub
                     self.tv_artwork.append(tv_artwork)
 
                 elif media_type == "Movie":
@@ -123,6 +124,7 @@ class MediuxScraper:
                         collection_artwork = {}
                         collection_artwork["title"] = title
                         collection_artwork["url"] = poster_url
+                        collection_artwork["id"] = image_stub
                         collection_artwork["source"] = "mediux"
                         self.collection_artwork.append(collection_artwork)
                     else:
@@ -131,6 +133,7 @@ class MediuxScraper:
                         movie_artwork["year"] = int(year)
                         movie_artwork["url"] = poster_url
                         movie_artwork["source"] = "mediux"
+                        movie_artwork["id"] = image_stub
                         self.movie_artwork.append(movie_artwork)
         except:
             raise ScraperException("Can't scrape from MediUX")

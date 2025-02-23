@@ -3,7 +3,7 @@
 
 class Options:
 
-    def __init__(self, add_posters=False, add_sets=False, force=False, filters=None, year=None):
+    def __init__(self, add_posters=False, add_sets=False, force=False, filters=None, exclude=None, year=None):
 
         if filters is None:
             filters = []
@@ -11,6 +11,7 @@ class Options:
         self.add_sets = add_sets
         self.force = force
         self.filters = filters
+        self.exclude = exclude
         self.year = year
 
     def has_filter(self, filter_type):
@@ -21,3 +22,6 @@ class Options:
 
     def clear_filters(self):
         self.filters = []
+
+    def is_excluded(self, item_id):
+        return self.exclude and item_id in self.exclude

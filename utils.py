@@ -110,6 +110,7 @@ def parse_url_and_options(line):
     url = parts[0]
 
     # Initialise filters list or None
+    exclude = None
     filters = None
     year = None
 
@@ -120,6 +121,14 @@ def parse_url_and_options(line):
             filters = []
             while index < len(parts) and not parts[index].startswith('--'):
                 filters.append(parts[index])
+                index += 1
+
+    if '--exclude' in parts:
+        index = parts.index('--exclude') + 1
+        if index < len(parts) and not parts[index].startswith('--'):
+            exclude = []
+            while index < len(parts) and not parts[index].startswith('--'):
+                exclude.append(parts[index])
                 index += 1
 
     if '--year' in parts:
@@ -135,6 +144,7 @@ def parse_url_and_options(line):
         add_sets='--add-sets' in parts,
         force='--force' in parts,
         filters=filters,  # Store the list of filters or None
+        exclude=exclude,
         year=year  # Store the year or None
     )
 
