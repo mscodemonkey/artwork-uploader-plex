@@ -80,6 +80,7 @@ The script supports various command-line arguments for flexible use.
    - ```--add-sets``` will also parse any additional sets when using the Poster DB 
    - ```--add-posters``` will also parse the additional posters section of the set, when using the Poster DB
    - ```--force``` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
+   - ```--exclude <id1> [<id2> <id3> ...]``` will exclude the poster or artwork with the specified ID from being uploaded.  Grab the ID from the session log (TPDb is a number, MediUX is a UUID) 
    - ```--filters <filter1> [<filter2> <filter3> ...]``` will **only** upload the selected artwork types, based on the options below
      - show_cover
      - background
