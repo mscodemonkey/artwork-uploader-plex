@@ -8,7 +8,7 @@ import argparse
 # --add-posters     Adds the "additional posters" section from TPDb page as well as the main posters
 # --force           Forces each poster to upload even, if the same artwork is already there according to the label.
 # --filters         Specify one or more filters, only these types will be applied (e.g., title_card, background, season_cover, show_cover, movie_poster, collection_poster)
-# --exclude         Specify one or more TPDb poster IDs to exclude from any uploads, eg
+# --exclude         Specify one or more IDs to exclude from any uploads, eg
 
 def parse_arguments():
 
