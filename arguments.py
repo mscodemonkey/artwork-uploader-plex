@@ -21,7 +21,7 @@ def parse_arguments():
     parser.add_argument('--add-posters', action='store_true', help="Scrape additional posters from same page - TPDb only")
     parser.add_argument('--force', action='store_true', help="Force upload even if its the same artwork")
     parser.add_argument("--filters", nargs='+', help="Only these artwork types will be applied (e.g., title_card, background, season_cover, show_cover, movie_poster, collection_poster).")
-    parser.add_argument("--exclude", nargs='+', help="Specify one or more poster TPDb IDs to exclude from any uploads.")
+    parser.add_argument("--exclude", nargs='+', help="Specify one or more IDs to exclude from any uploads.")
     parser.add_argument("--year", type=int, help="Override the year for matching (use the year in Plex)")
 
     return parser.parse_args()
