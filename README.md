@@ -1,5 +1,5 @@
 
-# plex-poster-set-helper
+# Plex Poster Uploader (plex-poster-set-helper)
 
 plex-poster-set-helper is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
