@@ -77,18 +77,18 @@ The script supports various command-line arguments for flexible use.
    python plex_poster_set_helper.py https://mediux.pro/sets/9242
    ```
    **Optional command line arguments**
-   - ```--add-sets``` will also parse any additional sets when using the Poster DB 
-   - ```--add-posters``` will also parse the additional posters section of the set, when using the Poster DB
-   - ```--force``` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
-   - ```--exclude <id1> [<id2> <id3> ...]``` will exclude the poster or artwork with the specified ID from being uploaded.  Grab the ID from the session log (TPDb is a number, MediUX is a UUID) 
-   - ```--filters <filter1> [<filter2> <filter3> ...]``` will **only** upload the selected artwork types, based on the options below
+    ```--add-sets``` will also parse any additional sets when using the Poster DB 
+    ```--add-posters``` will also parse the additional posters section of the set, when using the Poster DB
+    ```--force``` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
+    ```--exclude <id1> [<id2> <id3> ...]``` will exclude the poster or artwork with the specified ID from being uploaded.  Grab the ID from the session log (TPDb is a number, MediUX is a UUID) 
+    ```--filters <filter1> [<filter2> <filter3> ...]``` will **only** upload the selected artwork types, based on the options below
      - show_cover
      - background
      - season_cover
      - title_card 
      - movie_poster
      - collection_poster
-   - ```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
+    ```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
 
    **Using these options in files and GUI**
 
