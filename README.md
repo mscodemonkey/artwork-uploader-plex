@@ -159,27 +159,32 @@ Using these options, the tool will apply posters to the same media in all specif
 
 ## Filters
 
-Both the mediux_filters and tvdb_filters options in config.json allows you to control which artwork types are uploaded to Plex:
-#### for TV shows
-- show_cover: Upload covers for TV shows.
-- background: Upload background images.
-- season_cover: Set posters for each season.
-- title_card: Add title cards.
-#### for Movies
-- movie_poster: Upload posters for movies
-#### for Movie Collections
-- collection_poster: Upload posters for collections
-### Using filters 
+Both the ```mediux_filters``` and ```tvdb_filters``` options in **config.json** allows you to control which artwork types are uploaded to Plex.  You can also set these global filters in the GUI.
+
+```show_cover``` - Upload a cover for the TV show
+
+```background``` - Upload background images
+
+```season_cover``` - Upload covers for each individual season
+
+```title_card``` - Upload title cards for individual episodes
+
+```movie_poster``` - Upload posters for movies
+
+```collection_poster``` - Upload posters for collections
+
+### Using the above filters 
 Remember, these filters can be used in four ways...
-- In config.json, which will apply filters globally for each provider.  
+- In ```config.json```, which will apply filters globally for each provider.  
 
-Global filters can be overridden on a per-URL basis...
+These global filters can be overridden on a per-URL basis...
 
-- On the command line, by using ```--filters <filter1> [<filter2> ...]```
-- After the URL in a bulk file using the same format
-- In the scraper URL in the GUI
+- On the command line, by using ```--filters <filter1> [<filter2> <filter3>...]```
+- After the URL in a bulk file using the same format as you would on the command line
+- In the scraper URL in the GUI, again using the same format 
 
-## Executable Build
+---
+# Executable Build
 
 In the `dist/` directory, you'll find the compiled executable for Windows: `Plex Poster Set Helper.zip`. This executable allows you to run the tool without needing to have Python installed.
 
