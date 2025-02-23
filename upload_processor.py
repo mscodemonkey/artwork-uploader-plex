@@ -124,7 +124,7 @@ class UploadProcessor:
                             artwork_type = "Title card"
                             filter_type = "title_card"
                 except:
-                    raise ShowNotFound(f"{description} | not available on Plex")
+                    raise ShowNotFound(f"{description} | Not available on Plex")
 
                 try:
                     if upload_target:
