@@ -8,10 +8,7 @@ I store an artwork ID in a Plex label against each movie, show, episode and coll
 
 There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
 
-And there are other options such as filtering and year matching, fixing missing things that i found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example)
-
-## Why did I fork it?
-Because I've never coded in Python before, so I'm using it to learn at the same time!  I'm sure my code is probably a bit scrappy at the moment so any help would be appreciated.  I've managed to refactor quite a lot of the code so it's not all one big script anymore.  I hope that I haven't introduced any bugs along the way...
+And there are other options such as per-URL filtering and year matching, fixing missing things that i found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
@@ -162,7 +159,7 @@ Using these options, the tool will apply posters to the same media in all specif
 
 ## Filters
 
-Both the mediux_filters and tvdb_filters options in config.json allows you to control which media types get posters:
+Both the mediux_filters and tvdb_filters options in config.json allows you to control which artwork types are uploaded to Plex:
 #### for TV shows
 - show_cover: Upload covers for TV shows.
 - background: Upload background images.
@@ -173,7 +170,11 @@ Both the mediux_filters and tvdb_filters options in config.json allows you to co
 #### for Movie Collections
 - collection_poster: Upload posters for collections
 ### Using filters 
-Remember, these filters can be used in three ways...
+Remember, these filters can be used in four ways...
+- In config.json, which will apply filters globally for each provider.  
+
+Global filters can be overridden on a per-URL basis...
+
 - On the command line, by using ```--filters <filter1> [<filter2> ...]```
 - After the URL in a bulk file using the same format
 - In the scraper URL in the GUI
