@@ -19,7 +19,8 @@ import tpdb
 from utils import is_not_comment, parse_url_and_options, is_valid_url
 from options import Options
 from plex_connector import PlexConnector
-from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter
+from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
+    NotProcessedByExclusion
 
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the GUI by default
@@ -939,6 +940,8 @@ def scrape_and_upload(url, options):
                 update_log(result)
             except CollectionNotFound as not_found:
                 update_log(f"∙ {str(not_found)}")
+            except NotProcessedByExclusion as excluded:
+                update_log(f"- {str(excluded)}")
             except NotProcessedByFilter as not_processed:
                 update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
@@ -955,6 +958,8 @@ def scrape_and_upload(url, options):
                 update_log(result)
             except MovieNotFound as not_found:
                 update_log(f"∙ {str(not_found)}")
+            except NotProcessedByExclusion as excluded:
+                update_log(f"- {str(excluded)}")
             except NotProcessedByFilter as not_processed:
                 update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
@@ -968,6 +973,8 @@ def scrape_and_upload(url, options):
                 update_log(result)
             except ShowNotFound as not_found:
                 update_log(f"∙ {str(not_found)}")
+            except NotProcessedByExclusion as excluded:
+                update_log(f"- {str(excluded)}")
             except NotProcessedByFilter as not_processed:
                 update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
