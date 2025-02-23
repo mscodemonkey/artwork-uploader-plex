@@ -16,7 +16,7 @@ Because I've never coded in Python before, so I'm using it to learn at the same 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
 
-
+---
 # Installation
 
 1. [Install Python](https://www.python.org/downloads/) (if not installed already)
@@ -116,7 +116,7 @@ Use the ```gui``` argument to open the graphical user interface:
 
    - **If no text file parameter is provided, it will use the default value from config.json for bulk_txt.**
 
-
+---
 # Other features
 
 ## Interactive CLI Mode
