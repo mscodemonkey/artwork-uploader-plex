@@ -4,7 +4,7 @@ import soup_utils
 
 from options import Options
 from scraper_exceptions import ScraperException
-from utils import get_artwork_type
+from utils import get_artwork_type, is_valid_url
 
 
 class ThePosterDBScraper:
@@ -17,6 +17,9 @@ class ThePosterDBScraper:
         self.movie_artwork = []
         self.tv_artwork = []
         self.collection_artwork = []
+
+        self.user_uploads = 0
+        self.user_pages = 0
 
 
     # Set options - otherwise will use defaults of False
@@ -60,12 +63,13 @@ class ThePosterDBScraper:
 
     def scrape_user_info(self):
         try:
+            self.soup = soup_utils.cook_soup(self.url)
             span_tag = self.soup.find('span', class_='numCount')
             number_str = span_tag['data-count']
-            upload_count = int(number_str)
-            return math.ceil(upload_count / 24)
+            self.user_uploads = int(number_str)
+            self.user_pages = math.ceil(self.user_uploads / 24)
         except:
-            return None
+            raise ScraperException(f"Can't parse user information to get poster count")
 
 
     def get_posters(self, poster_div):

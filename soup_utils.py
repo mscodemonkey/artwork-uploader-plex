@@ -2,6 +2,9 @@ import sys
 import requests
 from bs4 import BeautifulSoup
 
+from utils import is_valid_url
+
+
 # -------------------------------------------------
 # Cook Soup - Implements Beautiful Soup HTML Parser
 # -------------------------------------------------
@@ -13,10 +16,15 @@ def cook_soup(url):
         'Sec-Ch-Ua-Platform': 'Windows'
     }
 
-    response = requests.get(url, headers=headers)
+    if is_valid_url(url):
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200 or (response.status_code == 500 and "mediux.pro" in url):
+            soup = BeautifulSoup(response.text, 'html.parser')
+            return soup
+        else:
+            sys.exit(f"x Failed to retrieve the page. Status code: {response.status_code}")
+    elif ".html" in url:
+        with open(url, 'r', encoding='utf-8') as file:
+            html_content = file.read()
+            soup = BeautifulSoup(html_content, 'html.parser')
 
-    if response.status_code == 200 or (response.status_code == 500 and "mediux.pro" in url):
-        soup = BeautifulSoup(response.text, 'html.parser')
-        return soup
-    else:
-        sys.exit(f"x Failed to retrieve the page. Status code: {response.status_code}")

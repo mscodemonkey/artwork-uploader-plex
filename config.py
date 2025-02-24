@@ -16,6 +16,7 @@ class Config:
         self.movie_library = ["Movies"]
         self.mediux_filters = ["title_card", "background", "season_cover", "show_cover"]
         self.tpdb_filters = ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"]
+        self.track_artwork_ids = True
 
     def load(self):
         """ Load the configuration from the JSON file """
@@ -36,6 +37,7 @@ class Config:
             self.mediux_filters = config.get("mediux_filters", [])
             self.tpdb_filters = config.get("tpdb_filters", [])
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
+            self.track_artwork_ids = config.get("track_artwork_ids", True)
 
         except Exception as e:
             raise ConfigLoadError
@@ -48,7 +50,8 @@ class Config:
             "tv_library": ["TV Shows", "Anime"],
             "movie_library": ["Movies"],
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover"],
-            "tpdb_filters":["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"]
+            "tpdb_filters":["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
+            "tracK_artwork_ids": True
         }
 
         # Create the config.json file if it doesn't exist
@@ -70,7 +73,8 @@ class Config:
             "movie_library": self.movie_library,
             "mediux_filters": self.mediux_filters,
             "tpdb_filters": self.tpdb_filters,
-            "bulk_txt": self.bulk_txt
+            "bulk_txt": self.bulk_txt,
+            "track_artwork_ids": self.track_artwork_ids
         }
 
         try:

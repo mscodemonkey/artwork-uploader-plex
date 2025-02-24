@@ -1,8 +1,5 @@
 from bs4 import BeautifulSoup
 
-import soup_utils
-import tpdb
-import mediux_scraper
 from options import Options
 from scraper_exceptions import ScraperException
 from theposterdb_scraper import ThePosterDBScraper
@@ -67,7 +64,6 @@ class Scraper:
 
     def scrape_theposterdb(self):
         try:
-
             theposterdb_scraper = ThePosterDBScraper(self.url)
             theposterdb_scraper.set_options(self.options)
             theposterdb_scraper.scrape()
@@ -121,8 +117,5 @@ class Scraper:
             None
         """
 
-        with open(self.url, 'r', encoding='utf-8') as file:
-            html_content = file.read()
-            soup = BeautifulSoup(html_content, 'html.parser')
-        return tpdb.scrape_posters(soup)
+        self.scrape_theposterdb()
 

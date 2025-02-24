@@ -12,10 +12,10 @@ from config_exceptions import ConfigLoadError, ConfigSaveError
 from plex_connector_exception import PlexConnectorException
 import arguments
 from config import Config
+from scraper_exceptions import ScraperException
+from theposterdb_scraper import ThePosterDBScraper
 from upload_processor import UploadProcessor
 from scraper import Scraper
-import soup_utils
-import tpdb
 from utils import is_not_comment, parse_url_and_options, is_valid_url
 from options import Options
 from plex_connector import PlexConnector
@@ -52,7 +52,12 @@ def parse_bulk_file_from_cli(file_path):
 
             # Parse according to whether it's a user portfolio or poster / set URL
             if "/user/" in parsed_url.url:
-                scrape_tpdb_user(parsed_url.url, parsed_url.options)
+                try:
+                    scrape_tpdb_user(parsed_url.url, parsed_url.options)
+                except ScraperException as scraper_error:
+                    print(str(scraper_error))
+                except Exception as unknown_error:
+                    print(str(unknown_error))
             else:
                 scrape_and_upload(parsed_url.url, parsed_url.options)
 
@@ -174,6 +179,7 @@ def save_config():
     config.mediux_filters =  mediux_filters_text.get().strip().split(", ")
     config.tpdb_filters =  tpdb_filters_text.get().strip().split(", ")
     config.bulk_txt = bulk_txt_entry.get().strip()
+    config.track_artwork_ids = track_artwork_checkbox.get()
 
     try:
         config.save()
@@ -220,6 +226,12 @@ def load_and_update_ui():
     if tpdb_filters_text is not None:
         tpdb_filters_text.delete(0, ctk.END)
         tpdb_filters_text.insert(0, ", ".join(config.tpdb_filters if config.tpdb_filters else []))
+
+    if track_artwork_checkbox is not None:
+        if config.track_artwork_ids:
+            track_artwork_checkbox.select()
+        else:
+            track_artwork_checkbox.deselect()
 
     load_bulk_import_file()
 
@@ -518,7 +530,7 @@ def create_button(container, text, command, color=None, primary=False, height=35
 def create_ui():
     """Create the main UI window."""
     global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, tpdb_filters_text, bulk_import_text, base_url_entry, token_entry,\
-        status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry, session_log_text, session_log_clear, tabview
+        status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry, session_log_text, session_log_clear, tabview, track_artwork_checkbox
 
 
     ctk.set_appearance_mode("dark")
@@ -693,6 +705,17 @@ def create_ui():
     tpdb_filters_text.bind("<Leave>", lambda event: on_hover_out(tpdb_filters_label))
     bind_context_menu(tpdb_filters_text)
 
+    # Cache Enabled Checkbox
+    track_artwork_label = ctk.CTkLabel(settings_tab, text="Track artwork IDs", text_color="#696969", font=("Roboto", 15))
+    track_artwork_label.grid(row=7, column=0, pady=5, padx=10, sticky="w")
+    track_artwork_checkbox = ctk.CTkCheckBox(settings_tab, text="", fg_color="#1C1E1E", text_color="#A1A1A1",
+                                             onvalue=True, offvalue=False)
+    track_artwork_checkbox.grid(row=7, column=1, pady=5, padx=10, sticky="ew")
+    track_artwork_checkbox.bind("<Enter>", lambda event: on_hover_in(track_artwork_label))
+    track_artwork_checkbox.bind("<Leave>", lambda event: on_hover_out(track_artwork_label))
+    bind_context_menu(track_artwork_checkbox)
+
+
     settings_tab.grid_rowconfigure(0, weight=0)
     settings_tab.grid_rowconfigure(1, weight=0)
     settings_tab.grid_rowconfigure(2, weight=0)
@@ -700,13 +723,15 @@ def create_ui():
     settings_tab.grid_rowconfigure(4, weight=0)
     settings_tab.grid_rowconfigure(5, weight=0)
     settings_tab.grid_rowconfigure(6, weight=0)
-    settings_tab.grid_rowconfigure(7, weight=1)
+    settings_tab.grid_rowconfigure(7, weight=0)
+    settings_tab.grid_rowconfigure(8, weight=1)
+
 
     # ? Load and Save Buttons (Anchored to the bottom)
     load_button = create_button(settings_tab, text="Reload", command=load_and_update_ui)
-    load_button.grid(row=8, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
+    load_button.grid(row=9, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
     save_button = create_button(settings_tab, text="Save", command=save_config, primary=True)
-    save_button.grid(row=8, column=1, pady=5, padx=5, sticky="ew")
+    save_button.grid(row=9, column=1, pady=5, padx=5, sticky="ew")
 
     settings_tab.grid_rowconfigure(8, weight=0, minsize=40)
 
@@ -894,27 +919,26 @@ def check_libraries():
 # Scrape all pages of a TPDb user's uploaded artwork
 def scrape_tpdb_user(url, options):
 
-    soup = soup_utils.cook_soup(url)
-    pages = tpdb.scrape_user_info(soup)
-
-    if not pages:
-        print(f"x Could not determine the number of pages for {url}")
-        return
+    pages = 0
 
     if "?" in url:
         cleaned_url = url.split("?")[0]
         url = cleaned_url
 
-    for page in range(pages):
-        # print(f"+ Scraping page {page + 1}.")
-        page_url = f"{url}?section=uploads&page={page + 1}"
+    try:
+        user_scraper = ThePosterDBScraper(url)
+        user_scraper.scrape_user_info()
+        pages = user_scraper.user_pages
+    except ScraperException as cannot_scrape:
+        print(str(cannot_scrape))
+        return
 
-        # print (f"Scraping {page_url}")
-        # a, b, c = scrape_single_url(page_url, options)
-        # print(f"{len(a)} movie posters, {len(b)} show posters and {len(c)} collection posters on this page")
-
-        scrape_and_upload(page_url, options)
-
+    try:
+        for page in range(pages):
+            page_url = f"{url}?section=uploads&page={page + 1}"
+            scrape_and_upload(page_url, options)
+    except Exception:
+        raise ScraperException(f"Failed to process and upload from URL: {url}")
 
 # Scraped the URL then uploads what it's scraped to Plex
 def scrape_and_upload(url, options):
@@ -933,7 +957,6 @@ def scrape_and_upload(url, options):
     processor.set_options(options)
 
     if scraper.collection_artwork:
-        print("-----------------------------------------------------------------------------------")
         for artwork in scraper.collection_artwork:
             try:
                 result = processor.process_collection_artwork(artwork)
@@ -948,10 +971,6 @@ def scrape_and_upload(url, options):
                 update_log(f"x {str(error_unexpected)}")
 
     if scraper.movie_artwork:
-        if not scraper.collection_artwork:
-            print("-----------------------------------------------------------------------------------")
-        else:
-            print("∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙")
         for artwork in scraper.movie_artwork:
             try:
                 result = processor.process_movie_artwork(artwork)
@@ -966,7 +985,6 @@ def scrape_and_upload(url, options):
                 update_log(f"x {str(error_unexpected)}")
 
     if scraper.tv_artwork:
-        print("-----------------------------------------------------------------------------------")
         for artwork in scraper.tv_artwork:
             try:
                 result = processor.process_tv_artwork(artwork)

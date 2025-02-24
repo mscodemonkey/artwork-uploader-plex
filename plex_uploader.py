@@ -12,6 +12,7 @@ class PlexUploader:
         self.label = None
         self.artwork = None
         self.options = Options()
+        self.track_artwork_ids = True
 
     def set_artwork(self, artwork):
         self.artwork = artwork
@@ -31,7 +32,8 @@ class PlexUploader:
                     self.upload_target.uploadArt(self.artwork["url"])
                 else:
                     self.upload_target.uploadPoster(self.artwork["url"])
-                self.upload_target.addLabel(self.label)
+                    if self.track_artwork_ids:
+                        self.upload_target.addLabel(self.label)
                 if self.artwork["source"] == "theposterdb":
                     time.sleep(6)
                 return f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}'
@@ -48,6 +50,8 @@ class PlexUploader:
             if existing_label.startswith(self.artwork_id): # Only check this type of ID, could be multiple IDs per item (e.g. background + cover)
                 if existing_label == self.label:
                     existing_artwork = True
+                    if not self.track_artwork_ids:
+                        self.upload_target.removeLabel(existing_label, False)  # Remove the existing label as we're no longer tracking the artwork IDs
                 else:
                     self.upload_target.removeLabel(existing_label, False)  # Remove the existing label as we're replacing the artwork
 

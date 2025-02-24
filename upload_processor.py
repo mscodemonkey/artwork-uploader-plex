@@ -33,6 +33,7 @@ class UploadProcessor:
                     if not self.options.is_excluded(artwork["id"]):
                         uploader = PlexUploader(collection_item, "Poster","P")
                         uploader.set_artwork(artwork)
+                        uploader.track_artwork_ids = self.config.track_artwork_ids
                         uploader.set_description(f"{artwork['title']} : ID {artwork['id']}")
                         uploader.set_options(self.options)
                         result = uploader.upload_to_plex()
@@ -61,6 +62,7 @@ class UploadProcessor:
                     if not self.options.is_excluded(artwork["id"]):
                         uploader = PlexUploader(movie_item, "Poster", artwork_id="P")
                         uploader.set_artwork(artwork)
+                        uploader.track_artwork_ids = self.config.track_artwork_ids
                         uploader.set_description(f"{artwork['title']} : ID {artwork['id']}")
                         if artwork['year']:
                             uploader.set_description(f"{artwork['title']} ({artwork['year']}) : ID {artwork['id']}")
@@ -141,6 +143,7 @@ class UploadProcessor:
                             if not self.options.is_excluded(artwork["id"]):
                                 uploader = PlexUploader(upload_target, artwork_type, artwork_id)
                                 uploader.set_artwork(artwork)
+                                uploader.track_artwork_ids = self.config.track_artwork_ids
                                 uploader.set_description(description)
                                 uploader.set_options(self.options)
                                 result = uploader.upload_to_plex()
