@@ -4,7 +4,7 @@
 Plex Artwork Uploader is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
 # What's different in this fork?
-I store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
+We (optionally) store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
 
 There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
 
@@ -39,10 +39,10 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this 
      - The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
    - **"mediux_filters"**
      - See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
-   - **"tpdb_filters**
+   - **"tpdb_filters"**
      - See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
-   - **"track_artwork_ids**
-     - Setting this to true will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.  If you switch this off, it'll upload every artwork every time you run.  This can result in long run-times, especially if you're using ThePosterDB.  We recommend you leave this as "true"!
+   - **"track_artwork_ids"**
+     - Setting this to true will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.  By setting this to **false**, it'll upload every artwork every time you run (like using the --force option for every item).  This can result in long run-times, especially if you're using ThePosterDB.  We recommend you leave this as **true** and use --force when you need to!
    
 ### Filter options
 
