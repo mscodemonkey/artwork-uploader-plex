@@ -38,28 +38,31 @@ class ThePosterDBScraper:
         Returns:
             bool: True if the posters were successfully grabbed, False otherwise.
         """
+        try:
+            if "/poster/" in self.url:
+                print(f"★ Got a poster URL {self.url}, looking up the correct set URL...")
+                poster_soup = soup_utils.cook_soup(self.url)
+                self.url = poster_soup.find('a', class_='rounded view_all')['href']
 
-        if "/poster/" in self.url:
-            print(f"★ Got a poster URL {self.url}, looking up the correct set URL...")
-            poster_soup = soup_utils.cook_soup(self.url)
-            self.url = poster_soup.find('a', class_='rounded view_all')['href']
+            if self.url and ("/set/" in self.url or "/user/" in self.url):
+                print(f"★ Got a valid URL {self.url}")
+                self.soup = soup_utils.cook_soup(self.url)
 
-        if self.url and ("/set/" in self.url or "/user/" in self.url):
-            self.soup = soup_utils.cook_soup(self.url)
+                # Get the standard set of posters on the TPDb page
+                self.scrape_posters(self.soup)
 
-            # Get the standard set of posters on the TPDb page
-            self.scrape_posters(self.soup)
+                # Get the additional posters if required
+                if self.options.add_posters:
+                    self.scrape_additional_posters()
 
-            # Get the additional posters if required
-            if self.options.add_posters:
-                self.scrape_additional_posters()
+                # Get the additional sets if required
+                if self.options.add_sets:
+                    self.scrape_additional_sets()
 
-            # Get the additional sets if required
-            if self.options.add_sets:
-                self.scrape_additional_sets()
-
-        else:
-            raise ScraperException(f"Invalid or unsupported URL for ThePosterDB: {self.url}")
+            else:
+                raise ScraperException(f"Invalid or unsupported URL for ThePosterDB: {self.url}")
+        except:
+            raise ScraperException(f"Could not process URL for ThePosterDB: {self.url}")
 
     def scrape_user_info(self):
         try:
@@ -69,7 +72,7 @@ class ThePosterDBScraper:
             self.user_uploads = int(number_str)
             self.user_pages = math.ceil(self.user_uploads / 24)
         except:
-            raise ScraperException(f"Can't parse user information to get poster count")
+            raise ScraperException(f"Can't get user information, please check the URL you're using")
 
 
     def get_posters(self, poster_div):

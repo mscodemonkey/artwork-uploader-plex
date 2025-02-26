@@ -1,5 +1,7 @@
-import os
-import time
+
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory
+from flask_socketio import SocketIO
+import os, threading
 
 import customtkinter as ctk
 import tkinter as tk
@@ -24,7 +26,7 @@ from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowN
 
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the GUI by default
-
+mode = "cli"
 
 # @ ---------------------- CORE FUNCTIONS ----------------------
 
@@ -59,8 +61,10 @@ def parse_bulk_file_from_cli(file_path):
                 except Exception as unknown_error:
                     print(str(unknown_error))
             else:
-                scrape_and_upload(parsed_url.url, parsed_url.options)
-
+                try:
+                    scrape_and_upload(parsed_url.url, parsed_url.options)
+                except:
+                    print("Oops")
 
 def cleanup():
 
@@ -110,15 +114,69 @@ def get_full_path(relative_path):
     return os.path.join(script_dir, relative_path)
 
 
-def update_status(message, color="white"):
+def update_status(message, color="white", update_cli = False, sticky = False, spinner=False, icon=None):
     """Update the status label with a message and color."""
-    app.after(0, lambda: status_label.configure(text=message, text_color=color))
+
+    # Map the colours
+    bootstrap_colors = {
+        'primary': {
+            'bg': '#0d6efd',  # background color
+            'fg': '#ffffff'  # foreground color (text color)
+        },
+        'secondary': {
+            'bg': '#6c757d',  # background color
+            'fg': '#ffffff'  # foreground color (text color)
+        },
+        'success': {
+            'bg': '#198754',  # background color
+            'fg': '#ffffff',  # foreground color (text color)
+            "icon": "check-circle"
+        },
+        'danger': {
+            'bg': '#dc3545',  # background color
+            'fg': '#ffffff',  # foreground color (text color)
+            "icon": "exclamation-triangle"
+        },
+        'warning': {
+            'bg': '#ffc107',  # background color
+            'fg': '#212529',  # foreground color (text color)
+            "icon": "exclamation-circle-fill"  # foreground color (text color)
+        },
+        'info': {
+            'bg': '#0dcaf0',  # background color
+            'fg': '#212529',  # foreground color (text color)
+            "icon": "info-circle"
+        },
+        'light': {
+            'bg': '#f8f9fa',  # background color
+            'fg': '#212529'  # foreground color (text color)
+        },
+        'dark': {
+            'bg': '#212529',  # background color
+            'fg': '#ffffff'  # foreground color (text color)
+        }
+    }
+
+
+    if mode=="cli" and update_cli:
+        print(message)
+    elif mode=="gui":
+        app.after(0, lambda: status_label.configure(text=message, text_color=bootstrap_colors.get(color, {}).get('bg', '#f8f9fa')))
+    elif mode=="web":
+        print("Updating status")
+        socketio.emit("status_update", {"message": message, "instance_id": instance_id, "color": color, "sticky": sticky, "spinner": spinner, "icon": icon if icon else bootstrap_colors.get(color, {}).get('icon', None)})
 
 
 def update_error(message):
     """Update the error label with a message, with a small delay."""
     # app.after(500, lambda: status_label.configure(text=message, text_color="red"))
-    status_label.configure(text=message, text_color="red")
+    if mode=="cli":
+        print(message)
+    if mode=="gui":
+        status_label.configure(text=message, text_color="red")
+    if mode=="web":
+        print(message)
+        socketio.emit("status_update", {"message": message, "instance_id": instance_id, "color": "danger"})
 
 
 def clear_url():
@@ -163,8 +221,6 @@ def show_global_context_menu(event):
 
 
 # * Configuration file I/O functions  ---
-
-
 def save_config():
 
     """Save the configuration from the UI fields to the file and update the in-memory config."""
@@ -238,51 +294,6 @@ def load_and_update_ui():
 
 # * Threaded functions for scraping and setting posters ---
 
-def run_url_scrape_thread():
-    """Run the URL scrape in a separate thread."""
-    global scrape_button, clear_button, bulk_import_button
-    url = url_entry.get()
-
-    if not url or not is_valid_url(url):
-        update_status("Please enter a valid URL.", color="red")
-        return
-
-    tabview.set("Session Log")
-    scrape_button.configure(state="disabled")
-    clear_button.configure(state="disabled")
-    bulk_import_button.configure(state="disabled")
-
-    threading.Thread(target=process_scrape_url_from_gui, args=(url,)).start()
-
-
-def run_bulk_import_scrape_thread():
-
-    """Run the bulk import scrape in a separate thread."""
-
-    global bulk_import_button
-    parsed_urls = []
-
-    # Grab the bulk list from the version currently in the GUI (whether saved or not)
-    bulk_import_list = bulk_import_text.get(1.0, ctk.END).strip().split("\n")
-
-    # Loop through the import file and build a list of URLs and options
-    # Ignoring any lines containing comments using # or //
-    for line in bulk_import_list:
-        if is_not_comment(line):
-            parsed_url = parse_url_and_options(line)
-            parsed_urls.append(parsed_url)
-
-    if not parsed_urls:
-        app.after(0, lambda: update_status("No bulk import entries found.", color="red"))
-        return
-
-    tabview.set("Session Log")
-    scrape_button.configure(state="disabled")
-    clear_button.configure(state="disabled")
-    bulk_import_button.configure(state="disabled")
-
-    # Pass the processing of the parsed URLs off to a thread
-    threading.Thread(target=process_bulk_import_from_gui, args=(parsed_urls,)).start()
 
 
 # UI Session Log
@@ -307,17 +318,38 @@ def update_log(update_text: str) -> None:
     """
 
     try:
-        print(update_text)
-        session_log_text.configure(state="normal")
-        session_log_text.insert("end",f"{update_text}\n")
-        session_log_text.configure(state="disabled")
+        if mode == "cli":
+            print(update_text)
+        elif mode == "gui":
+            session_log_text.configure(state="normal")
+            session_log_text.insert("end",f"{update_text}\n")
+            session_log_text.configure(state="disabled")
+        elif mode == "web":
+            update_web_log(f"{update_text}")
     except:
         pass
 
 
 # * Processing functions for scraping and setting posters from the GUI
 
-def process_scrape_url_from_gui(url: str) -> None:
+def run_url_scrape_thread():
+
+    """Run the URL scrape in a separate thread."""
+
+    url = url_entry.get()
+
+    if not url or not is_valid_url(url):
+        update_status("Please enter a valid URL.", color="red")
+        return
+
+    tabview.set("Session Log")
+    scrape_button.configure(state="disabled")
+    clear_button.configure(state="disabled")
+    bulk_import_button.configure(state="disabled")
+
+    threading.Thread(target=process_scrape_url_from_ui, args=(url,)).start()
+
+def process_scrape_url_from_ui(url: str) -> None:
 
     """
     Process the URL and any options, then scrape for posters and updates the GUI with the results
@@ -328,38 +360,90 @@ def process_scrape_url_from_gui(url: str) -> None:
     """
 
     try:
-
         # Check if the Plex TV and movie libraries are configured
         if plex.tv_libraries is None or plex.movie_libraries is None:
-            update_status("Plex setup incomplete. Please configure your settings.", color="red")
+            update_status("Plex setup incomplete. Please configure your settings.", color="warning")
             return
 
-        # Update the UI before we start
-        update_status(f"Scraping: {url}", color="#E5A00D")
-
-        # Process the URL and options passed from the UI
+        # Process the URL and options passed from the GUI or website
         parsed_line = parse_url_and_options(url)
 
+        # Update the UI before we start
+        update_status(f"Scraping: {parsed_line.url}", color="info", sticky=True, spinner=True)
+
         # Scrape the URL indicated, with the required options
-        scrape_and_upload(parsed_line.url, parsed_line.options)
+        if "/user/" in parsed_line.url:
+            scrape_tpdb_user(parsed_line.url, parsed_line.options)
+        else:
+            scrape_and_upload(parsed_line.url, parsed_line.options)
 
         # And update the UI when we're done
-        update_status(f"Posters successfully set for: {url}", color="#E5A00D")
+        update_status(f"Processed all artwork at {parsed_line.url}", color="success")
 
-    except Exception as scraping_error:
-        update_status(f"Error: {scraping_error}", color="red")
+    except ScraperException as scraping_error:
+        print("Exception")
+        update_status(f"{scraping_error}", color="danger")
 
     finally:
+        if mode == "gui":
+            # Reset the GUI
+            scrape_button.configure(state="normal")
+            clear_button.configure(state="normal")
+            bulk_import_button.configure(state="normal")
+        elif mode == "web":
+            socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "instance_id": instance_id, "mode": False})
 
-        # Reset the buttons on the UI
-        app.after(0, lambda: [
-            scrape_button.configure(state="normal"),
-            clear_button.configure(state="normal"),
-            bulk_import_button.configure(state="normal"),
-        ])
 
+def run_bulk_import_scrape_thread(web_list = None):
 
-def process_bulk_import_from_gui(parsed_urls: list) -> None:
+    """Run the bulk import scrape in a separate thread."""
+
+    global bulk_import_button
+    bulk_import_list = None
+    parsed_urls = []
+
+    if mode == "gui":
+        # Grab the bulk list from the version currently in the GUI (whether saved or not)
+        bulk_import_list = bulk_import_text.get(1.0, ctk.END)
+    elif mode == "web":
+        # Grab the one from the web interface
+        bulk_import_list = web_list
+
+    bulk_import_list = bulk_import_list.strip().split("\n")
+
+    # Loop through the import file and build a list of URLs and options
+    # Ignoring any lines containing comments using # or //
+    for line in bulk_import_list:
+        if is_not_comment(line):
+            parsed_url = parse_url_and_options(line)
+            parsed_urls.append(parsed_url)
+
+    if not parsed_urls:
+        if mode == "gui":
+            app.after(0, lambda: update_status("No bulk import entries found.", color="red"))
+            return
+        elif mode == "web":
+            update_status("No bulk import entries found.", color="danger")
+
+    if mode == "gui":
+        tabview.set("Session Log")
+        scrape_button.configure(state="disabled")
+        clear_button.configure(state="disabled")
+        bulk_import_button.configure(state="disabled")
+    elif mode == "web":
+        socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True,
+                                          "instance_id": instance_id})
+
+    # Pass the processing of the parsed URLs off to a thread
+    if mode == "gui":
+        threading.Thread(target=process_bulk_import_from_ui, args=(parsed_urls,)).start()
+    elif mode == "web":
+        try:
+            process_bulk_import_from_ui(parsed_urls)
+        except:
+            raise
+
+def process_bulk_import_from_ui(parsed_urls: list) -> None:
 
     """
     Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
@@ -376,21 +460,21 @@ def process_bulk_import_from_gui(parsed_urls: list) -> None:
 
         # Check if plex setup returned valid values
         if plex.tv_libraries is None or plex.movie_libraries is None:
-            update_status("Plex setup incomplete. Please configure your settings.", color="red")
+            update_status("Plex setup incomplete. Please check the settings.", color="red")
             return
 
-        for i, parsed_url in enumerate(parsed_urls):
+        for i, parsed_line in enumerate(parsed_urls):
 
-            status_text = f"Processing item {i + 1} of {len(parsed_urls)}: {parsed_url.url}"
+            status_text = f"Processing item {i + 1} of {len(parsed_urls)}: {parsed_line.url}"
             update_status(status_text, color="#E5A00D")
 
             # Parse according to whether it's a user portfolio or poster / set URL
-            if "/user/" in parsed_url.url:
-                scrape_tpdb_user(parsed_url.url, parsed_url.options)
+            if "/user/" in parsed_line.url:
+                scrape_tpdb_user(parsed_line.url, parsed_line.options)
             else:
-                scrape_and_upload(parsed_url.url, parsed_url.options)
+                scrape_and_upload(parsed_line.url, parsed_line.options)
 
-            update_status(f"Completed: {parsed_url.url}", color="#E5A00D")
+            update_status(f"Completed: {parsed_line.url}", color="#E5A00D")
 
 
         update_status("Bulk import scraping completed.", color="#E5A00D")
@@ -400,11 +484,119 @@ def process_bulk_import_from_gui(parsed_urls: list) -> None:
         update_status(f"Error during bulk import: {e}", color="red")
 
     finally:
-        app.after(0, lambda: [
+        if mode == "gui":
+            app.after(0, lambda: [
             scrape_button.configure(state="normal"),
             clear_button.configure(state="normal"),
             bulk_import_button.configure(state="normal"),
         ])
+        elif mode == "web":
+            socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False,
+                                              "instance_id": instance_id})
+
+# Scrape all pages of a TPDb user's uploaded artwork
+def scrape_tpdb_user(url, options):
+
+    pages = 0
+
+    if "?" in url:
+        cleaned_url = url.split("?")[0]
+        url = cleaned_url
+
+    try:
+        user_scraper = ThePosterDBScraper(url)
+        user_scraper.scrape_user_info()
+        pages = user_scraper.user_pages
+    except ScraperException as cannot_scrape:
+        print(str(cannot_scrape))
+        raise
+
+    try:
+        for page in range(pages):
+            page_url = f"{url}?section=uploads&page={page + 1}"
+            scrape_and_upload(page_url, options)
+    except Exception:
+        raise ScraperException(f"Failed to process and upload from URL: {url}")
+
+# Scraped the URL then uploads what it's scraped to Plex
+def scrape_and_upload(url, options):
+
+    global plex
+
+    print("Scraping started")
+    # Let's scrape the posters first
+    scraper = Scraper(url)
+    scraper.set_options(options)
+    print("Scraping happening now")
+    try:
+        scraper.scrape()
+    except ScraperException:
+        print("ScraperException")
+        raise
+    except Exception as e:
+        print("Other Exception")
+        raise Exception(e)
+
+    print("Scraping finished, no exceptions")
+
+
+    # Now upload them to Plex
+    processor = UploadProcessor(plex)
+    processor.set_options(options)
+
+    if scraper.collection_artwork:
+        for artwork in scraper.collection_artwork:
+            try:
+                update_status(f'Processing artwork for {artwork["title"]}', spinner=True)
+                result = processor.process_collection_artwork(artwork)
+                update_log(result)
+            except CollectionNotFound as not_found:
+                update_log(f"∙ {str(not_found)}")
+            except NotProcessedByExclusion as excluded:
+                update_log(f"- {str(excluded)}")
+            except NotProcessedByFilter as not_processed:
+                update_log(f"- {str(not_processed)}")
+            except Exception as error_unexpected:
+                update_log(f"x {str(error_unexpected)}")
+                exit(500)
+
+    if scraper.movie_artwork:
+        for artwork in scraper.movie_artwork:
+            try:
+                update_status(f'Processing artwork for {artwork["title"]}', spinner=True)
+                result = processor.process_movie_artwork(artwork)
+                update_log(result)
+            except MovieNotFound as not_found:
+                update_log(f"∙ {str(not_found)}")
+            except NotProcessedByExclusion as excluded:
+                update_log(f"- {str(excluded)}")
+            except NotProcessedByFilter as not_processed:
+                update_log(f"- {str(not_processed)}")
+            except Exception as error_unexpected:
+                update_log(f"x {str(error_unexpected)}")
+                exit(500)
+
+
+    if scraper.tv_artwork:
+        for artwork in scraper.tv_artwork:
+            try:
+                update_status(f'Processing artwork for {artwork["title"]}', spinner=True)
+                result = processor.process_tv_artwork(artwork)
+                update_log(result)
+            except ShowNotFound as not_found:
+                update_log(f"∙ {str(not_found)}")
+            except NotProcessedByExclusion as excluded:
+                update_log(f"- {str(excluded)}")
+            except NotProcessedByFilter as not_processed:
+                update_log(f"- {str(not_processed)}")
+            except Exception as error_unexpected:
+                update_log(f"x {str(error_unexpected)}")
+                exit(500)
+
+
+
+
+
 
 
 # * Bulk import file I/O functions ---
@@ -423,10 +615,14 @@ def load_bulk_import_file():
         bulk_txt_path = os.path.join(get_exe_dir(), bulk_txt_path)
 
         if not os.path.exists(bulk_txt_path):
-            print(f"File does not exist: {bulk_txt_path}")
-            bulk_import_text.delete(1.0, ctk.END)
-            bulk_import_text.insert(ctk.END, "Bulk import file path is not set or file does not exist.")
-            status_label.configure(text="Bulk import file path not set or file not found.", text_color="red")
+            if mode == "cli":
+                print(f"File does not exist: {bulk_txt_path}")
+            elif mode == "gui":
+                bulk_import_text.delete(1.0, ctk.END)
+                bulk_import_text.insert(ctk.END, "Bulk import file path is not set or file does not exist.")
+                status_label.configure(text="Bulk import file path not set or file not found.", text_color="red")
+            elif mode == "web":
+                update_status(f"File does not exist: {bulk_txt_path}")
             return
 
         with open(bulk_txt_path, "r", encoding="utf-8") as file:
@@ -916,93 +1112,83 @@ def check_libraries():
     return plex.tv_libraries and plex.movie_libraries
 
 
-# Scrape all pages of a TPDb user's uploaded artwork
-def scrape_tpdb_user(url, options):
 
-    pages = 0
 
-    if "?" in url:
-        cleaned_url = url.split("?")[0]
-        url = cleaned_url
+def setup_web_sockets():
 
-    try:
-        user_scraper = ThePosterDBScraper(url)
-        user_scraper.scrape_user_info()
-        pages = user_scraper.user_pages
-    except ScraperException as cannot_scrape:
-        print(str(cannot_scrape))
-        return
+    @web_app.route("/")
+    def home():
+        return render_template("web_interface.html", config=config)
 
-    try:
-        for page in range(pages):
-            page_url = f"{url}?section=uploads&page={page + 1}"
-            scrape_and_upload(page_url, options)
-    except Exception:
-        raise ScraperException(f"Failed to process and upload from URL: {url}")
 
-# Scraped the URL then uploads what it's scraped to Plex
-def scrape_and_upload(url, options):
+    @socketio.on("start_scrape")
+    def handle_scrape_from_web(data):
+        global instance_id
+        instance_id = data.get("instance_id")
+        url = data.get("url").lower()
+        options = data.get("options")
+        filters = data.get("filters")
+        if url:
+            if options:
+                url = url + " "+ " --".join(options)
+            if filters and len(filters) < 6:
+                url = url + " --filters " + " ".join(filters)
 
-    global plex
+            socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True, "instance_id": instance_id})
 
-    # Let's scrape the posters first
-    scraper = Scraper(url)
-    scraper.set_options(options)
-    scraper.scrape()
+            process_scrape_url_from_ui(url)
 
-   # print(vars(scraper))
+    @socketio.on("start_bulk_import")
+    def handle_bulk_import_from_web(data):
+        global instance_id
+        instance_id = data.get("instance_id")
+        bulk_list = data.get("bulk_list").lower()
+        print(bulk_list)
+        run_bulk_import_scrape_thread(bulk_list)
 
-    # Now upload them to Plex
-    processor = UploadProcessor(plex)
-    processor.set_options(options)
 
-    if scraper.collection_artwork:
-        for artwork in scraper.collection_artwork:
+    @socketio.on("save_bulk_import")
+    def handle_bulk_import(data):
+        content = data.get("content")
+        if content:
             try:
-                result = processor.process_collection_artwork(artwork)
-                update_log(result)
-            except CollectionNotFound as not_found:
-                update_log(f"∙ {str(not_found)}")
-            except NotProcessedByExclusion as excluded:
-                update_log(f"- {str(excluded)}")
-            except NotProcessedByFilter as not_processed:
-                update_log(f"- {str(not_processed)}")
-            except Exception as error_unexpected:
-                update_log(f"x {str(error_unexpected)}")
+                with open(config["bulk_import_file"], "w", encoding="utf-8") as file:
+                    file.write(content)
+                update_status("Bulk import file saved successfully!", "green")
+            except Exception as e:
+                update_status(f"Error saving bulk import file: {str(e)}", "red")
 
-    if scraper.movie_artwork:
-        for artwork in scraper.movie_artwork:
-            try:
-                result = processor.process_movie_artwork(artwork)
-                update_log(result)
-            except MovieNotFound as not_found:
-                update_log(f"∙ {str(not_found)}")
-            except NotProcessedByExclusion as excluded:
-                update_log(f"- {str(excluded)}")
-            except NotProcessedByFilter as not_processed:
-                update_log(f"- {str(not_processed)}")
-            except Exception as error_unexpected:
-                update_log(f"x {str(error_unexpected)}")
+    @socketio.on("load_config")
+    def load_config_web(data):
+        global instance_id, config
+        instance_id = data.get("instance_id")
+        config.load()
+        socketio.emit("load_config", {"config": vars(config), "instance_id": instance_id} )
 
-    if scraper.tv_artwork:
-        for artwork in scraper.tv_artwork:
-            try:
-                result = processor.process_tv_artwork(artwork)
-                update_log(result)
-            except ShowNotFound as not_found:
-                update_log(f"∙ {str(not_found)}")
-            except NotProcessedByExclusion as excluded:
-                update_log(f"- {str(excluded)}")
-            except NotProcessedByFilter as not_processed:
-                update_log(f"- {str(not_processed)}")
-            except Exception as error_unexpected:
-                update_log(f"x {str(error_unexpected)}")
+    @socketio.on("save_config")
+    def save_config_web(data):
+        global instance_id, config
+        instance_id = data.get("instance_id")
+        # Unpack the config dictionary into the local config
+        for key, value in data.get("config").items():
+            setattr(config, key, value)
+        config.save()
+        print(vars(config))
+        update_status(f"Configuration saved", "warning")
 
+    # Load the web server
+    socketio.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
+
+def update_web_log(message):
+    """Send status updates to the frontend via WebSockets."""
+    socketio.emit("log_update", {"message": message, "instance_id": instance_id} )
 
 
 
 # * Main Initialization ---
 if __name__ == "__main__":
+
+    instance_id = None
 
     # Process command line arguments
     args = arguments.parse_arguments()
@@ -1049,6 +1235,8 @@ if __name__ == "__main__":
         # Create the GUI if we need to
         if cli_command == 'gui':
 
+            mode = "gui"
+
             # Erase any arguments set in the CLI
             cli_options = Options()
 
@@ -1075,16 +1263,24 @@ if __name__ == "__main__":
             cli_options.year = None
             cli_options.add_posters = False
             cli_options.add_sets = False
-            scrape_tpdb_user(cli_command, cli_options)
+            try:
+                scrape_tpdb_user(cli_command, cli_options)
+            except:
+                print("Oops - handle this user error properly!")
 
         # User passed in a poster or set URL, so let's process that
         else:
-            scrape_and_upload(cli_command, cli_options)
-
+            try:
+                scrape_and_upload(cli_command, cli_options)
+            except Exception as e:
+                update_status(str(e),color="danger", update_cli=True)
     else:
 
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
         if not interactive_cli:
+
+            mode = "web"
+            print("Setting up web interface")
 
             # Connect to the TV and Movie libraries
             try:
@@ -1097,10 +1293,10 @@ if __name__ == "__main__":
             except PlexConnectorException as e:
                 sys.exit(str(e))
 
-            # Create the app and UI
-            app = ctk.CTk()
-            create_ui()
-
+            # Create the app and web server
+            web_app = Flask(__name__, template_folder="templates")
+            socketio = SocketIO(web_app, cors_allowed_origins="*")
+            setup_web_sockets()
 
 
         else:

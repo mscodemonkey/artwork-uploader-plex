@@ -51,16 +51,18 @@ class Scraper:
         Returns:
             None
         """
-
-        if self.source == "theposterdb":
-            self.scrape_theposterdb()
-        elif self.source == "mediux":
-            self.scrape_mediux()
-        elif self.source == "html":
-            return self.scrape_html()
-        else:
-            raise ScraperException(f"Invalid source provided ({self.source if self.source else 'empty source'})")
-
+        try:
+            print(self.source)
+            if self.source == "theposterdb":
+                self.scrape_theposterdb()
+            elif self.source == "mediux":
+                self.scrape_mediux()
+            elif self.source == "html":
+                return self.scrape_html()
+            else:
+                raise ScraperException(f"Invalid source provided ({self.source if self.source else 'empty source'})")
+        except Exception as e:
+            raise
 
     def scrape_theposterdb(self):
         try:
@@ -72,7 +74,7 @@ class Scraper:
             self.tv_artwork = theposterdb_scraper.tv_artwork
             self.collection_artwork = theposterdb_scraper.collection_artwork
 
-        except ScraperException:
+        except ScraperException as scraper_exception:
             raise
         except Exception as e:
             raise Exception(f"Unexpected error: {e}")

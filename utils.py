@@ -103,6 +103,8 @@ def parse_url_and_options(line):
     Each line could contain the URL and any options
     """
 
+    print(f"Line: {line}")
+
     # Split the line by spaces
     parts = line.strip().split()
 

@@ -94,7 +94,7 @@ https://theposterdb.com/set/145261
 https://theposterdb.com/set/263289
 
 // Dreamworks
-https://theposterdb.com/set/65006
+https://theposterdb.com/set/65006 --exclude 28339
 
 // Dumb and Dumber
 https://theposterdb.com/set/6048
@@ -104,6 +104,9 @@ https://theposterdb.com/set/55087
 
 // Fast and Furious
 https://theposterdb.com/set/221829
+
+// Frozen Collection
+https://theposterdb.com/index.php/set/32996 --filters collection_poster
 
 // Ghostbusters
 https://theposterdb.com/set/122495
@@ -157,6 +160,9 @@ https://theposterdb.com/set/9203
 
 // Mission: Impossible
 https://theposterdb.com/set/5765
+
+// Nymphomaniac
+https://mediux.pro/sets/2330
 
 // Ocean's 11...
 https://theposterdb.com/set/70
