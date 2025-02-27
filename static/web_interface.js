@@ -1,5 +1,4 @@
 
-        const socket = io();
 
         function generateUUID() {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -8,7 +7,15 @@
             });
         }
 
-        const instance_id = generateUUID();
+        function getInstanceId() {
+            let instanceId = localStorage.getItem("instanceId");
+            if (!instanceId) {
+                instanceId = crypto.randomUUID();
+                localStorage.setItem("instanceId", instanceId);
+            }
+            return instanceId;
+        }
+
 
         function element_disable(element_ids, mode = true) {
             if (!element_ids) return;  // Exit if no element_ids provided
@@ -27,7 +34,10 @@
             });
         }
 
-
+        let config = {};
+        const socket = io();
+        const instanceId = getInstanceId();
+        let currentBulkImport;
         let statusTimeout; // Store timeout reference
         const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
 
@@ -114,22 +124,40 @@
 
         // Modify your socket listener to check the message's tag or instanceId
         socket.on("element_disable", (data) => {
-            if (data.instance_id === "broadcast" || data.instance_id === instance_id) {
+            if (data.instance_id === "broadcast" || data.instance_id === instanceId) {
                 element_disable(data.element, data.mode);
             }
         });
 
         socket.on("status_update", (data) => {
-            if (data.instance_id === "broadcast" || data.instance_id === instance_id) {
+            if (data.instance_id === "broadcast" || data.instance_id === instanceId) {
                 updateStatus(data.message, data.color, data.sticky, data.spinner, data.icon);
             }
         });
 
         socket.on("log_update", (data) => {
-            if (data.instance_id === "broadcast" || data.instance_id === instance_id) {
+            if (data.instance_id === "broadcast" || data.instance_id === instanceId) {
                 updateLog(data.message);
             }
         });
+
+        socket.on("progress_bar", (data) => {
+
+            const bar_container = document.getElementById("progress_bar_container")
+            const bar = document.getElementById("progress_bar")
+            if (data.percent <= 100) {
+                bar_container.classList.add("show")
+                bar.style.width = data.percent + "%"
+                bar_container.ariaValueNow = data.message
+                bar.innerHTML = data.message || ""
+
+                if (data.percent == 100) {
+                    barTimer = setTimeout(() => {
+                        bar_container.classList.remove('show'); // Fade out the progress bar after a second
+                    }, 1000);
+                }
+            }
+        })
 
             document.getElementById("save_config_button").addEventListener("click", function(event) {
 
@@ -140,42 +168,84 @@
 
                 if (form.checkValidity()) {
                     // Form is valid, proceed with saving config
-                    const config = {};
+                    const save_config = {};
 
-                    config.base_url = document.getElementById("plex_base_url").value.trim();
-                    config.token = document.getElementById("plex_token").value.trim();
-                    config.bulk_txt = document.getElementById("bulk_import_file").value.trim();
+                    save_config.base_url = document.getElementById("plex_base_url").value.trim();
+                    save_config.token = document.getElementById("plex_token").value.trim();
+                    save_config.bulk_txt = document.getElementById("bulk_import_file").value;
 
                     // Convert comma-separated library inputs to arrays
-                    config.tv_library = document.getElementById("tv_library").value
+                    save_config.tv_library = document.getElementById("tv_library").value
                         .split(",")
                         .map(item => item.trim())
                         .filter(item => item !== ""); // Remove empty values
 
-                    config.movie_library = document.getElementById("movie_library").value
+                    save_config.movie_library = document.getElementById("movie_library").value
                         .split(",")
                         .map(item => item.trim())
                         .filter(item => item !== ""); // Remove empty values
 
                     // Checkbox for tracking artwork IDs
-                    config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
+                    save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
 
                     // Get selected mediux filters
-                    config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
+                    save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
                         .map(checkbox => checkbox.value);
 
                     // Get selected tpdb filters
-                    config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
+                    save_config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
                         .map(checkbox => checkbox.value);
 
-                    console.log("Really saving" + config)
-
-                    socket.emit("save_config", { instance_id: instance_id, config: config });
+                    socket.emit("save_config", { instance_id: instanceId, config: save_config });
 
                 } else {
                     form.classList.add("was-validated");
                 }
             });
+
+        socket.on("save_config", (data) => {
+            if (data.saved) {
+                updateStatus("Configuration saved","success", false, false, "check-circle")
+            } else {
+                updateStatus("Configuration could not be saved","danger", false, false, "cross-circle")
+            }
+        });
+
+        document.getElementById("bulk_import_file").addEventListener("change", function () {
+            const selectedFile = this.value; // Get selected file from dropdown
+            if (!selectedFile) return; // Do nothing if no file is selected
+
+            showLoadBulkImportModal(selectedFile).then((confirmed) => {
+                if (confirmed) {
+                    loadBulkImport(selectedFile);
+                }
+            });
+        });
+
+function showLoadBulkImportModal(filename) {
+    return new Promise((resolve) => {
+        const modalElement = document.getElementById("loadBulkImportModal");
+
+        // Update modal message with selected filename
+        document.getElementById("loadModalMessage").innerText = `Do you want to load "${filename}" now?`;
+
+        // Show modal
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Handle button clicks
+        document.getElementById("confirmLoad").onclick = () => {
+            modal.hide();
+            resolve(true);
+        };
+
+        document.getElementById("cancelLoad").onclick = () => {
+            modal.hide();
+            resolve(false);
+        };
+    });
+}
+
 
 
         function startScrape() {
@@ -198,7 +268,7 @@
                 });
 
                 const url = document.getElementById("scrape_url").value;
-                socket.emit("start_scrape", { url: url, options: options, filters: filters, instance_id: instance_id });
+                socket.emit("start_scrape", { url: url, options: options, filters: filters, instance_id: instanceId });
             } else {
                 // Trigger Bootstrap validation styles
                 form.classList.add('was-validated');
@@ -207,7 +277,7 @@
 
         document.addEventListener("DOMContentLoaded", function () {
 
-            updateLog("> New session started with ID: " + instance_id)
+            updateLog("> New session started with ID: " + instanceId)
 
             loadConfig()
 
@@ -247,14 +317,17 @@
         });
 
         function loadConfig() {
-            socket.emit("load_config", { instance_id: instance_id });
+            socket.emit("load_config", { instance_id: instanceId });
         }
 
         socket.on("load_config", (data) => {
-            if (data.instance_id === instance_id) {
+            if (data.instance_id === instanceId && data.config) {
+
+                config = data.config;
+
                 document.getElementById("plex_base_url").value = data.config.base_url
                 document.getElementById("plex_token").value = data.config.token
-                document.getElementById("bulk_import_file").value = data.config.bulk_txt
+                loadBulkFileList()
                 document.getElementById("tv_library").value = data.config.tv_library.join(", ")
                 document.getElementById("movie_library").value = data.config.movie_library.join(", ")
                 document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids
@@ -267,30 +340,116 @@
             }
         });
 
+        function loadBulkImport(bulkImport = null) {
+            if (!bulkImport) {bulkImport = config.bulk_txt;}
+            console.log(bulkImport)
+            socket.emit("load_bulk_import", { instance_id: instanceId, filename: bulkImport });
+        }
 
+        socket.on("load_bulk_import", (data) => {
+            console.log(data.instance_id, instanceId)
+            if (data.instance_id === instanceId) {
+                if (data.loaded) {
+                    const textArea = document.getElementById("bulk_import_text");
+                    textArea.value = data.bulk_import_text;
+                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
+                } else {
+                    updateStatus("Bulk import file could not be loaded","danger", false, false, "cross-circle")
+                }
+            }
+        });
 
+        function checkBulkImportFileToSave() {
+            let filename = document.getElementById("bulk_import_file").value;
 
-        function saveBulkImport() {
-            const content = document.getElementById("bulk_import_text").value;
-            socket.emit("save_bulk_import", { content: content });
+            if (currentBulkImport && (filename !== currentBulkImport.name)) {
+
+                // Show modal and wait for user choice
+                showSaveBulkImportModal(currentBulkImport.name, filename).then((choice) => {
+                    filename = choice;
+                    console.log("User choice was : " + filename);
+
+                    // Call the function that saves the file here if needed
+                    saveBulkImport(filename);
+                });
+            } else {
+                saveBulkImport(filename);
+            }
+        }
+
+        function loadBulkFileList() {
+            socket.emit("load_bulk_filelist", { instance_id: instanceId });
+        }
+
+        socket.on("load_bulk_filelist", (data) => {
+            if (data.instance_id === instanceId) {
+                const selectElement = document.getElementById("bulk_import_file");
+
+                // Clear existing options
+                selectElement.innerHTML = "";
+
+                let selectedFile = config.bulk_txt || ""; // Get the selected file from config
+
+                if (data.bulk_files.length > 0) {
+                    // Populate the dropdown with filenames
+                    data.bulk_files.forEach(filename => {
+                        const option = document.createElement("option");
+                        option.value = filename;
+                        option.textContent = filename;
+
+                        // Preselect the option if it matches the config.bulk_txt value
+                        if (filename === selectedFile) {
+                            option.selected = true;
+                            if (!document.getElementById("bulk_import_text").value) {loadBulkImport(filename)}
+                        }
+                        selectElement.appendChild(option);
+                   });
+                } else {
+                    // Show placeholder when no files exist
+                    const placeholder = document.createElement("option");
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    placeholder.value = "bulk_import.txt"
+                    placeholder.textContent = "Will create bulk_import.txt when saved";
+                    selectElement.appendChild(placeholder);
+                }
+            }
+        });
+
+        function saveBulkImport(filename) {
+            console.log("File to save is: " + filename);
+            const textArea = document.getElementById("bulk_import_text");
+
+            const fileData = {
+                filename: filename,
+                content: textArea.value
+            };
+
+            // Emit the event to Flask via Socket.IO
+            socket.emit("save_bulk_import", fileData);
         }
 
         function uploadBulkImportFile(event) {
+
+            const fileInput = event.target;
+            const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : "Upload a file";
+            document.getElementById("bulk_import_label").innerText = fileName;
+
             const file = event.target.files[0];
             if (file) {
-                console.log("File selected:", file.name); // Debugging
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     document.getElementById("bulk_import_text").value = e.target.result;
                 };
                 reader.readAsText(file);
+                currentBulkImport = file.name
             } else {
                 console.error("No file selected");
             }
         }
 
         function runBulkImport() {
-            socket.emit("start_bulk_import",{instance_id: instance_id, bulk_list: document.getElementById("bulk_import_text").value});
+            socket.emit("start_bulk_import",{instance_id: instanceId, bulk_list: document.getElementById("bulk_import_text").value});
         }
 
         // Validation
@@ -312,3 +471,31 @@
                 }, false);
             });
         })();
+
+        function showSaveBulkImportModal(current_bulk_import, default_bulk_import) {
+            return new Promise((resolve) => {
+        const modalElement = document.getElementById("saveBulkImportModal");
+
+        // Update modal text with variable values
+        document.getElementById("saveModalMessage").innerText = `Do you want to save as "${currentBulkImport}" rather than "${default_bulk_import}"?`;
+        document.getElementById("currentFileName").innerText = currentBulkImport;
+        document.getElementById("defaultFileName").innerText = default_bulk_import;
+
+        // Show modal
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Handle button clicks
+        document.getElementById("saveAsCurrent").onclick = () => {
+            modal.hide();
+            resolve(currentBulkImport);
+        };
+
+        document.getElementById("useDefault").onclick = () => {
+            modal.hide();
+            resolve(default_bulk_import);
+        };
+    });
+}
+
+

@@ -1,14 +1,16 @@
 
-# Plex Artwork Uploader (plex-poster-set-helper)
+# Artwork Scraper for Plex (plex-poster-set-helper)
 
 Plex Artwork Uploader is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
 # What's different in this fork?
-We (optionally) store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
+Lots!  We (optionally) store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
 
 There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
 
 And there are other options such as per-URL filtering and year matching, fixing missing things that i found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
+
+Oh and there's a shiny new web UI!
 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
@@ -141,6 +143,13 @@ When using bulk import, if no file path is specified, the script will default to
 The GUI provides a more user-friendly interface for managing poster uploads. Users can run the script with python plex_poster_set_helper.py gui to launch the CustomTkinter-based interface, where they can:
 - Easily enter single or bulk URLs.
 - View progress, status updates, and more in an intuitive layout.
+
+## New web UI
+![Settings](assets/settings.png)
+![Bulk Import](assets/web_bulk_import.png)
+![Processing](assets/processing.png)
+![Scraper](assets/url_scraper.png)
+![Session Log](assets/session_log.png)
 
 
 ## Multiple Libraries

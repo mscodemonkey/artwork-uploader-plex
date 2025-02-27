@@ -145,10 +145,8 @@ class ThePosterDBScraper:
                 set_url = poster_div.find('a', class_='rounded view_all')['href']
                 if set_url:
                     some_more_soup = soup_utils.cook_soup(set_url)
-                    movies, shows, collections = self.scrape_posters(some_more_soup)
-                    self.movie_artwork.extend(movies)
-                    self.tv_artwork.extend(shows)
-                    self.collection_artwork.extend(collections)
+                    self.scrape_posters(some_more_soup)
+
 
 
     def scrape_posters(self, soup):

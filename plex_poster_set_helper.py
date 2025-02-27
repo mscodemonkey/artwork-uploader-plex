@@ -1,3 +1,4 @@
+from pathlib import Path
 
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 from flask_socketio import SocketIO
@@ -163,8 +164,7 @@ def update_status(message, color="white", update_cli = False, sticky = False, sp
     elif mode=="gui":
         app.after(0, lambda: status_label.configure(text=message, text_color=bootstrap_colors.get(color, {}).get('bg', '#f8f9fa')))
     elif mode=="web":
-        print("Updating status")
-        socketio.emit("status_update", {"message": message, "instance_id": instance_id, "color": color, "sticky": sticky, "spinner": spinner, "icon": icon if icon else bootstrap_colors.get(color, {}).get('icon', None)})
+        notify_web("status_update", {"message": message, "color": color, "sticky": sticky, "spinner": spinner, "icon": icon if icon else bootstrap_colors.get(color, {}).get('icon', None)})
 
 
 def update_error(message):
@@ -176,7 +176,7 @@ def update_error(message):
         status_label.configure(text=message, text_color="red")
     if mode=="web":
         print(message)
-        socketio.emit("status_update", {"message": message, "instance_id": instance_id, "color": "danger"})
+        notify_web("status_update", {"message": message, "color": "danger"})
 
 
 def clear_url():
@@ -227,7 +227,7 @@ def save_config():
 
     global config
 
-    # Set new vslues for the config, from the UI
+    # Set new values for the config, from the UI
     config.base_url = base_url_entry.get().strip()
     config.token = token_entry.get().strip()
     config.tv_library = [item.strip() for item in tv_library_text.get().strip().split(",")]
@@ -391,7 +391,7 @@ def process_scrape_url_from_ui(url: str) -> None:
             clear_button.configure(state="normal")
             bulk_import_button.configure(state="normal")
         elif mode == "web":
-            socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "instance_id": instance_id, "mode": False})
+            notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 
 def run_bulk_import_scrape_thread(web_list = None):
@@ -431,8 +431,7 @@ def run_bulk_import_scrape_thread(web_list = None):
         clear_button.configure(state="disabled")
         bulk_import_button.configure(state="disabled")
     elif mode == "web":
-        socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True,
-                                          "instance_id": instance_id})
+        notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
 
     # Pass the processing of the parsed URLs off to a thread
     if mode == "gui":
@@ -463,10 +462,14 @@ def process_bulk_import_from_ui(parsed_urls: list) -> None:
             update_status("Plex setup incomplete. Please check the settings.", color="red")
             return
 
+        notify_web("progress_bar", {"percent" : 0} )
+
         for i, parsed_line in enumerate(parsed_urls):
 
-            status_text = f"Processing item {i + 1} of {len(parsed_urls)}: {parsed_line.url}"
-            update_status(status_text, color="#E5A00D")
+            status_text = f"Scraping URL {i + 1} of {len(parsed_urls)}: {parsed_line.url}"
+
+           # update_status(status_text, color="info", spinner=True, sticky=True)
+            notify_web("element_disable", {"element": [ "bulk_button"], "mode": True})
 
             # Parse according to whether it's a user portfolio or poster / set URL
             if "/user/" in parsed_line.url:
@@ -474,14 +477,16 @@ def process_bulk_import_from_ui(parsed_urls: list) -> None:
             else:
                 scrape_and_upload(parsed_line.url, parsed_line.options)
 
-            update_status(f"Completed: {parsed_line.url}", color="#E5A00D")
+            notify_web("progress_bar", {"message": f"{i+1} of {len(parsed_urls)}", "percent" : ((i + 1 / len(parsed_urls)) * 100)} )
+            #update_status(f"Completed: {parsed_line.url}", color="#E5A00D")
 
-
-        update_status("Bulk import scraping completed.", color="#E5A00D")
+        notify_web("progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
+        update_status("Bulk import scraping completed.", color="success")
 
     except Exception as e:
 
-        update_status(f"Error during bulk import: {e}", color="red")
+        notify_web("progress_bar", {"percent": 100})
+        update_status(f"Error during bulk import: {e}", color="danger")
 
     finally:
         if mode == "gui":
@@ -491,8 +496,7 @@ def process_bulk_import_from_ui(parsed_urls: list) -> None:
             bulk_import_button.configure(state="normal"),
         ])
         elif mode == "web":
-            socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False,
-                                              "instance_id": instance_id})
+            notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 # Scrape all pages of a TPDb user's uploaded artwork
 def scrape_tpdb_user(url, options):
@@ -527,18 +531,12 @@ def scrape_and_upload(url, options):
     # Let's scrape the posters first
     scraper = Scraper(url)
     scraper.set_options(options)
-    print("Scraping happening now")
     try:
         scraper.scrape()
     except ScraperException:
-        print("ScraperException")
         raise
     except Exception as e:
-        print("Other Exception")
         raise Exception(e)
-
-    print("Scraping finished, no exceptions")
-
 
     # Now upload them to Plex
     processor = UploadProcessor(plex)
@@ -547,7 +545,7 @@ def scrape_and_upload(url, options):
     if scraper.collection_artwork:
         for artwork in scraper.collection_artwork:
             try:
-                update_status(f'Processing artwork for {artwork["title"]}', spinner=True)
+                update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_collection_artwork(artwork)
                 update_log(result)
             except CollectionNotFound as not_found:
@@ -563,7 +561,7 @@ def scrape_and_upload(url, options):
     if scraper.movie_artwork:
         for artwork in scraper.movie_artwork:
             try:
-                update_status(f'Processing artwork for {artwork["title"]}', spinner=True)
+                update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_movie_artwork(artwork)
                 update_log(result)
             except MovieNotFound as not_found:
@@ -580,7 +578,7 @@ def scrape_and_upload(url, options):
     if scraper.tv_artwork:
         for artwork in scraper.tv_artwork:
             try:
-                update_status(f'Processing artwork for {artwork["title"]}', spinner=True)
+                update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_tv_artwork(artwork)
                 update_log(result)
             except ShowNotFound as not_found:
@@ -601,7 +599,7 @@ def scrape_and_upload(url, options):
 
 # * Bulk import file I/O functions ---
 
-def load_bulk_import_file():
+def load_bulk_import_file(filename = None):
 
     """Load the bulk import file into the text area."""
 
@@ -609,52 +607,72 @@ def load_bulk_import_file():
 
     try:
         # Get the current bulk_txt value from the config
-        bulk_txt_path = config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+        bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+        bulk_imports_path = "bulk_imports/"
 
         # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
-        bulk_txt_path = os.path.join(get_exe_dir(), bulk_txt_path)
+        bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
 
-        if not os.path.exists(bulk_txt_path):
+        if not os.path.exists(bulk_import_file):
             if mode == "cli":
-                print(f"File does not exist: {bulk_txt_path}")
+                print(f"File does not exist: {bulk_import_file}")
             elif mode == "gui":
                 bulk_import_text.delete(1.0, ctk.END)
                 bulk_import_text.insert(ctk.END, "Bulk import file path is not set or file does not exist.")
                 status_label.configure(text="Bulk import file path not set or file not found.", text_color="red")
             elif mode == "web":
-                update_status(f"File does not exist: {bulk_txt_path}")
+                update_status(f"File does not exist: {bulk_import_file}")
             return
 
-        with open(bulk_txt_path, "r", encoding="utf-8") as file:
+        with open(bulk_import_file, "r", encoding="utf-8") as file:
             content = file.read()
 
-        bulk_import_text.delete(1.0, ctk.END)
-        bulk_import_text.insert(ctk.END, content)
-
+        if mode == "gui":
+            bulk_import_text.delete(1.0, ctk.END)
+            bulk_import_text.insert(ctk.END, content)
+        elif mode == "web":
+            notify_web("load_bulk_import",{"loaded": True, "filename": bulk_import_filename, "bulk_import_text":content})
     except FileNotFoundError:
         bulk_import_text.delete(1.0, ctk.END)
         bulk_import_text.insert(ctk.END, "File not found or empty.")
+        notify_web("load_bulk_import", {"loaded": False})
     except Exception as e:
         bulk_import_text.delete(1.0, ctk.END)
         bulk_import_text.insert(ctk.END, f"Error loading file: {str(e)}")
+        notify_web("load_bulk_import", {"loaded": False})
 
 
-def save_bulk_import_file():
+def save_bulk_import_file(contents = None, filename = None):
     """Save the bulk import text area content to a file relative to the executable location."""
-    try:
-        exe_path = get_exe_dir()
-        bulk_txt_path = os.path.join(exe_path, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
 
-        os.makedirs(os.path.dirname(bulk_txt_path), exist_ok=True)
+    if mode == "gui":
+        contents = bulk_import_text.get(1.0, ctk.END).strip()
 
-        with open(bulk_txt_path, "w", encoding="utf-8") as file:
-            file.write(bulk_import_text.get(1.0, ctk.END).strip())
+    if contents:
+        try:
+            exe_path = get_exe_dir()
+            bulk_import_path = "bulk_imports/"
+            bulk_import_file = os.path.join(exe_path, bulk_import_path, filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
 
-        status_label.configure(text="Bulk import file saved!", text_color="#E5A00D")
-    except Exception as e:
-        status_label.configure(
-            text=f"Error saving bulk import file: {str(e)}", text_color="red"
-        )
+            os.makedirs(os.path.dirname(bulk_import_file), exist_ok=True)
+
+            with open(bulk_import_file, "w", encoding="utf-8") as file:
+                file.write(contents)
+
+            update_status(message="Bulk import file saved", color="success")
+            notify_web("save_bulk_import",{"saved": True})
+        except Exception as e:
+            update_status(message="Error saving bulk import file", color="danger")
+            notify_web("save_bulk_import",{"saved": False})
+
+def notify_web(event, data_to_include = None, broadcast = False):
+
+    global socketio, instance_id, mode
+
+    if mode == "web":
+        instance_data = {"instance_id": "broadcast" if broadcast else instance_id}
+        merged_arguments = data_to_include | instance_data
+        socketio.emit(event, merged_arguments)
 
 
 # * Button Creation ---
@@ -1133,8 +1151,7 @@ def setup_web_sockets():
                 url = url + " "+ " --".join(options)
             if filters and len(filters) < 6:
                 url = url + " --filters " + " ".join(filters)
-
-            socketio.emit("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True, "instance_id": instance_id})
+            notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
 
             process_scrape_url_from_ui(url)
 
@@ -1143,45 +1160,60 @@ def setup_web_sockets():
         global instance_id
         instance_id = data.get("instance_id")
         bulk_list = data.get("bulk_list").lower()
-        print(bulk_list)
         run_bulk_import_scrape_thread(bulk_list)
 
 
     @socketio.on("save_bulk_import")
     def handle_bulk_import(data):
         content = data.get("content")
+        filename = data.get("file")
         if content:
-            try:
-                with open(config["bulk_import_file"], "w", encoding="utf-8") as file:
-                    file.write(content)
-                update_status("Bulk import file saved successfully!", "green")
-            except Exception as e:
-                update_status(f"Error saving bulk import file: {str(e)}", "red")
+            save_bulk_import_file(content, filename)
 
     @socketio.on("load_config")
     def load_config_web(data):
         global instance_id, config
         instance_id = data.get("instance_id")
         config.load()
-        socketio.emit("load_config", {"config": vars(config), "instance_id": instance_id} )
+        notify_web("load_config", {"config": vars(config), "instance_id": instance_id} )
+
+    @socketio.on("load_bulk_filelist")
+    def load_bulk_filelist(data):
+        global instance_id
+        instance_id = data.get("instance_id")
+        bulk_files = None
+        try:
+            folder_path = Path("bulk_imports")
+            bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
+        except:
+            pass
+        notify_web("load_bulk_filelist",{"bulk_files": bulk_files})
+
+    @socketio.on("load_bulk_import")
+    def load_bulk_import(data):
+        global instance_id, config
+        instance_id = data.get("instance_id")
+        load_bulk_import_file(data.get("filename"))
 
     @socketio.on("save_config")
     def save_config_web(data):
-        global instance_id, config
-        instance_id = data.get("instance_id")
-        # Unpack the config dictionary into the local config
-        for key, value in data.get("config").items():
-            setattr(config, key, value)
-        config.save()
-        print(vars(config))
-        update_status(f"Configuration saved", "warning")
+        try:
+            global instance_id, config
+            instance_id = data.get("instance_id")
+            # Unpack the config dictionary into the local config
+            for key, value in data.get("config").items():
+                setattr(config, key, value)
+            config.save()
+            notify_web("save_config",{"saved":True})
+        except:
+            notify_web("save_config",{"saved":True})
 
     # Load the web server
     socketio.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
 
 def update_web_log(message):
     """Send status updates to the frontend via WebSockets."""
-    socketio.emit("log_update", {"message": message, "instance_id": instance_id} )
+    notify_web("log_update", {"message": message} )
 
 
 
@@ -1280,7 +1312,6 @@ if __name__ == "__main__":
         if not interactive_cli:
 
             mode = "web"
-            print("Setting up web interface")
 
             # Connect to the TV and Movie libraries
             try:
