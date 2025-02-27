@@ -28,6 +28,7 @@ class Scraper:
         self.tv_artwork = []
         self.collection_artwork = []
         self.source = None
+        self.title = None
 
         # Set source based on the contents of the URL
         if "theposterdb.com" in url:
@@ -70,6 +71,7 @@ class Scraper:
             theposterdb_scraper.set_options(self.options)
             theposterdb_scraper.scrape()
 
+            self.title = theposterdb_scraper.title
             self.movie_artwork = theposterdb_scraper.movie_artwork
             self.tv_artwork = theposterdb_scraper.tv_artwork
             self.collection_artwork = theposterdb_scraper.collection_artwork
@@ -97,6 +99,7 @@ class Scraper:
             mediux_scraper.set_options(self.options)
             mediux_scraper.scrape()
 
+            self.title = mediux_scraper.title
             self.movie_artwork = mediux_scraper.movie_artwork
             self.tv_artwork = mediux_scraper.tv_artwork
             self.collection_artwork = mediux_scraper.collection_artwork

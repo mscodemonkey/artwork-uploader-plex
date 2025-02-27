@@ -12,6 +12,7 @@ class MediuxScraper:
     def __init__(self, url):
         self.soup = None
         self.url = url
+        self.title = None
         self.options = Options()
 
         self.movie_artwork = []
@@ -42,6 +43,14 @@ class MediuxScraper:
                     if 'set' in script.text:
                         if 'Set Link\\' not in script.text:
                             data_dict = utils.parse_string_to_dict(script.text)
+
+                            if data_dict["set"]["show"] is not None:
+                                self.title = data_dict["set"]["show"]["name"]
+                            elif data_dict["set"]["movie"] is not None:
+                                self.title = data_dict["set"]["movie"]["title"]
+                            elif data_dict["set"]["collection"] is not None:
+                                self.title = data_dict["set"]["collection"]["collection_name"]
+
                             poster_data = data_dict["set"]["files"]
 
             for data in poster_data:

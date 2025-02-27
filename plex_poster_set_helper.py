@@ -67,6 +67,7 @@ def parse_bulk_file_from_cli(file_path):
                 except:
                     print("Oops")
 
+
 def cleanup():
 
     """Function to handle cleanup tasks on exit."""
@@ -249,7 +250,6 @@ def save_config():
         update_status(f"Error with config: {str(config_error)}", color="red")
 
 
-
 def load_and_update_ui():
     """Load the configuration and update the UI fields."""
 
@@ -295,7 +295,6 @@ def load_and_update_ui():
 # * Threaded functions for scraping and setting posters ---
 
 
-
 # UI Session Log
 def clear_log():
     try:
@@ -308,7 +307,8 @@ def clear_log():
     finally:
         app.after(1000, update_status, "", "#E5A00D")
 
-def update_log(update_text: str) -> None:
+
+def update_log(update_text: str, artwork_title = None) -> None:
 
     """
     Updates the session log in the GUI.  The session log only exists while the app is running.
@@ -325,13 +325,12 @@ def update_log(update_text: str) -> None:
             session_log_text.insert("end",f"{update_text}\n")
             session_log_text.configure(state="disabled")
         elif mode == "web":
-            update_web_log(f"{update_text}")
+            update_web_log(f"{update_text}", artwork_title)
     except:
         pass
 
 
 # * Processing functions for scraping and setting posters from the GUI
-
 def run_url_scrape_thread():
 
     """Run the URL scrape in a separate thread."""
@@ -349,6 +348,7 @@ def run_url_scrape_thread():
 
     threading.Thread(target=process_scrape_url_from_ui, args=(url,)).start()
 
+
 def process_scrape_url_from_ui(url: str) -> None:
 
     """
@@ -358,6 +358,7 @@ def process_scrape_url_from_ui(url: str) -> None:
     :param      url: The URL to scrape.  Note that due to options, this may not be the only URL that we end up scraping!
     :return:    nothing
     """
+    title = None
 
     try:
         # Check if the Plex TV and movie libraries are configured
@@ -375,10 +376,14 @@ def process_scrape_url_from_ui(url: str) -> None:
         if "/user/" in parsed_line.url:
             scrape_tpdb_user(parsed_line.url, parsed_line.options)
         else:
-            scrape_and_upload(parsed_line.url, parsed_line.options)
+            title = scrape_and_upload(parsed_line.url, parsed_line.options)
 
         # And update the UI when we're done
         update_status(f"Processed all artwork at {parsed_line.url}", color="success")
+
+        # Update the web ui bulk list with this URL and artwork (only if it's not already in the bulk list)
+        if parsed_line.options.add_to_bulk and title:
+            notify_web("add_to_bulk_list", {"url": url, "title": title})
 
     except ScraperException as scraping_error:
         print("Exception")
@@ -442,6 +447,7 @@ def run_bulk_import_scrape_thread(web_list = None):
         except:
             raise
 
+
 def process_bulk_import_from_ui(parsed_urls: list) -> None:
 
     """
@@ -462,8 +468,10 @@ def process_bulk_import_from_ui(parsed_urls: list) -> None:
             update_status("Plex setup incomplete. Please check the settings.", color="red")
             return
 
+        # Show the progress bar on the web UI
         notify_web("progress_bar", {"percent" : 0} )
 
+        # Loop through the bulk list
         for i, parsed_line in enumerate(parsed_urls):
 
             status_text = f"Scraping URL {i + 1} of {len(parsed_urls)}: {parsed_line.url}"
@@ -480,6 +488,7 @@ def process_bulk_import_from_ui(parsed_urls: list) -> None:
             notify_web("progress_bar", {"message": f"{i+1} of {len(parsed_urls)}", "percent" : ((i + 1 / len(parsed_urls)) * 100)} )
             #update_status(f"Completed: {parsed_line.url}", color="#E5A00D")
 
+        # All done, update the UI
         notify_web("progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
         update_status("Bulk import scraping completed.", color="success")
 
@@ -497,6 +506,7 @@ def process_bulk_import_from_ui(parsed_urls: list) -> None:
         ])
         elif mode == "web":
             notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
+
 
 # Scrape all pages of a TPDb user's uploaded artwork
 def scrape_tpdb_user(url, options):
@@ -522,31 +532,36 @@ def scrape_tpdb_user(url, options):
     except Exception:
         raise ScraperException(f"Failed to process and upload from URL: {url}")
 
+
 # Scraped the URL then uploads what it's scraped to Plex
 def scrape_and_upload(url, options):
 
     global plex
 
-    print("Scraping started")
     # Let's scrape the posters first
     scraper = Scraper(url)
     scraper.set_options(options)
     try:
         scraper.scrape()
+        title = scraper.title
     except ScraperException:
         raise
     except Exception as e:
         raise Exception(e)
 
+
     # Now upload them to Plex
     processor = UploadProcessor(plex)
     processor.set_options(options)
+
+    artwork_title = None
 
     if scraper.collection_artwork:
         for artwork in scraper.collection_artwork:
             try:
                 update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_collection_artwork(artwork)
+                artwork_title = artwork["title"]
                 update_log(result)
             except CollectionNotFound as not_found:
                 update_log(f"∙ {str(not_found)}")
@@ -563,6 +578,7 @@ def scrape_and_upload(url, options):
             try:
                 update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_movie_artwork(artwork)
+                artwork_title = artwork["title"]
                 update_log(result)
             except MovieNotFound as not_found:
                 update_log(f"∙ {str(not_found)}")
@@ -580,6 +596,7 @@ def scrape_and_upload(url, options):
             try:
                 update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_tv_artwork(artwork)
+                artwork_title = artwork["title"]
                 update_log(result)
             except ShowNotFound as not_found:
                 update_log(f"∙ {str(not_found)}")
@@ -591,14 +608,10 @@ def scrape_and_upload(url, options):
                 update_log(f"x {str(error_unexpected)}")
                 exit(500)
 
-
-
-
-
+    return title
 
 
 # * Bulk import file I/O functions ---
-
 def load_bulk_import_file(filename = None):
 
     """Load the bulk import file into the text area."""
@@ -665,6 +678,7 @@ def save_bulk_import_file(contents = None, filename = None):
             update_status(message="Error saving bulk import file", color="danger")
             notify_web("save_bulk_import",{"saved": False})
 
+
 def notify_web(event, data_to_include = None, broadcast = False):
 
     global socketio, instance_id, mode
@@ -676,7 +690,6 @@ def notify_web(event, data_to_include = None, broadcast = False):
 
 
 # * Button Creation ---
-
 def create_button(container, text, command, color=None, primary=False, height=35):
     """Create a custom button with hover effects for a CustomTkinter GUI."""
 
@@ -740,7 +753,6 @@ def create_button(container, text, command, color=None, primary=False, height=35
 
 
 # * Main UI Creation function ---
-
 def create_ui():
     """Create the main UI window."""
     global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, tpdb_filters_text, bulk_import_text, base_url_entry, token_entry,\
@@ -1130,8 +1142,6 @@ def check_libraries():
     return plex.tv_libraries and plex.movie_libraries
 
 
-
-
 def setup_web_sockets():
 
     @web_app.route("/")
@@ -1151,8 +1161,8 @@ def setup_web_sockets():
                 url = url + " "+ " --".join(options)
             if filters and len(filters) < 6:
                 url = url + " --filters " + " ".join(filters)
+            print (url)
             notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
-
             process_scrape_url_from_ui(url)
 
     @socketio.on("start_bulk_import")
@@ -1189,6 +1199,7 @@ def setup_web_sockets():
             pass
         notify_web("load_bulk_filelist",{"bulk_files": bulk_files})
 
+
     @socketio.on("load_bulk_import")
     def load_bulk_import(data):
         global instance_id, config
@@ -1211,10 +1222,10 @@ def setup_web_sockets():
     # Load the web server
     socketio.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
 
-def update_web_log(message):
-    """Send status updates to the frontend via WebSockets."""
-    notify_web("log_update", {"message": message} )
 
+def update_web_log(message, artwork_title = None):
+    """Send status updates to the frontend via WebSockets."""
+    notify_web("log_update", {"message": message, "artwork_title": artwork_title} )
 
 
 # * Main Initialization ---

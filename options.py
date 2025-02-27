@@ -3,7 +3,7 @@
 
 class Options:
 
-    def __init__(self, add_posters=False, add_sets=False, force=False, filters=None, exclude=None, year=None):
+    def __init__(self, add_posters=False, add_sets=False, force=False, filters=None, exclude=None, year=None, add_to_bulk = False):
 
         if filters is None:
             filters = []
@@ -13,6 +13,7 @@ class Options:
         self.filters = filters
         self.exclude = exclude
         self.year = year
+        self.add_to_bulk = add_to_bulk
 
     def has_filter(self, filter_type):
         return self.filters and filter_type in self.filters

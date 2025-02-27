@@ -17,6 +17,7 @@
         }
 
 
+
         function element_disable(element_ids, mode = true) {
             if (!element_ids) return;  // Exit if no element_ids provided
 
@@ -112,7 +113,7 @@
         }
 
 
-        function updateLog(message, color = null) {
+        function updateLog(message, color = null, artwork_title = null) {
             let statusElement = document.getElementById("session_log");
 
             // Get current timestamp
@@ -124,7 +125,7 @@
 
         // Modify your socket listener to check the message's tag or instanceId
         socket.on("element_disable", (data) => {
-            if (data.instance_id === "broadcast" || data.instance_id === instanceId) {
+            if (data.instance_id === instanceId) {
                 element_disable(data.element, data.mode);
             }
         });
@@ -137,7 +138,7 @@
 
         socket.on("log_update", (data) => {
             if (data.instance_id === "broadcast" || data.instance_id === instanceId) {
-                updateLog(data.message);
+                updateLog(data.message, data.artwork_title);
             }
         });
 
@@ -158,6 +159,19 @@
                 }
             }
         })
+
+        socket.on("add_to_bulk_list", (data) => {
+            let bulkText = document.getElementById("bulk_import_text").value;
+            let urlWithoutFlag = data.url.replace(" --add-to-bulk", "").trim();
+
+            // Regex to match the URL as part of a line, even if extra arguments and values exist
+            let regex = new RegExp(`^${urlWithoutFlag}(\\s+--\\S+(\\s+\\S+)*)?$`, "m");
+
+            if (!regex.test(bulkText)) {
+                document.getElementById("bulk_import_text").value += "\n// " + data.title + "\n" + urlWithoutFlag + "\n";
+            }
+        });
+
 
             document.getElementById("save_config_button").addEventListener("click", function(event) {
 

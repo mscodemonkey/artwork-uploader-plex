@@ -12,6 +12,7 @@ class ThePosterDBScraper:
     def __init__(self, url):
         self.soup = None
         self.url = url
+        self.title = None
         self.options = Options()
 
         self.movie_artwork = []
@@ -48,6 +49,8 @@ class ThePosterDBScraper:
                 print(f"★ Got a valid URL {self.url}")
                 self.soup = soup_utils.cook_soup(self.url)
 
+                self.get_set_title(self.soup)
+
                 # Get the standard set of posters on the TPDb page
                 self.scrape_posters(self.soup)
 
@@ -74,6 +77,13 @@ class ThePosterDBScraper:
         except:
             raise ScraperException(f"Can't get user information, please check the URL you're using")
 
+    def get_set_title(self, soup):
+        try:
+            self.title = soup.find('p', id = "set-title").a.string
+
+
+        except:
+            print(f"title lookup failed {soup}")
 
     def get_posters(self, poster_div):
 
@@ -94,8 +104,8 @@ class ThePosterDBScraper:
             posters.pop()
 
         for poster in posters:
-            media_type = \
-            poster.find('a', class_="text-white", attrs={'data-toggle': 'tooltip', 'data-placement': 'top'})['title']
+
+            media_type = poster.find('a', class_="text-white", attrs={'data-toggle': 'tooltip', 'data-placement': 'top'})['title']
             poster_id = poster.find('div', class_='overlay').get('data-poster-id')
 
            # if not self.options.is_excluded(poster_id):

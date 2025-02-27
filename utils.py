@@ -144,6 +144,7 @@ def parse_url_and_options(line):
     options = Options(
         add_posters='--add-posters' in parts,
         add_sets='--add-sets' in parts,
+        add_to_bulk='--add-to-bulk' in parts,
         force='--force' in parts,
         filters=filters,  # Store the list of filters or None
         exclude=exclude,
