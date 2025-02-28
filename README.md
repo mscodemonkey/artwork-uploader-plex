@@ -10,7 +10,7 @@ There are also a couple of new options for thePosterDb, which will allow you to 
 
 And there are other options such as per-URL filtering and year matching, fixing missing things that i found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
 
-Oh and there's a shiny new web UI!
+**Oh and there's now a shiny new web UI - see below**
 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
@@ -65,12 +65,15 @@ In a terminal, run ```python plex_poster_set_helper.py``` (note you may need to 
 
 The script supports various command-line arguments for flexible use.
 
-### Launch the GUI
-Use the ```gui``` argument to open the graphical user interface:
+### Launch the local GUI
+Use the ```gui``` argument to open the local graphical user interface:
    
 ```bash
   python plex_poster_set_helper.py gui
 ```
+
+** The local GUI is deprecated and may eventually be removed once the Web UI is secure.  The new Web UI is fully-featured and I will only be working on this as a user interface moving forward.
+
 ### Single link import  
    Provide a link directly to set posters from a single MediUX or ThePosterDB set:
    
