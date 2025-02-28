@@ -655,7 +655,47 @@ def load_bulk_import_file(filename = None):
         notify_web("load_bulk_import", {"loaded": False})
 
 
-def save_bulk_import_file(contents = None, filename = None):
+def rename_bulk_import_file(old_name, new_name):
+
+    bulk_imports_path = "bulk_imports/"
+
+    print(f"{old_name}, {new_name}")
+
+    if old_name != new_name:
+        try:
+
+            # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
+            old_filename = os.path.join(get_exe_dir(), bulk_imports_path, old_name)
+            new_filename = os.path.join(get_exe_dir(), bulk_imports_path, new_name)
+            os.rename(old_filename, new_filename)
+
+            notify_web("rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
+            update_status(f"Renamed to {new_name}", "success")
+        except Exception as e:
+            print(e)
+            notify_web("rename_bulk_file", {"renamed": False, "old_filename": old_name})
+            update_status(f"Could not rename {old_name}", "warning")
+
+def delete_bulk_import_file(file_name):
+
+    bulk_imports_path = "bulk_imports/"
+
+    if file_name:
+        try:
+
+            # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
+            filename = os.path.join(get_exe_dir(), bulk_imports_path, file_name)
+            os.remove(filename)
+
+            notify_web("delete_bulk_file", {"renamed": True, "filename": file_name})
+            update_status(f"Deleted {file_name}", "success")
+        except Exception as e:
+            print(e)
+            notify_web("delete_bulk_file", {"renamed": False, "filename": file_name})
+            update_status(f"Could not delete {file_name}", "warning")
+
+
+def save_bulk_import_file(contents = None, filename = None, now_load = None):
     """Save the bulk import text area content to a file relative to the executable location."""
 
     if mode == "gui":
@@ -669,14 +709,16 @@ def save_bulk_import_file(contents = None, filename = None):
 
             os.makedirs(os.path.dirname(bulk_import_file), exist_ok=True)
 
+            print("Saving" + bulk_import_file)
+
             with open(bulk_import_file, "w", encoding="utf-8") as file:
                 file.write(contents)
 
-            update_status(message="Bulk import file saved", color="success")
-            notify_web("save_bulk_import",{"saved": True})
+            update_status(message="Bulk import file " + filename + " saved", color="success")
+            notify_web("save_bulk_import",{"saved": True, "now_load": now_load})
         except Exception as e:
             update_status(message="Error saving bulk import file", color="danger")
-            notify_web("save_bulk_import",{"saved": False})
+            notify_web("save_bulk_import",{"saved": False, "now_load": now_load})
 
 
 def notify_web(event, data_to_include = None, broadcast = False):
@@ -1176,9 +1218,10 @@ def setup_web_sockets():
     @socketio.on("save_bulk_import")
     def handle_bulk_import(data):
         content = data.get("content")
-        filename = data.get("file")
+        filename = data.get("filename")
+        now_load = data.get("now_load")
         if content:
-            save_bulk_import_file(content, filename)
+            save_bulk_import_file(content, filename, now_load)
 
     @socketio.on("load_config")
     def load_config_web(data):
@@ -1205,6 +1248,18 @@ def setup_web_sockets():
         global instance_id, config
         instance_id = data.get("instance_id")
         load_bulk_import_file(data.get("filename"))
+
+    @socketio.on("rename_bulk_file")
+    def rename_bulk_file(data):
+        global instance_id
+        instance_id = data.get("instance_id")
+        rename_bulk_import_file(data.get("old_filename"), data.get("new_filename"))
+
+    @socketio.on("delete_bulk_file")
+    def delete_bulk_file(data):
+        global instance_id
+        instance_id = data.get("instance_id")
+        delete_bulk_import_file(data.get("filename"))
 
     @socketio.on("save_config")
     def save_config_web(data):

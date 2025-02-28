@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plex Poster Upload Helper</title>
+    <title>Artwork Scraper for Plex</title>
     <!-- Link to Bootstrap CSS (CDN) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
           integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
     <!-- Google Font: JetBrains Mono (Nice Monospaced Font) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <style>
@@ -18,7 +19,7 @@
         body {
             background-image: url(/static/bg.jpg);
             background-repeat: no-repeat;
-            background-size: auto;
+            background-size: cover;
         }
 
         * {
@@ -48,7 +49,7 @@
             font-size: 0.9rem;
         }
 
-        .bg-light {opacity: 0.7}
+        .bg-light {opacity: 0.85}
 
     </style>
 
@@ -83,7 +84,7 @@
     </nav>
 
     <div class="progress mt-3 collapse" id="progress_bar_container" role="progressbar" aria-label="Progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-      <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" id="progress_bar" style="width: 0%"></div>
+        <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" id="progress_bar" style="width: 0%"></div>
     </div>
 
     <div class="tab-content" id="myTabContent">
@@ -95,6 +96,7 @@
                 <div class="row mb-3">
                     <div class="col md-6">
                         <div class="p-3 border bg-light">
+                            <h5 class="mb-3">Plex server settings</h5>
                             <div class="mb-3">
                                 <label for="plex_base_url" class="form-label">Plex base URL:</label>
                                 <input type="url" id="plex_base_url" name="plex_base_url" class="form-control" required
@@ -107,32 +109,24 @@
                             </div>
                             <div class="mb-3">
                                 <label for="plex_token" class="form-label">Plex token:</label>
-                                <input type="text" id="plex_token" name="plex_token" class="form-control" required pattern="[A-Za-z0-9]{20}" title="Plex token should be a 20-character alphanumeric string.">
+                                <input type="text" id="plex_token" name="plex_token" class="form-control" required pattern="[A-Za-z0-9]{20}"
+                                       title="Plex token should be a 20-character alphanumeric string.">
                                 <div class="invalid-feedback">
                                     Please provide a valid Plex token.
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="bulk_import_file" class="form-label">Default bulk import file:</label>
-                                <select id="bulk_import_file" name="bulk_import_file" class="form-select" required>
-                                    <option selected disabled>Loading file list...</option>
-                                </select>
-                                <div class="invalid-feedback">
-                                    Please provide a bulk import file path.
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label for="tv_library" class="form-label">TV library:</label>
                                 <input type="text" id="tv_library" name="tv_library" class="form-control" required>
                                 <div class="invalid-feedback">
-                                    Please provide your TV library name.  If more than one, separate using commas.
+                                    Please provide your TV library name. If more than one, separate using commas.
                                 </div>
                             </div>
                             <div class="mb-3">
                                 <label for="movie_library" class="form-label">Movie library:</label>
                                 <input type="text" id="movie_library" name="movie_library" class="form-control" required>
                                 <div class="invalid-feedback">
-                                    Please provide your Movie library name.  If more than one, separate using commas.
+                                    Please provide your Movie library name. If more than one, separate using commas.
                                 </div>
                             </div>
                         </div>
@@ -259,19 +253,48 @@
             </form>
         </div>
 
+
         <!-- Bulk Import Tab -->
         <div class="tab-pane fade" id="bulk-import" role="tabpanel" aria-labelledby="bulk-import-tab" tabindex="0">
             <!--                <form id="bulk_form" class="needs-validation" novalidate> -->
+
+
             <div class="row mb-3">
                 <div class="col">
+                    <div class="p-3 border bg-light d-flex align-items-center">
+                        <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select me-3" required>
+                            <option selected disabled>Loading file list...</option>
+                        </select>
+                        <div class="invalid-feedback">
+                            Please provide a bulk import file path.
+                        </div>
+                        <!-- Default bulk file checkbox -->
+                        <div class="ms-3 d-flex align-items-center">
+                            <input type="hidden" id="bulk_import_file" name="bulk_import_file" class="bulk_import_file">
+                            <div class="form-check mb-0 d-flex align-items-center">
+                                <!-- Default bulk file checkbox using Bootstrap icons -->
+                                <input type="checkbox" id="default_bulk_file" class="d-none">
+                                <a title="Default file will be loaded when Artwork Scraper starts"><i id="default_bulk_file_icon" class="bi bi-check-circle h4 ms-3" role="button"></i></a>
+                                <label class="form-check-label mb-0 ms-1" for="default_bulk_file">Default</label>
+                            </div>
+                        </div>
+                        <!-- Icons at the end -->
+                        <a title="Delete this file"><i id="delete_icon" class="bi bi-trash h4 ms-3" role="button"></i></a>
+                        <a title="Rename this file"><i id="rename_icon" class="bi bi-pencil-square h4 ms-3" role="button"></i></a>
+                        <a title="Upload a new .txt file"><i id="upload_icon" class="bi bi-upload h4 ms-3" role="button"></i></a>
+                    </div>
+                </div>
+
+                <div class="col d-none"> <!-- Hides the file input -->
                     <div class="p-3 border bg-light">
                         <div class="input-group">
-                            <input type="file" id="bulk_import_upload" class="form-control d-none" accept=".txt" onchange="uploadBulkImportFile(event)">
-                            <label class="input-group-text btn btn-primary" for="bulk_import_upload" id="bulk_import_label">Upload a file</label>
+                            <input type="file" id="bulk_import_upload" class="form-control" accept=".txt" onchange="uploadBulkImportFile(event)">
                         </div>
                     </div>
                 </div>
             </div>
+
+
             <div class="row mb-3">
                 <div class="col">
                     <div class="p-3 border bg-light">
@@ -281,12 +304,13 @@
             </div>
             <div class="row mb-3">
                 <div class="col">
-                    <button class="btn btn-secondary" onclick="checkBulkImportFileToSave()">Save Bulk Import</button>
+                    <button class="btn btn-secondary" id="save_bulk_button" onclick="checkBulkImportFileToSave()">Save Bulk File</button>
                     <button class="btn btn-primary" id="bulk_button" onclick="runBulkImport()">Run Bulk Import</button>
                 </div>
             </div>
             <!--                </form> -->
         </div>
+
 
         <!-- Scraper Tab -->
         <div class="tab-pane fade show active" id="scraper" role="tabpanel" aria-labelledby="scraper-tab" tabindex="0">
@@ -317,7 +341,7 @@
                                 <input class="form-check-input" type="checkbox" value="--add-to-bulk"
                                        id="option-add-to-bulk"/>
                                 <label for="option-add-to-bulk" class="form-check-label">Automatically add this URL to
-                                    the bulk import list if successful</label>
+                                    the current bulk import list if scraped</label>
                             </div>
                         </div>
                     </div>
@@ -434,20 +458,40 @@
     </div>
 </div>
 
-<!-- Load Bulk Import Modal -->
-<div class="modal fade" id="loadBulkImportModal" tabindex="-1" aria-labelledby="loadModalLabel" aria-hidden="true">
+<!-- Load Yes No Modal -->
+<div class="modal fade" id="loadBulkImportModal" tabindex="-1" aria-labelledby="yesNoModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="loadModalLabel">Load Bulk Import File</h5>
+                <h5 class="modal-title" id="yesNoModalLabel">Please choose</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p id="loadModalMessage"></p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-primary" id="confirmLoad">Yes, load now</button>
-                <button type="button" class="btn btn-secondary" id="cancelLoad" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="yes_Button">Yes</button>
+                <button type="button" class="btn btn-secondary" id="no_Button" data-bs-dismiss="modal">No</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Yes No Cancel Modal -->
+<div class="modal fade" id="yesNoCancelModal" tabindex="-1" aria-labelledby="yesNoCancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="yesNoCancelModalLabel">Please choose</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="yesNoCancelModalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="yesButton">Yes</button>
+                <button type="button" class="btn btn-secondary" id="noButton">No</button>
+                <button type="button" class="btn btn-secondary" id="cancelButton" data-bs-dismiss="modal">Cancel</button>
             </div>
         </div>
     </div>

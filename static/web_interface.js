@@ -30,7 +30,7 @@
                 if (element) {
                     element.disabled = mode;
                 } else {
-                    console.warn(`Element with ID "${id}" not found.`);
+                    console.warn('Element with ID "${id}" not found.');
                 }
             });
         }
@@ -38,16 +38,17 @@
         let config = {};
         const socket = io();
         const instanceId = getInstanceId();
-        let currentBulkImport;
         let statusTimeout; // Store timeout reference
         const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
 
 
         function updateStatus(message, color = "info", sticky = false, spinner = false, icon = false) {
+
             const statusEl = document.getElementById("status");
             const spinnerEl = document.getElementById("status_spinner"); // Get the spinner element
             const messageEl = document.getElementById("status_message");
             const iconEl = document.getElementById("status_icon");
+
 
             if (!statusEl) return;
 
@@ -91,7 +92,7 @@
 
             // Add the new text-bg-{color} class for the background color
             if (color) {
-                statusEl.classList.add(`text-bg-${color}`);
+                statusEl.classList.add('text-bg-' + color);
             }
 
             // Ensure the fade class is present for transitions
@@ -123,7 +124,6 @@
             statusElement.innerHTML = '<div class="log_message">[' + timestamp +'] ' + message + '</div>' + statusElement.innerHTML;
         }
 
-        // Modify your socket listener to check the message's tag or instanceId
         socket.on("element_disable", (data) => {
             if (data.instance_id === instanceId) {
                 element_disable(data.element, data.mode);
@@ -165,7 +165,7 @@
             let urlWithoutFlag = data.url.replace(" --add-to-bulk", "").trim();
 
             // Regex to match the URL as part of a line, even if extra arguments and values exist
-            let regex = new RegExp(`^${urlWithoutFlag}(\\s+--\\S+(\\s+\\S+)*)?$`, "m");
+            let regex = new RegExp("^${urlWithoutFlag}(\\s+--\\S+(\\s+\\S+)*)?$", "m");
 
             if (!regex.test(bulkText)) {
                 document.getElementById("bulk_import_text").value += "\n// " + data.title + "\n" + urlWithoutFlag + "\n";
@@ -176,46 +176,51 @@
             document.getElementById("save_config_button").addEventListener("click", function(event) {
 
                 event.preventDefault(); // Prevent actual form submission
-                const form = document.getElementById("config_form"); // Replace with your actual form ID
+                saveConfig();
 
-                console.log("Saving...")
-
-                if (form.checkValidity()) {
-                    // Form is valid, proceed with saving config
-                    const save_config = {};
-
-                    save_config.base_url = document.getElementById("plex_base_url").value.trim();
-                    save_config.token = document.getElementById("plex_token").value.trim();
-                    save_config.bulk_txt = document.getElementById("bulk_import_file").value;
-
-                    // Convert comma-separated library inputs to arrays
-                    save_config.tv_library = document.getElementById("tv_library").value
-                        .split(",")
-                        .map(item => item.trim())
-                        .filter(item => item !== ""); // Remove empty values
-
-                    save_config.movie_library = document.getElementById("movie_library").value
-                        .split(",")
-                        .map(item => item.trim())
-                        .filter(item => item !== ""); // Remove empty values
-
-                    // Checkbox for tracking artwork IDs
-                    save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
-
-                    // Get selected mediux filters
-                    save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
-                        .map(checkbox => checkbox.value);
-
-                    // Get selected tpdb filters
-                    save_config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
-                        .map(checkbox => checkbox.value);
-
-                    socket.emit("save_config", { instance_id: instanceId, config: save_config });
-
-                } else {
-                    form.classList.add("was-validated");
-                }
             });
+
+        function saveConfig() {
+            const form = document.getElementById("config_form");
+
+            console.log("Saving...")
+
+            if (form.checkValidity()) {
+                // Form is valid, proceed with saving config
+                const save_config = {};
+
+                save_config.base_url = document.getElementById("plex_base_url").value.trim();
+                save_config.token = document.getElementById("plex_token").value.trim();
+                save_config.bulk_txt = document.getElementById("bulk_import_file").value;
+
+                // Convert comma-separated library inputs to arrays
+                save_config.tv_library = document.getElementById("tv_library").value
+                    .split(",")
+                    .map(item => item.trim())
+                    .filter(item => item !== ""); // Remove empty values
+
+                save_config.movie_library = document.getElementById("movie_library").value
+                    .split(",")
+                    .map(item => item.trim())
+                    .filter(item => item !== ""); // Remove empty values
+
+                // Checkbox for tracking artwork IDs
+                save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
+
+                // Get selected mediux filters
+                save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
+                    .map(checkbox => checkbox.value);
+
+                // Get selected tpdb filters
+                save_config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
+                    .map(checkbox => checkbox.value);
+
+                socket.emit("save_config", { instance_id: instanceId, config: save_config });
+
+            } else {
+                form.classList.add("was-validated");
+            }
+        }
 
         socket.on("save_config", (data) => {
             if (data.saved) {
@@ -236,12 +241,16 @@
             });
         });
 
+
+
+
+
 function showLoadBulkImportModal(filename) {
     return new Promise((resolve) => {
         const modalElement = document.getElementById("loadBulkImportModal");
 
         // Update modal message with selected filename
-        document.getElementById("loadModalMessage").innerText = `Do you want to load "${filename}" now?`;
+        document.getElementById("loadModalMessage").innerText = 'Do you want to load "${filename}" now?';
 
         // Show modal
         const modal = new bootstrap.Modal(modalElement);
@@ -261,6 +270,45 @@ function showLoadBulkImportModal(filename) {
 }
 
 
+        /* Switch the bulk import file to use */
+
+
+
+        function saveBulkChangesModal(filename) {
+            return new Promise((resolve) => {
+                const modalElement = document.getElementById("yesNoCancelModal");
+
+                // Update modal message and title
+                document.getElementById("yesNoCancelModalLabel").innerText = "Before you load " + filename;
+                document.getElementById("yesNoCancelModalMessage").innerText = "Do you want to save changes to " + currentBulkImport + " first?";
+
+                // Update buttons with choices
+                document.getElementById("yesButton").innerText = "Yes, save changes"
+                document.getElementById("noButton").innerText = "No, lose changes"
+                document.getElementById("cancelButton").innerText = "Cancel"
+
+                // Show modal
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+
+                // Handle button clicks
+                document.getElementById("yesButton").onclick = () => {
+                    modal.hide();
+                    resolve("yes");
+                };
+
+                // Handle button clicks
+                document.getElementById("noButton").onclick = () => {
+                    modal.hide();
+                    resolve("no");
+                };
+
+                document.getElementById("cancelButton").onclick = () => {
+                    modal.hide();
+                    resolve("cancel");
+                };
+            });
+        }
 
         function startScrape() {
             var form = document.getElementById('scraperForm');
@@ -288,6 +336,26 @@ function showLoadBulkImportModal(filename) {
                 form.classList.add('was-validated');
             }
         }
+
+        /* Check whether bulk import has been edited and enable the button if it has */
+
+        // Function to check for changes and enable/disable the save button
+        function checkBulkTextChanged() {
+            const bulkTextArea = document.getElementById("bulk_import_text");
+            const saveButton = document.getElementById("save_bulk_button");
+
+            if (bulkTextArea.value !== bulkTextAsLoaded) {
+                saveButton.disabled = false; // Enable button if text has changed
+            } else {
+                saveButton.disabled = true;  // Disable button if no changes
+            }
+        }
+
+        // Attach event listener to track changes
+        document.getElementById("bulk_import_text").addEventListener("input", checkBulkTextChanged);
+
+
+
 
         document.addEventListener("DOMContentLoaded", function () {
 
@@ -341,7 +409,7 @@ function showLoadBulkImportModal(filename) {
 
                 document.getElementById("plex_base_url").value = data.config.base_url
                 document.getElementById("plex_token").value = data.config.token
-                loadBulkFileList()
+                document.getElementById("bulk_import_file").value = data.config.bulk_txt
                 document.getElementById("tv_library").value = data.config.tv_library.join(", ")
                 document.getElementById("movie_library").value = data.config.movie_library.join(", ")
                 document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids
@@ -351,22 +419,40 @@ function showLoadBulkImportModal(filename) {
                 document.querySelectorAll('[id^="p_filter-"]').forEach(checkbox => {
                     checkbox.checked = data.config.tpdb_filters.includes(checkbox.value);
                 });
+                loadBulkFileList(); // For the switcher
             }
         });
 
+
+        /* Loading the bulk import file */
+
         function loadBulkImport(bulkImport = null) {
             if (!bulkImport) {bulkImport = config.bulk_txt;}
-            console.log(bulkImport)
+            console.log("Loading bulk file - " + bulkImport)
             socket.emit("load_bulk_import", { instance_id: instanceId, filename: bulkImport });
         }
 
         socket.on("load_bulk_import", (data) => {
-            console.log(data.instance_id, instanceId)
+
+            const textArea = document.getElementById("bulk_import_text");
+            console.log("Loader complete, returned " + data.loaded + " / " + data.filename + " / " + data.bulk_import_text)
             if (data.instance_id === instanceId) {
                 if (data.loaded) {
-                    const textArea = document.getElementById("bulk_import_text");
                     textArea.value = data.bulk_import_text;
-                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
+                    currentBulkImport = data.filename;
+                    bulkTextAsLoaded = data.bulk_import_text;
+
+                    // Select the correct option in the dropdown
+                    const selectElement = document.getElementById("switch_bulk_file");
+                    for (const option of selectElement.options) {
+                        if (option.value === data.filename) {
+                            option.selected = true;
+                            break;
+                        }
+                    }
+
+                    checkBulkTextChanged();
+//                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
                 } else {
                     updateStatus("Bulk import file could not be loaded","danger", false, false, "cross-circle")
                 }
@@ -374,93 +460,106 @@ function showLoadBulkImportModal(filename) {
         });
 
         function checkBulkImportFileToSave() {
-            let filename = document.getElementById("bulk_import_file").value;
 
-            if (currentBulkImport && (filename !== currentBulkImport.name)) {
+                saveBulkImport(currentBulkImport);
 
-                // Show modal and wait for user choice
-                showSaveBulkImportModal(currentBulkImport.name, filename).then((choice) => {
-                    filename = choice;
-                    console.log("User choice was : " + filename);
-
-                    // Call the function that saves the file here if needed
-                    saveBulkImport(filename);
-                });
-            } else {
-                saveBulkImport(filename);
-            }
         }
+
+
+
+        /* Loading the list of available bulk files */
 
         function loadBulkFileList() {
             socket.emit("load_bulk_filelist", { instance_id: instanceId });
+
+            socket.on("load_bulk_filelist", (data) => {
+                if (data.instance_id === instanceId) {
+                    const selectElements = document.querySelectorAll(".bulk_import_file"); // Select all matching elements
+
+                    let selectedFile = currentBulkImport || config.bulk_txt; // Get the selected file from config
+
+                    selectElements.forEach((selectElement) => {
+                        // Clear existing options
+                        selectElement.innerHTML = "";
+
+                        if (data.bulk_files.length > 0) {
+                            // Populate the dropdown with filenames
+                            data.bulk_files.forEach((filename) => {
+                                const option = document.createElement("option");
+                                option.value = filename;
+                                option.textContent = filename;
+
+                                // Preselect the option if it matches the config.bulk_txt value
+                                if (filename === selectedFile) {
+                                    option.selected = true;
+                                    if (!document.getElementById("bulk_import_text").value) {
+                                        loadBulkImport(filename);
+                                    }
+                                }
+                                selectElement.appendChild(option);
+                            });
+
+                            // Check if the selected file is the default file and update the checkbox icon
+                            const defaultCheckbox = document.getElementById("default_bulk_file_icon");
+                            if (selectedFile === document.getElementById("bulk_import_file").value) {
+                                // Set the icon to filled if the selected file is the default
+                                defaultCheckbox.classList.remove("bi-check-circle");
+                                defaultCheckbox.classList.add("link-primary");
+                                defaultCheckbox.classList.add("bi-check-circle-fill");
+                                defaultCheckbox.classList.add("disabled");
+                            } else {
+                                // Otherwise, set the icon to unfilled
+                                defaultCheckbox.classList.remove("link-primary");
+                                defaultCheckbox.classList.remove("bi-check-circle-fill");
+                                defaultCheckbox.classList.add("bi-check-circle");
+                                defaultCheckbox.classList.remove("disabled");
+                            }
+                        } else {
+                            // Show placeholder when no files exist
+                            const placeholder = document.createElement("option");
+                            placeholder.disabled = true;
+                            placeholder.selected = true;
+                            placeholder.value = "bulk_import.txt";
+                            placeholder.textContent = "Will create bulk_import.txt when saved";
+                            selectElement.appendChild(placeholder);
+                        }
+                    });
+                }
+                });
         }
 
-        socket.on("load_bulk_filelist", (data) => {
-            if (data.instance_id === instanceId) {
-                const selectElement = document.getElementById("bulk_import_file");
+        function saveBulkImport(filename, nowLoad = null) {
 
-                // Clear existing options
-                selectElement.innerHTML = "";
-
-                let selectedFile = config.bulk_txt || ""; // Get the selected file from config
-
-                if (data.bulk_files.length > 0) {
-                    // Populate the dropdown with filenames
-                    data.bulk_files.forEach(filename => {
-                        const option = document.createElement("option");
-                        option.value = filename;
-                        option.textContent = filename;
-
-                        // Preselect the option if it matches the config.bulk_txt value
-                        if (filename === selectedFile) {
-                            option.selected = true;
-                            if (!document.getElementById("bulk_import_text").value) {loadBulkImport(filename)}
-                        }
-                        selectElement.appendChild(option);
-                   });
-                } else {
-                    // Show placeholder when no files exist
-                    const placeholder = document.createElement("option");
-                    placeholder.disabled = true;
-                    placeholder.selected = true;
-                    placeholder.value = "bulk_import.txt"
-                    placeholder.textContent = "Will create bulk_import.txt when saved";
-                    selectElement.appendChild(placeholder);
-                }
-            }
-        });
-
-        function saveBulkImport(filename) {
             console.log("File to save is: " + filename);
             const textArea = document.getElementById("bulk_import_text");
 
             const fileData = {
                 filename: filename,
-                content: textArea.value
+                content: textArea.value,
+                now_load: nowLoad
+
             };
 
             // Emit the event to Flask via Socket.IO
             socket.emit("save_bulk_import", fileData);
+
+            // And wait for a response
+            socket.on("save_bulk_import", data => {
+                if (data.instance_id === instanceId) {
+                    if (data.saved == true) {
+                        loadBulkFileList();
+                        if (data.now_load) {
+                            console.log("Saved, now loading " + data.now_load)
+                            loadBulkImport(data.now_load);
+                        }
+                    }
+                }
+            });
         }
 
-        function uploadBulkImportFile(event) {
 
-            const fileInput = event.target;
-            const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : "Upload a file";
-            document.getElementById("bulk_import_label").innerText = fileName;
 
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    document.getElementById("bulk_import_text").value = e.target.result;
-                };
-                reader.readAsText(file);
-                currentBulkImport = file.name
-            } else {
-                console.error("No file selected");
-            }
-        }
+
 
         function runBulkImport() {
             socket.emit("start_bulk_import",{instance_id: instanceId, bulk_list: document.getElementById("bulk_import_text").value});
@@ -486,30 +585,248 @@ function showLoadBulkImportModal(filename) {
             });
         })();
 
-        function showSaveBulkImportModal(current_bulk_import, default_bulk_import) {
-            return new Promise((resolve) => {
-        const modalElement = document.getElementById("saveBulkImportModal");
 
-        // Update modal text with variable values
-        document.getElementById("saveModalMessage").innerText = `Do you want to save as "${currentBulkImport}" rather than "${default_bulk_import}"?`;
-        document.getElementById("currentFileName").innerText = currentBulkImport;
-        document.getElementById("defaultFileName").innerText = default_bulk_import;
+        /* =============================================
+           Bulk file handling rename, delete, uploading
+           ============================================*/
 
-        // Show modal
-        const modal = new bootstrap.Modal(modalElement);
-        modal.show();
+ // Set up variables
+let currentBulkImport = '';
+let bulkTextAsLoaded = '';
 
-        // Handle button clicks
-        document.getElementById("saveAsCurrent").onclick = () => {
-            modal.hide();
-            resolve(currentBulkImport);
-        };
+// Function to handle changing the bulk import file
+document.getElementById("switch_bulk_file").addEventListener("change", function () {
+    const selectedFile = this.value;
+    if (!selectedFile) return; // Do nothing if no file is selected
 
-        document.getElementById("useDefault").onclick = () => {
-            modal.hide();
-            resolve(default_bulk_import);
-        };
-    });
-}
+    const bulkTextArea = document.getElementById("bulk_import_text");
+
+    if (bulkTextArea.value !== bulkTextAsLoaded) {
+        // If content has changed, show the modal
+        saveBulkChangesModal(selectedFile).then((confirmed) => {
+            if (confirmed === "yes") {
+                saveBulkImport(currentBulkImport, selectedFile);
+            } else if (confirmed === "no") {
+                loadBulkImport(selectedFile);
+            }
+        });
+    } else {
+        // If no changes, just load the new file
+        loadBulkImport(selectedFile);
+    }
+
+    // Handle default checkbox when the file is selected
+    const bulkImportFileField = document.getElementById("bulk_import_file");
+    const defaultCheckbox = document.getElementById("default_bulk_file");
+    const defaultIcon = document.getElementById("default_bulk_file_icon");
+
+    // Update the default checkbox and icon based on the selected file
+    if (selectedFile === bulkImportFileField.value) {
+        defaultCheckbox.checked = true;
+        defaultIcon.classList.add("link-primary");
+        defaultIcon.classList.remove("bi-check-circle");
+        defaultIcon.classList.add("bi-check-circle-fill");
+        defaultIcon.classList.add("disabled"); // Disable the icon
+    } else {
+        defaultCheckbox.checked = false;
+        defaultIcon.classList.remove("link-primary");
+        defaultIcon.classList.remove("bi-check-circle-fill");
+        defaultIcon.classList.add("bi-check-circle");
+        defaultIcon.classList.remove("disabled"); // Enable the icon
+    }
+});
+
+// Function to handle renaming the bulk file
+document.getElementById("rename_icon").addEventListener("click", function () {
+    const selectElement = document.getElementById("switch_bulk_file");
+    const filename = selectElement.value;
+
+    if (filename) {
+        // Hide the select and display the text box for renaming
+        selectElement.classList.add("d-none");
+
+        // Create a text input for renaming
+        const renameInputGroup = document.createElement("div");
+        renameInputGroup.classList.add("input-group", "me-3");
+        const renameInput = document.createElement("input");
+        renameInput.type = "text";
+        renameInput.id = "rename_input";
+        renameInput.value = filename.slice(0, -4);  // Strip .txt for editing
+        renameInput.classList.add("form-control");
+
+        const suffixText = document.createElement("span");
+        suffixText.classList.add("input-group-text", "text-muted");
+        suffixText.textContent = ".txt";
+
+        renameInputGroup.appendChild(renameInput);
+        renameInputGroup.appendChild(suffixText);
+
+        // Insert the rename input group
+        selectElement.parentNode.insertBefore(renameInputGroup, selectElement.nextSibling);
+
+        // Add Cancel X button
+        const cancelButton = document.createElement("button");
+        cancelButton.innerHTML = '<i class="bi bi-x-circle h4 text-danger"></i>';
+        cancelButton.classList.add("btn", "btn-link", "ms-2");
+
+        // Append the cancel button next to the input
+        renameInputGroup.appendChild(cancelButton);
+
+        cancelButton.addEventListener("click", function () {
+            renameInputGroup.remove(); // Remove the input box
+            cancelButton.remove(); // Remove the cancel button
+            selectElement.classList.remove("d-none"); // Show the select box again
+            selectElement.value = filename; // Restore the original value
+        });
+
+        // Focus the input field and set the cursor to the end of the text
+        renameInput.focus();
+        renameInput.setSelectionRange(renameInput.value.length, renameInput.value.length);  // Set the cursor at the end of the text
+
+        renameInput.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {  // Check if the pressed key is Enter
+                event.preventDefault();  // Prevent the default behavior (e.g., form submission)
+                renameInput.blur();  // Manually trigger the blur event
+            }
+        });
+
+        renameInput.addEventListener("blur", function () {
+
+            console.log("Blur event triggered"); // Debugging line
+            const newFilename = renameInput.value + ".txt"; // Ensure .txt is appended
+            if (newFilename && newFilename !== filename) {
+                // Emit rename event
+                socket.emit("rename_bulk_file", {
+                    instance_id: instanceId,
+                    old_filename: filename,
+                    new_filename: newFilename
+                });
+
+                // Wait for response
+                socket.on("rename_bulk_file", (data) => {
+                    if (instanceId == data.instance_id) {
+                        if (data.renamed) {
+
+                            // Set the currently loaded file
+                            currentBulkImport = data.new_filename
+
+                            // If the renamed file is the default, update the config
+                            const bulkImportFileField = document.getElementById("bulk_import_file");
+                            const selectElement = document.getElementById("switch_bulk_file");
+                            if (bulkImportFileField.value === filename) {
+                                bulkImportFileField.value = data.new_filename; // Update the hidden field
+                            }
+
+                            // Update the file list if renamed
+                            loadBulkFileList();
+
+                            // Now restore the select box
+                            renameInputGroup.remove(); // Remove the input box
+                            cancelButton.remove(); // Remove the cancel button
+                            selectElement.classList.remove("d-none"); // Show the select box again
+                        } else {
+                            updateStatus(`${filename} was not renamed`, "danger");
+                        }
+                    }
+                });
+            } else {
+                // No change, just restore the select box
+                renameInputGroup.remove();
+                cancelButton.remove();
+                selectElement.classList.remove("d-none");
+                selectElement.value = filename; // Restore the original value
+            }
+        });
+
+    }
+});
+
+// Function to handle deleting the bulk file
+document.getElementById("delete_icon").addEventListener("click", function () {
+    const selectElement = document.getElementById("switch_bulk_file");
+    const filename = selectElement.value;
+
+    // Get the value of the default bulk file from the hidden field
+    const defaultBulkFile = document.getElementById("bulk_import_file").value;
+
+    // Prevent deleting if the selected file is the default file
+    if (filename === defaultBulkFile) {
+        alert("You cannot delete the default bulk file.");
+        return; // Exit the function if it's the default file
+    }
+
+    if (filename) {
+        if (confirm(`Are you sure you want to permanetly delete ${filename}?`)) {
+            socket.emit("delete_bulk_file", {
+                instance_id: instanceId,
+                filename: filename
+            });
+
+            // Wait for response
+            socket.on("delete_bulk_file", (data) => {
+                if (instanceId == data.instance_id) {
+                    if (data.deleted) {
+                        currentBulkImport = null
+                        loadBulkFileList(); // Reload the file list if deleted
+                    }
+                }
+            });
+        }
+    }
+});
+
+
+// Function to handle uploading a bulk file
+document.getElementById("upload_icon").addEventListener("click", function () {
+    document.getElementById("bulk_import_upload").click(); // Trigger file input click
+});
+
+function uploadBulkImportFile(event) {
+
+//        const fileInput = event.target;
+//        const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : "Upload a file";
+//        document.getElementById("bulk_import_label").innerText = fileName;
+
+        const file = event.target.files[0];
+        if (file && file.name.endsWith('.txt')) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                document.getElementById("bulk_import_text").value = text;
+                currentBulkImport = file.name
+                saveBulkImport(file.name);
+ //               socket.emit("upload_bulk_file", { filename: file.name, content: text });
+            };
+            reader.readAsText(file);
+        } else {
+            console.error("No file selected");
+        }
+    }
+
+
+// Listen for clicks on the "Default bulk file" icon
+document.getElementById("default_bulk_file_icon").addEventListener("click", function () {
+    const selectElement = document.getElementById("switch_bulk_file");
+    const selectedFile = selectElement.value;
+
+    // Only allow setting default if the selected file is different from the current default
+    if (selectedFile && document.getElementById("bulk_import_file").value !== selectedFile) {
+        // Set the default bulk import file to the selected file
+        document.getElementById("bulk_import_file").value = selectedFile; // Update the hidden field
+
+        // Change the icon to checked
+        this.classList.remove("bi-check-circle");
+        this.classList.add("bi-check-circle-fill");
+        this.classList.add("link-primary");
+
+        // Disable the icon to prevent further changes
+        this.classList.add("disabled");
+
+        // Save the configuration change
+        saveConfig();
+    }
+});
+
+
 
 
