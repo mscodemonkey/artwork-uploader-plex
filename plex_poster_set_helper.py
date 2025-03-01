@@ -721,6 +721,29 @@ def save_bulk_import_file(contents = None, filename = None, now_load = None):
             notify_web("save_bulk_import",{"saved": False, "now_load": now_load})
 
 
+def check_for_bulk_import_file():
+    """Check if any .txt files exist in the bulk_imports folder before creating bulk_import.txt."""
+    contents = "## This is a blank bulk import file\n// You can use comments with # or // like this"
+
+    try:
+        exe_path = get_exe_dir()
+        bulk_import_path = os.path.join(exe_path, "bulk_imports")
+        bulk_import_file = os.path.join(bulk_import_path, "bulk_import.txt")
+
+        # Firstly, make sure the bulk_imports folder exists
+        os.makedirs(bulk_import_path, exist_ok=True)
+
+        # Check if any .txt files exist in the bulk_imports folder
+        txt_files = [f for f in os.listdir(bulk_import_path) if f.endswith(".txt")]
+
+        if not txt_files:  # Only create if no .txt files exist
+            with open(bulk_import_file, "w", encoding="utf-8") as file:
+                file.write(contents)
+
+    except Exception as e:
+        update_status(message="Error creating bulk import file", color="danger")
+
+
 def notify_web(event, data_to_include = None, broadcast = False):
 
     global socketio, instance_id, mode
@@ -1312,6 +1335,9 @@ if __name__ == "__main__":
         sys.exit("Can't load config.json file.  Please check that the file exists and is in the correct format.")
     except Exception as config_load_exception:
         sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
+
+    # Make sure there's at least one bulk_import file
+    check_for_bulk_import_file()
 
     # Create a connector for Plex
     plex = PlexConnector(config.base_url, config.token)
