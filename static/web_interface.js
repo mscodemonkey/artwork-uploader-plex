@@ -453,6 +453,7 @@ function checkBulkImportFileToSave() {
 /* Loading the list of available bulk files */
 
 function loadBulkFileList() {
+
     socket.emit("load_bulk_filelist", { instance_id: instanceId });
 
     socket.on("load_bulk_filelist", (data) => {
@@ -749,6 +750,7 @@ document.getElementById("delete_icon").addEventListener("click", function () {
                 if (instanceId == data.instance_id) {
                     if (data.deleted) {
                         currentBulkImport = null
+                        bulkTextAsLoaded = null
                         loadBulkFileList(); // Reload the file list if deleted
                     }
                 }
@@ -776,6 +778,7 @@ function uploadBulkImportFile(event) {
             const text = e.target.result;
             document.getElementById("bulk_import_text").value = text;
             currentBulkImport = file.name
+            bulkTextAsLoaded = text
             saveBulkImport(file.name);
             //               socket.emit("upload_bulk_file", { filename: file.name, content: text });
         };
