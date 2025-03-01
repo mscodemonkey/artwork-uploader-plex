@@ -728,7 +728,7 @@ def check_for_bulk_import_file():
     try:
         exe_path = get_exe_dir()
         bulk_import_path = os.path.join(exe_path, "bulk_imports")
-        bulk_import_file = os.path.join(bulk_import_path, "bulk_import.txt")
+        bulk_import_file = os.path.join(bulk_import_path, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
 
         # Firstly, make sure the bulk_imports folder exists
         os.makedirs(bulk_import_path, exist_ok=True)

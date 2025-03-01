@@ -457,56 +457,54 @@ function loadBulkFileList() {
 
     socket.on("load_bulk_filelist", (data) => {
         if (data.instance_id === instanceId) {
-            const selectElements = document.querySelectorAll(".bulk_import_file"); // Select all matching elements
+            const selectElement = document.getElementById("switch_bulk_file");
 
             let selectedFile = currentBulkImport || config.bulk_txt; // Get the selected file from config
 
-            selectElements.forEach((selectElement) => {
-                // Clear existing options
-                selectElement.innerHTML = "";
+            // Clear existing options
+            selectElement.innerHTML = "";
 
-                if (data.bulk_files.length > 0) {
-                    // Populate the dropdown with filenames
-                    data.bulk_files.forEach((filename) => {
-                        const option = document.createElement("option");
-                        option.value = filename;
-                        option.textContent = filename;
+            if (data.bulk_files.length > 0) {
+                // Populate the dropdown with filenames
+                data.bulk_files.forEach((filename) => {
+                    const option = document.createElement("option");
+                    option.value = filename;
+                    option.textContent = filename;
 
-                        // Preselect the option if it matches the config.bulk_txt value
-                        if (filename === selectedFile) {
-                            option.selected = true;
-                            if (!document.getElementById("bulk_import_text").value) {
-                                loadBulkImport(filename);
-                            }
+                    // Preselect the option if it matches the config.bulk_txt value
+                    if (filename === selectedFile) {
+                        option.selected = true;
+                        if (!document.getElementById("bulk_import_text").value) {
+                            loadBulkImport(filename);
                         }
-                        selectElement.appendChild(option);
-                    });
-
-                    // Check if the selected file is the default file and update the checkbox icon
-                    const defaultCheckbox = document.getElementById("default_bulk_file_icon");
-                    if (selectedFile === document.getElementById("bulk_import_file").value) {
-                        // Set the icon to filled if the selected file is the default
-                        defaultCheckbox.classList.remove("bi-check-circle");
-                        defaultCheckbox.classList.add("link-primary");
-                        defaultCheckbox.classList.add("bi-check-circle-fill");
-                        defaultCheckbox.classList.add("disabled");
-                    } else {
-                        // Otherwise, set the icon to unfilled
-                        defaultCheckbox.classList.remove("link-primary");
-                        defaultCheckbox.classList.remove("bi-check-circle-fill");
-                        defaultCheckbox.classList.add("bi-check-circle");
-                        defaultCheckbox.classList.remove("disabled");
                     }
+                    selectElement.appendChild(option);
+                });
+
+                // Check if the selected file is the default file and update the checkbox icon
+                const defaultCheckbox = document.getElementById("default_bulk_file_icon");
+                if (selectedFile === document.getElementById("bulk_import_file").value) {
+                    // Set the icon to filled if the selected file is the default
+                    defaultCheckbox.classList.remove("bi-check-circle");
+                    defaultCheckbox.classList.add("link-primary");
+                    defaultCheckbox.classList.add("bi-check-circle-fill");
+                    defaultCheckbox.classList.add("disabled");
                 } else {
-                    // Show placeholder when no files exist
-                    const placeholder = document.createElement("option");
-                    placeholder.disabled = true;
-                    placeholder.selected = true;
-                    placeholder.value = "bulk_import.txt";
-                    placeholder.textContent = "Will create bulk_import.txt when saved";
-                    selectElement.appendChild(placeholder);
+                    // Otherwise, set the icon to unfilled
+                    defaultCheckbox.classList.remove("link-primary");
+                    defaultCheckbox.classList.remove("bi-check-circle-fill");
+                    defaultCheckbox.classList.add("bi-check-circle");
+                    defaultCheckbox.classList.remove("disabled");
                 }
-            });
+            } else {
+                // Show placeholder when no files exist
+                const placeholder = document.createElement("option");
+                placeholder.disabled = true;
+                placeholder.selected = true;
+                placeholder.value = "bulk_import.txt";
+                placeholder.textContent = "Will create bulk_import.txt when saved";
+                selectElement.appendChild(placeholder);
+            }
         }
     });
 }
