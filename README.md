@@ -21,9 +21,11 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the o
 
 1. [Install Python](https://www.python.org/downloads/) (if not installed already)
 
+> Mac users please download Python 3.10 or later.
+
 2. Extract all files into a folder
 
-3. Open a terminal in the folder
+3. Open a terminal and CD to the folder
 
 4. **Install the required dependencies** using
 
@@ -31,25 +33,37 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the o
    pip install -r requirements.txt
    ```
 
-5. Optionally, rename example_config.json to config.json, and populate with the proper information.  If you don't do this, a new config.json will be created when you first run the utility.
-   - **"base_url"**  
-     - The IP and port of your Plex server. e.g. "http://12.345.67.890:32400/".
-   - **"token"**  
-     - Your Plex token (can be found [here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)).
-   - **"tv_library"**  
-     - The name of your TV Shows library (e.g., "TV Shows"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
-   - **"movie_library"**  
-     - The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
-   - **"mediux_filters"**
-     - See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
-   - **"tpdb_filters"**
-     - See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
-   - **"track_artwork_ids"**
-     - Setting this to true will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.  By setting this to **false**, it'll upload every artwork every time you run (like using the --force option for every item).  This can result in long run-times, especially if you're using ThePosterDB.  We recommend you leave this as **true** and use --force when you need to!
+>You may need to use ```python3 -m pip install -r requirements.txt```
+
+5. Optionally, rename ```example_config.json``` to ```config.json```.  
+
+> If you don't do this, a new config.json will be created when you first run the utility.
+
+6. Populate your config.json with the following information:  
+
+**"base_url"**  
+- The IP and port of your Plex server. e.g. "http://12.345.67.890:32400/".
+
+**"token"**  
+- Your Plex token (can be found [here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)).
+
+**"tv_library"**  
+- The name of your TV Shows library (e.g., "TV Shows"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
+
+**"movie_library"**  
+- The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
+
+**"mediux_filters"**
+- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
+
+**"tpdb_filters"**
+- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
+
+**"track_artwork_ids"**
+- Setting this to true will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.  By setting this to **false**, it'll upload every artwork every time you run (like using the --force option for every item).  This can result in long run-times, especially if you're using ThePosterDB.  We recommend you leave this as **true** and use --force when you need to!
    
 ### Filter options
-
-   Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
+Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
       - show_cover
       - background
       - season_cover
@@ -60,7 +74,11 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the o
 ---
 # Usage
 
-In a terminal, run ```python plex_poster_set_helper.py``` (note you may need to use ```python3``` rather than ```python```, especially Mac users), using one of the following options:
+**NOTE**: THIS REQUIRES AT LEAST PYTHON 3.10.  You will encounter odd errors in the scraping log for earlier versions of Python.
+
+**In a terminal, run ```python artwork_scraper.py```** 
+ 
+>**NOTE**: You may need to use ```python3``` rather than ```python```, especially Mac users).
 
 ## Command Line Arguments
 
@@ -101,7 +119,7 @@ Use the ```gui``` argument to open the local graphical user interface:
 - movie_poster
 - collection_poster
     
---year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
+```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
 
 ### Using these options in files and GUI
 
