@@ -148,7 +148,7 @@ socket.on("status_update", (data) => {
 
 // ==================================================
 function updateLog(message, color = null, artwork_title = null) {
-    let statusElement = document.getElementById("session_log");
+    let statusElement = document.getElementById("scraping_log");
 
     // Get current timestamp
     let timestamp = new Date().toLocaleTimeString("en-GB", { hour12: false });

@@ -38,7 +38,7 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: 13px;
             color: #000; /* Black text */
-            background-color: #eeeeee; /* Light grey background */
+            background-color: #EEEEEE;
             padding: 5px;
             border-radius: 4px;
             display: block;
@@ -79,8 +79,8 @@
            role="tab" aria-controls="bulk-import" aria-selected="false">Bulk Import</a>
         <a class="nav-link active" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
            role="tab" aria-controls="scraper" aria-selected="true">Scraper</a>
-        <a class="nav-link" id="session-log-tab" data-bs-toggle="tab" data-bs-target="#session-log" type="button"
-           role="tab" aria-controls="session-log" aria-selected="false">Session Log</a>
+        <a class="nav-link" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
+           role="tab" aria-controls="scraping-log" aria-selected="false">Scraping Log</a>
     </nav>
 
     <div class="progress mt-3 collapse" id="progress_bar_container" role="progressbar" aria-label="Progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
@@ -430,11 +430,10 @@
 
         </div>
 
-        <!-- Session Log Tab -->
-        <div class="tab-pane fade" id="session-log" role="tabpanel" aria-labelledby="session-log-tab" tabindex="0">
-            <h3>Session Log</h3>
-            <div id="session_log"><!-- --></div>
-            <!-- Your session log content here -->
+        <!-- Scraping Log Tab -->
+        <div class="tab-pane fade" id="scraping-log" role="tabpanel" aria-labelledby="scraping-log-tab" tabindex="0">
+            <div class="mt-3" id="scraping_log"><!-- --></div>
+            <!-- Your scraping log content here -->
         </div>
     </div>
 </div>
