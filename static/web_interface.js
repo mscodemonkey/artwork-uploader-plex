@@ -577,9 +577,10 @@ function runBulkImport() {
 let currentBulkImport = '';
 let bulkTextAsLoaded = '';
 
-// Function to handle changing the bulk import file
 document.getElementById("switch_bulk_file").addEventListener("change", function () {
+
     const selectedFile = this.value;
+
     if (!selectedFile) return; // Do nothing if no file is selected
 
     const bulkTextArea = document.getElementById("bulk_import_text");
@@ -591,6 +592,9 @@ document.getElementById("switch_bulk_file").addEventListener("change", function 
                 saveBulkImport(currentBulkImport, selectedFile);
             } else if (confirmed === "no") {
                 loadBulkImport(selectedFile);
+            } else if (confirmed === "cancel") {
+                // User canceled, revert to previous selection
+                this.value = currentBulkImport;
             }
         });
     } else {
@@ -749,13 +753,11 @@ document.getElementById("delete_icon").addEventListener("click", function () {
             socket.on("delete_bulk_file", (data) => {
                 if (instanceId == data.instance_id) {
                     if (data.deleted) {
-
                         // Get the value of the default bulk file from the hidden field
                         const defaultBulkFile = document.getElementById("bulk_import_file").value;
                         currentBulkImport = null
                         bulkTextAsLoaded = null
                         loadBulkFileList(); // Reload the file list if deleted
-                        document.getElementById("bulk_import_file").value;
                         loadBulkImport(defaultBulkFile);
                     }
                 }
