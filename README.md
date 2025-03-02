@@ -9,9 +9,9 @@ Lots!  We (optionally) store an artwork ID in a Plex label against each movie, s
 
 There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
 
-And there are other options such as per-URL filtering and year matching, fixing missing things that i found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
+And there are other options such as per-URL filtering and year matching, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
 
-**Oh and there's now a shiny new web UI - see below**
+### Oh - there's now a shiny new web UI - see below!
 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
@@ -149,6 +149,8 @@ The GUI provides a more user-friendly interface for managing poster uploads. Use
 - View progress, status updates, and more in an intuitive layout.
 
 ## New web UI
+It's still work in progress, as is this entire fork.  I wouldn't consider it production ready yet!
+
 ![Settings](assets/settings.png)
 ![Bulk Import](assets/web_bulk_import.png)
 ![Processing](assets/processing.png)
