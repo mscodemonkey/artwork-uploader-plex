@@ -327,6 +327,17 @@
                             <div class="invalid-feedback">Please provide a valid URL to scrape.</div>
                         </div>
                     </div>
+                    <div class="col-md-2">
+                        <div class="p-3 border bg-light">
+                                <label for="scrape_url" class="form-label">Use Plex year:</label>
+                                <input type="text" id="year" name="year" class="form-control"
+                                       value=""
+                                       placeholder="e.g. 1978 or 2023"
+                                       pattern="^(19|20)\d{2}$"
+                                       title="Use this if the year in Plex is different to that on MediUX or TPDb">
+                                <div class="invalid-feedback">Please use a valid year (eg 1978, 2023).</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="row mb-3">
                     <div class="col">

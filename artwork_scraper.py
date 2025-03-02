@@ -1221,12 +1221,14 @@ def setup_web_sockets():
         url = data.get("url").lower()
         options = data.get("options")
         filters = data.get("filters")
+        year = data.get("year")
         if url:
+            if year:
+                url = url + f" --year {year}"
             if options:
                 url = url + " "+ " --".join(options)
             if filters and len(filters) < 6:
                 url = url + " --filters " + " ".join(filters)
-            print (url)
             notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
             process_scrape_url_from_ui(url)
 

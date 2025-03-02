@@ -193,6 +193,9 @@ socket.on("add_to_bulk_list", (data) => {
     if (!regex.test(bulkText)) {
         document.getElementById("bulk_import_text").value += "\n// " + data.title + "\n" + urlWithoutFlag + "\n";
     }
+
+    checkBulkTextChanged();
+
 });
 
 
@@ -321,8 +324,9 @@ function startScrape() {
             filters.push(checkbox.value);
         });
 
+        const year = document.getElementById("year").value;
         const url = document.getElementById("scrape_url").value;
-        socket.emit("start_scrape", { url: url, options: options, filters: filters, instance_id: instanceId });
+        socket.emit("start_scrape", { url: url, year: year, options: options, filters: filters, instance_id: instanceId });
     } else {
         // Trigger Bootstrap validation styles
         form.classList.add('was-validated');
@@ -531,6 +535,8 @@ function saveBulkImport(filename, nowLoad = null) {
         if (data.instance_id === instanceId) {
             if (data.saved == true) {
                 loadBulkFileList();
+                bulkTextAsLoaded = textArea.value
+                checkBulkTextChanged()
                 if (data.now_load) {
                     console.log("Saved, now loading " + data.now_load)
                     loadBulkImport(data.now_load);

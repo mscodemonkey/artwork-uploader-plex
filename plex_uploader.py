@@ -27,7 +27,7 @@ class PlexUploader:
 
     def upload_to_plex(self):
         try:
-            if self.artwork_exists_on_plex() == False or self.options.force:
+            if self.artwork_exists_on_plex() is False or self.options.force:
                 if self.artwork_id == "BID:":
                     self.upload_target.uploadArt(self.artwork["url"])
                 else:
