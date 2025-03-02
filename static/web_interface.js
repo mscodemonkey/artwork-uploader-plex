@@ -435,6 +435,7 @@ socket.on("load_bulk_import", (data) => {
             }
 
             checkBulkTextChanged();
+            handleDefaultCheckbox()
             //                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
         } else {
             updateStatus("Bulk import file could not be loaded","danger", false, false, "cross-circle")
@@ -594,6 +595,7 @@ document.getElementById("switch_bulk_file").addEventListener("change", function 
             } else if (confirmed === "cancel") {
                 // User canceled, revert to previous selection
                 this.value = currentBulkImport;
+                handleDefaultCheckbox()
             }
         });
     } else {
@@ -601,10 +603,17 @@ document.getElementById("switch_bulk_file").addEventListener("change", function 
         loadBulkImport(selectedFile);
     }
 
+
+
+});
+
+
+function handleDefaultCheckbox() {
     // Handle default checkbox when the file is selected
     const bulkImportFileField = document.getElementById("bulk_import_file");
     const defaultCheckbox = document.getElementById("default_bulk_file");
     const defaultIcon = document.getElementById("default_bulk_file_icon");
+    const selectedFile = document.getElementById("switch_bulk_file").value;
 
     // Update the default checkbox and icon based on the selected file
     if (selectedFile === bulkImportFileField.value) {
@@ -620,8 +629,8 @@ document.getElementById("switch_bulk_file").addEventListener("change", function 
         defaultIcon.classList.add("bi-check-circle");
         defaultIcon.classList.remove("disabled"); // Enable the icon
     }
+}
 
-});
 
 // Function to handle renaming the bulk file
 document.getElementById("rename_icon").addEventListener("click", function () {
