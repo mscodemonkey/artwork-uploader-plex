@@ -161,13 +161,14 @@ When using bulk import, if no file path is specified, the script will default to
 ![Bulk Import](https://raw.githubusercontent.com/tonywied17/plex-poster-set-helper/refs/heads/main/assets/bulk_import.png)
 ![URL Scrape](https://raw.githubusercontent.com/tonywied17/plex-poster-set-helper/refs/heads/main/assets/url_scrape.png)
 
-
 The GUI provides a more user-friendly interface for managing poster uploads. Users can run the script with python plex_poster_set_helper.py gui to launch the CustomTkinter-based interface, where they can:
 - Easily enter single or bulk URLs.
 - View progress, status updates, and more in an intuitive layout.
 
+The local GUI will no longer be developed, in favour of the new Web UI.
+
 ## New web UI
-It's still work in progress, as is this entire fork.  I wouldn't consider it production ready yet!
+It's still work in progress, as is this entire fork.  I wouldn't consider it production ready yet but it's fully functional!
 
 ![Settings](assets/settings.png)
 ![Bulk Import](assets/web_bulk_import.png)
