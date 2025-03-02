@@ -1,7 +1,8 @@
 
-# Artwork Scraper for Plex (plex-poster-set-helper)
+# Artwork Scraper for Plex 
+Formerly plex-poster-set-helper
 
-Plex Artwork Uploader is a tool to help upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
+Artwork Scraper is a tool to help scrape and upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
 
 # What's different in this fork?
 Lots!  We (optionally) store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  If you really want to upload it again, use the --force option at the command line, in the bulk file, or when entering the URL in the GUI.
@@ -13,7 +14,7 @@ And there are other options such as per-URL filtering and year matching, fixing 
 **Oh and there's now a shiny new web UI - see below**
 
 ## Thanks
-Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for this fantastic utility.  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
+Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
 
 ---
 # Installation
@@ -69,7 +70,7 @@ The script supports various command-line arguments for flexible use.
 Use the ```gui``` argument to open the local graphical user interface:
    
 ```bash
-  python plex_poster_set_helper.py gui
+  python artwork_scraper.py gui
 ```
 
 ** The local GUI is deprecated and may eventually be removed once the Web UI is secure.  The new Web UI is fully-featured and I will only be working on this as a user interface moving forward.
@@ -78,7 +79,7 @@ Use the ```gui``` argument to open the local graphical user interface:
    Provide a link directly to set posters from a single MediUX or ThePosterDB set:
    
 ```bash
-   python plex_poster_set_helper.py https://mediux.pro/sets/9242
+   python artwork_scraper.py https://mediux.pro/sets/9242
 ```
 ### Optional command line arguments
 
@@ -113,7 +114,7 @@ Use the ```gui``` argument to open the local graphical user interface:
    Import multiple links from a .txt file using the bulk argument:
    
 ```bash
-   python plex_poster_set_helper.py bulk bulk_import.txt
+   python artwork_scraper.py bulk bulk_import.txt
    ```
 
    - The .txt file should contain one URL per line. Lines starting with # or // will be ignored as comments.

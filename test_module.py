@@ -1,8 +1,8 @@
-import plex_poster_set_helper
+import artwork_scraper
 import pytest
 
 def test_scrapeposterdb_set_tv_series():
-    soup = plex_poster_set_helper.cook_soup("https://theposterdb.com/set/8846")
+    soup = artwork_scraper.cook_soup("https://theposterdb.com/set/8846")
     movieposters, showposters, collectionposters = plex_poster_set_helper.scrape_posterdb(soup)
     assert len(movieposters) == 0
     assert len(collectionposters) == 0
@@ -25,7 +25,7 @@ def test_scrapeposterdb_set_movie_collection():
         assert collectionposter["source"] == "posterdb"
         
 def test_scrape_mediux_set_tv_series():
-    soup = plex_poster_set_helper.cook_soup("https://mediux.pro/sets/9242")
+    soup = artwork_scraper.cook_soup("https://mediux.pro/sets/9242")
     movieposters, showposters, collectionposters = plex_poster_set_helper.scrape_mediux(soup)
     assert len(movieposters) == 0
     assert len(collectionposters) == 0
@@ -51,7 +51,7 @@ def test_scrape_mediux_set_tv_series():
 
 def test_scrape_mediux_set_tv_series_long():
     soup = plex_poster_set_helper.cook_soup("https://mediux.pro/sets/13427")
-    movieposters, showposters, collectionposters = plex_poster_set_helper.scrape_mediux(soup)
+    movieposters, showposters, collectionposters = artwork_scraper.scrape_mediux(soup)
     assert len(movieposters) == 0
     assert len(collectionposters) == 0
     assert len(showposters) == 264
