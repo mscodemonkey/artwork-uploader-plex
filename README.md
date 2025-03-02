@@ -11,6 +11,8 @@ There are also a couple of new options for thePosterDb, which will allow you to 
 
 And there are other options such as per-URL filtering and year matching, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
 
+Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you)
+
 ### Oh - there's now a shiny new web UI - see below!
 
 ## Thanks
@@ -61,6 +63,10 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the o
 
 **"track_artwork_ids"**
 - Setting this to true will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.  By setting this to **false**, it'll upload every artwork every time you run (like using the --force option for every item).  This can result in long run-times, especially if you're using ThePosterDB.  We recommend you leave this as **true** and use --force when you need to!
+
+**"auto_manage_bulk_files"**
+- Setting this to true will automatically add, label and sort URLs from the scrape tab into the currently loaded bulk import file.  At the moment it won't auto-save, but I might add that later.
+ 
    
 ### Filter options
 Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
