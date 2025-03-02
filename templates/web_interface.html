@@ -244,6 +244,10 @@
                                         <input class="form-check-input" type="checkbox" value="--force" id="track_artwork_ids"/>
                                         <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex labels (recommend to leave checked)</label>
                                     </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="--force" id="auto_manage_bulk_files"/>
+                                        <label for="auto_manage_bulk_files" class="form-check-label">Sort and label bulk files automatically</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -321,8 +325,8 @@
                             <label for="scrape_url" class="form-label">URL to scrape:</label>
                             <input type="text" id="scrape_url" name="plex_token" class="form-control"
                                    value="https://mediux.pro/sets/9133" required
-                                   placeholder="theposterdb.com or mediux.pro URL"
-                                   pattern="https://(theposterdb\.com/(set/\d+|user/[A-Za-z0-9]+)|mediux\.pro/sets/\d+)"
+                                   placeholder="theposterdb.com (poster/set/user) or mediux.pro (sets) URL"
+                                   pattern="https://(theposterdb\.com/(poster/\d+|set/\d+|user/[A-Za-z0-9]+)|mediux\.pro/sets/\d+)"
                                    title="Please enter a valid URL (e.g., https://theposterdb.com/set/12345 or https://mediux.pro/sets/12345)">
                             <div class="invalid-feedback">Please provide a valid URL to scrape.</div>
                         </div>

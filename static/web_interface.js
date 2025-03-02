@@ -184,19 +184,130 @@ socket.on("progress_bar", (data) => {
 
 
 socket.on("add_to_bulk_list", (data) => {
-    let bulkText = document.getElementById("bulk_import_text").value;
-    let urlWithoutFlag = data.url.replace(" --add-to-bulk", "").trim();
 
-    // Regex to match the URL as part of a line, even if extra arguments and values exist
-    let regex = new RegExp("^${urlWithoutFlag}(\\s+--\\S+(\\s+\\S+)*)?$", "m");
+    let bulkText = document.getElementById("bulk_import_text").value;
+    let urlWithoutFlag = data.url.split(' ')[0]; // Extract base URL
+
+    // Remove the --add-to-bulk flag from the original data.url because we don't want that added to the bulk file!
+    let cleanedUrl = data.url.replace(/\s+--add-to-bulk\b/, "").trim();
+
+    // Escape special regex characters in URL for proper matching
+    let escapedUrl = urlWithoutFlag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Regex to match the URL as a standalone line with optional extra arguments
+    let regex = new RegExp(`^${escapedUrl}(\\s+--\\S+(\\s+\\S+)*)?$`, "m");
+
+    console.log(regex);
 
     if (!regex.test(bulkText)) {
-        document.getElementById("bulk_import_text").value += "\n// " + data.title + "\n" + urlWithoutFlag + "\n";
+        if (config.auto_manage_bulk_files) {
+            document.getElementById("bulk_import_text").value = processAndSortUrls(bulkText, data.title, cleanedUrl);
+        } else {
+            document.getElementById("bulk_import_text").value += `\n// ${data.title}\n${cleanedUrl}\n`;
+        }
+
     }
+
 
     checkBulkTextChanged();
 
 });
+
+
+function processAndSortUrls(inputText, newTitle, newUrl) {
+  // Initialize data structures
+  const titleMap = {};
+  const mediUXUrls = [];
+  const thePosterDBUrls = [];
+
+  // Function to remove leading articles from a title
+  const removeLeadingArticles = (title) => {
+    const articles = ['a', 'an', 'the'];
+    const words = title.toLowerCase().split(' ');
+    if (words.length > 1 && articles.includes(words[0])) {
+      words.shift(); // Remove the leading article
+    }
+    return words.join(' ');
+  };
+
+  // Function to add a new title and its URL
+  const addTitleAndUrl = (title, url) => {
+    if (title && url) {
+      titleMap[title] = titleMap[title] || [];
+      titleMap[title].push(url);
+    }
+  };
+
+  // Split the input data into lines
+  const lines = inputText.split('\n');
+  let currentTitle = '';
+
+  // Process each line
+  lines.forEach(line => {
+    line = line.trim();
+    if (line.startsWith('//')) {
+      // New title
+      currentTitle = line.substring(3).trim();
+      titleMap[currentTitle] = [];
+    } else if (line === '') {
+      // Blank line
+      currentTitle = '';
+    } else if (line) {
+      // URL line
+      if (currentTitle) {
+        // Associated with a title
+        titleMap[currentTitle].push(line);
+      } else {
+        // Standalone URL
+        if (line.includes('mediux.pro')) {
+          mediUXUrls.push(line);
+        } else if (line.includes('theposterdb.com')) {
+          thePosterDBUrls.push(line);
+        }
+      }
+    }
+  });
+
+  // Add the new title and URL
+  addTitleAndUrl(newTitle, newUrl);
+
+  // Format the output
+  let output = '';
+  // Sort titles alphabetically, ignoring leading articles
+  const sortedTitles = Object.keys(titleMap).sort((a, b) => {
+    const aTitle = removeLeadingArticles(a);
+    const bTitle = removeLeadingArticles(b);
+    return aTitle.localeCompare(bTitle);
+  });
+  // Add title sections
+  sortedTitles.forEach(title => {
+    output += `// ${title}\n`;
+    titleMap[title].forEach(url => {
+      output += `${url}\n`;
+    });
+    output += '\n';
+  });
+  // Add MediUX URLs section
+  if (mediUXUrls.length > 0) {
+    output += '// MediUX URLs\n';
+    mediUXUrls.forEach(url => {
+      output += `${url}\n`;
+    });
+    output += '\n';
+  }
+  // Add The Poster DB URLs section
+  if (thePosterDBUrls.length > 0) {
+    output += '// The Poster DB URLs\n';
+    thePosterDBUrls.forEach(url => {
+      output += `${url}\n`;
+    });
+    output += '\n';
+  }
+
+  return output;
+}
+
+
 
 
 
@@ -236,6 +347,9 @@ function saveConfig() {
 
         // Checkbox for tracking artwork IDs
         save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
+
+        // Checkbox for managing bulk files
+        save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
 
         // Get selected mediux filters
         save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
@@ -400,6 +514,8 @@ socket.on("load_config", (data) => {
         document.getElementById("tv_library").value = data.config.tv_library.join(", ")
         document.getElementById("movie_library").value = data.config.movie_library.join(", ")
         document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids
+        document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files
+        document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files
         document.querySelectorAll('[id^="m_filter-"]').forEach(checkbox => {
             checkbox.checked = data.config.mediux_filters.includes(checkbox.value);
         });
