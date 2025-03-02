@@ -261,21 +261,21 @@
 
             <div class="row mb-3">
                 <div class="col">
-                    <div class="p-3 border bg-light d-flex align-items-center">
-                        <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select me-3" required>
+                    <div class="p-3 border bg-light d-flex align-items-center"><span class="pe-2">Loaded:</span>
+                        <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select" required>
                             <option selected disabled>Loading file list...</option>
                         </select>
                         <div class="invalid-feedback">
                             Please provide a bulk import file path.
                         </div>
                         <!-- Default bulk file checkbox -->
-                        <div class="ms-3 d-flex align-items-center">
+                        <div class="ms-1 me-3 d-flex align-items-center">
                             <input type="hidden" id="bulk_import_file" name="bulk_import_file" class="bulk_import_file">
                             <div class="form-check mb-0 d-flex align-items-center">
                                 <!-- Default bulk file checkbox using Bootstrap icons -->
                                 <input type="checkbox" id="default_bulk_file" class="d-none">
-                                <a title="Default file will be loaded when Artwork Scraper starts"><i id="default_bulk_file_icon" class="bi bi-check-circle h4 ms-3" role="button"></i></a>
-                                <label class="form-check-label mb-0 ms-1" for="default_bulk_file">Default</label>
+                                <a title="Default file will be loaded when Artwork Scraper starts"><i id="default_bulk_file_icon" class="bi bi-check-circle h4" role="button"></i></a>
+                                <label class="form-check-label mb-0 ms-2" for="default_bulk_file">Default</label>
                             </div>
                         </div>
                         <!-- Icons at the end -->

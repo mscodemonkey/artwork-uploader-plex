@@ -411,14 +411,14 @@ socket.on("load_config", (data) => {
 
 function loadBulkImport(bulkImport = null) {
     if (!bulkImport) {bulkImport = config.bulk_txt;}
-    console.log("Loading bulk file - " + bulkImport)
+    // console.log("Loading bulk file - " + bulkImport)
     socket.emit("load_bulk_import", { instance_id: instanceId, filename: bulkImport });
 }
 
 socket.on("load_bulk_import", (data) => {
 
     const textArea = document.getElementById("bulk_import_text");
-    console.log("Loader complete, returned " + data.loaded + " / " + data.filename + " / " + data.bulk_import_text)
+    // console.log("Loader complete, returned " + data.loaded + " / " + data.filename + " / " + data.bulk_import_text)
     if (data.instance_id === instanceId) {
         if (data.loaded) {
             textArea.value = data.bulk_import_text;
@@ -749,9 +749,14 @@ document.getElementById("delete_icon").addEventListener("click", function () {
             socket.on("delete_bulk_file", (data) => {
                 if (instanceId == data.instance_id) {
                     if (data.deleted) {
+
+                        // Get the value of the default bulk file from the hidden field
+                        const defaultBulkFile = document.getElementById("bulk_import_file").value;
                         currentBulkImport = null
                         bulkTextAsLoaded = null
                         loadBulkFileList(); // Reload the file list if deleted
+                        document.getElementById("bulk_import_file").value;
+                        loadBulkImport(defaultBulkFile);
                     }
                 }
             });
@@ -762,31 +767,58 @@ document.getElementById("delete_icon").addEventListener("click", function () {
 
 // Function to handle uploading a bulk file
 document.getElementById("upload_icon").addEventListener("click", function () {
+    document.getElementById("bulk_import_upload").value = "";
     document.getElementById("bulk_import_upload").click(); // Trigger file input click
 });
 
 function uploadBulkImportFile(event) {
+    const fileInput = event.target;
 
-    //        const fileInput = event.target;
-    //        const fileName = fileInput.files.length > 0 ? fileInput.files[0].name : "Upload a file";
-    //        document.getElementById("bulk_import_label").innerText = fileName;
+    if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
 
-    const file = event.target.files[0];
-    if (file && file.name.endsWith('.txt')) {
+        if (!file.name.endsWith('.txt')) {
+            console.error("Invalid file type. Only .txt files are allowed.");
+            return;
+        }
+
+        // Get the select box element
+        const selectBox = document.getElementById("switch_bulk_file");
+
+        // Check if the file already exists in the select box
+        let fileExists = false;
+        for (let option of selectBox.options) {
+            if (option.value === file.name) {
+                fileExists = true;
+                break;
+            }
+        }
+
+        // If the file exists, ask the user if they want to overwrite it
+        if (fileExists) {
+            const confirmOverwrite = confirm("File '" + file.name + "' already exists. Would you like to overwrite it?");
+            if (!confirmOverwrite) {
+                console.log("User chose not to overwrite the file.");
+                return;
+            }
+        }
+
+        // Proceed with reading and processing the file
         const reader = new FileReader();
         reader.onload = function(e) {
+            console.log(e);
             const text = e.target.result;
             document.getElementById("bulk_import_text").value = text;
-            currentBulkImport = file.name
-            bulkTextAsLoaded = text
+            currentBulkImport = file.name;
+            bulkTextAsLoaded = text;
             saveBulkImport(file.name);
-            //               socket.emit("upload_bulk_file", { filename: file.name, content: text });
         };
         reader.readAsText(file);
     } else {
         console.error("No file selected");
     }
 }
+
 
 
 // Listen for clicks on the "Default bulk file" icon

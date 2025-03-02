@@ -687,11 +687,11 @@ def delete_bulk_import_file(file_name):
             filename = os.path.join(get_exe_dir(), bulk_imports_path, file_name)
             os.remove(filename)
 
-            notify_web("delete_bulk_file", {"renamed": True, "filename": file_name})
+            notify_web("delete_bulk_file", {"deleted": True, "filename": file_name})
             update_status(f"Deleted {file_name}", "success")
         except Exception as e:
             print(e)
-            notify_web("delete_bulk_file", {"renamed": False, "filename": file_name})
+            notify_web("delete_bulk_file", {"deleted": False, "filename": file_name})
             update_status(f"Could not delete {file_name}", "warning")
 
 
