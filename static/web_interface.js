@@ -580,7 +580,6 @@ let bulkTextAsLoaded = '';
 document.getElementById("switch_bulk_file").addEventListener("change", function () {
 
     const selectedFile = this.value;
-
     if (!selectedFile) return; // Do nothing if no file is selected
 
     const bulkTextArea = document.getElementById("bulk_import_text");
@@ -621,6 +620,7 @@ document.getElementById("switch_bulk_file").addEventListener("change", function 
         defaultIcon.classList.add("bi-check-circle");
         defaultIcon.classList.remove("disabled"); // Enable the icon
     }
+
 });
 
 // Function to handle renaming the bulk file
@@ -808,12 +808,32 @@ function uploadBulkImportFile(event) {
         // Proceed with reading and processing the file
         const reader = new FileReader();
         reader.onload = function(e) {
-            console.log(e);
             const text = e.target.result;
-            document.getElementById("bulk_import_text").value = text;
-            currentBulkImport = file.name;
-            bulkTextAsLoaded = text;
-            saveBulkImport(file.name);
+
+            const bulkTextArea = document.getElementById("bulk_import_text");
+
+            if (bulkTextArea.value !== bulkTextAsLoaded) {
+                // If content has changed, show the modal
+                saveBulkChangesModal(file.name).then((confirmed) => {
+                    if (confirmed === "yes") {
+                        saveBulkImport(currentBulkImport);
+                    }
+
+                    if (confirmed === "cancel") {
+                        return
+                    } else {
+                        bulkTextArea.value = text;
+                        bulkTextAsLoaded = text;
+                        currentBulkImport = file.name;
+                        saveBulkImport(file.name);
+                    }
+                });
+            } else {
+                bulkTextArea.value = text;
+                bulkTextAsLoaded = text;
+                currentBulkImport = file.name;
+                saveBulkImport(file.name);
+            }
         };
         reader.readAsText(file);
     } else {
