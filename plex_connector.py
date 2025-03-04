@@ -18,6 +18,18 @@ class PlexConnector:
     def set_options(self, options):
         self.options = options
 
+    def reconnect(self, updated_config):
+        self.plex = None
+        self.base_url = updated_config.base_url
+        self.token = updated_config.token
+
+        try:
+            self.connect()
+            self.set_tv_libraries(updated_config.tv_library)
+            self.set_movie_libraries(updated_config.movie_library)
+        except:
+            raise
+
     def connect(self):
         if not self.plex:
             if not self.base_url or not self.token:
@@ -28,18 +40,22 @@ class PlexConnector:
 
             except requests.exceptions.RequestException as e:
                 # Handle network-related errors (e.g., unable to reach the server)
+                self.plex = None
                 raise PlexConnectorException('Unable to connect to Plex server. Please check the "base_url" in config.json or provide one.', f"Unable to connect to Plex server: {str(e)}")
 
             except plexapi.exceptions.Unauthorized as e:
                 # Handle authentication-related errors (e.g., invalid token)
-                raise PlexConnectorException('Invalid Plex token. Please check the "token" in config.json or provide one.', f"Invalid Plex token: {str(e)}")
+                self.plex = None
+                raise PlexConnectorException(f'Invalid Plex token "{self.token}" -  please check the "token" in config.json or provide one.', f"Invalid Plex token: {str(e)}")
 
             except xml.etree.ElementTree.ParseError as e:
                 # Handle XML parsing errors (e.g., invalid XML response from Plex)
+                self.plex = None
                 raise PlexConnectorException('Received invalid XML from Plex server. Check server connection.', f"Received invalid XML from Plex server: {str(e)}")
 
             except Exception as e:
                 # Handle any other unexpected errors
+                self.plex = None
                 raise PlexConnectorException(f"Unexpected error: {str(e)}", f"Unexpected error: {str(e)}")
 
 

@@ -1,8 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-
 a = Analysis(
-    ['plex_poster_set_helper.py'],
+    ['artwork_scraper.py'],
     pathex=[],
     binaries=[],
     datas=[('icons/Plex.ico', 'icons')],
@@ -22,7 +21,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='Plex Poster Set Helper',
+    name='Artwork Scraper for Plex',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

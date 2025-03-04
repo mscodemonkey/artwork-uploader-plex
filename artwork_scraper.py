@@ -1,3 +1,4 @@
+from calendar import firstweekday
 from pathlib import Path
 
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
@@ -538,6 +539,13 @@ def scrape_and_upload(url, options):
 
     global plex
 
+    # Check the connection to Plex
+    try:
+        plex.connect()
+    except PlexConnectorException as not_connected:
+        update_status(str(not_connected), "danger")
+        raise
+
     # Let's scrape the posters first
     scraper = Scraper(url)
     scraper.set_options(options)
@@ -571,7 +579,7 @@ def scrape_and_upload(url, options):
                 update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
                 update_log(f"x {str(error_unexpected)}")
-                exit(500)
+                update_status(f"Error: {str(error_unexpected)}","danger")
 
     if scraper.movie_artwork:
         for artwork in scraper.movie_artwork:
@@ -588,7 +596,8 @@ def scrape_and_upload(url, options):
                 update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
                 update_log(f"x {str(error_unexpected)}")
-                exit(500)
+                update_status(f"Error: {str(error_unexpected)}","danger")
+
 
 
     if scraper.tv_artwork:
@@ -606,7 +615,7 @@ def scrape_and_upload(url, options):
                 update_log(f"- {str(not_processed)}")
             except Exception as error_unexpected:
                 update_log(f"x {str(error_unexpected)}")
-                exit(500)
+                update_status(f"Error: {str(error_unexpected)}","danger")
 
     return title
 
@@ -733,10 +742,8 @@ def check_for_bulk_import_file():
         # Firstly, make sure the bulk_imports folder exists
         os.makedirs(bulk_import_path, exist_ok=True)
 
-        # Check if any .txt files exist in the bulk_imports folder
-        txt_files = [f for f in os.listdir(bulk_import_path) if f.endswith(".txt")]
-
-        if not txt_files:  # Only create if no .txt files exist
+        # And that the default bulk file doesn't exist...
+        if not os.path.isfile(bulk_import_file):
             with open(bulk_import_file, "w", encoding="utf-8") as file:
                 file.write(contents)
 
@@ -1296,9 +1303,13 @@ def setup_web_sockets():
             for key, value in data.get("config").items():
                 setattr(config, key, value)
             config.save()
-            notify_web("save_config",{"saved":True})
-        except:
-            notify_web("save_config",{"saved":True})
+
+            # Reconnect to Plex because the Plex server or token might have changed
+            update_log("Saving updated configuration and reconnecting to Plex")
+            plex.reconnect(config)
+            notify_web("save_config",{"saved":True, "config": vars(config)})
+        except Exception as config_error:
+            update_status(str(config_error), color="danger", update_cli=True)
 
     # Load the web server
     socketio.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
@@ -1412,12 +1423,13 @@ if __name__ == "__main__":
             try:
                 plex.set_tv_libraries(config.tv_library)
             except PlexConnectorException as e:
-                sys.exit(str(e))
-
+                # sys.exit(str(e))
+                pass
             try:
                 plex.set_movie_libraries(config.movie_library)
             except PlexConnectorException as e:
-                sys.exit(str(e))
+               # sys.exit(str(e))
+                pass
 
             # Create the app and web server
             web_app = Flask(__name__, template_folder="templates")

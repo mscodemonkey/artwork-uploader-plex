@@ -59,7 +59,7 @@
 </head>
 <body>
 <div class="container mt-4">
-    <img class="mb-4" src="/static/app_logo.png" title="Artwork Scraper for Plex" style="height: 52px">
+    <img class="mb-4 d-none d-sm-block" src="/static/app_logo.png" title="Artwork Scraper for Plex" style="height: 52px"><h1 class="d-sm-none mb-4">Artwork Scraper for Plex</h1>
     <div class="row m-3 rounded fade fixed-top" id="status">
         <div class="col">
             <div class="p-3">
@@ -73,14 +73,14 @@
     <!-- Bootstrap Tabs -->
 
     <nav class="nav nav-tabs" id="myTab">
-        <a class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab"
+        <a class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab"
            aria-controls="config" aria-selected="false">Config</a>
-        <a class="nav-link" id="bulk-import-tab" data-bs-toggle="tab" data-bs-target="#bulk-import" type="button"
+        <a class="nav-link collapse" id="bulk-import-tab" data-bs-toggle="tab" data-bs-target="#bulk-import" type="button"
            role="tab" aria-controls="bulk-import" aria-selected="false">Bulk Import</a>
-        <a class="nav-link active" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
+        <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
            role="tab" aria-controls="scraper" aria-selected="true">Scraper</a>
-        <a class="nav-link" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
-           role="tab" aria-controls="scraping-log" aria-selected="false">Scraping Log</a>
+        <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
+           role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block">Upload&nbsp;</span>Log</a>
     </nav>
 
     <div class="progress mt-3 collapse" id="progress_bar_container" role="progressbar" aria-label="Progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
@@ -90,11 +90,11 @@
     <div class="tab-content" id="myTabContent">
 
         <!-- Settings Tab -->
-        <div class="tab-pane fade" id="config" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
+        <div class="tab-pane fade show active" id="config" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
 
             <form id="config_form" class="needs-validation" novalidate>
-                <div class="row mb-3">
-                    <div class="col md-6">
+                <div class="row">
+                    <div class="col-lg-5 mb-3">
                         <div class="p-3 border bg-light">
                             <h5 class="mb-3">Plex server settings</h5>
                             <div class="mb-3">
@@ -131,35 +131,33 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col md-6">
+                    <div class="col-lg-7">
                         <div class="row mb-3">
                             <div class="col">
                                 <div class="p-3 border bg-light">
-                                    <h5 class="mb-3">Artwork to include from ThePosterDB.com</h5>
-                                    <div class="row mb-2">
-                                        <div class="col-md-2"><strong>TV shows</strong></div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                    <h5 class="mb-3">Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB.com</h5>
+                                    <div class="row mb-1">
+                                        <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="p_filter-show_cover"/>
                                                 <label for="p_filter-show_cover" class="form-check-label">Show cover</label>
                                             </div>
                                         </div>
-                                        <div class="col">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="p_filter-background"/>
-                                                <label for="p_filter-background" class="form-check-label">Background</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row mb-2">
-                                        <div class="col offset-md-2">
-                                            <div class="form-check">
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="p_filter-season_cover"/>
                                                 <label for="p_filter-season_cover" class="form-check-label">Season covers</label>
                                             </div>
                                         </div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="p_filter-background"/>
+                                                <label for="p_filter-background" class="form-check-label">Background</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="p_filter-title_card"/>
                                                 <label for="p_filter-title_card" class="form-check-label">Title cards</label>
                                             </div>
@@ -167,15 +165,15 @@
                                     </div>
 
                                     <div class="row">
-                                        <div class="col-md-2"><strong>Movies</strong></div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                        <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" checked value="movie_poster" id="p_filter-movie_poster"/>
                                                 <label for="p_filter-movie_poster" class="form-check-label">Movie poster</label>
                                             </div>
                                         </div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                        <div class="col-6 col-md-4 col-xl-4">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" checked value="collection_poster" id="p_filter-collection_poster"/>
                                                 <label for="p_filter-collection_poster" class="form-check-label">Collection
                                                     poster</label>
@@ -188,47 +186,44 @@
                         <div class="row mb-3">
                             <div class="col">
                                 <div class="p-3 border bg-light">
-                                    <h5 class="mb-3">Artwork to include from MediUX.pro</h5>
-                                    <div class="row mb-2">
-                                        <div class="col-md-2"><strong>TV shows</strong></div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                    <h5 class="mb-3">Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX.pro</h5>
+                                    <div class="row mb-1">
+                                        <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" value="show_cover" id="m_filter-show_cover"/>
                                                 <label for="m_filter-show_cover" class="form-check-label">Show cover</label>
                                             </div>
                                         </div>
-                                        <div class="col">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" value="background" id="m_filter-background"/>
-                                                <label for="m_filter-background" class="form-check-label">Background</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row mb-2">
-                                        <div class="col offset-md-2">
-                                            <div class="form-check">
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" value="season_cover" id="m_filter-season_cover"/>
                                                 <label for="m_filter-season_cover" class="form-check-label">Season covers</label>
                                             </div>
                                         </div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" value="background" id="m_filter-background"/>
+                                                <label for="m_filter-background" class="form-check-label">Background</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" value="title_card" id="m_filter-title_card"/>
                                                 <label for="m_filter-title_card" class="form-check-label">Title cards</label>
                                             </div>
                                         </div>
                                     </div>
-
                                     <div class="row">
-                                        <div class="col-md-2"><strong>Movies</strong></div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                        <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" value="movie_poster" id="m_filter-movie_poster"/>
                                                 <label for="m_filter-movie_poster" class="form-check-label">Movie poster</label>
                                             </div>
                                         </div>
-                                        <div class="col">
-                                            <div class="form-check">
+                                        <div class="col-6 col-md-4 col-xl-4 mb-3">
+                                            <div class="form-check mb-2">
                                                 <input class="form-check-input" type="checkbox" value="collection_poster" id="m_filter-collection_poster"/>
                                                 <label for="m_filter-collection_poster" class="form-check-label">Collection poster</label>
                                             </div>
@@ -237,7 +232,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="row mb-3">
+                        <div class="row">
                             <div class="col">
                                 <div class="p-3 border bg-light">
                                     <div class="form-check mb-3">
@@ -265,7 +260,7 @@
 
             <div class="row mb-3">
                 <div class="col">
-                    <div class="p-3 border bg-light d-flex align-items-center"><span class="pe-2">Loaded:</span>
+                    <div class="p-3 border bg-light d-flex align-items-center">
                         <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select" required>
                             <option selected disabled>Loading file list...</option>
                         </select>
@@ -273,13 +268,13 @@
                             Please provide a bulk import file path.
                         </div>
                         <!-- Default bulk file checkbox -->
-                        <div class="ms-1 me-3 d-flex align-items-center">
+                        <div class="d-flex align-items-center">
                             <input type="hidden" id="bulk_import_file" name="bulk_import_file" class="bulk_import_file">
                             <div class="form-check mb-0 d-flex align-items-center">
                                 <!-- Default bulk file checkbox using Bootstrap icons -->
                                 <input type="checkbox" id="default_bulk_file" class="d-none">
                                 <a title="Default file will be loaded when Artwork Scraper starts"><i id="default_bulk_file_icon" class="bi bi-check-circle h4" role="button"></i></a>
-                                <label class="form-check-label mb-0 ms-2" for="default_bulk_file">Default</label>
+                                <label class="d-none d-sm-block form-check-label mb-0 ms-2" for="default_bulk_file">Default</label>
                             </div>
                         </div>
                         <!-- Icons at the end -->
@@ -317,10 +312,10 @@
 
 
         <!-- Scraper Tab -->
-        <div class="tab-pane fade show active" id="scraper" role="tabpanel" aria-labelledby="scraper-tab" tabindex="0">
+        <div class="tab-pane fade" id="scraper" role="tabpanel" aria-labelledby="scraper-tab" tabindex="0">
             <form id="scraperForm" class="needs-validation" novalidate>
-                <div class="row mb-3">
-                    <div class="col">
+                <div class="row">
+                    <div class="col mb-3">
                         <div class="p-3 border bg-light">
                             <label for="scrape_url" class="form-label">URL to scrape:</label>
                             <input type="text" id="scrape_url" name="plex_token" class="form-control"
@@ -331,7 +326,7 @@
                             <div class="invalid-feedback">Please provide a valid URL to scrape.</div>
                         </div>
                     </div>
-                    <div class="col-md-2">
+                    <div class="mb-3 col-md-4 col-lg-3">
                         <div class="p-3 border bg-light">
                                 <label for="scrape_url" class="form-label">Plex year:</label>
                                 <input type="text" id="year" name="year" class="form-control"
@@ -347,7 +342,7 @@
                     <div class="col">
                         <div class="p-3 border bg-light">
                             <h5 class="mb-3">Options</h5>
-                            <div class="form-check">
+                            <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" value="--force" id="option-force"/>
                                 <label for="option-force" class="form-check-label">Force upload the artwork, even if it
                                     already exists</label>
@@ -382,48 +377,44 @@
                     <div class="col">
                         <div class="p-3 border bg-light">
                             <h5 class="mb-3">Artwork to include</h5>
-                            <div class="row mb-2">
-                                <div class="col-md-1"><strong>TV shows</strong></div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" checked value="show_cover"
-                                               name="filter" id="filter-show_cover"/>
+                            <div class="row mb-1">
+                                <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="filter-show_cover"/>
                                         <label for="filter-show_cover" class="form-check-label">Show cover</label>
                                     </div>
                                 </div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" checked value="background"
-                                               name="filter" id="filter-background"/>
-                                        <label for="filter-background" class="form-check-label">Background</label>
-                                    </div>
-                                </div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" checked value="season_cover"
-                                               name="filter" id="filter-season_cover"/>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="filter-season_cover"/>
                                         <label for="filter-season_cover" class="form-check-label">Season covers</label>
                                     </div>
                                 </div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" checked value="title_card"
-                                               name="filter" id="filter-title_card"/>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="filter-background"/>
+                                        <label for="filter-background" class="form-check-label">Background</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="filter-title_card"/>
                                         <label for="filter-title_card" class="form-check-label">Title cards</label>
                                     </div>
                                 </div>
                             </div>
                             <div class="row">
-                                <div class="col-md-1"><strong>Movies</strong></div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
+                                <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" checked value="movie_poster"
                                                id="filter-movie_poster"/>
                                         <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
                                     </div>
                                 </div>
-                                <div class="col-md-2">
-                                    <div class="form-check">
+                                <div class="col-6 col-md-8 col-lg-3">
+                                    <div class="form-check mb-2">
                                         <input class="form-check-input" type="checkbox" checked
                                                value="collection_poster" id="filter-collection_poster"/>
                                         <label for="filter-collection_poster" class="form-check-label">Collection

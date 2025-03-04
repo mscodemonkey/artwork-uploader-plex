@@ -363,9 +363,12 @@ function saveConfig() {
 
         socket.on("save_config", (data) => {
             if (data.saved) {
+                config = data.config;
                 updateStatus("Configuration saved","success", false, false, "check-circle")
+                configureTabs(true);
             } else {
                 updateStatus("Configuration could not be saved","danger", false, false, "cross-circle")
+                configureTabs(true);
             }
         });
 
@@ -523,9 +526,23 @@ socket.on("load_config", (data) => {
             checkbox.checked = data.config.tpdb_filters.includes(checkbox.value);
         });
         loadBulkFileList(); // For the switcher
+        configureTabs();
     }
 });
 
+function configureTabs(afterSave = false) {
+        if (config.base_url && config.token) {
+            document.getElementById('bulk-import-tab').classList.add("show");
+            document.getElementById('scraper-tab').classList.add("show");
+            document.getElementById('scraping-log-tab').classList.add("show");
+            if (!afterSave) {
+                document.getElementById('config').classList.remove("show","active");
+                document.getElementById('config-tab').classList.remove("active");
+                document.getElementById('scraper').classList.add("show","active");
+                document.getElementById('scraper-tab').classList.add("active");
+            }
+        }
+}
 
 /* Loading the bulk import file */
 

@@ -14,7 +14,7 @@ class Config:
         self.bulk_txt = "bulk_import.txt"
         self.tv_library = ["TV Shows"]
         self.movie_library = ["Movies"]
-        self.mediux_filters = ["title_card", "background", "season_cover", "show_cover"]
+        self.mediux_filters = ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"]
         self.tpdb_filters = ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"]
         self.track_artwork_ids = True
         self.auto_manage_bulk_files = True
@@ -49,9 +49,9 @@ class Config:
             "base_url": "",
             "token": "",
             "bulk_txt": "bulk_import.txt",
-            "tv_library": ["TV Shows", "Anime"],
+            "tv_library": ["TV Shows"],
             "movie_library": ["Movies"],
-            "mediux_filters": ["title_card", "background", "season_cover", "show_cover"],
+            "mediux_filters": ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"],
             "tpdb_filters":["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
             "tracK_artwork_ids": True,
             "auto_manage_bulk_files": True
