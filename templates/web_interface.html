@@ -19,8 +19,16 @@
         body {
             background-image: url(/static/bg.jpg);
             background-repeat: no-repeat;
-            background-size: cover;
+            background-position-x: right;
+            background-size: cover
         }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+
 
         * {
             font-family: "Noto Sans", serif;
@@ -33,6 +41,9 @@
         .tab-content {
             margin-top: 1rem;
         }
+
+        h1 {font-weight: 400; letter-spacing: -1px;}
+        h1 img {position: relative;  top: -0.2rem; margin-right:1rem;}
 
         .log_message {
             font-family: 'JetBrains Mono', monospace;
@@ -59,7 +70,9 @@
 </head>
 <body>
 <div class="container mt-4">
-    <img class="mb-4 d-none d-sm-block" src="/static/app_logo.png" title="Artwork Scraper for Plex" style="height: 52px"><h1 class="d-sm-none mb-4">Artwork Scraper for Plex</h1>
+    <div class="mb-4">
+        <h1><img src="/static/artwork_scraper.png" title="Artwork Scraper for Plex" style="height: 2.5rem">Artwork Scraper for Plex</h1>
+    </div>
     <div class="row m-3 rounded fade fixed-top" id="status">
         <div class="col">
             <div class="p-3">
