@@ -19,6 +19,7 @@ PlexAPI==4.15.6
 python-engineio==4.11.2
 python-socketio==5.12.1
 requests==2.31.0
+schedule==1.2.2
 simple-websocket==1.1.0
 soupsieve==2.5
 strongtyping==3.10.7

@@ -29,6 +29,9 @@ Oh, last but not least, there's now a shiny new web UI so you can leave it runni
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
 
+## Disclaimer
+This is a first project for me, i'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that it currently breaks the terms of service of TPDb so will look into a better way of downloading from there.  Wish these sites had APIs!
+
 ---
 # Installation
 

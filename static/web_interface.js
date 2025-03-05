@@ -11,6 +11,14 @@ const scrapeUrlInput = document.getElementById("scrape_url");
 const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
 
 
+
+const now = new Date();
+now.setMinutes(now.getMinutes() + 1);
+const hours = now.getHours().toString().padStart(2, '0');
+const minutes = now.getMinutes().toString().padStart(2, '0');
+const timeString = `${hours}:${minutes}`;
+socket.emit("add_to_scheduler",{instance_id:instanceId, time: timeString})
+
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("> New session started with ID: " + instanceId)
     loadConfig()

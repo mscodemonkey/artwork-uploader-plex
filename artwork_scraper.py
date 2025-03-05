@@ -3,7 +3,8 @@ from pathlib import Path
 
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 from flask_socketio import SocketIO
-import os, threading
+import os
+import schedule, time
 
 import customtkinter as ctk
 import tkinter as tk
@@ -1311,6 +1312,19 @@ def setup_web_sockets():
         except Exception as config_error:
             update_status(str(config_error), color="danger", update_cli=True)
 
+    @socketio.on("add_to_scheduler")
+    def add_tasks_to_scheduler(data):
+        try:
+            # Schedule bulk import task
+            if data.get("instance_id"):
+                schedule.every().day.at(data.get("time")).do(lambda: task_three(data.get("instance_id")))
+
+            # Start the scheduler in a background thread
+                start_scheduler()
+
+        except:
+            pass
+
     # Load the web server
     socketio.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
 
@@ -1320,10 +1334,67 @@ def update_web_log(message, artwork_title = None):
     notify_web("log_update", {"message": message, "artwork_title": artwork_title} )
 
 
+def task_three(instance = None):
+    if instance:
+        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, "bulk_test.txt",)).start()
+
+def process_bulk_file_on_schedule(instance, filename):
+    global config
+    content = None
+
+    try:
+        # Get the current bulk_txt value from the config
+        bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+        bulk_imports_path = "bulk_imports/"
+
+        # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
+        bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
+
+        if not os.path.exists(bulk_import_file):
+            if mode == "cli":
+                print(f"File does not exist: {bulk_import_file}")
+            elif mode == "gui":
+                bulk_import_text.delete(1.0, ctk.END)
+                bulk_import_text.insert(ctk.END, "Bulk import file path is not set or file does not exist.")
+                status_label.configure(text="Bulk import file path not set or file not found.", text_color="red")
+            elif mode == "web":
+                update_status(f"File does not exist: {bulk_import_file}")
+            return
+
+        with open(bulk_import_file, "r", encoding="utf-8") as file:
+            content = file.read()
+
+        if content:
+            update_log("@ *** Scheduled import started ***")
+            run_bulk_import_scrape_thread(content)
+
+    except FileNotFoundError:
+        update_log(f"@ Scheduled import failed due to missing file ({filename})")
+    except Exception as e:
+        update_log(f"@ Scheduled import failed ({str(e)})")
+
+# Function to run the scheduler in a separate thread
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
+# Function to start the scheduler safely
+def start_scheduler():
+    global scheduler_thread
+    if scheduler_thread is None or not scheduler_thread.is_alive():
+        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+        scheduler_thread.start()
+        print("Scheduler started.")
+    else:
+        print("Scheduler is already running.")
+
+
 # * Main Initialization ---
 if __name__ == "__main__":
 
     instance_id = None
+    scheduler_thread = None
 
     # Process command line arguments
     args = arguments.parse_arguments()
