@@ -24,6 +24,17 @@ def calculate_md5(input_string):
     return md5_hash.hexdigest()
 
 
+def calculate_file_md5(file_path):
+    md5_hash = hashlib.md5()
+
+    with open(file_path, "rb") as file:
+        # Read the file in chunks to handle large files
+        while chunk := file.read(8192):  # 8 KB chunks
+            md5_hash.update(chunk)
+
+    return md5_hash.hexdigest()
+
+
 def is_numeric(value):
     if isinstance(value, (int, float)):  # Directly check if it's a number
         return True

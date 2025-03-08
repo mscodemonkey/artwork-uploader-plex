@@ -17,7 +17,7 @@ now.setMinutes(now.getMinutes() + 1);
 const hours = now.getHours().toString().padStart(2, '0');
 const minutes = now.getMinutes().toString().padStart(2, '0');
 const timeString = `${hours}:${minutes}`;
-socket.emit("add_to_scheduler",{instance_id:instanceId, time: timeString})
+//socket.emit("add_to_scheduler",{instance_id:instanceId, time: timeString})
 
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("> New session started with ID: " + instanceId)
@@ -543,6 +543,7 @@ function configureTabs(afterSave = false) {
             document.getElementById('bulk-import-tab').classList.add("show");
             document.getElementById('scraper-tab').classList.add("show");
             document.getElementById('scraping-log-tab').classList.add("show");
+            document.getElementById('uploader-tab').classList.add("show");
             if (!afterSave) {
                 document.getElementById('config').classList.remove("show","active");
                 document.getElementById('config-tab').classList.remove("active");
@@ -1022,6 +1023,102 @@ document.getElementById("default_bulk_file_icon").addEventListener("click", func
     }
 });
 
+// Drag and drop
 
+        const dropArea = document.getElementById("drop-area");
+        const progressContainer = document.getElementById("progress-container");
+        const progressBar = document.getElementById("progress-bar");
+        const progressText = document.getElementById("progress-text");
+
+
+        dropArea.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dropArea.classList.add("highlight");
+        });
+
+        dropArea.addEventListener("dragleave", () => {
+            dropArea.classList.remove("highlight");
+        });
+
+        dropArea.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dropArea.classList.remove("highlight");
+
+            const file = e.dataTransfer.files[0];
+            if (file && file.name.endsWith(".zip")) {
+                uploadFile(file);
+            } else {
+                alert("Please drop a valid ZIP file.");
+            }
+        });
+
+        dropArea.addEventListener("click", () => {
+            let input = document.createElement("input");
+            input.type = "file";
+            input.accept = ".zip";
+            input.onchange = (e) => {
+                let file = e.target.files[0];
+                if (file) uploadFile(file);
+            };
+            input.click();
+        });
+
+
+const CHUNK_SIZE = 1024 * 64; // 64 KB per chunk
+
+function uploadFile(file) {
+    const reader = new FileReader();
+    let offset = 0; // Track progress
+
+    reader.onload = function (event) {
+        const arrayBuffer = event.target.result;
+        const totalChunks = Math.ceil(arrayBuffer.byteLength / CHUNK_SIZE);
+
+        function sendChunk() {
+            progressContainer.style.display = "block"
+            if (offset >= arrayBuffer.byteLength) {
+                socket.emit("upload_complete", { fileName: file.name });
+                return;
+            }
+
+
+            const chunk = arrayBuffer.slice(offset, offset + CHUNK_SIZE);
+            const base64Chunk = btoa(String.fromCharCode(...new Uint8Array(chunk)));
+
+         //   socket.emit("upload_artwork_chunk", {message:"Working"})
+
+            socket.emit("upload_artwork_chunk", {
+                instance_id: instanceId,
+                fileName: file.name,
+                chunkData: base64Chunk,
+                chunkIndex: offset / CHUNK_SIZE,
+                totalChunks: totalChunks
+            });
+
+            offset += CHUNK_SIZE;
+            let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
+
+            progressBar.style.width = progress + "%";
+            progressText.textContent = progress + "%";
+            setTimeout(sendChunk, 10); // Avoid blocking the event loop
+        }
+
+        sendChunk();
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+        socket.on("upload_progress", function (data) {
+            let percent = data.progress;
+            progressBar.style.width = percent + "%";
+            progressText.textContent = percent + "%";
+        });
+
+        socket.on("upload_complete", function (data) {
+            progressBar.style.width = "100%";
+            progressText.textContent = "Upload complete!";
+            setTimeout(() => progressContainer.style.display = "none", 2000);
+        });
 
 

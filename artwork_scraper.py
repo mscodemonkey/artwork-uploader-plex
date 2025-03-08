@@ -1,19 +1,28 @@
-from calendar import firstweekday
+import base64
 from pathlib import Path
 
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory
-from flask_socketio import SocketIO
+import uuid
 import os
+import re
+import zipfile
+import tempfile
+
+from PIL import Image
+from flask import Flask, render_template, jsonify, request
+from flask_socketio import SocketIO
+
 import schedule, time
 
-import customtkinter as ctk
-import tkinter as tk
+import globals
 import threading
 import atexit
 import sys
-from PIL import Image
 
-from config_exceptions import ConfigLoadError, ConfigSaveError
+import utils
+from instance import Instance
+from media_metadata import parse_movie, parse_title
+from notifications import update_log, update_status, notify_web
+from config_exceptions import ConfigLoadError
 from plex_connector_exception import PlexConnectorException
 import arguments
 from config import Config
@@ -21,19 +30,19 @@ from scraper_exceptions import ScraperException
 from theposterdb_scraper import ThePosterDBScraper
 from upload_processor import UploadProcessor
 from scraper import Scraper
-from utils import is_not_comment, parse_url_and_options, is_valid_url
+from utils import is_not_comment, parse_url_and_options
 from options import Options
 from plex_connector import PlexConnector
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
     NotProcessedByExclusion
 
 # ! Interactive CLI mode flag
-interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the GUI by default
+interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
 mode = "cli"
 
 # @ ---------------------- CORE FUNCTIONS ----------------------
 
-def parse_bulk_file_from_cli(file_path):
+def parse_bulk_file_from_cli(instance: Instance, file_path):
 
     """
     Load and parse the URLs from a bulk file, then scrape them with any options set for that URL.
@@ -58,14 +67,14 @@ def parse_bulk_file_from_cli(file_path):
             # Parse according to whether it's a user portfolio or poster / set URL
             if "/user/" in parsed_url.url:
                 try:
-                    scrape_tpdb_user(parsed_url.url, parsed_url.options)
+                    scrape_tpdb_user(instance, parsed_url.url, parsed_url.options)
                 except ScraperException as scraper_error:
                     print(str(scraper_error))
                 except Exception as unknown_error:
                     print(str(unknown_error))
             else:
                 try:
-                    scrape_and_upload(parsed_url.url, parsed_url.options)
+                    scrape_and_upload(instance, parsed_url.url, parsed_url.options)
                 except:
                     print("Oops")
 
@@ -99,324 +108,61 @@ def get_exe_dir():
         return os.path.dirname(__file__)  # Path to script file
 
 
-def resource_path(relative_path):
-    """Get the absolute path to resource, works for dev and for PyInstaller bundle."""
-    try:
-        # PyInstaller creates a temp folder for the bundled app, MEIPASS is the path to that folder
-        base_path = sys._MEIPASS
-    except Exception:
-        # If running in a normal Python environment, use the current working directory
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
-
-
-def get_full_path(relative_path):
-    """Helper function to get the absolute path based on the script's location."""
-    print("relative_path", relative_path)
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(script_dir, relative_path)
-
-
-def update_status(message, color="white", update_cli = False, sticky = False, spinner=False, icon=None):
-    """Update the status label with a message and color."""
-
-    # Map the colours
-    bootstrap_colors = {
-        'primary': {
-            'bg': '#0d6efd',  # background color
-            'fg': '#ffffff'  # foreground color (text color)
-        },
-        'secondary': {
-            'bg': '#6c757d',  # background color
-            'fg': '#ffffff'  # foreground color (text color)
-        },
-        'success': {
-            'bg': '#198754',  # background color
-            'fg': '#ffffff',  # foreground color (text color)
-            "icon": "check-circle"
-        },
-        'danger': {
-            'bg': '#dc3545',  # background color
-            'fg': '#ffffff',  # foreground color (text color)
-            "icon": "exclamation-triangle"
-        },
-        'warning': {
-            'bg': '#ffc107',  # background color
-            'fg': '#212529',  # foreground color (text color)
-            "icon": "exclamation-circle-fill"  # foreground color (text color)
-        },
-        'info': {
-            'bg': '#0dcaf0',  # background color
-            'fg': '#212529',  # foreground color (text color)
-            "icon": "info-circle"
-        },
-        'light': {
-            'bg': '#f8f9fa',  # background color
-            'fg': '#212529'  # foreground color (text color)
-        },
-        'dark': {
-            'bg': '#212529',  # background color
-            'fg': '#ffffff'  # foreground color (text color)
-        }
-    }
-
-
-    if mode=="cli" and update_cli:
-        print(message)
-    elif mode=="gui":
-        app.after(0, lambda: status_label.configure(text=message, text_color=bootstrap_colors.get(color, {}).get('bg', '#f8f9fa')))
-    elif mode=="web":
-        notify_web("status_update", {"message": message, "color": color, "sticky": sticky, "spinner": spinner, "icon": icon if icon else bootstrap_colors.get(color, {}).get('icon', None)})
-
-
-def update_error(message):
-    """Update the error label with a message, with a small delay."""
-    # app.after(500, lambda: status_label.configure(text=message, text_color="red"))
-    if mode=="cli":
-        print(message)
-    if mode=="gui":
-        status_label.configure(text=message, text_color="red")
-    if mode=="web":
-        print(message)
-        notify_web("status_update", {"message": message, "color": "danger"})
-
-
-def clear_url():
-    """Clear the URL entry field."""
-    url_entry.delete(0, ctk.END)
-    status_label.configure(text="URL cleared.", text_color="orange")
-
-
-def set_default_tab(tabview):
-    """Set the default tab to the Settings tab."""
-    plex_base_url = base_url_entry.get()
-    plex_token = token_entry.get()
-
-    if plex_base_url and plex_token:
-        tabview.set("Bulk Import")
-    else:
-        tabview.set("Settings")
-
-
-def bind_context_menu(widget):
-    """Bind the right-click context menu to the widget."""
-    widget.bind("<Button-3>", clear_placeholder_on_right_click)
-    widget.bind("<Control-1>", clear_placeholder_on_right_click)
-
-
-def clear_placeholder_on_right_click(event):
-    """Clears placeholder text and sets focus before showing the context menu."""
-    widget = event.widget
-    if isinstance(widget, ctk.CTkEntry) and widget.get() == "":
-        widget.delete(0, tk.END)
-    widget.focus()
-    show_global_context_menu(event)
-
-
-def show_global_context_menu(event):
-    """Show the global context menu at the cursor position."""
-    widget = event.widget
-    global_context_menu.entryconfigure("Cut", command=lambda: widget.event_generate("<<Cut>>"))
-    global_context_menu.entryconfigure("Copy", command=lambda: widget.event_generate("<<Copy>>"))
-    global_context_menu.entryconfigure("Paste", command=lambda: widget.event_generate("<<Paste>>"))
-    global_context_menu.tk_popup(event.x_root, event.y_root)
-
-
-# * Configuration file I/O functions  ---
-def save_config():
-
-    """Save the configuration from the UI fields to the file and update the in-memory config."""
-
-    global config
-
-    # Set new values for the config, from the UI
-    config.base_url = base_url_entry.get().strip()
-    config.token = token_entry.get().strip()
-    config.tv_library = [item.strip() for item in tv_library_text.get().strip().split(",")]
-    config.movie_library =  [item.strip() for item in movie_library_text.get().strip().split(",")]
-    config.mediux_filters =  mediux_filters_text.get().strip().split(", ")
-    config.tpdb_filters =  tpdb_filters_text.get().strip().split(", ")
-    config.bulk_txt = bulk_txt_entry.get().strip()
-    config.track_artwork_ids = track_artwork_checkbox.get()
-
-    try:
-        config.save()
-        update_status("Configuration saved successfully!", color="#E5A00D")
-    except ConfigSaveError as config_save_error:
-        update_status(f"Error saving config: {str(config_save_error)}", color="red")
-
-    try:
-        load_and_update_ui()
-    except Exception as config_error:
-        update_status(f"Error with config: {str(config_error)}", color="red")
-
-
-def load_and_update_ui():
-    """Load the configuration and update the UI fields."""
-
-    global config
-
-    if base_url_entry is not None:
-        base_url_entry.delete(0, ctk.END)
-        base_url_entry.insert(0, config.base_url if config.base_url is not None else "")
-
-    if token_entry is not None:
-        token_entry.delete(0, ctk.END)
-        token_entry.insert(0, config.token if config.token is not None else "")
-
-    if bulk_txt_entry is not None:
-        bulk_txt_entry.delete(0, ctk.END)
-        bulk_txt_entry.insert(0, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
-
-    if tv_library_text is not None:
-        tv_library_text.delete(0, ctk.END)
-        tv_library_text.insert(0, ", ".join(config.tv_library if config.tv_library else []))
-
-    if movie_library_text is not None:
-        movie_library_text.delete(0, ctk.END)
-        movie_library_text.insert(0, ", ".join(config.movie_library if config.movie_library else []))
-
-    if mediux_filters_text is not None:
-        mediux_filters_text.delete(0, ctk.END)
-        mediux_filters_text.insert(0, ", ".join(config.mediux_filters if config.mediux_filters else []))
-
-    if tpdb_filters_text is not None:
-        tpdb_filters_text.delete(0, ctk.END)
-        tpdb_filters_text.insert(0, ", ".join(config.tpdb_filters if config.tpdb_filters else []))
-
-    if track_artwork_checkbox is not None:
-        if config.track_artwork_ids:
-            track_artwork_checkbox.select()
-        else:
-            track_artwork_checkbox.deselect()
-
-    load_bulk_import_file()
-
-
-# * Threaded functions for scraping and setting posters ---
-
-
-# UI Session Log
-def clear_log():
-    try:
-        session_log_text.configure(state="normal")
-        session_log_text.delete(1.0, "end")
-        session_log_text.configure(state="disabled")
-        update_status("Log cleared", color="#E5A00D")
-    except:
-        pass
-    finally:
-        app.after(1000, update_status, "", "#E5A00D")
-
-
-def update_log(update_text: str, artwork_title = None) -> None:
-
-    """
-    Updates the session log in the GUI.  The session log only exists while the app is running.
-
-    :param  update_text:    The text to append to the session log.  Will remain until cleared.
-    :return: nothing
-    """
-
-    try:
-        if mode == "cli":
-            print(update_text)
-        elif mode == "gui":
-            session_log_text.configure(state="normal")
-            session_log_text.insert("end",f"{update_text}\n")
-            session_log_text.configure(state="disabled")
-        elif mode == "web":
-            update_web_log(f"{update_text}", artwork_title)
-    except:
-        pass
-
-
-# * Processing functions for scraping and setting posters from the GUI
-def run_url_scrape_thread():
-
-    """Run the URL scrape in a separate thread."""
-
-    url = url_entry.get()
-
-    if not url or not is_valid_url(url):
-        update_status("Please enter a valid URL.", color="red")
-        return
-
-    tabview.set("Session Log")
-    scrape_button.configure(state="disabled")
-    clear_button.configure(state="disabled")
-    bulk_import_button.configure(state="disabled")
-
-    threading.Thread(target=process_scrape_url_from_ui, args=(url,)).start()
-
-
-def process_scrape_url_from_ui(url: str) -> None:
+def process_scrape_url_from_ui(instance: Instance, url: str) -> None:
 
     """
     Process the URL and any options, then scrape for posters and updates the GUI with the results
     Now switches to the session log tab when you hit the button so that you can see the results as they happen
 
-    :param      url: The URL to scrape.  Note that due to options, this may not be the only URL that we end up scraping!
-    :return:    nothing
+    Args:
+        instance:
+        url: The URL to scrape.  Note that due to options, this may not be the only URL that we end up scraping!
     """
+
     title = None
 
     try:
         # Check if the Plex TV and movie libraries are configured
         if plex.tv_libraries is None or plex.movie_libraries is None:
-            update_status("Plex setup incomplete. Please configure your settings.", color="warning")
+            update_status(instance, "Plex setup incomplete. Please configure your settings.", color="warning")
             return
 
         # Process the URL and options passed from the GUI or website
         parsed_line = parse_url_and_options(url)
 
         # Update the UI before we start
-        update_status(f"Scraping: {parsed_line.url}", color="info", sticky=True, spinner=True)
+        update_status(instance, f"Scraping: {parsed_line.url}", color="info", sticky=True, spinner=True)
 
         # Scrape the URL indicated, with the required options
         if "/user/" in parsed_line.url:
-            scrape_tpdb_user(parsed_line.url, parsed_line.options)
+            scrape_tpdb_user(instance, parsed_line.url, parsed_line.options)
         else:
-            title = scrape_and_upload(parsed_line.url, parsed_line.options)
+            title = scrape_and_upload(instance, parsed_line.url, parsed_line.options)
 
         # And update the UI when we're done
-        update_status(f"Processed all artwork at {parsed_line.url}", color="success")
+        update_status(instance, f"Processed all artwork at {parsed_line.url}", color="success")
 
         # Update the web ui bulk list with this URL and artwork (only if it's not already in the bulk list)
         if parsed_line.options.add_to_bulk and title:
-            notify_web("add_to_bulk_list", {"url": url, "title": title})
+            notify_web(instance, "add_to_bulk_list", {"url": url, "title": title})
 
     except ScraperException as scraping_error:
         print("Exception")
-        update_status(f"{scraping_error}", color="danger")
+        update_status(instance, f"{scraping_error}", color="danger")
 
     finally:
-        if mode == "gui":
-            # Reset the GUI
-            scrape_button.configure(state="normal")
-            clear_button.configure(state="normal")
-            bulk_import_button.configure(state="normal")
-        elif mode == "web":
-            notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
+        if instance.mode == "web":
+            notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 
-def run_bulk_import_scrape_thread(web_list = None):
+def run_bulk_import_scrape_thread(instance: Instance, web_list = None):
 
     """Run the bulk import scrape in a separate thread."""
 
-    global bulk_import_button
-    bulk_import_list = None
     parsed_urls = []
 
-    if mode == "gui":
-        # Grab the bulk list from the version currently in the GUI (whether saved or not)
-        bulk_import_list = bulk_import_text.get(1.0, ctk.END)
-    elif mode == "web":
-        # Grab the one from the web interface
-        bulk_import_list = web_list
-
-    bulk_import_list = bulk_import_list.strip().split("\n")
+    # Grab the one from the web interface
+    bulk_import_list = web_list.strip().split("\n")
 
     # Loop through the import file and build a list of URLs and options
     # Ignoring any lines containing comments using # or //
@@ -426,39 +172,30 @@ def run_bulk_import_scrape_thread(web_list = None):
             parsed_urls.append(parsed_url)
 
     if not parsed_urls:
-        if mode == "gui":
-            app.after(0, lambda: update_status("No bulk import entries found.", color="red"))
-            return
-        elif mode == "web":
-            update_status("No bulk import entries found.", color="danger")
+        if instance.mode == "web":
+            update_status(instance, "No bulk import entries found.", color="danger")
 
-    if mode == "gui":
-        tabview.set("Session Log")
-        scrape_button.configure(state="disabled")
-        clear_button.configure(state="disabled")
-        bulk_import_button.configure(state="disabled")
-    elif mode == "web":
-        notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
+    if instance.mode == "web":
+        notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
 
     # Pass the processing of the parsed URLs off to a thread
-    if mode == "gui":
-        threading.Thread(target=process_bulk_import_from_ui, args=(parsed_urls,)).start()
-    elif mode == "web":
+    if instance.mode == "web":
         try:
-            process_bulk_import_from_ui(parsed_urls)
+            process_bulk_import_from_ui(instance, parsed_urls)
         except:
             raise
 
 
-def process_bulk_import_from_ui(parsed_urls: list) -> None:
+def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
 
     """
     Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
 
     The bulk import list doesn't need to have been saved, it will use the list as it exists in the GUI currently.
 
-    :param      parsed_urls:    The URLs to scrape.  These can be theposterdb poster, set or user URL or a mediux set URL.
-    :return:    nothing
+    Args:
+        instance:
+        parsed_urls:    The URLs to scrape.  These can be theposterdb poster, set or user URL or a mediux set URL.
     """
 
     global plex
@@ -467,53 +204,40 @@ def process_bulk_import_from_ui(parsed_urls: list) -> None:
 
         # Check if plex setup returned valid values
         if plex.tv_libraries is None or plex.movie_libraries is None:
-            update_status("Plex setup incomplete. Please check the settings.", color="red")
+            update_status(instance, "Plex setup incomplete. Please check the settings.", color="red")
             return
 
         # Show the progress bar on the web UI
-        notify_web("progress_bar", {"percent" : 0} )
+        notify_web(instance, "progress_bar", {"percent" : 0})
 
         # Loop through the bulk list
         for i, parsed_line in enumerate(parsed_urls):
 
-            status_text = f"Scraping URL {i + 1} of {len(parsed_urls)}: {parsed_line.url}"
-
-           # update_status(status_text, color="info", spinner=True, sticky=True)
-            notify_web("element_disable", {"element": [ "bulk_button"], "mode": True})
+            notify_web(instance, "element_disable", {"element": ["bulk_button"], "mode": True})
 
             # Parse according to whether it's a user portfolio or poster / set URL
             if "/user/" in parsed_line.url:
-                scrape_tpdb_user(parsed_line.url, parsed_line.options)
+                scrape_tpdb_user(instance, parsed_line.url, parsed_line.options)
             else:
-                scrape_and_upload(parsed_line.url, parsed_line.options)
+                scrape_and_upload(instance, parsed_line.url, parsed_line.options)
 
-            notify_web("progress_bar", {"message": f"{i+1} of {len(parsed_urls)}", "percent" : ((i + 1 / len(parsed_urls)) * 100)} )
-            #update_status(f"Completed: {parsed_line.url}", color="#E5A00D")
+            notify_web(instance, "progress_bar", {"message": f"{i + 1} of {len(parsed_urls)}", "percent" : ((i + 1 / len(parsed_urls)) * 100)})
 
         # All done, update the UI
-        notify_web("progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
-        update_status("Bulk import scraping completed.", color="success")
+        notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
+        update_status(instance, "Bulk import scraping completed.", color="success")
 
     except Exception as e:
-
-        notify_web("progress_bar", {"percent": 100})
-        update_status(f"Error during bulk import: {e}", color="danger")
+        notify_web(instance, "progress_bar", {"percent": 100})
+        update_status(instance, f"Error during bulk import: {e}", color="danger")
 
     finally:
-        if mode == "gui":
-            app.after(0, lambda: [
-            scrape_button.configure(state="normal"),
-            clear_button.configure(state="normal"),
-            bulk_import_button.configure(state="normal"),
-        ])
-        elif mode == "web":
-            notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
+        if instance.mode == "web":
+            notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 
 # Scrape all pages of a TPDb user's uploaded artwork
-def scrape_tpdb_user(url, options):
-
-    pages = 0
+def scrape_tpdb_user(instance: Instance, url, options):
 
     if "?" in url:
         cleaned_url = url.split("?")[0]
@@ -530,13 +254,13 @@ def scrape_tpdb_user(url, options):
     try:
         for page in range(pages):
             page_url = f"{url}?section=uploads&page={page + 1}"
-            scrape_and_upload(page_url, options)
+            scrape_and_upload(instance, page_url, options)
     except Exception:
         raise ScraperException(f"Failed to process and upload from URL: {url}")
 
 
 # Scraped the URL then uploads what it's scraped to Plex
-def scrape_and_upload(url, options):
+def scrape_and_upload(instance: Instance, url, options):
 
     global plex
 
@@ -544,7 +268,7 @@ def scrape_and_upload(url, options):
     try:
         plex.connect()
     except PlexConnectorException as not_connected:
-        update_status(str(not_connected), "danger")
+        update_status(instance, str(not_connected), "danger")
         raise
 
     # Let's scrape the posters first
@@ -563,66 +287,96 @@ def scrape_and_upload(url, options):
     processor = UploadProcessor(plex)
     processor.set_options(options)
 
-    artwork_title = None
-
     if scraper.collection_artwork:
         for artwork in scraper.collection_artwork:
             try:
-                update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
+                update_status(instance, f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_collection_artwork(artwork)
-                artwork_title = artwork["title"]
-                update_log(result)
+                update_log(instance, result)
             except CollectionNotFound as not_found:
-                update_log(f"∙ {str(not_found)}")
+                update_log(instance, f"∙ {str(not_found)}")
             except NotProcessedByExclusion as excluded:
-                update_log(f"- {str(excluded)}")
+                update_log(instance, f"- {str(excluded)}")
             except NotProcessedByFilter as not_processed:
-                update_log(f"- {str(not_processed)}")
+                update_log(instance, f"- {str(not_processed)}")
             except Exception as error_unexpected:
-                update_log(f"x {str(error_unexpected)}")
-                update_status(f"Error: {str(error_unexpected)}","danger")
+                update_log(instance, f"x {str(error_unexpected)}")
+                update_status(instance, f"Error: {str(error_unexpected)}", "danger")
 
     if scraper.movie_artwork:
         for artwork in scraper.movie_artwork:
             try:
-                update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
+                update_status(instance, f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_movie_artwork(artwork)
-                artwork_title = artwork["title"]
-                update_log(result)
+                update_log(instance, result)
             except MovieNotFound as not_found:
-                update_log(f"∙ {str(not_found)}")
+                update_log(instance, f"∙ {str(not_found)}")
             except NotProcessedByExclusion as excluded:
-                update_log(f"- {str(excluded)}")
+                update_log(instance, f"- {str(excluded)}")
             except NotProcessedByFilter as not_processed:
-                update_log(f"- {str(not_processed)}")
+                update_log(instance, f"- {str(not_processed)}")
             except Exception as error_unexpected:
-                update_log(f"x {str(error_unexpected)}")
-                update_status(f"Error: {str(error_unexpected)}","danger")
+                update_log(instance, f"x {str(error_unexpected)}")
+                update_status(instance, f"Error: {str(error_unexpected)}", "danger")
 
 
 
     if scraper.tv_artwork:
         for artwork in scraper.tv_artwork:
             try:
-                update_status(f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
+                update_status(instance, f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
                 result = processor.process_tv_artwork(artwork)
-                artwork_title = artwork["title"]
-                update_log(result)
+                update_log(instance, result)
             except ShowNotFound as not_found:
-                update_log(f"∙ {str(not_found)}")
+                update_log(instance, f"∙ {str(not_found)}")
             except NotProcessedByExclusion as excluded:
-                update_log(f"- {str(excluded)}")
+                update_log(instance, f"- {str(excluded)}")
             except NotProcessedByFilter as not_processed:
-                update_log(f"- {str(not_processed)}")
+                update_log(instance, f"- {str(not_processed)}")
             except Exception as error_unexpected:
-                update_log(f"x {str(error_unexpected)}")
-                update_status(f"Error: {str(error_unexpected)}","danger")
+                update_log(instance, f"x {str(error_unexpected)}")
+                update_status(instance, f"Error: {str(error_unexpected)}", "danger")
 
     return title
 
+def process_uploaded_artwork(instance: Instance, file_list):
+
+    global plex
+
+    # Upload the artwork to Plex
+    processor = UploadProcessor(plex)
+    print("Processing and uploading...")
+    for artwork in file_list:
+        try:
+            result = None
+            line_status = f'Processing artwork for {artwork["media"].lower()} "{artwork["title"]}"{" - Season " + str(artwork["season"]) if artwork["season"] else ""}{", Episode " + str(artwork["episode"]) if artwork["episode"] else ""}'
+            print(line_status)
+            update_status(instance, line_status, spinner=True, sticky=True)
+            if artwork['media'] == "Collection":
+                result = processor.process_collection_artwork(artwork)
+            elif artwork['media'] == "Movie":
+                result = processor.process_movie_artwork(artwork)
+            elif artwork['media'] == "TV Show":
+                result = processor.process_tv_artwork(artwork)
+            update_log(instance, result)
+        except CollectionNotFound as not_found:
+            update_log(instance, f"∙ {str(not_found)}")
+            print("Not found " + str(not_found))
+        except NotProcessedByExclusion as excluded:
+            update_log(instance, f"- {str(excluded)}")
+            print("Excluded " + str(excluded))
+        except NotProcessedByFilter as not_processed:
+            update_log(instance, f"- {str(not_processed)}")
+            print("Not processed " + str(not_processed))
+        except Exception as error_unexpected:
+            update_log(instance, f"x {str(error_unexpected)}")
+            update_status(instance, f"Error: {str(error_unexpected)}", "danger")
+            print("Unexpected " + str(error_unexpected))
+            raise
+
 
 # * Bulk import file I/O functions ---
-def load_bulk_import_file(filename = None):
+def load_bulk_import_file(instance: Instance, filename = None):
 
     """Load the bulk import file into the text area."""
 
@@ -637,35 +391,25 @@ def load_bulk_import_file(filename = None):
         bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
 
         if not os.path.exists(bulk_import_file):
-            if mode == "cli":
+            if instance.mode == "cli":
                 print(f"File does not exist: {bulk_import_file}")
-            elif mode == "gui":
-                bulk_import_text.delete(1.0, ctk.END)
-                bulk_import_text.insert(ctk.END, "Bulk import file path is not set or file does not exist.")
-                status_label.configure(text="Bulk import file path not set or file not found.", text_color="red")
-            elif mode == "web":
-                update_status(f"File does not exist: {bulk_import_file}")
+            if instance.mode == "web":
+                update_status(instance, f"File does not exist: {bulk_import_file}")
             return
 
         with open(bulk_import_file, "r", encoding="utf-8") as file:
             content = file.read()
 
-        if mode == "gui":
-            bulk_import_text.delete(1.0, ctk.END)
-            bulk_import_text.insert(ctk.END, content)
-        elif mode == "web":
-            notify_web("load_bulk_import",{"loaded": True, "filename": bulk_import_filename, "bulk_import_text":content})
+        if instance.mode == "web":
+            notify_web(instance, "load_bulk_import", {"loaded": True, "filename": bulk_import_filename, "bulk_import_text":content})
+
     except FileNotFoundError:
-        bulk_import_text.delete(1.0, ctk.END)
-        bulk_import_text.insert(ctk.END, "File not found or empty.")
-        notify_web("load_bulk_import", {"loaded": False})
+        notify_web(instance, "load_bulk_import", {"loaded": False})
     except Exception as e:
-        bulk_import_text.delete(1.0, ctk.END)
-        bulk_import_text.insert(ctk.END, f"Error loading file: {str(e)}")
-        notify_web("load_bulk_import", {"loaded": False})
+        notify_web(instance, "load_bulk_import", {"loaded": False})
 
 
-def rename_bulk_import_file(old_name, new_name):
+def rename_bulk_import_file(instance: Instance, old_name, new_name):
 
     bulk_imports_path = "bulk_imports/"
 
@@ -679,14 +423,15 @@ def rename_bulk_import_file(old_name, new_name):
             new_filename = os.path.join(get_exe_dir(), bulk_imports_path, new_name)
             os.rename(old_filename, new_filename)
 
-            notify_web("rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
-            update_status(f"Renamed to {new_name}", "success")
+            notify_web(instance, "rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
+            update_status(instance, f"Renamed to {new_name}", "success")
         except Exception as e:
             print(e)
-            notify_web("rename_bulk_file", {"renamed": False, "old_filename": old_name})
-            update_status(f"Could not rename {old_name}", "warning")
+            notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
+            update_status(instance, f"Could not rename {old_name}", "warning")
 
-def delete_bulk_import_file(file_name):
+
+def delete_bulk_import_file(instance: Instance, file_name):
 
     bulk_imports_path = "bulk_imports/"
 
@@ -697,19 +442,16 @@ def delete_bulk_import_file(file_name):
             filename = os.path.join(get_exe_dir(), bulk_imports_path, file_name)
             os.remove(filename)
 
-            notify_web("delete_bulk_file", {"deleted": True, "filename": file_name})
-            update_status(f"Deleted {file_name}", "success")
+            notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
+            update_status(instance, f"Deleted {file_name}", "success")
         except Exception as e:
             print(e)
-            notify_web("delete_bulk_file", {"deleted": False, "filename": file_name})
-            update_status(f"Could not delete {file_name}", "warning")
+            notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
+            update_status(instance, f"Could not delete {file_name}", "warning")
 
 
-def save_bulk_import_file(contents = None, filename = None, now_load = None):
+def save_bulk_import_file(instance: Instance, contents = None, filename = None, now_load = None):
     """Save the bulk import text area content to a file relative to the executable location."""
-
-    if mode == "gui":
-        contents = bulk_import_text.get(1.0, ctk.END).strip()
 
     if contents:
         try:
@@ -724,14 +466,14 @@ def save_bulk_import_file(contents = None, filename = None, now_load = None):
             with open(bulk_import_file, "w", encoding="utf-8") as file:
                 file.write(contents)
 
-            update_status(message="Bulk import file " + filename + " saved", color="success")
-            notify_web("save_bulk_import",{"saved": True, "now_load": now_load})
+            update_status(instance, message="Bulk import file " + filename + " saved", color="success")
+            notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
         except Exception as e:
-            update_status(message="Error saving bulk import file", color="danger")
-            notify_web("save_bulk_import",{"saved": False, "now_load": now_load})
+            update_status(instance, message="Error saving bulk import file", color="danger")
+            notify_web(instance, "save_bulk_import", {"saved": False, "now_load": now_load})
 
 
-def check_for_bulk_import_file():
+def check_for_bulk_import_file(instance: Instance):
     """Check if any .txt files exist in the bulk_imports folder before creating bulk_import.txt."""
     contents = "## This is a blank bulk import file\n// You can use comments with # or // like this"
 
@@ -749,470 +491,7 @@ def check_for_bulk_import_file():
                 file.write(contents)
 
     except Exception as e:
-        update_status(message="Error creating bulk import file", color="danger")
-
-
-def notify_web(event, data_to_include = None, broadcast = False):
-
-    global socketio, instance_id, mode
-
-    if mode == "web":
-        instance_data = {"instance_id": "broadcast" if broadcast else instance_id}
-        merged_arguments = data_to_include | instance_data
-        socketio.emit(event, merged_arguments)
-
-
-# * Button Creation ---
-def create_button(container, text, command, color=None, primary=False, height=35):
-    """Create a custom button with hover effects for a CustomTkinter GUI."""
-
-    button_height = height
-    button_fg = "#2A2B2B" if color else "#1C1E1E"
-    button_border = "#484848"
-    button_text_color = "#CECECE" if color else "#696969"
-    plex_orange = "#E5A00D"
-
-    if primary:
-        button_fg = plex_orange
-        button_text_color, button_border = "#1C1E1E", "#1C1E1E"
-
-    button = ctk.CTkButton(
-        container,
-        text=text,
-        command=command,
-        border_width=1,
-        text_color=button_text_color,
-        fg_color=button_fg,
-        border_color=button_border,
-        hover_color="#333333",
-        width=80,
-        height=button_height,
-        font=("Roboto", 13, "bold"),
-    )
-
-    def on_enter(event):
-        """Change button appearance when mouse enters."""
-        if color:
-            button.configure(fg_color="#2A2B2B", text_color=lighten_color(color, 0.3),
-                             border_color=lighten_color(color, 0.5))
-        else:
-            button.configure(fg_color="#1C1E1E", text_color=plex_orange, border_color=plex_orange)
-
-    def on_leave(event):
-        """Reset button appearance when mouse leaves."""
-        if color:
-            button.configure(fg_color="#2A2B2B", text_color="#CECECE", border_color=button_border)
-        else:
-            if primary:
-                button.configure(fg_color=plex_orange, text_color="#1C1E1E", border_color="#1C1E1E")
-            else:
-                button.configure(fg_color="#1C1E1E", text_color="#696969", border_color=button_border)
-
-    def lighten_color(color, amount=0.5):
-        """Lighten a color by blending it with white."""
-        hex_to_rgb = lambda c: tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
-        r, g, b = hex_to_rgb(color)
-
-        r = int(r + (255 - r) * amount)
-        g = int(g + (255 - g) * amount)
-        b = int(b + (255 - b) * amount)
-
-        return f"#{r:02x}{g:02x}{b:02x}"
-
-    button.bind("<Enter>", on_enter)
-    button.bind("<Leave>", on_leave)
-
-    return button
-
-
-# * Main UI Creation function ---
-def create_ui():
-    """Create the main UI window."""
-    global plex, app, global_context_menu, scrape_button, clear_button, mediux_filters_text, tpdb_filters_text, bulk_import_text, base_url_entry, token_entry,\
-        status_label, url_entry, app, bulk_import_button, tv_library_text, movie_library_text, bulk_txt_entry, session_log_text, session_log_clear, tabview, track_artwork_checkbox
-
-
-    ctk.set_appearance_mode("dark")
-
-    app.title("Plex Poster Upload Helper")
-    app.geometry("850x600")
-    app.iconbitmap(resource_path("icons/Plex.ico"))
-    app.configure(fg_color="#2A2B2B")
-
-    global_context_menu = tk.Menu(app, tearoff=0)
-    global_context_menu.add_command(label="Cut")
-    global_context_menu.add_command(label="Copy")
-    global_context_menu.add_command(label="Paste")
-
-    def open_url(url):
-        """Open a URL in the default web browser."""
-        import webbrowser
-        webbrowser.open(url)
-
-    # ! Create a frame for the link bar --
-    link_bar = ctk.CTkFrame(app, fg_color="transparent")
-    link_bar.pack(fill="x", pady=5, padx=10)
-
-    # ? Link to Plex Media Server from the base URL
-    base_url = config.base_url
-    target_url = base_url if base_url else "https://www.plex.tv"
-
-    plex_icon = ctk.CTkImage(light_image=Image.open(resource_path("icons/Plex.ico")), size=(24, 24))
-    plex_icon_image = Image.open(resource_path("icons/Plex.ico"))
-
-    icon_label = ctk.CTkLabel(link_bar, image=plex_icon, text="", anchor="w")
-    icon_label.pack(side="left", padx=0, pady=0)
-    url_text = base_url if base_url else "Plex Media Server"
-    url_label = ctk.CTkLabel(link_bar, text=url_text, anchor="w", font=("Roboto", 14, "bold"), text_color="#CECECE")
-    url_label.pack(side="left", padx=(5, 10))
-
-    def on_hover_enter(event):
-        app.config(cursor="hand2")
-        rotated_image = plex_icon_image.rotate(15, expand=True)
-        rotated_ctk_icon = ctk.CTkImage(light_image=rotated_image, size=(24, 24))
-        icon_label.configure(image=rotated_ctk_icon)
-
-    def on_hover_leave(event):
-        app.config(cursor="")
-        icon_label.configure(image=plex_icon)
-
-    def on_click(event):
-        open_url(target_url)
-
-    for widget in (icon_label, url_label):
-        widget.bind("<Enter>", on_hover_enter)
-        widget.bind("<Leave>", on_hover_leave)
-        widget.bind("<Button-1>", on_click)
-
-    # ? Links to Mediux and ThePosterDB
-    mediux_button = create_button(
-        link_bar,
-        text="MediUX.pro",
-        command=lambda: open_url("https://mediux.pro"),
-        color="#945af2",
-        height=30
-    )
-    mediux_button.pack(side="right", padx=5)
-
-    posterdb_button = create_button(
-        link_bar,
-        text="ThePosterDB",
-        command=lambda: open_url("https://theposterdb.com"),
-        color="#FA6940",
-        height=30
-    )
-    posterdb_button.pack(side="right", padx=5)
-
-    # ! Create Tabview --
-    tabview = ctk.CTkTabview(app)
-    tabview.pack(fill="both", expand=True, padx=20, pady=0)
-
-    tabview.configure(
-        fg_color="#2A2B2B",
-        segmented_button_fg_color="#1C1E1E",
-        segmented_button_selected_color="#915e06",
-        segmented_button_selected_hover_color="#915e06",
-        segmented_button_unselected_color="#1C1E1E",
-        segmented_button_unselected_hover_color="#1C1E1E",
-        text_color="#CECECE",
-        text_color_disabled="#777777",
-        border_color="#484848",
-        border_width=2,
-    )
-
-    # ! Form row label hover
-    LABEL_HOVER = "#878787"
-
-    def on_hover_in(label):
-        label.configure(text_color=LABEL_HOVER)
-
-    def on_hover_out(label):
-        label.configure(text_color="#696969")
-
-        # ! Settings Tab --
-
-    settings_tab = tabview.add("Settings")
-    settings_tab.grid_columnconfigure(0, weight=0)
-    settings_tab.grid_columnconfigure(1, weight=1)
-
-    # Plex Base URL
-    base_url_label = ctk.CTkLabel(settings_tab, text="Plex Base URL", text_color="#696969", font=("Roboto", 15))
-    base_url_label.grid(row=0, column=0, pady=5, padx=10, sticky="w")
-    base_url_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter Plex Base URL", fg_color="#1C1E1E",
-                                  text_color="#A1A1A1", border_width=0, height=40)
-    base_url_entry.grid(row=0, column=1, pady=5, padx=10, sticky="ew")
-    base_url_entry.bind("<Enter>", lambda event: on_hover_in(base_url_label))
-    base_url_entry.bind("<Leave>", lambda event: on_hover_out(base_url_label))
-    bind_context_menu(base_url_entry)
-
-    # Plex Token
-    token_label = ctk.CTkLabel(settings_tab, text="Plex Token", text_color="#696969", font=("Roboto", 15))
-    token_label.grid(row=1, column=0, pady=5, padx=10, sticky="w")
-    token_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter Plex Token", fg_color="#1C1E1E",
-                               text_color="#A1A1A1", border_width=0, height=40)
-    token_entry.grid(row=1, column=1, pady=5, padx=10, sticky="ew")
-    token_entry.bind("<Enter>", lambda event: on_hover_in(token_label))
-    token_entry.bind("<Leave>", lambda event: on_hover_out(token_label))
-    bind_context_menu(token_entry)
-
-    # Bulk Import File
-    bulk_txt_label = ctk.CTkLabel(settings_tab, text="Bulk Import File", text_color="#696969", font=("Roboto", 15))
-    bulk_txt_label.grid(row=2, column=0, pady=5, padx=10, sticky="w")
-    bulk_txt_entry = ctk.CTkEntry(settings_tab, placeholder_text="Enter bulk import file path", fg_color="#1C1E1E",
-                                  text_color="#A1A1A1", border_width=0, height=40)
-    bulk_txt_entry.grid(row=2, column=1, pady=5, padx=10, sticky="ew")
-    bulk_txt_entry.bind("<Enter>", lambda event: on_hover_in(bulk_txt_label))
-    bulk_txt_entry.bind("<Leave>", lambda event: on_hover_out(bulk_txt_label))
-    bind_context_menu(bulk_txt_entry)
-
-    # TV Library Names
-    tv_library_label = ctk.CTkLabel(settings_tab, text="TV Library Names", text_color="#696969", font=("Roboto", 15))
-    tv_library_label.grid(row=3, column=0, pady=5, padx=10, sticky="w")
-    tv_library_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
-    tv_library_text.grid(row=3, column=1, pady=5, padx=10, sticky="ew")
-    tv_library_text.bind("<Enter>", lambda event: on_hover_in(tv_library_label))
-    tv_library_text.bind("<Leave>", lambda event: on_hover_out(tv_library_label))
-    bind_context_menu(tv_library_text)
-
-    # Movie Library Names
-    movie_library_label = ctk.CTkLabel(settings_tab, text="Movie Library Names", text_color="#696969",
-                                       font=("Roboto", 15))
-    movie_library_label.grid(row=4, column=0, pady=5, padx=10, sticky="w")
-    movie_library_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
-    movie_library_text.grid(row=4, column=1, pady=5, padx=10, sticky="ew")
-    movie_library_text.bind("<Enter>", lambda event: on_hover_in(movie_library_label))
-    movie_library_text.bind("<Leave>", lambda event: on_hover_out(movie_library_label))
-    bind_context_menu(movie_library_text)
-
-    # Mediux Filters
-    mediux_filters_label = ctk.CTkLabel(settings_tab, text="MediuUX Filters", text_color="#696969", font=("Roboto", 15))
-    mediux_filters_label.grid(row=5, column=0, pady=5, padx=10, sticky="w")
-    mediux_filters_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0,
-                                       height=40)
-    mediux_filters_text.grid(row=5, column=1, pady=5, padx=10, sticky="ew")
-    mediux_filters_text.bind("<Enter>", lambda event: on_hover_in(mediux_filters_label))
-    mediux_filters_text.bind("<Leave>", lambda event: on_hover_out(mediux_filters_label))
-    bind_context_menu(mediux_filters_text)
-
-    # TPDb Filters
-    tpdb_filters_label = ctk.CTkLabel(settings_tab, text="TPDb Filters", text_color="#696969", font=("Roboto", 15))
-    tpdb_filters_label.grid(row=6, column=0, pady=5, padx=10, sticky="w")
-    tpdb_filters_text = ctk.CTkEntry(settings_tab, fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0,
-                                       height=40)
-    tpdb_filters_text.grid(row=6, column=1, pady=5, padx=10, sticky="ew")
-    tpdb_filters_text.bind("<Enter>", lambda event: on_hover_in(tpdb_filters_label))
-    tpdb_filters_text.bind("<Leave>", lambda event: on_hover_out(tpdb_filters_label))
-    bind_context_menu(tpdb_filters_text)
-
-    # Cache Enabled Checkbox
-    track_artwork_label = ctk.CTkLabel(settings_tab, text="Track artwork IDs", text_color="#696969", font=("Roboto", 15))
-    track_artwork_label.grid(row=7, column=0, pady=5, padx=10, sticky="w")
-    track_artwork_checkbox = ctk.CTkCheckBox(settings_tab, text="", fg_color="#1C1E1E", text_color="#A1A1A1",
-                                             onvalue=True, offvalue=False)
-    track_artwork_checkbox.grid(row=7, column=1, pady=5, padx=10, sticky="ew")
-    track_artwork_checkbox.bind("<Enter>", lambda event: on_hover_in(track_artwork_label))
-    track_artwork_checkbox.bind("<Leave>", lambda event: on_hover_out(track_artwork_label))
-    bind_context_menu(track_artwork_checkbox)
-
-
-    settings_tab.grid_rowconfigure(0, weight=0)
-    settings_tab.grid_rowconfigure(1, weight=0)
-    settings_tab.grid_rowconfigure(2, weight=0)
-    settings_tab.grid_rowconfigure(3, weight=0)
-    settings_tab.grid_rowconfigure(4, weight=0)
-    settings_tab.grid_rowconfigure(5, weight=0)
-    settings_tab.grid_rowconfigure(6, weight=0)
-    settings_tab.grid_rowconfigure(7, weight=0)
-    settings_tab.grid_rowconfigure(8, weight=1)
-
-
-    # ? Load and Save Buttons (Anchored to the bottom)
-    load_button = create_button(settings_tab, text="Reload", command=load_and_update_ui)
-    load_button.grid(row=9, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
-    save_button = create_button(settings_tab, text="Save", command=save_config, primary=True)
-    save_button.grid(row=9, column=1, pady=5, padx=5, sticky="ew")
-
-    settings_tab.grid_rowconfigure(8, weight=0, minsize=40)
-
-    # ! Bulk Import Tab --
-    bulk_import_tab = tabview.add("Bulk Import")
-
-    bulk_import_tab.grid_columnconfigure(0, weight=0)
-    bulk_import_tab.grid_columnconfigure(1, weight=3)
-    bulk_import_tab.grid_columnconfigure(2, weight=0)
-
-    # bulk_import_label = ctk.CTkLabel(bulk_import_tab, text=f"Bulk Import Text", text_color="#CECECE")
-    # bulk_import_label.grid(row=0, column=0, pady=5, padx=10, sticky="w")
-    bulk_import_text = ctk.CTkTextbox(
-        bulk_import_tab,
-        height=15,
-        wrap="none",
-        state="normal",
-        fg_color="#1C1E1E",
-        text_color="#A1A1A1",
-        font=("Courier", 14)
-    )
-    bulk_import_text.grid(row=1, column=0, padx=10, pady=5, sticky="nsew", columnspan=2)
-    bind_context_menu(bulk_import_text)
-
-    bulk_import_tab.grid_rowconfigure(0, weight=0)
-    bulk_import_tab.grid_rowconfigure(1, weight=1)
-    bulk_import_tab.grid_rowconfigure(2, weight=0)
-
-    # Button row: Load, Save, Run buttons
-    load_bulk_button = create_button(bulk_import_tab, text="Reload", command=load_bulk_import_file)
-    load_bulk_button.grid(row=2, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
-
-    save_bulk_button = create_button(bulk_import_tab, text="Save", command=save_bulk_import_file)
-    save_bulk_button.grid(row=2, column=1, pady=5, padx=5, sticky="ew", columnspan=2)
-
-    bulk_import_button = create_button(bulk_import_tab, text="Run Bulk Import", command=run_bulk_import_scrape_thread,
-                                       primary=True)
-    bulk_import_button.grid(row=3, column=0, pady=5, padx=5, sticky="ew", columnspan=3)
-
-    # ! Poster Scrape Tab --
-    poster_scrape_tab = tabview.add("Artwork Scrape")
-
-    poster_scrape_tab.grid_columnconfigure(0, weight=0)
-    poster_scrape_tab.grid_columnconfigure(1, weight=1)
-    poster_scrape_tab.grid_columnconfigure(2, weight=0)
-
-    poster_scrape_tab.grid_rowconfigure(0, weight=0)
-    poster_scrape_tab.grid_rowconfigure(1, weight=0)
-    poster_scrape_tab.grid_rowconfigure(2, weight=1)
-    poster_scrape_tab.grid_rowconfigure(3, weight=0)
-
-    url_label = ctk.CTkLabel(poster_scrape_tab,
-                             text="Enter a ThePosterDB set URL, MediUX set URL, or ThePosterDB user URL",
-                             text_color="#696969", font=("Roboto", 15))
-    url_label.grid(row=0, column=0, columnspan=2, pady=5, padx=5, sticky="w")
-
-    url_entry = ctk.CTkEntry(poster_scrape_tab, placeholder_text="e.g., https://mediux.pro/sets/6527",
-                             fg_color="#1C1E1E", text_color="#A1A1A1", border_width=0, height=40)
-    url_entry.grid(row=1, column=0, columnspan=2, pady=5, padx=5, sticky="ew")
-    url_entry.bind("<Enter>", lambda event: on_hover_in(url_label))
-    url_entry.bind("<Leave>", lambda event: on_hover_out(url_label))
-    bind_context_menu(url_entry)
-
-    clear_button = create_button(poster_scrape_tab, text="Clear", command=clear_url)
-    clear_button.grid(row=3, column=0, pady=5, padx=5, ipadx=30, sticky="ew")
-
-    scrape_button = create_button(poster_scrape_tab, text="Run URL Scrape", command=run_url_scrape_thread, primary=True)
-    scrape_button.grid(row=3, column=1, pady=5, padx=5, sticky="ew", columnspan=2)
-
-    poster_scrape_tab.grid_rowconfigure(2, weight=1)
-
-    # ! Session Log Tab --
-    session_log_tab = tabview.add("Session Log")
-    session_log_tab.grid_columnconfigure(0, weight=0)
-    session_log_tab.grid_columnconfigure(1, weight=3)
-    session_log_tab.grid_columnconfigure(2, weight=0)
-
-    # bulk_import_label = ctk.CTkLabel(bulk_import_tab, text=f"Bulk Import Text", text_color="#CECECE")
-    # bulk_import_label.grid(row=0, column=0, pady=5, padx=10, sticky="w")
-    session_log_text = ctk.CTkTextbox(
-        session_log_tab,
-        height=15,
-        wrap="none",
-        state="normal",
-        fg_color="#1C1E1E",
-        text_color="#A1A1A1",
-        font=("Courier", 14)
-    )
-    session_log_text.configure(state="disabled")
-    session_log_text.grid(row=1, column=0, padx=10, pady=5, sticky="nsew", columnspan=2)
-    bind_context_menu(session_log_text)
-
-    session_log_tab.grid_rowconfigure(0, weight=0)
-    session_log_tab.grid_rowconfigure(1, weight=1)
-    session_log_tab.grid_rowconfigure(2, weight=0)
-
-    # Button row: Load, Save, Run buttons
-    session_log_clear = create_button(session_log_tab, text="Clear Log", command=clear_log)
-    session_log_clear.grid(row=2, column=0, pady=5, padx=5, sticky="ew", columnspan=3)
-
-
-    # ! Status and Error Labels --
-    status_label = ctk.CTkLabel(app, text="", text_color="#E5A00D")
-    status_label.pack(side="bottom", fill="x", pady=(5))
-
-    # ! Load configuration and bulk import data at start, set default tab
-    load_and_update_ui()
-    load_bulk_import_file()
-
-    set_default_tab(
-        tabview)  # default tab will be 'Settings' if base_url and token are not set, otherwise 'Bulk Import'
-
-    app.mainloop()
-
-
-# * CLI-based user input loop (fallback if no arguments were provided) ---
-def interactive_cli_loop():
-
-    global cli_options
-    global config
-    global plex
-    global app
-
-    while True:
-        print("\n--- Poster Scraper Interactive CLI ---")
-        print("1. Enter a ThePosterDB set URL, MediUX set URL, or ThePosterDB user URL.")
-        print("2. Run Bulk Import from a file")
-        print("3. Launch GUI")
-        print("4. Exit")
-
-        choice = input("Select an option (1-4): ")
-
-        # Ask for the URL and then process it as appropriate
-        if choice == '1':
-            print("\nNote, this is a basic service only - if you want to use options such as additional posters, pass the URL and arguments in the command line.")
-            url = input("Enter URL: ")
-            if check_libraries():
-
-                if "/user/" in url.lower():
-                    try:
-                        scrape_tpdb_user(url, cli_options)
-                    except Exception as e:
-                        print(str(e))
-                else:
-                    try:
-                        scrape_and_upload(url, cli_options)
-                    except Exception as e:
-                        print(str(e))
-
-        # Ask for a file and then run the bulk import
-        elif choice == '2':
-            file_path = input(f"Enter the path to the bulk import .txt file, or press [Enter] to use '{config.bulk_txt}': ")
-            file_path = file_path.strip() if file_path else config.bulk_txt
-            if check_libraries():
-                parse_bulk_file_from_cli(file_path)
-
-        elif choice == '3':
-            print("Launching GUI...")
-
-            # Create the app and UI
-            app = ctk.CTk()
-            create_ui()
-
-            break  # Exit CLI loop to launch GUI
-
-        elif choice == '4':
-            print("Stopping...")
-            break
-
-        else:
-            print("Invalid choice. Please select an option between 1 and 4.")
-
-
-def check_libraries():
-
-    global plex
-
-    if not plex.tv_libraries:
-        print("! No TV libraries initialized. Verify the 'tv_library' in config.json.")
-    if not plex.movie_libraries:
-        print("! No Movies libraries initialized. Verify the 'movie_library' in config.json.")
-    return plex.tv_libraries and plex.movie_libraries
+        update_status(instance, message="Error creating bulk import file", color="danger")
 
 
 def setup_web_sockets():
@@ -1222,10 +501,10 @@ def setup_web_sockets():
         return render_template("web_interface.html", config=config)
 
 
-    @socketio.on("start_scrape")
+    @globals.web_socket.on("start_scrape")
     def handle_scrape_from_web(data):
-        global instance_id
-        instance_id = data.get("instance_id")
+        
+        instance = Instance(data.get("instance_id"),"web")
         url = data.get("url").lower()
         options = data.get("options")
         filters = data.get("filters")
@@ -1238,86 +517,91 @@ def setup_web_sockets():
                 url = url + " " + " ".join(options)
             if filters and len(filters) < 6:
                 url = url + " --filters " + " ".join(filters)
-            notify_web("element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
-            process_scrape_url_from_ui(url)
+            notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
+            process_scrape_url_from_ui(instance, url)
 
-    @socketio.on("start_bulk_import")
+    @globals.web_socket.on("start_bulk_import")
     def handle_bulk_import_from_web(data):
-        global instance_id
-        instance_id = data.get("instance_id")
+        
+        instance = Instance(data.get("instance_id"),"web")
         bulk_list = data.get("bulk_list").lower()
-        run_bulk_import_scrape_thread(bulk_list)
+        run_bulk_import_scrape_thread(instance, bulk_list)
 
 
-    @socketio.on("save_bulk_import")
+    @globals.web_socket.on("save_bulk_import")
     def handle_bulk_import(data):
+        instance = Instance(data.get("instance_id"),"web")
         content = data.get("content")
         filename = data.get("filename")
         now_load = data.get("now_load")
         if content:
-            save_bulk_import_file(content, filename, now_load)
+            save_bulk_import_file(instance, content, filename, now_load)
 
-    @socketio.on("load_config")
+    @globals.web_socket.on("load_config")
     def load_config_web(data):
-        global instance_id, config
-        instance_id = data.get("instance_id")
+        global config
+        instance = Instance(data.get("instance_id"), "web")
         config.load()
-        notify_web("load_config", {"config": vars(config), "instance_id": instance_id} )
+        notify_web(instance, "load_config", {"config": vars(config)} )
 
-    @socketio.on("load_bulk_filelist")
+    @globals.web_socket.on("load_bulk_filelist")
     def load_bulk_filelist(data):
-        global instance_id
-        instance_id = data.get("instance_id")
+        instance = Instance(data.get("instance_id"),"web")
         bulk_files = None
         try:
             folder_path = Path("bulk_imports")
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
         except:
             pass
-        notify_web("load_bulk_filelist",{"bulk_files": bulk_files})
+        notify_web(instance, "load_bulk_filelist",{"bulk_files": bulk_files})
 
 
-    @socketio.on("load_bulk_import")
+    @globals.web_socket.on("load_bulk_import")
     def load_bulk_import(data):
-        global instance_id, config
-        instance_id = data.get("instance_id")
-        load_bulk_import_file(data.get("filename"))
+        global config
+        instance = Instance(data.get("instance_id"),"web")
+        load_bulk_import_file(instance, data.get("filename"))
 
-    @socketio.on("rename_bulk_file")
+    @globals.web_socket.on("rename_bulk_file")
     def rename_bulk_file(data):
-        global instance_id
-        instance_id = data.get("instance_id")
-        rename_bulk_import_file(data.get("old_filename"), data.get("new_filename"))
+        instance = Instance(data.get("instance_id"),"web")
+        rename_bulk_import_file(instance, data.get("old_filename"), data.get("new_filename"))
 
-    @socketio.on("delete_bulk_file")
+    @globals.web_socket.on("delete_bulk_file")
     def delete_bulk_file(data):
-        global instance_id
-        instance_id = data.get("instance_id")
-        delete_bulk_import_file(data.get("filename"))
+        instance = Instance(data.get("instance_id"),"web")
+        delete_bulk_import_file(instance, data.get("filename"))
 
-    @socketio.on("save_config")
+    @globals.web_socket.on("display_message")
+    def display_message(data):
+        print(data.get("message"))
+
+    @globals.web_socket.on("save_config")
     def save_config_web(data):
+
+        global config
+        instance = Instance(data.get("instance_id"),"web")
+
         try:
-            global instance_id, config
-            instance_id = data.get("instance_id")
             # Unpack the config dictionary into the local config
             for key, value in data.get("config").items():
                 setattr(config, key, value)
             config.save()
 
             # Reconnect to Plex because the Plex server or token might have changed
-            update_log("Saving updated configuration and reconnecting to Plex")
+            update_log(instance, "Saving updated configuration and reconnecting to Plex")
             plex.reconnect(config)
-            notify_web("save_config",{"saved":True, "config": vars(config)})
+            notify_web(instance, "save_config",{"saved":True, "config": vars(config)})
         except Exception as config_error:
-            update_status(str(config_error), color="danger", update_cli=True)
+            update_status(instance, str(config_error), color="danger", update_cli=True)
 
-    @socketio.on("add_to_scheduler")
+    @globals.web_socket.on("add_to_scheduler")
     def add_tasks_to_scheduler(data):
         try:
             # Schedule bulk import task
             if data.get("instance_id"):
-                schedule.every().day.at(data.get("time")).do(lambda: task_three(data.get("instance_id")))
+                instance = Instance(data.get("instance_id"),"web")
+                schedule.every().day.at(data.get("time")).do(lambda: task_three(instance))
 
             # Start the scheduler in a background thread
                 start_scheduler()
@@ -1325,22 +609,156 @@ def setup_web_sockets():
         except:
             pass
 
+    # Temporary storage for chunks
+    upload_chunks = {}
+
+    @globals.web_socket.on("upload_artwork_chunk")
+    def handle_upload_chunk(data):
+        """Handles chunked upload"""
+        instance = Instance(data.get("instance_id"), "web")
+        file_name = data["fileName"]
+        chunk_data = data["chunkData"]
+        chunk_index = data["chunkIndex"]
+        total_chunks = data["totalChunks"]
+
+        if file_name not in upload_chunks:
+            upload_chunks[file_name] = []
+
+        upload_chunks[file_name].append(base64.b64decode(chunk_data))
+
+        print(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}")
+
+        if len(upload_chunks[file_name]) == total_chunks:
+            save_uploaded_file(instance, file_name)
+
+    def save_uploaded_file(instance: Instance, file_name):
+        """Assembles chunks and saves the file"""
+        temp_zip_path = tempfile.mktemp(suffix=".zip")
+
+        with open(temp_zip_path, "wb") as f:
+            for chunk in upload_chunks[file_name]:
+                f.write(chunk)
+
+        del upload_chunks[file_name]  # Free memory
+        print(f"Saved ZIP file: {temp_zip_path}")
+
+        extracted_files = extract_and_list_zip(temp_zip_path)
+
+        print(extracted_files)
+
+        process_uploaded_artwork(instance, extracted_files)
+
+        notify_web(instance, "upload_complete", {"files": extracted_files})
+        update_status(instance, "Finished processing uploaded file.", color="success")
+
+
+    # Updated regex: "Movie Title (YYYY).png" OR "Movie Title.png"
+    FILENAME_PATTERN = re.compile(r'^[^/]+(?:\.jpg|\.jpeg|\.png)$', re.IGNORECASE)
+
+    def extract_and_list_zip(zip_path):
+        """Extracts a ZIP file, flattens directories, and returns a list of valid image files."""
+        extract_dir = tempfile.mkdtemp()
+        valid_files = []
+        zip_source = "theposterdb"
+
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            for zip_info in zip_ref.infolist():
+                filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
+
+                # Skip directories and unwanted metadata files
+                if not filename or filename.startswith('.') or filename.lower() in {"ds_store", "__macosx"}:
+                    continue
+
+                if filename == "source.txt":
+                    zip_source = "mediux"
+                elif FILENAME_PATTERN.match(filename):
+                    extracted_path = os.path.join(extract_dir, filename)
+
+                    with zip_ref.open(zip_info.filename) as source, open(extracted_path, "wb") as target:
+                        target.write(source.read())
+
+                    valid_files.append(extracted_path)
+
+        file_list = []
+        tv_flag = False
+
+        for file in os.listdir(extract_dir):
+            full_path = os.path.join(extract_dir, file)
+            md5 = utils.calculate_file_md5(full_path)
+
+            artwork = parse_title(os.path.splitext(file)[0])
+            artwork["source"] = zip_source
+            artwork["path"] = full_path
+            artwork["checksum"] = md5
+            artwork["id"] = "Upload"
+            if artwork['media'] == "TV Show":
+                tv_flag = True
+
+            file_list.append(artwork)
+
+        if tv_flag is True:
+            for file in file_list:
+                if file['media'] != "TV Show":
+                    file['media'] = "TV Show"
+                    if not file['season']:
+                        file['season'] = "Cover"
+                    file['episode'] = None
+
+                # Take into account that MediUX downloads sometimes don't label backdrops as backdrops
+                # So let's correct that before backdrops get uploaded as covers
+                if file['season'] == "Cover" and check_image_orientation(file["path"]) == "landscape":
+                    file['season'] = "Backdrop"
+
+        sorted_data = sorted(file_list, key=sort_key)
+
+        return sorted_data
+
     # Load the web server
-    socketio.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
+    globals.web_socket.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
+
+def check_image_orientation(image_path):
+    with Image.open(image_path) as img:
+        width, height = img.size
+
+    if width > height:
+        return "landscape"
+    elif width < height:
+        return "portrait"
+    else:
+        return "square"
+
+def sort_key(item):
+    def parse_season(season):
+        # If the season is missing, None, or non-numeric, treat it as the highest possible value
+        if season is None or not isinstance(season, (int, str)) or (isinstance(season, str) and not season.isdigit()):
+            return float('inf')
+        return int(season)
+
+    def parse_episode(episode):
+        # Handle missing or non-numeric episodes
+        return int(episode) if isinstance(episode, int) else float('inf')
+
+    def parse_source(source):
+        # Treat missing source or invalid entries as empty string to ensure they are last
+        return source if source else ''
+
+    # Now safely get the values, even if they are missing
+    season_value = parse_season(item.get('season'))  # Using .get() to avoid KeyError
+    episode_value = parse_episode(item.get('episode'))  # Same for episode
+    source_value = parse_source(item.get('source'))  # Same for source
+
+    return item['media'], season_value, episode_value, source_value
 
 
-def update_web_log(message, artwork_title = None):
-    """Send status updates to the frontend via WebSockets."""
-    notify_web("log_update", {"message": message, "artwork_title": artwork_title} )
 
 
-def task_three(instance = None):
+
+def task_three(instance: Instance):
     if instance:
         threading.Thread(target=process_bulk_file_on_schedule, args=(instance, "bulk_test.txt",)).start()
 
 def process_bulk_file_on_schedule(instance, filename):
     global config
-    content = None
 
     try:
         # Get the current bulk_txt value from the config
@@ -1351,27 +769,20 @@ def process_bulk_file_on_schedule(instance, filename):
         bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
 
         if not os.path.exists(bulk_import_file):
-            if mode == "cli":
-                print(f"File does not exist: {bulk_import_file}")
-            elif mode == "gui":
-                bulk_import_text.delete(1.0, ctk.END)
-                bulk_import_text.insert(ctk.END, "Bulk import file path is not set or file does not exist.")
-                status_label.configure(text="Bulk import file path not set or file not found.", text_color="red")
-            elif mode == "web":
-                update_status(f"File does not exist: {bulk_import_file}")
+            update_log(instance, f"File does not exist: {bulk_import_file}")
             return
 
         with open(bulk_import_file, "r", encoding="utf-8") as file:
             content = file.read()
 
         if content:
-            update_log("@ *** Scheduled import started ***")
-            run_bulk_import_scrape_thread(content)
+            update_log(instance, "@ *** Scheduled import started ***")
+            run_bulk_import_scrape_thread(instance, content)
 
     except FileNotFoundError:
-        update_log(f"@ Scheduled import failed due to missing file ({filename})")
+        update_log(instance, f"@ Scheduled import failed due to missing file ({filename})")
     except Exception as e:
-        update_log(f"@ Scheduled import failed ({str(e)})")
+        update_log(instance, f"@ Scheduled import failed ({str(e)})")
 
 # Function to run the scheduler in a separate thread
 def run_scheduler():
@@ -1393,7 +804,12 @@ def start_scheduler():
 # * Main Initialization ---
 if __name__ == "__main__":
 
-    instance_id = None
+    # Regex pattern for movie poster filenames
+    FILENAME_PATTERN = re.compile(r'^(.*) \((\d{4})\)\.png$')
+
+    # Create an instance object including a unique id and "cli" mode to pass around
+    cli_instance = Instance(uuid.uuid4(),"cli")
+
     scheduler_thread = None
 
     # Process command line arguments
@@ -1422,7 +838,7 @@ if __name__ == "__main__":
         sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
 
     # Make sure there's at least one bulk_import file
-    check_for_bulk_import_file()
+    check_for_bulk_import_file(cli_instance)
 
     # Create a connector for Plex
     plex = PlexConnector(config.base_url, config.token)
@@ -1441,20 +857,8 @@ if __name__ == "__main__":
         except PlexConnectorException as e:
             sys.exit(str(e))
 
-        # Create the GUI if we need to
-        if cli_command == 'gui':
-
-            mode = "gui"
-
-            # Erase any arguments set in the CLI
-            cli_options = Options()
-
-            # Create the UI now
-            app = ctk.CTk()
-            create_ui()
-
-        # Handle the CLI options if we're not using the GUI
-        elif cli_command == 'bulk':
+        # Handle the CLI options if we're not using the web ui
+        if cli_command == 'bulk':
 
             # Remove some of the command line options which should be specified per line
             cli_options.add_posters = False
@@ -1463,7 +867,7 @@ if __name__ == "__main__":
             cli_options.clear_filters()
 
             # Process using the bulk filename if supplied, else the bulk file set in the config
-            parse_bulk_file_from_cli(args.bulk_file if args.bulk_file else config.bulk_txt)
+            parse_bulk_file_from_cli(cli_instance, args.bulk_file if args.bulk_file else config.bulk_txt)
 
         # Now we're looking at URLs - firstly one containing a TPDb user
         elif "/user/" in cli_command:
@@ -1473,22 +877,20 @@ if __name__ == "__main__":
             cli_options.add_posters = False
             cli_options.add_sets = False
             try:
-                scrape_tpdb_user(cli_command, cli_options)
+                scrape_tpdb_user(cli_instance, cli_command, cli_options)
             except:
                 print("Oops - handle this user error properly!")
 
         # User passed in a poster or set URL, so let's process that
         else:
             try:
-                scrape_and_upload(cli_command, cli_options)
+                scrape_and_upload(cli_instance, cli_command, cli_options)
             except Exception as e:
-                update_status(str(e),color="danger", update_cli=True)
+                update_status(cli_instance, str(e),color="danger", update_cli=True)
     else:
 
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
         if not interactive_cli:
-
-            mode = "web"
 
             # Connect to the TV and Movie libraries
             try:
@@ -1503,29 +905,7 @@ if __name__ == "__main__":
                 pass
 
             # Create the app and web server
+
             web_app = Flask(__name__, template_folder="templates")
-            socketio = SocketIO(web_app, cors_allowed_origins="*")
+            globals.web_socket = SocketIO(web_app, cors_allowed_origins="*")
             setup_web_sockets()
-
-
-        else:
-
-            sys.stdout.reconfigure(encoding='utf-8')
-            gui_flag = cli_command == "gui"
-
-            # Perform CLI plex_setup if GUI flag is not present
-            if not gui_flag:
-
-                # Connect to the TV and Movie libraries
-                try:
-                    plex.set_tv_libraries(config.tv_library)
-                except PlexConnectorException as e:
-                    sys.exit(str(e))
-
-                try:
-                    plex.set_movie_libraries(config.movie_library)
-                except PlexConnectorException as e:
-                    sys.exit(str(e))
-
-            # Handle interactive CLI
-            interactive_cli_loop()

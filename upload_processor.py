@@ -1,9 +1,11 @@
 from config import Config
+from media_metadata import parse_movie
 from options import Options
 from plex_uploader import PlexUploader
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound, \
     NotProcessedByExclusion
 from utils import is_numeric
+import re
 
 class UploadProcessor:
 
@@ -23,6 +25,10 @@ class UploadProcessor:
     def process_collection_artwork(self, artwork):
 
         collection_items = self.plex.find_collection(artwork["title"])
+
+        if not collection_items:
+            collection_items = self.plex.find_collection(artwork["title"].replace(" Collection",""))
+
         result = None
         artwork_source = artwork["source"]
         filter_type = "collection_poster"
@@ -34,17 +40,16 @@ class UploadProcessor:
                         uploader = PlexUploader(collection_item, "Poster","P")
                         uploader.set_artwork(artwork)
                         uploader.track_artwork_ids = self.config.track_artwork_ids
-                        uploader.set_description(f"{artwork['title']} : ID {artwork['id']}")
+                        uploader.set_description(f"{artwork['title']} : {artwork['id']}")
                         uploader.set_options(self.options)
                         result = uploader.upload_to_plex()
                     else:
                         raise NotProcessedByExclusion(
-                            f"{artwork['title']} : ID {artwork['id']} | Poster excluded")
+                            f"{artwork['title']} : {artwork['id']} | Poster excluded")
                 else:
-                    raise NotProcessedByFilter(f"{artwork['title']} : ID {artwork['id']} | Poster not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
+                    raise NotProcessedByFilter(f"{artwork['title']} : {artwork['id']} | Poster not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
         else:
-            collection_title = artwork["title"].replace(" Collection", "")
-            raise CollectionNotFound(f'{collection_title}: ID {artwork["id"]} | Collection not available on Plex')
+            raise CollectionNotFound(f'{artwork["title"]}: {artwork["id"]} | Collection not available on Plex')
         return result
 
     def process_movie_artwork(self, artwork):
@@ -52,6 +57,13 @@ class UploadProcessor:
         year = self.options.year if self.options.year else artwork["year"]
 
         movie_items = self.plex.find_in_library("movie", artwork["title"], year)
+
+        # If no match is found, modify the title to replace dashes - this is useful for file uploads where colons have been replaced with dashes to comply with filesystem rules
+        if not movie_items:
+            # Replace the hyphen directly after a word with a colon (no space before it)
+            modified_title = re.sub(r'(\w)-', r'\1:', artwork["title"])
+            movie_items = self.plex.find_in_library("movie", modified_title, year)
+
         result = None
         artwork_source = artwork["source"]
         filter_type = "movie_poster"
@@ -63,17 +75,17 @@ class UploadProcessor:
                         uploader = PlexUploader(movie_item, "Poster", artwork_id="P")
                         uploader.set_artwork(artwork)
                         uploader.track_artwork_ids = self.config.track_artwork_ids
-                        uploader.set_description(f"{artwork['title']} : ID {artwork['id']}")
+                        uploader.set_description(f"{artwork['title']} : {artwork['id']}")
                         if artwork['year']:
-                            uploader.set_description(f"{artwork['title']} ({artwork['year']}) : ID {artwork['id']}")
+                            uploader.set_description(f"{artwork['title']} ({artwork['year']}) : {artwork['id']}")
                         uploader.set_options(self.options)
                         result = uploader.upload_to_plex()
                     else:
-                        raise NotProcessedByExclusion(f"{artwork['title']} ({artwork['year']}) | ID {artwork['id']} | Poster excluded")
+                        raise NotProcessedByExclusion(f"{artwork['title']} ({artwork['year']}) | {artwork['id']} | Poster excluded")
                 else:
-                    raise NotProcessedByFilter(f"{artwork['title']} ({artwork['year']}) | ID {artwork['id']} | Poster filtered by {'request' if not self.options.has_filter(filter_type) else artwork_source}")
+                    raise NotProcessedByFilter(f"{artwork['title']} ({artwork['year']}) | {artwork['id']} | Poster filtered by {'request' if not self.options.has_filter(filter_type) else artwork_source}")
         else:
-            raise MovieNotFound(f'{artwork["title"]} ({artwork["year"]}) | ID {artwork["id"]} | Movie not available on Plex')
+            raise MovieNotFound(f'{artwork["title"]} ({artwork["year"]}) | {artwork["id"]} | Movie not available on Plex')
         return result
 
 
@@ -94,11 +106,11 @@ class UploadProcessor:
             season = f"Season {artwork['season']:02}"
 #
         if is_numeric(artwork['season']) and is_numeric(artwork['episode']):
-            description = f"{artwork['title']} | {season}, Episode {artwork['episode']:02} : ID {artwork['id']}"
+            description = f"{artwork['title']} | {season}, Episode {artwork['episode']:02} : {artwork['id']}"
         elif (artwork['episode'] is None or artwork['episode'] == "Cover") and is_numeric(artwork['season']):
-            description = f"{artwork['title']} | {season} : ID {artwork['id']}"
+            description = f"{artwork['title']} | {season} : {artwork['id']}"
         elif artwork['season'] is None or artwork["season"] == "Cover" or artwork["season"] == "Backdrop":
-            description = f"{artwork['title']} : ID {artwork['id']}"
+            description = f"{artwork['title']} : {artwork['id']}"
 
         year = self.options.year if self.options.year else artwork["year"]
 
@@ -154,7 +166,7 @@ class UploadProcessor:
                 except Exception:
                     raise
         else:
-            raise ShowNotFound(f"{artwork['title']} | Show not available on Plex")
+            raise ShowNotFound(f"{artwork['title']} ({artwork['year']}) | Show not available on Plex")
 
         return result
 

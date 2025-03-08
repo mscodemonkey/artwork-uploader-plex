@@ -62,6 +62,40 @@
 
         .bg-light {opacity: 0.85}
 
+        #drop-area {
+            width: 100%;
+            margin: auto;
+            padding: 40px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        #drop-area.highlight {
+            border-color: #00bfff;
+            background: #f0f8ff;
+        }
+
+        #progress-container {
+            width: 80%;
+            margin: auto;
+            display: block;
+            display: block;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 20px;
+            background: #00bfff;
+            border-radius: 5px;
+        }
+        #file-list {
+            margin-top: 20px;
+            text-align: left;
+            max-width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
     </style>
 
     <!-- Optional: You can also use a custom stylesheet to override default styles -->
@@ -71,7 +105,7 @@
 <body>
 <div class="container mt-4">
     <div class="mb-4">
-        <h1><img src="/static/artwork_scraper.png" title="Artwork Scraper for Plex" style="height: 2.5rem">Artwork Scraper for Plex</h1>
+        <h1><img src="/static/artwork_scraper.png" title="Artwork Scraper for Plex" style="height: 2.5rem">Artwork Uploader for Plex</h1>
     </div>
     <div class="row m-3 rounded fade fixed-top" id="status">
         <div class="col">
@@ -92,6 +126,8 @@
            role="tab" aria-controls="bulk-import" aria-selected="false">Bulk Import</a>
         <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
            role="tab" aria-controls="scraper" aria-selected="true">Scraper</a>
+        <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
+           role="tab" aria-controls="uploader" aria-selected="true">Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
         <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
            role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block">Upload&nbsp;</span>Log</a>
     </nav>
@@ -449,11 +485,25 @@
 
         </div>
 
+        <!-- Uploader Tab -->
+        <div class="tab-pane fade" id="uploader" role="tabpanel" aria-labelledby="uploader-tab" tabindex="0">
+            <div id="drop-area">
+                <p>Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.  This is a beta feature so please let me know any anomalies!</p>
+            </div>
+    <div id="progress-container" class="mt-3" style="display:none">
+        <p>Uploading... <span id="progress-text">0%</span></p>
+        <div style="width: 100%; background: #ddd; border-radius: 5px;">
+            <div id="progress-bar"></div>
+        </div>
+    </div>
+        </div>
+
         <!-- Scraping Log Tab -->
         <div class="tab-pane fade" id="scraping-log" role="tabpanel" aria-labelledby="scraping-log-tab" tabindex="0">
             <div class="mt-3" id="scraping_log"><!-- --></div>
-            <!-- Your scraping log content here -->
         </div>
+
+
     </div>
 </div>
 

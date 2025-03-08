@@ -12,11 +12,17 @@ class PlexUploader:
         self.label = None
         self.artwork = None
         self.options = Options()
+        self.type = None
         self.track_artwork_ids = True
 
     def set_artwork(self, artwork):
         self.artwork = artwork
-        self.label = self.artwork_id + utils.calculate_md5(self.artwork["url"])
+        if artwork['id'] == "Upload":
+            self.type = "file"
+            self.label = self.artwork_id + artwork['checksum']
+        else:
+            self.type = "url"
+            self.label = self.artwork_id + utils.calculate_md5(self.artwork["url"])
 
     def set_description(self, description):
         self.description = description
@@ -29,9 +35,15 @@ class PlexUploader:
         try:
             if self.artwork_exists_on_plex() is False or self.options.force:
                 if self.artwork_id == "BID:":
-                    self.upload_target.uploadArt(self.artwork["url"])
+                    if self.type == "file":
+                        self.upload_target.uploadPoster( filepath = self.artwork['path'])
+                    else:
+                        self.upload_target.uploadPoster( url = self.artwork["url"])
                 else:
-                    self.upload_target.uploadPoster(self.artwork["url"])
+                    if self.type == "file":
+                        self.upload_target.uploadPoster( filepath = self.artwork['path'])
+                    else:
+                        self.upload_target.uploadPoster( url = self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
                 if self.artwork["source"] == "theposterdb":
@@ -40,7 +52,7 @@ class PlexUploader:
             else:
                 return f'- {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}'
         except Exception as e:
-            return f'x {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}'
+            return f'x {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle} - More info: {str(e)}'
 
     def artwork_exists_on_plex(self):
         existing_artwork = False

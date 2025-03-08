@@ -1,18 +1,22 @@
 
-# Artwork Scraper for Plex 
-Formerly plex-poster-set-helper
+# Artwork Uploader for Plex 
+Adapted from a fork of plex-poster-set-helper by Brian Brown
 
-Artwork Scraper is a tool to help scrape and upload sets of posters from ThePosterDB or MediUX to your Plex server in seconds!
+Artwork Uploader is a tool to help upload sets of posters from ThePosterDB or MediUX or scrape posters from MediUX and upload them to your Plex server in seconds!
 
-# What's different in this fork?
+# What's different from Brian's original app?
+### Upload Zip files
+You can upload the Zip file you download from theposterdb.com or mediux.pro.  It should handle all types of Zip, including the odd misnamed file from MediUX.  This feature is still in Beta so help me out with some feedback here!
+This is also to keep theposterdb happy that we're not breaking their terms of service by scraping.
+
 ### Artwork tracking for speedy updates
 We (optionally) store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  
 
 ### Force artwork to be updated
-If you really want to upload artwork again, use the ```--force``` option at the command line, in the bulk file, or when entering the URL in the GUI.
+If you really want to upload artwork again, use the ```--force``` option at the command line, in the bulk file, or when entering the URL in the Web UI.
 
-### ThePosterDB extras
-There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.
+### ThePosterDB scraping
+There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.  This is against the terms of service of theposterdb.com so we encourage you to login, download the files you want, and upload them using this tool.
 
 ### Per-URL filtering and artwork excludes 
 And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
@@ -30,7 +34,7 @@ Oh, last but not least, there's now a shiny new web UI so you can leave it runni
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
 
 ## Disclaimer
-This is a first project for me, i'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that it currently breaks the terms of service of TPDb so will look into a better way of downloading from there.  Wish these sites had APIs!
+This is a first project for me, i'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that scraping breaks the terms of service of TPDb so please consider using the upload Zip feature from there.  Wish these sites had APIs!
 
 ---
 # Installation
@@ -38,11 +42,11 @@ This is a first project for me, i'm using it to learn Python so it will be const
 ### 1. Install Python
 [Install Python](https://www.python.org/downloads/) (if not installed already).  You'll need version 3.10 or later.
 
-### 2. Get Artwork Scraper for Plex
+### 2. Get Artwork Uploader for Plex
 Either download the Zip and extract all files into a folder, or Git Clone the repository
 
 ### 3. Open a terminal 
-Then CD to the folder where you extracted Artwork Scraper
+Then CD to the folder where you extracted Artwork Uploader
 
 ### 4. Install the required dependencies
 
@@ -70,10 +74,10 @@ This is optional - if you don't do this, a new config.json will be created when 
 - The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
 
 ```"mediux_filters"```
-- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
+- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the Web UI.
 
 ```"tpdb_filters"```
-- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the GUI.
+- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the Web UI.
 
 ```"track_artwork_ids"```
 - Setting this to ```true``` will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.
@@ -99,29 +103,26 @@ Both mediux_filters and tpdb_filters specify which artwork types to upload by in
 
 ### In a terminal
 ``` bash
-    python artwork_scraper.py
+    python artwork_uploader.py
 ```
 **NOTE**: You may need to use ```python3``` rather than ```python```, especially Mac users).
 
-With no arguments, Artwork Scraper will start a webserver on port 4567 (this may change!)
+With no arguments, Artwork Uploader will start a webserver on port 4567 (this may change!)
 
 ## Command Line Arguments
 
 The script supports various command-line arguments for flexible use.
 
-### 1. Local GUI
-Use the ```gui``` argument to open the local graphical user interface:
+### 1. Single link import  
+   Provide a link directly to set posters from a single set of posters:
    
 ```bash
-  python artwork_scraper.py gui
-```
-** The local GUI is no longer under development and may eventually be removed once the Web UI is secure.  The new Web UI is fully-featured and I will only be working on this as a user interface moving forward.
-
-### 2. Single link import  
-   Provide a link directly to set posters from a single MediUX or ThePosterDB set:
+   python artwork_uploader.py https://mediux.pro/sets/9242
    
-```bash
-   python artwork_scraper.py https://mediux.pro/sets/9242
+   or, depending on your environment
+   
+   python3 artwork_uploader.py https://mediux.pro/sets/9242
+   
 ```
 #### Optional command line arguments
 
@@ -156,7 +157,7 @@ Use the ```gui``` argument to open the local graphical user interface:
    Import multiple links from a .txt file using the bulk argument:
    
 ```bash
-   python artwork_scraper.py bulk bulk_import.txt
+   python artwork_uploader.py bulk bulk_import.txt
    ```
 
    - The .txt file should contain one URL per line. Lines starting with # or // will be ignored as comments.
@@ -166,33 +167,8 @@ Use the ```gui``` argument to open the local graphical user interface:
 ---
 # Other features
 
-## Interactive CLI Mode
-
-![GUI Overview](https://raw.githubusercontent.com/tonywied17/plex-poster-set-helper/refs/heads/main/assets/cli_overview.png)
-
-If no command-line arguments are provided, the script will enter an interactive CLI mode, where you can select from menu options to perform various tasks:
-
-- **Option 1:** Enter a ThePosterDB set URL, MediUX set URL, or ThePosterDB user URL to set posters for individual items or entire user collections.
-- **Option 2:** Run a bulk import by specifying the path to a `.txt` file containing multiple URLs (or simply press `Enter` to use the default bulk file defined in `config.json`).
-- **Option 3:** Launch the GUI for a graphical interface.
-- **Option 4:** Stop the program and exit.
-
-When using bulk import, if no file path is specified, the script will default to the file provided in the `config.json` under the `bulk_txt` key. Each URL in the `.txt` file should be on a separate line, and any lines starting with `#` or `//` will be ignored as comments.
-
-## GUI Mode
-
-![GUI Overview](https://raw.githubusercontent.com/tonywied17/plex-poster-set-helper/refs/heads/main/assets/gui_overview.png)
-![Bulk Import](https://raw.githubusercontent.com/tonywied17/plex-poster-set-helper/refs/heads/main/assets/bulk_import.png)
-![URL Scrape](https://raw.githubusercontent.com/tonywied17/plex-poster-set-helper/refs/heads/main/assets/url_scrape.png)
-
-The GUI provides a more user-friendly interface for managing poster uploads. Users can run the script with python plex_poster_set_helper.py gui to launch the CustomTkinter-based interface, where they can:
-- Easily enter single or bulk URLs.
-- View progress, status updates, and more in an intuitive layout.
-
-The local GUI will no longer be developed, in favour of the new Web UI.
-
 ## Web UI
-It's still work in progress, as is this entire fork.  I wouldn't consider it production ready yet but it's fully functional!
+It's still work in progress, as is this entire app!  I wouldn't consider it "production" ready but it's fully functional!
 
 ![Settings](assets/settings.png)
 ![Bulk Import](assets/web_bulk_import.png)
@@ -244,26 +220,4 @@ Both the ```mediux_filters``` and ```tvdb_filters``` options in **config.json** 
 - After the URL in a bulk file using the same format as you would on the command line
 - After the URL in the Bulk Import tab of the Web UI or local GUI using the same format as you would on the command line
 - In the scraper tab in the Web UI, where you can simply check boxes to set options and filters.
-- In the scraper URL in the local GUI, again using the same format 
 
----
-# Executable Build
-
-In the `dist/` directory, you'll find the compiled executable for Windows: `Plex Poster Set Helper.zip`. This executable allows you to run the tool without needing to have Python installed.
-
-To rebuild the executable:
-
-*Note: Prior to building, set the `interactive_cli` boolean to False on line `20` to ensure the executable launches in GUI Mode by default*
-
-1. Install PyInstaller if you don't have it already:
-   ```bash
-   pip install pyinstaller
-   ```
-
-2. Use the provided spec file (`_ArtworkScraper.spec`) to build the executable:
-
-   ```bash
-   pyinstaller _ArtworkScraper.spec
-   ```
-
-This will create the executable along with the necessary files.
