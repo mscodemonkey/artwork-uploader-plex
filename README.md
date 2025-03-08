@@ -30,8 +30,11 @@ Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you
 ### Web UI
 Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
 
+## Coming soon
+Scheduler, so that you can leave this running and update all your artwork every day.
+
 ## Thanks
-Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!
+Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!  I really hope you don't mind me taking your work and running with it, please get in touch if you'd like to merge the two projects!
 
 ## Disclaimer
 This is a first project for me, i'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that scraping breaks the terms of service of TPDb so please consider using the upload Zip feature from there.  Wish these sites had APIs!
