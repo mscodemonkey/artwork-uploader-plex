@@ -8,7 +8,7 @@ import zipfile
 import tempfile
 
 from PIL import Image
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template
 from flask_socketio import SocketIO
 
 import schedule, time
@@ -20,8 +20,8 @@ import sys
 
 import utils
 from instance import Instance
-from media_metadata import parse_movie, parse_title
-from notifications import update_log, update_status, notify_web
+from media_metadata import parse_title
+from notifications import update_log, update_status, notify_web, debug_me
 from config_exceptions import ConfigLoadError
 from plex_connector_exception import PlexConnectorException
 import arguments
@@ -78,17 +78,16 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                 except:
                     print("Oops")
 
-
 def cleanup():
 
     """Function to handle cleanup tasks on exit."""
 
-    print("-----------------------------------------------------------------------------------")
+    debug_me("-----------------------------------------------------------------------------------")
 
     try:
         if plex:
-            print("Closing Plex server connection...")
-        print("Exiting application. Cleanup complete.")
+            debug_me("Closing Plex server connection...")
+        debug_me("Exiting application. Cleanup complete.")
     except:
         pass
 
@@ -147,7 +146,6 @@ def process_scrape_url_from_ui(instance: Instance, url: str) -> None:
             notify_web(instance, "add_to_bulk_list", {"url": url, "title": title})
 
     except ScraperException as scraping_error:
-        print("Exception")
         update_status(instance, f"{scraping_error}", color="danger")
 
     finally:
@@ -248,7 +246,7 @@ def scrape_tpdb_user(instance: Instance, url, options):
         user_scraper.scrape_user_info()
         pages = user_scraper.user_pages
     except ScraperException as cannot_scrape:
-        print(str(cannot_scrape))
+        debug_me(str(cannot_scrape))
         raise
 
     try:
@@ -345,12 +343,12 @@ def process_uploaded_artwork(instance: Instance, file_list):
 
     # Upload the artwork to Plex
     processor = UploadProcessor(plex)
-    print("Processing and uploading...")
+    debug_me("Processing uploaded file and uploading to Plex...")
     for artwork in file_list:
         try:
             result = None
             line_status = f'Processing artwork for {artwork["media"].lower()} "{artwork["title"]}"{" - Season " + str(artwork["season"]) if artwork["season"] else ""}{", Episode " + str(artwork["episode"]) if artwork["episode"] else ""}'
-            print(line_status)
+            debug_me(line_status)
             update_status(instance, line_status, spinner=True, sticky=True)
             if artwork['media'] == "Collection":
                 result = processor.process_collection_artwork(artwork)
@@ -361,18 +359,14 @@ def process_uploaded_artwork(instance: Instance, file_list):
             update_log(instance, result)
         except CollectionNotFound as not_found:
             update_log(instance, f"∙ {str(not_found)}")
-            print("Not found " + str(not_found))
         except NotProcessedByExclusion as excluded:
             update_log(instance, f"- {str(excluded)}")
-            print("Excluded " + str(excluded))
         except NotProcessedByFilter as not_processed:
             update_log(instance, f"- {str(not_processed)}")
-            print("Not processed " + str(not_processed))
         except Exception as error_unexpected:
             update_log(instance, f"x {str(error_unexpected)}")
             update_status(instance, f"Error: {str(error_unexpected)}", "danger")
-            print("Unexpected " + str(error_unexpected))
-            raise
+
 
 
 # * Bulk import file I/O functions ---
@@ -413,7 +407,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
 
     bulk_imports_path = "bulk_imports/"
 
-    print(f"{old_name}, {new_name}")
+    debug_me(f"Renaming file from {old_name} to {new_name}")
 
     if old_name != new_name:
         try:
@@ -426,7 +420,6 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
             notify_web(instance, "rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
             update_status(instance, f"Renamed to {new_name}", "success")
         except Exception as e:
-            print(e)
             notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
             update_status(instance, f"Could not rename {old_name}", "warning")
 
@@ -445,7 +438,6 @@ def delete_bulk_import_file(instance: Instance, file_name):
             notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
             update_status(instance, f"Deleted {file_name}", "success")
         except Exception as e:
-            print(e)
             notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
             update_status(instance, f"Could not delete {file_name}", "warning")
 
@@ -461,7 +453,7 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
 
             os.makedirs(os.path.dirname(bulk_import_file), exist_ok=True)
 
-            print("Saving" + bulk_import_file)
+            debug_me("Saving" + bulk_import_file)
 
             with open(bulk_import_file, "w", encoding="utf-8") as file:
                 file.write(contents)
@@ -574,7 +566,7 @@ def setup_web_sockets():
 
     @globals.web_socket.on("display_message")
     def display_message(data):
-        print(data.get("message"))
+        debug_me(data.get("message"))
 
     @globals.web_socket.on("save_config")
     def save_config_web(data):
@@ -593,7 +585,7 @@ def setup_web_sockets():
             plex.reconnect(config)
             notify_web(instance, "save_config",{"saved":True, "config": vars(config)})
         except Exception as config_error:
-            update_status(instance, str(config_error), color="danger", update_cli=True)
+            update_status(instance, str(config_error), color="danger")
 
     @globals.web_socket.on("add_to_scheduler")
     def add_tasks_to_scheduler(data):
@@ -626,7 +618,7 @@ def setup_web_sockets():
 
         upload_chunks[file_name].append(base64.b64decode(chunk_data))
 
-        print(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}")
+        debug_me(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}")
 
         if len(upload_chunks[file_name]) == total_chunks:
             save_uploaded_file(instance, file_name)
@@ -640,11 +632,11 @@ def setup_web_sockets():
                 f.write(chunk)
 
         del upload_chunks[file_name]  # Free memory
-        print(f"Saved ZIP file: {temp_zip_path}")
+        debug_me(f"Saved ZIP file: {temp_zip_path}")
 
         extracted_files = extract_and_list_zip(temp_zip_path)
 
-        print(extracted_files)
+        debug_me(str(extracted_files))
 
         process_uploaded_artwork(instance, extracted_files)
 
@@ -705,7 +697,7 @@ def setup_web_sockets():
                     file['episode'] = None
 
                 # Take into account that MediUX downloads sometimes don't label backdrops as backdrops
-                # So let's correct that before backdrops get uploaded as covers
+                # So let's correct that before backdrops get uploaded as covers by checking whether it's a landscape image
                 if file['season'] == "Cover" and check_image_orientation(file["path"]) == "landscape":
                     file['season'] = "Backdrop"
 
@@ -714,7 +706,7 @@ def setup_web_sockets():
         return sorted_data
 
     # Load the web server
-    globals.web_socket.run(web_app, host="0.0.0.0", port=4567, debug=True) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
+    globals.web_socket.run(web_app, host="0.0.0.0", port=4567, debug=globals.debug) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
 
 def check_image_orientation(image_path):
     with Image.open(image_path) as img:
@@ -796,9 +788,9 @@ def start_scheduler():
     if scheduler_thread is None or not scheduler_thread.is_alive():
         scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
         scheduler_thread.start()
-        print("Scheduler started.")
+        debug_me("Scheduler started.")
     else:
-        print("Scheduler is already running.")
+        debug_me("Scheduler is already running.")
 
 
 # * Main Initialization ---
@@ -806,6 +798,8 @@ if __name__ == "__main__":
 
     # Regex pattern for movie poster filenames
     FILENAME_PATTERN = re.compile(r'^(.*) \((\d{4})\)\.png$')
+
+    globals.debug = False
 
     # Create an instance object including a unique id and "cli" mode to pass around
     cli_instance = Instance(uuid.uuid4(),"cli")
@@ -879,14 +873,14 @@ if __name__ == "__main__":
             try:
                 scrape_tpdb_user(cli_instance, cli_command, cli_options)
             except:
-                print("Oops - handle this user error properly!")
+                debug_me("Oops - handle this user error properly!")
 
         # User passed in a poster or set URL, so let's process that
         else:
             try:
                 scrape_and_upload(cli_instance, cli_command, cli_options)
             except Exception as e:
-                update_status(cli_instance, str(e),color="danger", update_cli=True)
+                update_status(cli_instance, str(e),color="danger")
     else:
 
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)

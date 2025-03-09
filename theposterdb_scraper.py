@@ -1,10 +1,11 @@
 import math
 import media_metadata
 import soup_utils
+from notifications import debug_me
 
 from options import Options
 from scraper_exceptions import ScraperException
-from utils import get_artwork_type, is_valid_url
+from utils import get_artwork_type
 
 
 class ThePosterDBScraper:
@@ -41,12 +42,12 @@ class ThePosterDBScraper:
         """
         try:
             if "/poster/" in self.url:
-                print(f"★ Got a poster URL {self.url}, looking up the correct set URL...")
+                debug_me(f"★ Got a poster URL {self.url}, looking up the correct set URL...")
                 poster_soup = soup_utils.cook_soup(self.url)
                 self.url = poster_soup.find('a', class_='rounded view_all')['href']
 
             if self.url and ("/set/" in self.url or "/user/" in self.url):
-                print(f"★ Got a valid URL {self.url}")
+                debug_me(f"★ Got a valid URL {self.url}")
                 self.soup = soup_utils.cook_soup(self.url)
 
                 self.get_set_title(self.soup)
@@ -80,10 +81,8 @@ class ThePosterDBScraper:
     def get_set_title(self, soup):
         try:
             self.title = soup.find('p', id = "set-title").a.string
-
-
         except:
-            print(f"title lookup failed {soup}")
+            debug_me(f"title lookup failed {soup}")
 
     def get_posters(self, poster_div):
 
@@ -97,7 +96,6 @@ class ThePosterDBScraper:
             None
         """
 
-        movie_posters, show_posters, collection_posters = [], [], []
         posters = poster_div.find_all('div', class_='col-6 col-lg-2 p-1')
 
         if posters[-1].find('a', class_='rounded view_all'):
@@ -132,8 +130,7 @@ class ThePosterDBScraper:
         Returns:
 
         """
-        movie_posters, show_posters, collection_posters = [], [], []
-        print("⚲ Looking for additional posters...")
+        debug_me("⚲ Looking for additional posters...")
         poster_div = self.soup.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')[-1]
         mt4s = self.soup.find('main').find_all('div', class_='mt-4')
 
@@ -144,13 +141,14 @@ class ThePosterDBScraper:
 
 
     def scrape_additional_sets(self):
-        print("⚲ Looking for additional sets...")
+
+        debug_me("⚲ Looking for additional sets...")
         mt4s = self.soup.find('main').find_all('div', class_='mt-4')
 
         for mt4 in mt4s:
             additional_set = mt4.find('p').find('span').getText()
             if additional_set.startswith("Additional Set -"):
-                print(f"+ {additional_set}")
+                debug_me(f"+ {additional_set}")
                 poster_div = mt4.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')[-1]
                 set_url = poster_div.find('a', class_='rounded view_all')['href']
                 if set_url:

@@ -1,5 +1,8 @@
 import re
 
+from notifications import debug_me
+
+
 def parse_show(media_title):
     title = media_title.split(" (")[0]
     year = None
@@ -33,7 +36,7 @@ def parse_movie(movie_title):
             year = int(match.group(2)) if match.group(2) else None
             return title, year
     except:
-        print("Couldn't match" + movie_title)
+        debug_me("Couldn't match" + movie_title)
         return None, None
 
 

@@ -3,7 +3,7 @@ import os
 from typing import TextIO
 
 from config_exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
-
+from notifications import debug_me
 
 class Config:
 
@@ -62,7 +62,7 @@ class Config:
             try:
                 with open(self.path, "w", encoding="utf-8") as config_file:  # type: TextIO
                     json.dump(config_json, config_file, indent=4)
-                print(f"Config file '{self.path}' created with default settings.")
+                debug_me(f"Config file '{self.path}' created with default settings.")
             except Exception as e:
                 raise ConfigCreationError
 

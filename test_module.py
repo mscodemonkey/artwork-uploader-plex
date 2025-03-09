@@ -1,4 +1,4 @@
-import artwork_scraper
+import artwork_uploader
 import pytest
 
 def test_scrapeposterdb_set_tv_series():

@@ -1,9 +1,8 @@
-from bs4 import BeautifulSoup
-
 from options import Options
 from scraper_exceptions import ScraperException
 from theposterdb_scraper import ThePosterDBScraper
 from mediux_scraper import MediuxScraper
+from notifications import debug_me
 
 class Scraper:
 
@@ -53,7 +52,7 @@ class Scraper:
             None
         """
         try:
-            print(self.source)
+            debug_me(f"Scraping from {self.source}")
             if self.source == "theposterdb":
                 self.scrape_theposterdb()
             elif self.source == "mediux":

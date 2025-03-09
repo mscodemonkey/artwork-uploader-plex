@@ -1,6 +1,7 @@
 
 import soup_utils
 import utils
+from notifications import debug_me
 from options import Options
 from scraper_exceptions import ScraperException
 
@@ -78,7 +79,7 @@ class MediuxScraper:
                         try:
                             episode = int(title.rsplit(" E", 1)[1])
                         except:
-                            print(f"Error getting episode number for {title}.")
+                            debug_me(f"Error getting episode number for {title}.")
 
                         file_type = "title_card"
 

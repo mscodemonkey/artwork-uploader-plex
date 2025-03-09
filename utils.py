@@ -4,6 +4,7 @@ import re
 
 import validators
 
+from notifications import debug_me
 from options import Options
 from url_item import URLItem
 
@@ -114,7 +115,7 @@ def parse_url_and_options(line):
     Each line could contain the URL and any options
     """
 
-    print(f"Line: {line}")
+    debug_me(f"Line: {line}")
 
     # Split the line by spaces
     parts = line.strip().split()
