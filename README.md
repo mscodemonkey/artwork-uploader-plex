@@ -31,7 +31,8 @@ Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you
 Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
 
 ## Coming soon
-Scheduler, so that you can leave this running and update all your artwork every day.
+- Scheduler, so that you can leave this running and update all your artwork every day.
+- API integration with MediUX so we don't need to scrape any more
 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!  I really hope you don't mind me taking your work and running with it, please get in touch if you'd like to merge the two projects!

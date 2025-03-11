@@ -487,15 +487,69 @@
 
         <!-- Uploader Tab -->
         <div class="tab-pane fade" id="uploader" role="tabpanel" aria-labelledby="uploader-tab" tabindex="0">
-            <div id="drop-area">
-                <p>Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.  This is a beta feature so please let me know any anomalies!</p>
+            <div class="row mb-3" id="drop-area">
+                <div class="col">
+                    <p>Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.</p><p>It'll try to determine whether the artwork is for a TV show or a movie / collection.  This is a beta feature so please let me know any anomalies you find in Zip files!</p>
+                </div>
             </div>
-    <div id="progress-container" class="mt-3" style="display:none">
-        <p>Uploading... <span id="progress-text">0%</span></p>
-        <div style="width: 100%; background: #ddd; border-radius: 5px;">
-            <div id="progress-bar"></div>
-        </div>
-    </div>
+            <div id="row progress-container" class="mt-3 mb-3" style="display:none">
+                <div class="col">
+                    <p>Uploading... <span id="progress-text">0%</span></p>
+                    <div style="width: 100%; background: #ddd; border-radius: 5px;">
+                        <div id="progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="p-3 border bg-light">
+                        <h5 class="mb-3">Artwork to include</h5>
+                        <div class="row mb-1">
+                            <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="upload-show_cover"/>
+                                    <label for="filter-show_cover" class="form-check-label">Show cover</label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="upload-season_cover"/>
+                                    <label for="filter-season_cover" class="form-check-label">Season covers</label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-background"/>
+                                    <label for="filter-background" class="form-check-label">Background</label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="upload-title_card"/>
+                                    <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12 mb-2"><strong>Movies</strong></div>
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" checked value="movie_poster" id="upload-movie_poster"/>
+                                    <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
+                                </div>
+                            </div>
+                            <div class="col-6 col-md-8 col-lg-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" checked value="collection_poster" id="upload-collection_poster"/>
+                                    <label for="filter-collection_poster" class="form-check-label">Collection poster</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Scraping Log Tab -->
