@@ -458,6 +458,8 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
             with open(bulk_import_file, "w", encoding="utf-8") as file:
                 file.write(contents)
 
+            debug_me(instance.id)
+
             update_status(instance, message="Bulk import file " + filename + " saved", color="success")
             notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
         except Exception as e:
@@ -527,6 +529,7 @@ def setup_web_sockets():
         filename = data.get("filename")
         now_load = data.get("now_load")
         if content:
+            debug_me(instance.id)
             save_bulk_import_file(instance, content, filename, now_load)
 
     @globals.web_socket.on("load_config")

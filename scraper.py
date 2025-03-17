@@ -3,6 +3,7 @@ from scraper_exceptions import ScraperException
 from theposterdb_scraper import ThePosterDBScraper
 from mediux_scraper import MediuxScraper
 from notifications import debug_me
+from urllib.parse import urlparse
 
 class Scraper:
 
@@ -30,9 +31,11 @@ class Scraper:
         self.title = None
 
         # Set source based on the contents of the URL
-        if "theposterdb.com" in url:
+        parsed_url = urlparse(url)
+        host = parsed_url.hostname
+        if host == "theposterdb.com":
             self.source = "theposterdb"
-        elif "mediux.pro" in url and "sets" in url:
+        elif host == "mediux.pro" and "sets" in url:
             self.source = "mediux"
         elif ".html" in url:
             self.source = "html"

@@ -203,9 +203,7 @@ socket.on("add_to_bulk_list", (data) => {
     let escapedUrl = urlWithoutFlag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     // Regex to match the URL as a standalone line with optional extra arguments
-    let regex = new RegExp(`^${escapedUrl}(\\s+--\\S+(\\s+\\S+)*)?$`, "m");
-
-    console.log(regex);
+    let regex = new RegExp(`^${escapedUrl}(\\s+--\\S+(\\s+\\S+)*)?$`, "m")
 
     if (!regex.test(bulkText)) {
         if (config.auto_manage_bulk_files) {
@@ -659,14 +657,13 @@ function loadBulkFileList() {
 
 function saveBulkImport(filename, nowLoad = null) {
 
-    console.log("File to save is: " + filename);
     const textArea = document.getElementById("bulk_import_text");
 
     const fileData = {
         filename: filename,
         content: textArea.value,
-        now_load: nowLoad
-
+        now_load: nowLoad,
+        instance_id: instanceId
     };
 
     // Emit the event to Flask via Socket.IO
@@ -680,7 +677,7 @@ function saveBulkImport(filename, nowLoad = null) {
                 bulkTextAsLoaded = textArea.value
                 checkBulkTextChanged()
                 if (data.now_load) {
-                    console.log("Saved, now loading " + data.now_load)
+                    //console.log("Saved, now loading " + data.now_load)
                     loadBulkImport(data.now_load);
                 }
             }
@@ -836,7 +833,7 @@ document.getElementById("rename_icon").addEventListener("click", function () {
 
         renameInput.addEventListener("blur", function () {
 
-            console.log("Blur event triggered"); // Debugging line
+            //console.log("Blur event triggered"); // Debugging line
             const newFilename = renameInput.value + ".txt"; // Ensure .txt is appended
             if (newFilename && newFilename !== filename) {
                 // Emit rename event
@@ -916,6 +913,7 @@ document.getElementById("delete_icon").addEventListener("click", function () {
                         bulkTextAsLoaded = null
                         loadBulkFileList(); // Reload the file list if deleted
                         loadBulkImport(defaultBulkFile);
+                        checkBulkTextChanged()
                     }
                 }
             });
@@ -957,7 +955,7 @@ function uploadBulkImportFile(event) {
         if (fileExists) {
             const confirmOverwrite = confirm("File '" + file.name + "' already exists. Would you like to overwrite it?");
             if (!confirmOverwrite) {
-                console.log("User chose not to overwrite the file.");
+                //console.log("User chose not to overwrite the file.");
                 return;
             }
         }

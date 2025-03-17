@@ -82,5 +82,6 @@ def notify_web(instance: Instance, event, data_to_include = None):
     if instance.mode == "web":
         instance_data = {"instance_id": instance.id}
         merged_arguments = data_to_include | instance_data
+        debug_me(merged_arguments)
         globals.web_socket.emit(event, merged_arguments)
 
