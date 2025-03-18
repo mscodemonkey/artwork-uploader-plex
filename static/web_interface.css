@@ -1,0 +1,132 @@
+
+
+        body {
+            background-image: url(/static/bg.jpg);
+            background-repeat: no-repeat;
+            background-position-x: right;
+            background-size: cover
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+
+
+        * {
+            font-family: "Noto Sans", serif;
+            font-optical-sizing: auto;
+            font-weight: 400;
+            font-style: normal;
+            font-variation-settings: "wdth" 100;
+        }
+
+        .tab-content {
+            margin-top: 1rem;
+        }
+
+        h1 {font-weight: 400; letter-spacing: -1px;}
+        h1 img {position: relative;  top: -0.2rem; margin-right:1rem;}
+
+        .log_message {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #000; /* Black text */
+            background-color: #EEEEEE;
+            padding: 5px;
+            border-radius: 4px;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        #bulk_import_text {
+            font-size: 0.9rem;
+        }
+
+        .bg-light {opacity: 0.85}
+
+        #drop-area {
+            width: 100%;
+            margin: auto;
+            padding: 40px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        #drop-area.highlight {
+            border-color: #00bfff;
+            background: #f0f8ff;
+        }
+
+        #progress-container {
+            width: 80%;
+            margin: auto;
+            display: block;
+            display: block;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 20px;
+            background: #00bfff;
+            border-radius: 5px;
+        }
+        #file-list {
+            margin-top: 20px;
+            text-align: left;
+            max-width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+  #time_select_box {
+    position: absolute;
+    top: 0;
+    right: 55px; /* Move the tooltip 20px to the right */
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    display: none;
+    z-index: 1100;
+    min-width: 250px;
+    overflow: visible !important;
+}
+
+/* Outer arrow (border color matches the tooltip border) */
+#tooltip_arrow {
+    position: absolute;
+    top: -10px; /* Move arrow to the top */
+    right: 15px; /* Align the arrow to the right */
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 10px solid #dee2e6; /* Arrow border color */
+}
+
+/* Inner arrow (matches tooltip background) */
+#tooltip_arrow::after {
+    content: "";
+    position: absolute;
+    top: 1px; /* Moves inner arrow down slightly */
+    left: -9px;
+    width: 0;
+    height: 0;
+    border-left: 9px solid transparent;
+    border-right: 9px solid transparent;
+    border-bottom: 9px solid #f8f9fa; /* Matches tooltip background */
+}
+
+
+
+
+        /* Class to show tooltip */
+        .show-tooltip {
+            display: block !important;
+        }
+
+
+

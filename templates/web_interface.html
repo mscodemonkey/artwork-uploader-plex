@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Artwork Scraper for Plex</title>
+    <title>Artwork Uploader for Plex</title>
     <!-- Link to Bootstrap CSS (CDN) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
           integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
@@ -14,89 +14,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
-    <style>
-
-        body {
-            background-image: url(/static/bg.jpg);
-            background-repeat: no-repeat;
-            background-position-x: right;
-            background-size: cover
-        }
-
-        html, body {
-            height: 100%;
-            margin: 0;
-        }
-
-
-
-        * {
-            font-family: "Noto Sans", serif;
-            font-optical-sizing: auto;
-            font-weight: 400;
-            font-style: normal;
-            font-variation-settings: "wdth" 100;
-        }
-
-        .tab-content {
-            margin-top: 1rem;
-        }
-
-        h1 {font-weight: 400; letter-spacing: -1px;}
-        h1 img {position: relative;  top: -0.2rem; margin-right:1rem;}
-
-        .log_message {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: #000; /* Black text */
-            background-color: #EEEEEE;
-            padding: 5px;
-            border-radius: 4px;
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        #bulk_import_text {
-            font-size: 0.9rem;
-        }
-
-        .bg-light {opacity: 0.85}
-
-        #drop-area {
-            width: 100%;
-            margin: auto;
-            padding: 40px;
-            border: 2px dashed #ccc;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        #drop-area.highlight {
-            border-color: #00bfff;
-            background: #f0f8ff;
-        }
-
-        #progress-container {
-            width: 80%;
-            margin: auto;
-            display: block;
-            display: block;
-        }
-        #progress-bar {
-            width: 0%;
-            height: 20px;
-            background: #00bfff;
-            border-radius: 5px;
-        }
-        #file-list {
-            margin-top: 20px;
-            text-align: left;
-            max-width: 80%;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-    </style>
+    <link rel="stylesheet" href="/static/web_interface.css">
 
     <!-- Optional: You can also use a custom stylesheet to override default styles -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.4.1/socket.io.js"></script>
@@ -322,13 +240,14 @@
                             <div class="form-check mb-0 d-flex align-items-center">
                                 <!-- Default bulk file checkbox using Bootstrap icons -->
                                 <input type="checkbox" id="default_bulk_file" class="d-none">
-                                <a title="Default file will be loaded when Artwork Scraper starts"><i id="default_bulk_file_icon" class="bi bi-check-circle h4" role="button"></i></a>
+                                <a title="Default file will be loaded when Artwork Uploader starts"><i id="default_bulk_file_icon" class="bi bi-check-circle h4" role="button"></i></a>
                                 <label class="d-none d-sm-block form-check-label mb-0 ms-2" for="default_bulk_file">Default</label>
                             </div>
                         </div>
                         <!-- Icons at the end -->
                         <a title="Delete this file"><i id="delete_icon" class="bi bi-trash h4 ms-3" role="button"></i></a>
                         <a title="Rename this file"><i id="rename_icon" class="bi bi-pencil-square h4 ms-3" role="button"></i></a>
+                        <a title="Schedule upload"><i id="schedule_icon" class="bi bi-clock h4 ms-3" role="button"></i></a>
                         <a title="Upload a new .txt file"><i id="upload_icon" class="bi bi-upload h4 ms-3" role="button"></i></a>
                     </div>
                 </div>
@@ -341,6 +260,27 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Time Selector for scheduler -->
+            <div id="time_select_box" class="p-3 border bg-light">
+                <div id="tooltip_arrow"></div>
+                <div class="row">
+                    <div class="col-auto">
+                        <label class="col-form-label">Every day at</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="time" id="schedule_time" class="form-control">
+                    </div>
+                    <div class="col-auto">
+                        <button id="set_time" class="btn btn-primary">Set</button>
+                    </div>
+                    <div class="col-auto" id="cancel_container" style="display: none;">
+                        <button id="cancel_time" class="btn btn-danger">Delete</button>
+                    </div>
+                </div>
+            </div>
+
+
 
 
             <div class="row mb-3">

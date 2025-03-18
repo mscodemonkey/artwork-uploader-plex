@@ -39,6 +39,8 @@ from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowN
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
 mode = "cli"
+scheduled_jobs = {}
+scheduled_jobs_by_file = {}
 
 # @ ---------------------- CORE FUNCTIONS ----------------------
 
@@ -537,6 +539,7 @@ def setup_web_sockets():
         global config
         instance = Instance(data.get("instance_id"), "web")
         config.load()
+        update_scheduled_jobs()
         notify_web(instance, "load_config", {"config": vars(config)} )
 
     @globals.web_socket.on("load_bulk_filelist")
@@ -590,19 +593,87 @@ def setup_web_sockets():
         except Exception as config_error:
             update_status(instance, str(config_error), color="danger")
 
-    @globals.web_socket.on("add_to_scheduler")
+    @globals.web_socket.on("delete_schedule")
+    def delete_task_from_scheduler(data):
+
+        if data.get("instance_id"):
+            instance = Instance(data.get("instance_id"),"web")
+            schedule_file = data.get("file")
+
+            if schedule_file:
+                try:
+                    job_id = scheduled_jobs_by_file[schedule_file]
+                except:
+                    job_id = None
+
+                if job_id:
+
+                    # Cancel the scheduled job and delete it from the job list
+                    schedule.cancel_job(scheduled_jobs[job_id])
+                    del scheduled_jobs[job_id]
+
+                    # Make sure it's also removed from the config file
+                    config.load()
+                    config.schedules = [each_schedule for each_schedule in config.schedules if each_schedule["file"] != schedule_file]
+                    config.save()
+
+                    # And update the front-end
+                    notify_web(instance, "delete_schedule", {"file": schedule_file, "job_reference": job_id, "deleted": True})
+                else:
+                    notify_web(instance,"delete_schedule", {"deleted": False, "job_id": job_id})
+
+
+    @globals.web_socket.on("add_schedule")
     def add_tasks_to_scheduler(data):
         try:
             # Schedule bulk import task
             if data.get("instance_id"):
                 instance = Instance(data.get("instance_id"),"web")
-                schedule.every().day.at(data.get("time")).do(lambda: task_three(instance))
+                schedule_file = data.get("file")
+                schedule_time = data.get("time")
 
-            # Start the scheduler in a background thread
+                # Make sure the schedule is saved as part of the config
+                config.load()
+                update_or_add_schedule(schedule_file, schedule_time)
+                config.save()
+
+                try:
+                    job = schedule.every().day.at(data.get("time")).do(lambda: add_file_to_schedule_thread(instance, schedule_file))
+
+                    # Create a unique job ID
+                    job_id = str(uuid.uuid4())
+
+                    # Store job reference
+                    scheduled_jobs[job_id] = job
+                    scheduled_jobs_by_file[schedule_file] = job_id
+
+                    notify_web(instance, "add_schedule", {"added": True, "file": schedule_file, "time": schedule_time, "jobReference": job_id})
+                except:
+                    raise
+            # Start the scheduler in a background thread if it's not already started
                 start_scheduler()
 
         except:
-            pass
+            if globals.debug:
+                raise
+            else:
+                pass
+
+
+
+    def update_or_add_schedule(file_name, new_time):
+        for eacH_schedule in config.schedules:
+            if eacH_schedule["file"] == file_name:
+                # Update existing schedule
+                eacH_schedule["time"] = new_time
+                return
+
+        # Add new schedule if not found
+        config.schedules.append({"file": file_name, "time": new_time})
+
+
+
+
 
     # Temporary storage for chunks
     upload_chunks = {}
@@ -748,9 +819,9 @@ def sort_key(item):
 
 
 
-def task_three(instance: Instance):
+def add_file_to_schedule_thread(instance: Instance, filename):
     if instance:
-        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, "bulk_test.txt",)).start()
+        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
 
 def process_bulk_file_on_schedule(instance, filename):
     global config
@@ -764,7 +835,7 @@ def process_bulk_file_on_schedule(instance, filename):
         bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
 
         if not os.path.exists(bulk_import_file):
-            update_log(instance, f"File does not exist: {bulk_import_file}")
+            update_log(instance, f"Scheduled file does not exist: {bulk_import_file}")
             return
 
         with open(bulk_import_file, "r", encoding="utf-8") as file:
@@ -795,6 +866,29 @@ def start_scheduler():
     else:
         debug_me("Scheduler is already running.")
 
+def setup_scheduler(instance: Instance):
+
+    if not scheduled_jobs:
+        for each_schedule in config.schedules:
+            schedule_file = each_schedule.get("file")
+            schedule_time = each_schedule.get("time")
+
+            job = schedule.every().day.at(schedule_time).do(lambda: add_file_to_schedule_thread(instance, schedule_file))
+
+            # Create a unique job ID
+            job_id = str(uuid.uuid4())
+
+            # Store job reference
+            scheduled_jobs[job_id] = job
+            scheduled_jobs_by_file[schedule_file] = job_id
+
+            each_schedule["jobReference"] = job_id
+
+        print(config.schedules)
+
+def update_scheduled_jobs():
+    for each_schedule in config.schedules:
+        each_schedule["jobReference"] = scheduled_jobs_by_file[each_schedule["file"]]
 
 # * Main Initialization ---
 if __name__ == "__main__":
@@ -802,7 +896,7 @@ if __name__ == "__main__":
     # Regex pattern for movie poster filenames
     FILENAME_PATTERN = re.compile(r'^(.*) \((\d{4})\)\.png$')
 
-    globals.debug = False
+    globals.debug = True
 
     # Create an instance object including a unique id and "cli" mode to pass around
     cli_instance = Instance(uuid.uuid4(),"cli")
@@ -839,6 +933,9 @@ if __name__ == "__main__":
 
     # Create a connector for Plex
     plex = PlexConnector(config.base_url, config.token)
+
+    # Setup scheduler
+    setup_scheduler(cli_instance)
 
     # Check for CLI arguments regardless of interactive_cli flag
     if cli_command:
@@ -906,3 +1003,4 @@ if __name__ == "__main__":
             web_app = Flask(__name__, template_folder="templates")
             globals.web_socket = SocketIO(web_app, cors_allowed_origins="*")
             setup_web_sockets()
+

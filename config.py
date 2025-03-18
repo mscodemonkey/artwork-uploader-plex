@@ -18,6 +18,8 @@ class Config:
         self.tpdb_filters = ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"]
         self.track_artwork_ids = True
         self.auto_manage_bulk_files = True
+        self.schedules = []
+
 
     def load(self):
         """ Load the configuration from the JSON file """
@@ -40,6 +42,7 @@ class Config:
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
+            self.schedules = config.get("schedules",[])
 
         except Exception as e:
             raise ConfigLoadError
@@ -54,7 +57,8 @@ class Config:
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"],
             "tpdb_filters":["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
             "tracK_artwork_ids": True,
-            "auto_manage_bulk_files": True
+            "auto_manage_bulk_files": True,
+            "schedules": []
         }
 
         # Create the config.json file if it doesn't exist
@@ -69,6 +73,9 @@ class Config:
     def save(self):
         """Save the configuration from the UI fields to the file and update the in-memory config."""
 
+        for schedule in self.schedules:
+            schedule.pop("jobReference", None)
+
         config_json = {
             "base_url": self.base_url,
             "token": self.token,
@@ -78,7 +85,8 @@ class Config:
             "tpdb_filters": self.tpdb_filters,
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,
-            "auto_manage_bulk_files": self.auto_manage_bulk_files
+            "auto_manage_bulk_files": self.auto_manage_bulk_files,
+            "schedules": self.schedules
         }
 
         try:
