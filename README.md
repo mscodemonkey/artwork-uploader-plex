@@ -31,7 +31,7 @@ Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you
 Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
 
 ## Coming soon
-- Scheduler, so that you can leave this running and update all your artwork every day.
+- Scheduler, so that you can leave this running and update all your artwork every day.  The first test version for the brave is available now on the bulk imports page, click on the clock to enable or disable per file.  It's in prep for when we have API access but works for scrapers at the moment and is limited to running once a day.
 - API integration with MediUX so we don't need to scrape any more
 
 ## Thanks
