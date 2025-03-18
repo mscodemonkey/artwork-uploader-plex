@@ -884,7 +884,9 @@ def setup_scheduler(instance: Instance):
 
             each_schedule["jobReference"] = job_id
 
-        print(config.schedules)
+        start_scheduler()
+
+        debug_me(config.schedules)
 
 def update_scheduled_jobs():
     for each_schedule in config.schedules:
@@ -896,7 +898,7 @@ if __name__ == "__main__":
     # Regex pattern for movie poster filenames
     FILENAME_PATTERN = re.compile(r'^(.*) \((\d{4})\)\.png$')
 
-    globals.debug = True
+    globals.debug = False
 
     # Create an instance object including a unique id and "cli" mode to pass around
     cli_instance = Instance(uuid.uuid4(),"cli")
