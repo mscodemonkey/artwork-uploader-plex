@@ -1,5 +1,4 @@
 from config import Config
-from media_metadata import parse_movie
 from options import Options
 from plex_uploader import PlexUploader
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound, \
@@ -116,6 +115,12 @@ class UploadProcessor:
 
         tv_show_items = self.plex.find_in_library("tv", artwork["title"], year )
 
+        # If no match is found, modify the title to replace dashes - this is useful for file uploads where colons have been replaced with dashes to comply with filesystem rules
+        if not tv_show_items:
+            # Replace the hyphen directly after a word with a colon (no space before it)
+            modified_title = re.sub(r'(\w)-', r'\1:', artwork["title"])
+            tv_show_items = self.plex.find_in_library("tv", modified_title, year)
+
         if tv_show_items:
             for tv_show in tv_show_items:
                 try:
@@ -169,6 +174,5 @@ class UploadProcessor:
             raise ShowNotFound(f"{artwork['title']} ({artwork['year']}) | Show not available on Plex")
 
         return result
-
 
 

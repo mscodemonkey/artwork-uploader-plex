@@ -5,9 +5,6 @@ from notifications import debug_me
 from options import Options
 from scraper_exceptions import ScraperException
 
-
-# Disclaimer : I don't have a clue how this scraper works
-
 class MediuxScraper:
 
     def __init__(self, url):
@@ -62,6 +59,8 @@ class MediuxScraper:
                     media_type = "Movie"
 
             for data in poster_data:
+                print(str(data["id"]))
+
                 if media_type == "Show":
 
                     episodes = data_dict["set"]["show"]["seasons"]
@@ -83,22 +82,30 @@ class MediuxScraper:
 
                         file_type = "title_card"
 
-                    elif data["fileType"] == "backdrop":
+                    elif data["fileType"] == "backdrop" and data["show_id_backdrop"] is not None:
+                        print ("Backdrop: "+ str(data["show_id_backdrop"]))
                         season = "Backdrop"
                         episode = None
                         file_type = "background"
 
-                    elif data["season_id"] is not None:
+                    elif data["fileType"] == "poster" and data["season_id"] is None:
+                        print ("Cover: " + str(data["show_id"]))
+                        season = "Cover"
+                        episode = None
+                        file_type = "show_cover"
+
+                    elif data["fileType"] == "poster" and data["season_id"] is not None:
+                        print("Season cover: " + str(data["season_id"]))
                         season_id = data["season_id"]["id"]
                         season_data = [episode for episode in episodes if episode["id"] == season_id][0]
                         episode = "Cover"
                         season = season_data["season_number"]
                         file_type = "season_cover"
 
-                    elif data["show_id"] is not None:
-                        season = "Cover"
-                        episode = None
-                        file_type = "show_cover"
+                    #elif data["show_id"] is not None:
+                    #    season = "Cover"
+                    #    episode = None
+                    #    file_type = "show_cover"
 
                 elif media_type == "Movie":
 
@@ -127,6 +134,8 @@ class MediuxScraper:
                     tv_artwork["source"] = "mediux"
                     tv_artwork["year"] = year
                     tv_artwork["id"] = image_stub
+
+                    print(tv_artwork)
                     self.tv_artwork.append(tv_artwork)
 
                 elif media_type == "Movie":
