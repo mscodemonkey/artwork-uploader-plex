@@ -1132,6 +1132,7 @@ function uploadFile(file) {
     const scheduleIcon = document.getElementById("schedule_icon");
     const setTimeBtn = document.getElementById("set_time");
     const cancelTimeBtn = document.getElementById("cancel_time");
+    const setContainer = document.getElementById("set_container");
     const cancelContainer = document.getElementById("cancel_container");
     const scheduleTimeInput = document.getElementById("schedule_time");
     const timeSelectBox = document.getElementById("time_select_box");
@@ -1216,15 +1217,19 @@ function uploadFile(file) {
         if (details && details['time']) {
             scheduleIcon.classList.remove("bi-clock");
             scheduleIcon.classList.add("bi-clock-fill"); // Change to filled icon
-            cancelContainer.style.display = "inline-block"; // Show cancel button
-            scheduleTimeInput.value = details['time']
-            scheduleIcon.classList.add("text-success")
+            setContainer.classList.remove("show"); // Hide set button
+            cancelContainer.classList.add("show"); // Show cancel button
+            scheduleTimeInput.value = details['time'];
+            scheduleTimeInput.readOnly = true;
+            scheduleIcon.classList.add("text-success");
         } else {
             scheduleIcon.classList.add("bi-clock");
             scheduleIcon.classList.remove("bi-clock-fill"); // Change to filled icon
-            scheduleIcon.classList.remove("text-success")
-            scheduleTimeInput.value = ""
-            cancelContainer.style.display = "none"; // Hide cancel button
+            scheduleIcon.classList.remove("text-success");
+            setContainer.classList.add("show"); // Show set button
+            cancelContainer.classList.remove("show"); // Hide cancel button
+            scheduleTimeInput.value = "";
+            scheduleTimeInput.readOnly = false;
         }
     }
 
