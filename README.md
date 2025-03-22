@@ -25,14 +25,20 @@ And there are other options such as per-URL filtering, fixing missing things tha
 Sometimes the year on Plex and the year at the artwork provider is different.  Use the --year <year> argument to set the Plex year, so the artwork matches.  Also available in the Web UI and bulk files.
 
 ### Clean up your bulk files
-Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you).  It's not really production ready yet but works just fine - but soon...
+Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you).  It's not really production ready yet but works just fine I think - do let me know!
 
 ### Web UI
 Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
 
+### Scheduler
+Basic scheduler, so that you can leave this running and update all your artwork every day. 
+
+The basic version is available now on the bulk imports page, click on the clock to enable or disable per file.  
+
+It's there for when we have API access (and works for scrapers in the meantime) but is limited to running once a day which should be fine.
+
 ## Coming soon
-- Scheduler, so that you can leave this running and update all your artwork every day.  The first test version for the brave is available now on the bulk imports page, click on the clock to enable or disable per file.  It's in prep for when we have API access but works for scrapers at the moment and is limited to running once a day.
-- API integration with MediUX so we don't need to scrape any more
+- API integration with MediUX so we don't need to scrape any more.  I've been in contact with them to get access to the API as soon as it's launched.
 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!  I really hope you don't mind me taking your work and running with it, please get in touch if you'd like to merge the two projects!
