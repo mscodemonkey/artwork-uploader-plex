@@ -3,25 +3,55 @@
 // App initialisation and startup
 // ==================================================
 
-let config = {};
-let statusTimeout; // Store timeout reference
-let schedules = [];
+let config = {};                // Current configuration
+let statusTimeout;              // Store timeout reference
+let schedules = [];             // Scheduled imports
+let currentBulkImport = '';     // Current bulk import file
+let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
+
 const socket = io();
 const instanceId = getInstanceId();
-const scrapeUrlInput = document.getElementById("scrape_url");
 const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
+const CHUNK_SIZE = 1024 * 64; // 64 KB per chunk for uploads
 
 
+// UI References
+const scrapeUrlInput = document.getElementById("scrape_url");
+const dropArea = document.getElementById("drop-area");
+const scheduleIcon = document.getElementById("schedule_icon");
+const setTimeBtn = document.getElementById("set_time");
+const cancelTimeBtn = document.getElementById("cancel_time");
+const setContainer = document.getElementById("set_container");
+const cancelContainer = document.getElementById("cancel_container");
+const scheduleTimeInput = document.getElementById("schedule_time");
+const timeSelectBox = document.getElementById("time_select_box");
+const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 
-
+// Event listeners
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("> New session started with ID: " + instanceId)
     loadConfig()
     toggleThePosterDBElements();
 });
 
+// Specific event listeners
+document.getElementById("switch_bulk_file").addEventListener("change", bulkFileSwitched);
+document.getElementById("bulk_import_text").addEventListener("input", updateBulkSaveButtonState);
+document.getElementById("scraper-filters-global").addEventListener("change", inheritGlobalFiltersForScraper);
+document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
 
-function generateUUID() {
+// ==================================================
+// General helper functions
+// ==================================================
+
+// Check incoming socket message is for this instance
+function validResponse(data, broadcast = false) {
+    return data.instance_id === instanceId || (broadcast && data.instance_id === "broadcast");
+}
+
+
+// Generate a UUID to create an instance ID in local storage
+function getInstanceId() {
     // Fallback for browsers that don't support crypto.randomUUID()
     const fallbackUUID = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         const r = (Math.random() * 16) | 0, v = c === 'x' ? r : (r & 0x3) | 0x8;
@@ -36,16 +66,13 @@ function generateUUID() {
     return uuid;
 }
 
-function getInstanceId() {
-    let instanceId = localStorage.getItem("instanceId");
-    if (!instanceId) {
-        instanceId = generateUUID();
-        localStorage.setItem("instanceId", instanceId);
-    }
-    return instanceId;
-}
+
 
 // ==================================================
+// UI-specific helper functions
+// ==================================================
+
+// Disable frontend elements from backend
 function element_disable(element_ids, mode = true) {
     if (!element_ids) return;  // Exit if no element_ids provided
 
@@ -63,21 +90,19 @@ function element_disable(element_ids, mode = true) {
     });
 }
 socket.on("element_disable", (data) => {
-    if (data.instance_id === instanceId) {
+    if (validResponse(data)) {
         element_disable(data.element, data.mode);
     }
 });
-// ==================================================
 
 
-// ==================================================
+// Update the status bar
 function updateStatus(message, color = "info", sticky = false, spinner = false, icon = false) {
 
     const statusEl = document.getElementById("status");
     const spinnerEl = document.getElementById("status_spinner"); // Get the spinner element
     const messageEl = document.getElementById("status_message");
     const iconEl = document.getElementById("status_icon");
-
 
     if (!statusEl) return;
 
@@ -142,14 +167,13 @@ function updateStatus(message, color = "info", sticky = false, spinner = false, 
 
 }
 socket.on("status_update", (data) => {
-    if (data.instance_id === "broadcast" || data.instance_id === instanceId) {
+    if (validResponse(data)) {
         updateStatus(data.message, data.color, data.sticky, data.spinner, data.icon);
     }
 });
-// ==================================================
 
 
-// ==================================================
+// Update the log page
 function updateLog(message, color = null, artwork_title = null) {
     let statusElement = document.getElementById("scraping_log");
 
@@ -160,62 +184,75 @@ function updateLog(message, color = null, artwork_title = null) {
     statusElement.innerHTML = '<div class="log_message">[' + timestamp +'] ' + message + '</div>' + statusElement.innerHTML;
 }
 socket.on("log_update", (data) => {
-    if (data.instance_id === "broadcast" || data.instance_id === instanceId) {
+    if (validResponse(data)) {
         updateLog(data.message, data.artwork_title);
     }
 });
-// ==================================================
 
 
-socket.on("progress_bar", (data) => {
+// Update the progress bar, showing and hiding as required
+function progress_bar(percent, message = "") {
 
     const bar_container = document.getElementById("progress_bar_container")
     const bar = document.getElementById("progress_bar")
-    if (data.percent <= 100) {
-        bar_container.classList.add("show")
-        bar.style.width = data.percent + "%"
-        bar_container.ariaValueNow = data.message
-        bar.innerHTML = data.message || ""
 
-        if (data.percent == 100) {
-            barTimer = setTimeout(() => {
-                bar_container.classList.remove('show'); // Fade out the progress bar after a second
-            }, 1000);
-        }
+    percent = percent > 100 ? 100 : percent;
+
+    if (percent <= 100) {
+        bar_container.classList.add("show")
+        bar.style.width = percent + "%"
+        bar_container.ariaValueNow = message
+        bar.innerHTML = message || ""
     }
+
+    if (percent == 100) {
+        barTimer = setTimeout(() => {
+            bar_container.classList.remove('show'); // Fade out the progress bar after a second
+        }, 1000);
+    }
+}
+socket.on("progress_bar", (data) => {
+    if (validResponse(data)) {
+        progress_bar(data.percent, data.message)
+        }
 })
 
 
+// Add scraped URL to the bulk list, label and sort it
 socket.on("add_to_bulk_list", (data) => {
 
-    let bulkText = document.getElementById("bulk_import_text").value;
-    let urlWithoutFlag = data.url.split(' ')[0]; // Extract base URL
+    if (validResponse(data)) {
 
-    // Remove the --add-to-bulk flag from the original data.url because we don't want that added to the bulk file!
-    let cleanedUrl = data.url.replace(/\s+--add-to-bulk\b/, "").trim();
+        let bulkText = document.getElementById("bulk_import_text").value;
+        let urlWithoutFlag = data.url.split(' ')[0]; // Extract base URL
 
-    // Escape special regex characters in URL for proper matching
-    let escapedUrl = urlWithoutFlag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Remove the --add-to-bulk flag from the original data.url because we don't want that added to the bulk file!
+        let cleanedUrl = data.url.replace(/\s+--add-to-bulk\b/, "").trim();
 
-    // Regex to match the URL as a standalone line with optional extra arguments
-    let regex = new RegExp(`^${escapedUrl}(\\s+--\\S+(\\s+\\S+)*)?$`, "m")
+        // Escape special regex characters in URL for proper matching
+        let escapedUrl = urlWithoutFlag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    if (!regex.test(bulkText)) {
-        if (config.auto_manage_bulk_files) {
-            document.getElementById("bulk_import_text").value = processAndSortUrls(bulkText, data.title, cleanedUrl);
-        } else {
-            document.getElementById("bulk_import_text").value += `\n// ${data.title}\n${cleanedUrl}\n`;
+        // Regex to match the URL as a standalone line with optional extra arguments
+        let regex = new RegExp(`^${escapedUrl}(\\s+--\\S+(\\s+\\S+)*)?$`, "m")
+
+        if (!regex.test(bulkText)) {
+            if (config.auto_manage_bulk_files) {
+                document.getElementById("bulk_import_text").value = processAndSortUrls(bulkText, data.title, cleanedUrl);
+            } else {
+                document.getElementById("bulk_import_text").value += `\n// ${data.title}\n${cleanedUrl}\n`;
+            }
+
         }
 
+        updateBulkSaveButtonState();
     }
-
-
-    checkBulkTextChanged();
 
 });
 
 
+// Sort the bulk list into order by media title
 function processAndSortUrls(inputText, newTitle, newUrl) {
+
   // Initialize data structures
   const titleMap = {};
   const mediUXUrls = [];
@@ -309,14 +346,11 @@ function processAndSortUrls(inputText, newTitle, newUrl) {
 }
 
 
-
-
-
 // ==================================================
-// Save configuration
+// Configuration - load and save
 // ==================================================
 
-// Button handler
+// Button handler for save configuration
 document.getElementById("save_config_button").addEventListener("click", function(event) {
     event.preventDefault(); // Prevent actual form submission
     saveConfig();
@@ -324,61 +358,101 @@ document.getElementById("save_config_button").addEventListener("click", function
 
 // Save configuration
 function saveConfig() {
-
     const form = document.getElementById("config_form");
 
-    if (form.checkValidity()) {
-        // Form is valid, proceed with saving config
-        const save_config = {};
+    if (!form.checkValidity()) {
+        form.classList.add("was-validated");
+        return; // Prevent further execution if form is invalid
+    }
 
-        save_config.base_url = document.getElementById("plex_base_url").value.trim();
-        save_config.token = document.getElementById("plex_token").value.trim();
-        save_config.bulk_txt = document.getElementById("bulk_import_file").value;
+    // Form is valid, proceed with saving config
+    const save_config = {};
 
-        // Convert comma-separated library inputs to arrays
-        save_config.tv_library = document.getElementById("tv_library").value
-            .split(",")
-            .map(item => item.trim())
-            .filter(item => item !== ""); // Remove empty values
+    save_config.base_url = document.getElementById("plex_base_url").value.trim();
+    save_config.token = document.getElementById("plex_token").value.trim();
+    save_config.bulk_txt = document.getElementById("bulk_import_file").value;
 
-        save_config.movie_library = document.getElementById("movie_library").value
-            .split(",")
-            .map(item => item.trim())
-            .filter(item => item !== ""); // Remove empty values
+    // Convert comma-separated library inputs to arrays
+    save_config.tv_library = document.getElementById("tv_library").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values
 
-        // Checkbox for tracking artwork IDs
-        save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
+    save_config.movie_library = document.getElementById("movie_library").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values
 
-        // Checkbox for managing bulk files
-        save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
+    // Checkbox for tracking artwork IDs
+    save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
 
-        // Get selected mediux filters
-        save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
-            .map(checkbox => checkbox.value);
+    // Checkbox for managing bulk files
+    save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
 
-        // Get selected tpdb filters
-        save_config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
-            .map(checkbox => checkbox.value);
+    // Get selected mediux filters
+    save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
+        .map(checkbox => checkbox.value);
 
-        // Save schedules
-        save_config.schedules = schedules;
+    // Get selected tpdb filters
+    save_config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
+        .map(checkbox => checkbox.value);
 
-        socket.emit("save_config", { instance_id: instanceId, config: save_config });
+    // Save schedules (Ensure it’s an array)
+    save_config.schedules = Array.isArray(schedules) ? schedules : [];
 
-        socket.on("save_config", (data) => {
+    socket.emit("save_config", { instance_id: instanceId, config: save_config });
+
+    // Prevent duplicate event listeners
+    socket.once("save_config", (data) => {
+        if (validResponse(data)) {
             if (data.saved) {
                 config = data.config;
-                updateStatus("Configuration saved","success", false, false, "check-circle")
+                updateStatus("Configuration saved", "success", false, false, "check-circle");
                 configureTabs(true);
             } else {
-                updateStatus("Configuration could not be saved","danger", false, false, "cross-circle")
+                updateStatus("Configuration could not be saved", "danger", false, false, "cross-circle");
                 configureTabs(true);
             }
-        });
+        }
+    });
+}
 
-    } else {
-        form.classList.add("was-validated");
-    }
+
+// Load configuration
+function loadConfig() {
+    socket.emit("load_config", { instance_id: instanceId });
+
+    socket.once("load_config", (data) => { // Use 'once' to prevent duplicate listeners
+        if (validResponse(data) && data.config) {
+            config = data.config;
+            document.getElementById("plex_base_url").value = data.config.base_url;
+            document.getElementById("plex_token").value = data.config.token;
+            document.getElementById("bulk_import_file").value = data.config.bulk_txt;
+            document.getElementById("tv_library").value = data.config.tv_library.join(", ");
+            document.getElementById("movie_library").value = data.config.movie_library.join(", ");
+            document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids;
+            document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
+            document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
+
+            if (Array.isArray(data.config.mediux_filters)) {
+                document.querySelectorAll('[id^="m_filter-"]').forEach(checkbox => {
+                    checkbox.checked = data.config.mediux_filters.includes(checkbox.value);
+                });
+            }
+
+            if (Array.isArray(data.config.tpdb_filters)) {
+                document.querySelectorAll('[id^="p_filter-"]').forEach(checkbox => {
+                    checkbox.checked = data.config.tpdb_filters.includes(checkbox.value);
+                });
+            }
+
+            schedules = data.config.schedules;
+            console.log(schedules);
+
+            loadBulkFileList(); // For the switcher
+            configureTabs();
+        }
+    });
 }
 
 
@@ -441,9 +515,11 @@ function startScrape() {
 
         // Collect checked checkboxes with ids starting with "filter-"
         let filters = [];
-        document.querySelectorAll('[id^="filter-"]:checked').forEach(checkbox => {
-            filters.push(checkbox.value);
-        });
+        if(!document.getElementById("scraper-filters-global").checked) {
+            document.querySelectorAll('[id^="filter-"]:checked').forEach(checkbox => {
+                filters.push(checkbox.value);
+            });
+        }
 
         const year = document.getElementById("year").value;
         const url = document.getElementById("scrape_url").value;
@@ -454,10 +530,10 @@ function startScrape() {
     }
 }
 
-/* Check whether bulk import has been edited and enable the button if it has */
 
 // Function to check for changes and enable/disable the save button
-function checkBulkTextChanged() {
+function updateBulkSaveButtonState() {
+
     const bulkTextArea = document.getElementById("bulk_import_text");
     const saveButton = document.getElementById("save_bulk_button");
 
@@ -469,7 +545,6 @@ function checkBulkTextChanged() {
 }
 
 // Attach event listener to track changes
-document.getElementById("bulk_import_text").addEventListener("input", checkBulkTextChanged);
 
 
 
@@ -508,35 +583,8 @@ if (scrapeUrlInput) {
 }
 
 
-function loadConfig() {
-    socket.emit("load_config", { instance_id: instanceId });
-}
 
-socket.on("load_config", (data) => {
-    if (data.instance_id === instanceId && data.config) {
-        config = data.config;
-        document.getElementById("plex_base_url").value = data.config.base_url
-        document.getElementById("plex_token").value = data.config.token
-        document.getElementById("bulk_import_file").value = data.config.bulk_txt
-        document.getElementById("tv_library").value = data.config.tv_library.join(", ")
-        document.getElementById("movie_library").value = data.config.movie_library.join(", ")
-        document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids
-        document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files
-        document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files
-        document.querySelectorAll('[id^="m_filter-"]').forEach(checkbox => {
-            checkbox.checked = data.config.mediux_filters.includes(checkbox.value);
-        });
-        document.querySelectorAll('[id^="p_filter-"]').forEach(checkbox => {
-            checkbox.checked = data.config.tpdb_filters.includes(checkbox.value);
-        });
-        schedules = data.config.schedules;
 
-        console.log(schedules);
-
-        loadBulkFileList(); // For the switcher
-        configureTabs();
-    }
-});
 
 function configureTabs(afterSave = false) {
         if (config.base_url && config.token) {
@@ -555,40 +603,46 @@ function configureTabs(afterSave = false) {
 
 /* Loading the bulk import file */
 
-function loadBulkImport(bulkImport = null) {
+function loadBulkFile(bulkImport = null) {
+
     if (!bulkImport) {bulkImport = config.bulk_txt;}
-    // console.log("Loading bulk file - " + bulkImport)
+
     socket.emit("load_bulk_import", { instance_id: instanceId, filename: bulkImport });
+
+    socket.once("load_bulk_import", (data) => {
+
+        const textArea = document.getElementById("bulk_import_text");
+
+        if(validResponse(data)) {
+
+                if (data.loaded) {
+                    textArea.value = data.bulk_import_text;
+                    currentBulkImport = data.filename;
+                    bulkTextAsLoaded = data.bulk_import_text;
+
+                    // Select the correct option in the dropdown
+                    const selectElement = document.getElementById("switch_bulk_file");
+                    for (const option of selectElement.options) {
+                        if (option.value === data.filename) {
+                            option.selected = true;
+                            break;
+                        }
+                    }
+
+                    updateBulkSaveButtonState();
+                    handleDefaultCheckbox();
+                    updateSchedulerIcon();
+                    //                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
+                } else {
+                    updateStatus("Bulk import file could not be loaded","danger", false, false, "cross-circle")
+                }
+
+
+        }
+    });
+
 }
 
-socket.on("load_bulk_import", (data) => {
-
-    const textArea = document.getElementById("bulk_import_text");
-    // console.log("Loader complete, returned " + data.loaded + " / " + data.filename + " / " + data.bulk_import_text)
-    if (data.instance_id === instanceId) {
-        if (data.loaded) {
-            textArea.value = data.bulk_import_text;
-            currentBulkImport = data.filename;
-            bulkTextAsLoaded = data.bulk_import_text;
-
-            // Select the correct option in the dropdown
-            const selectElement = document.getElementById("switch_bulk_file");
-            for (const option of selectElement.options) {
-                if (option.value === data.filename) {
-                    option.selected = true;
-                    break;
-                }
-            }
-
-            checkBulkTextChanged();
-            handleDefaultCheckbox();
-            setupSchedulerIcon();
-            //                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
-        } else {
-            updateStatus("Bulk import file could not be loaded","danger", false, false, "cross-circle")
-        }
-    }
-});
 
 function checkBulkImportFileToSave() {
 
@@ -604,8 +658,8 @@ function loadBulkFileList() {
 
     socket.emit("load_bulk_filelist", { instance_id: instanceId });
 
-    socket.on("load_bulk_filelist", (data) => {
-        if (data.instance_id === instanceId) {
+    socket.once("load_bulk_filelist", (data) => {
+        if (validResponse(data)) {
             const selectElement = document.getElementById("switch_bulk_file");
 
             let selectedFile = currentBulkImport || config.bulk_txt; // Get the selected file from config
@@ -624,7 +678,7 @@ function loadBulkFileList() {
                     if (filename === selectedFile) {
                         option.selected = true;
                         if (!document.getElementById("bulk_import_text").value) {
-                            loadBulkImport(filename);
+                            loadBulkFile(filename);
                         }
                     }
                     selectElement.appendChild(option);
@@ -673,15 +727,15 @@ function saveBulkImport(filename, nowLoad = null) {
     socket.emit("save_bulk_import", fileData);
 
     // And wait for a response
-    socket.on("save_bulk_import", data => {
-        if (data.instance_id === instanceId) {
+    socket.once("save_bulk_import", data => {
+        if (validResponse(data)) {
             if (data.saved == true) {
                 loadBulkFileList();
                 bulkTextAsLoaded = textArea.value
-                checkBulkTextChanged()
+                updateBulkSaveButtonState()
                 if (data.now_load) {
                     //console.log("Saved, now loading " + data.now_load)
-                    loadBulkImport(data.now_load);
+                    loadBulkFile(data.now_load);
                 }
             }
         }
@@ -723,12 +777,11 @@ function runBulkImport() {
    ============================================*/
 
 // Set up variables
-let currentBulkImport = '';
-let bulkTextAsLoaded = '';
 
-document.getElementById("switch_bulk_file").addEventListener("change", function () {
 
-    const selectedFile = this.value;
+function bulkFileSwitched() {
+
+    const selectedFile = bulkFileSwitcher.value;
     if (!selectedFile) return; // Do nothing if no file is selected
 
     const bulkTextArea = document.getElementById("bulk_import_text");
@@ -739,7 +792,7 @@ document.getElementById("switch_bulk_file").addEventListener("change", function 
             if (confirmed === "yes") {
                 saveBulkImport(currentBulkImport, selectedFile);
             } else if (confirmed === "no") {
-                loadBulkImport(selectedFile);
+                loadBulkFile(selectedFile);
             } else if (confirmed === "cancel") {
                 // User canceled, revert to previous selection
                 this.value = currentBulkImport;
@@ -748,13 +801,26 @@ document.getElementById("switch_bulk_file").addEventListener("change", function 
         });
     } else {
         // If no changes, just load the new file
-        loadBulkImport(selectedFile);
+        loadBulkFile(selectedFile);
     }
 
+}
 
+function inheritGlobalFiltersForScraper() {
+    if (document.getElementById("scraper-filters-global").checked) {
+        document.getElementById("scraper-filters").classList.remove("show");
+    } else {
+        document.getElementById("scraper-filters").classList.add("show");
+    }
+}
 
-});
-
+function inheritGlobalFiltersForUploads() {
+    if (document.getElementById("upload-filters-global").checked) {
+        document.getElementById("upload-filters").classList.remove("show");
+    } else {
+        document.getElementById("upload-filters").classList.add("show");
+    }
+}
 
 function handleDefaultCheckbox() {
     // Handle default checkbox when the file is selected
@@ -848,8 +914,8 @@ document.getElementById("rename_icon").addEventListener("click", function () {
                 });
 
                 // Wait for response
-                socket.on("rename_bulk_file", (data) => {
-                    if (instanceId == data.instance_id) {
+                socket.once("rename_bulk_file", (data) => {
+                    if (validResponse(data)) {
                         if (data.renamed) {
 
                             // Set the currently loaded file
@@ -908,23 +974,22 @@ document.getElementById("delete_icon").addEventListener("click", function () {
             });
 
             // Wait for response
-            socket.on("delete_bulk_file", (data) => {
-                if (instanceId == data.instance_id) {
+            socket.once("delete_bulk_file", (data) => {
+                if (validResponse(data)) {
                     if (data.deleted) {
                         // Get the value of the default bulk file from the hidden field
                         const defaultBulkFile = document.getElementById("bulk_import_file").value;
                         currentBulkImport = null
                         bulkTextAsLoaded = null
                         loadBulkFileList(); // Reload the file list if deleted
-                        loadBulkImport(defaultBulkFile);
-                        checkBulkTextChanged()
+                        loadBulkFile(defaultBulkFile);
+                        updateBulkSaveButtonState()
                     }
                 }
             });
         }
     }
 });
-
 
 // Function to handle uploading a bulk file
 document.getElementById("upload_icon").addEventListener("click", function () {
@@ -1025,84 +1090,103 @@ document.getElementById("default_bulk_file_icon").addEventListener("click", func
     }
 });
 
-// Drag and drop
 
-        const dropArea = document.getElementById("drop-area");
-        const progressContainer = document.getElementById("progress-container");
-        const progressBar = document.getElementById("progress-bar");
-        const progressText = document.getElementById("progress-text");
+// Drag and drop functionality
 
+dropArea.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropArea.classList.add("highlight");
+});
 
-        dropArea.addEventListener("dragover", (e) => {
-            e.preventDefault();
-            dropArea.classList.add("highlight");
-        });
+dropArea.addEventListener("dragleave", () => {
+    dropArea.classList.remove("highlight");
+});
 
-        dropArea.addEventListener("dragleave", () => {
-            dropArea.classList.remove("highlight");
-        });
+dropArea.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropArea.classList.remove("highlight");
 
-        dropArea.addEventListener("drop", (e) => {
-            e.preventDefault();
-            dropArea.classList.remove("highlight");
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.endsWith(".zip")) {
+        uploadFile(file);
+    } else {
+        alert("Please drop a valid ZIP file.");
+    }
+});
 
-            const file = e.dataTransfer.files[0];
-            if (file && file.name.endsWith(".zip")) {
-                uploadFile(file);
-            } else {
-                alert("Please drop a valid ZIP file.");
-            }
-        });
+dropArea.addEventListener("click", () => {
+    let input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip";
+    input.onchange = (e) => {
+        let file = e.target.files[0];
+        if (file) uploadFile(file);
+    };
+    input.click();
+});
 
-        dropArea.addEventListener("click", () => {
-            let input = document.createElement("input");
-            input.type = "file";
-            input.accept = ".zip";
-            input.onchange = (e) => {
-                let file = e.target.files[0];
-                if (file) uploadFile(file);
-            };
-            input.click();
-        });
-
-
-const CHUNK_SIZE = 1024 * 64; // 64 KB per chunk
 
 function uploadFile(file) {
     const reader = new FileReader();
-    let offset = 0; // Track progress
+    let offset = 0;
 
     reader.onload = function (event) {
         const arrayBuffer = event.target.result;
         const totalChunks = Math.ceil(arrayBuffer.byteLength / CHUNK_SIZE);
 
+        function arrayBufferToBase64(buffer) {
+            return new Promise((resolve) => {
+                const blob = new Blob([buffer]);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    let base64Data = reader.result.split(",")[1]; // Extract only the Base64 part
+                    resolve(base64Data);
+                };
+                reader.readAsDataURL(blob);
+            });
+        }
+
+
         function sendChunk() {
-            progressContainer.style.display = "block"
             if (offset >= arrayBuffer.byteLength) {
-                socket.emit("upload_complete", { fileName: file.name });
-                return;
+                console.log("All chunks sent, emitting upload_complete event.");
+
+                let filters = [];
+                if (!document.getElementById("upload-filters-global").checked) {
+                    document.querySelectorAll('[id^=upload]').forEach(checkbox => {
+                        if (checkbox.checked) {
+                            filters.push(checkbox.value);
+                        }
+                    });
+                }
+
+                socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, filters: filters });
+
+                return; // Ensure no further execution in this function
             }
 
-
             const chunk = arrayBuffer.slice(offset, offset + CHUNK_SIZE);
-            const base64Chunk = btoa(String.fromCharCode(...new Uint8Array(chunk)));
 
-         //   socket.emit("upload_artwork_chunk", {message:"Working"})
+            arrayBufferToBase64(chunk).then(base64Chunk => {
+                socket.emit("upload_artwork_chunk", {
+                    instance_id: instanceId,
+                    fileName: file.name,
+                    chunkData: base64Chunk,
+                    chunkIndex: offset / CHUNK_SIZE,
+                    totalChunks: totalChunks
+                });
 
-            socket.emit("upload_artwork_chunk", {
-                instance_id: instanceId,
-                fileName: file.name,
-                chunkData: base64Chunk,
-                chunkIndex: offset / CHUNK_SIZE,
-                totalChunks: totalChunks
+                offset += CHUNK_SIZE;
+                let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
+                progress_bar(progress);
+
+                if (offset < arrayBuffer.byteLength) {
+                    setTimeout(sendChunk, 10);
+                } else {
+                    console.log("Final chunk sent, triggering upload_complete...");
+                    sendChunk(); // This ensures the final event fires
+                }
             });
-
-            offset += CHUNK_SIZE;
-            let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
-
-            progressBar.style.width = progress + "%";
-            progressText.textContent = progress + "%";
-            setTimeout(sendChunk, 10); // Avoid blocking the event loop
         }
 
         sendChunk();
@@ -1111,17 +1195,23 @@ function uploadFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-        socket.on("upload_progress", function (data) {
-            let percent = data.progress;
-            progressBar.style.width = percent + "%";
-            progressText.textContent = percent + "%";
-        });
 
-        socket.on("upload_complete", function (data) {
-            progressBar.style.width = "100%";
-            progressText.textContent = "Upload complete!";
-            setTimeout(() => progressContainer.style.display = "none", 2000);
-        });
+
+socket.on("upload_progress", function (data) {
+    if(validResponse(data)) {
+        progress_bar(data.progress);
+    }
+});
+
+socket.on("upload_complete", function (data) {
+    if(validResponse(data)) {
+        progress_bar(100,"Upload complete!");
+    }
+});
+
+
+
+
 
 
 // =====================
@@ -1129,13 +1219,7 @@ function uploadFile(file) {
 // =====================
 
 
-    const scheduleIcon = document.getElementById("schedule_icon");
-    const setTimeBtn = document.getElementById("set_time");
-    const cancelTimeBtn = document.getElementById("cancel_time");
-    const setContainer = document.getElementById("set_container");
-    const cancelContainer = document.getElementById("cancel_container");
-    const scheduleTimeInput = document.getElementById("schedule_time");
-    const timeSelectBox = document.getElementById("time_select_box");
+
 
     function updateOrAddSchedule(fileName, newTime, jobReference = null) {
         const schedule = schedules.find(s => s.file === fileName);
@@ -1173,45 +1257,49 @@ function uploadFile(file) {
         const selectedTime = scheduleTimeInput.value;
         if (selectedTime) {
             socket.emit("add_schedule",{instance_id:instanceId, file: currentBulkImport, time: selectedTime})
+
+            // Wait for response on add schedule
+            socket.once("add_schedule", (data) => {
+                if (validResponse(data)) {
+                    if (data.added) {
+                        updateOrAddSchedule(data.file, data.time, data.jobReference);
+                        updateSchedulerIcon();
+                        timeSelectBox.classList.remove("show-tooltip");
+                    }
+                }
+            });
+
         }
     });
 
     // Handle cancelling the schedule
     cancelTimeBtn.addEventListener("click", function () {
         socket.emit("delete_schedule",{instance_id:instanceId, file: currentBulkImport})
-    });
 
+        // Wait for response
+        socket.once("delete_schedule", (data) => {
+            if (validResponse(data)) {
+                if (data.deleted) {
+                    // Get the value of the default bulk file from the hidden field
+                    console.log(schedules)
+                    updateOrAddSchedule(data.file, null, null)
+                    console.log(schedules)
+                    updateSchedulerIcon();
+                } else {
 
-
-    // Wait for response on add schedule
-    socket.on("add_schedule", (data) => {
-        if (instanceId == data.instance_id) {
-            if (data.added) {
-                updateOrAddSchedule(data.file, data.time, data.jobReference);
-                setupSchedulerIcon();
-                timeSelectBox.classList.remove("show-tooltip");
+                }
+            timeSelectBox.classList.remove("show-tooltip");
             }
-        }
-    });
+        });
 
-    // Wait for response
-    socket.on("delete_schedule", (data) => {
-        if (instanceId == data.instance_id) {
-            if (data.deleted) {
-                // Get the value of the default bulk file from the hidden field
-                console.log(schedules)
-                updateOrAddSchedule(data.file, null, null)
-                console.log(schedules)
-                setupSchedulerIcon();
-            } else {
-
-            }
-        timeSelectBox.classList.remove("show-tooltip");
-        }
     });
 
 
-    function setupSchedulerIcon(){
+
+
+
+
+    function updateSchedulerIcon(){
         let details = getScheduleDetails(currentBulkImport);
         // console.log(schedules)
         if (details && details['time']) {

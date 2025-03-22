@@ -215,7 +215,7 @@
                         </div>
                     </div>
                 </div>
-                <button class="btn btn-primary" id="save_config_button">Save Config</button>
+                <button class="btn btn-primary mt-3" id="save_config_button">Save Config</button>
             </form>
         </div>
 
@@ -292,7 +292,7 @@
             </div>
             <div class="row mb-3">
                 <div class="col">
-                    <button class="btn btn-secondary" id="save_bulk_button" onclick="checkBulkImportFileToSave()">Save Bulk File</button>
+                    <button class="btn btn-secondary me-3" id="save_bulk_button" onclick="checkBulkImportFileToSave()">Save Bulk File</button>
                     <button class="btn btn-primary" id="bulk_button" onclick="runBulkImport()">Run Bulk Import</button>
                 </div>
             </div>
@@ -366,48 +366,58 @@
                     <div class="col">
                         <div class="p-3 border bg-light">
                             <h5 class="mb-3">Artwork to include</h5>
-                            <div class="row mb-1">
-                                <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                            <div id="scraper-filters-inherit" class="collapse show row mb-1">
                                 <div class="col-6 col-md-4 col-lg-3">
                                     <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="filter-show_cover"/>
-                                        <label for="filter-show_cover" class="form-check-label">Show cover</label>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-3">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="filter-season_cover"/>
-                                        <label for="filter-season_cover" class="form-check-label">Season covers</label>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-3">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="filter-background"/>
-                                        <label for="filter-background" class="form-check-label">Background</label>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-3">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="filter-title_card"/>
-                                        <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                        <input class="form-check-input" type="checkbox" checked value="inherit" name="filter" id="scraper-filters-global"/>
+                                        <label for="scraper-filters-global" class="form-check-label">As set by global filters</label>
                                     </div>
                                 </div>
                             </div>
-                            <div class="row">
-                                <div class="col-12 mb-2"><strong>Movies</strong></div>
-                                <div class="col-6 col-md-4 col-lg-3">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked value="movie_poster"
-                                               id="filter-movie_poster"/>
-                                        <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
+                            <div id="scraper-filters" class="collapse">
+                                <div class="row mb-1">
+                                    <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="filter-show_cover"/>
+                                            <label for="filter-show_cover" class="form-check-label">Show cover</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="filter-season_cover"/>
+                                            <label for="filter-season_cover" class="form-check-label">Season covers</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="filter-background"/>
+                                            <label for="filter-background" class="form-check-label">Background</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="filter-title_card"/>
+                                            <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-6 col-md-8 col-lg-3">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" checked
-                                               value="collection_poster" id="filter-collection_poster"/>
-                                        <label for="filter-collection_poster" class="form-check-label">Collection
-                                            poster</label>
+                                <div class="row">
+                                    <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="movie_poster"
+                                                   id="filter-movie_poster"/>
+                                            <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-8 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked
+                                                   value="collection_poster" id="filter-collection_poster"/>
+                                            <label for="filter-collection_poster" class="form-check-label">Collection
+                                                poster</label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -444,45 +454,55 @@
                 <div class="col">
                     <div class="p-3 border bg-light">
                         <h5 class="mb-3">Artwork to include</h5>
-                        <div class="row mb-1">
-                            <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                        <div id="upload-filters-inherit" class="collapse show row mb-1">
                             <div class="col-6 col-md-4 col-lg-3">
                                 <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="upload-show_cover"/>
-                                    <label for="filter-show_cover" class="form-check-label">Show cover</label>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-4 col-lg-3">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="upload-season_cover"/>
-                                    <label for="filter-season_cover" class="form-check-label">Season covers</label>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-4 col-lg-3">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-background"/>
-                                    <label for="filter-background" class="form-check-label">Background</label>
-                                </div>
-                            </div>
-                            <div class="col-6 col-md-4 col-lg-3">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="upload-title_card"/>
-                                    <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                    <input class="form-check-input" type="checkbox" checked value="inherit" name="filter" id="upload-filters-global"/>
+                                    <label for="upload-filters-global" class="form-check-label">As set by global filters</label>
                                 </div>
                             </div>
                         </div>
-                        <div class="row">
-                            <div class="col-12 mb-2"><strong>Movies</strong></div>
-                            <div class="col-6 col-md-4 col-lg-3">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked value="movie_poster" id="upload-movie_poster"/>
-                                    <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
+                        <div id="upload-filters" class="collapse">
+                            <div class="row mb-1">
+                                <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="upload-show_cover"/>
+                                        <label for="filter-show_cover" class="form-check-label">Show cover</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="upload-season_cover"/>
+                                        <label for="filter-season_cover" class="form-check-label">Season covers</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-background"/>
+                                        <label for="filter-background" class="form-check-label">Background</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="upload-title_card"/>
+                                        <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-6 col-md-8 col-lg-3">
-                                <div class="form-check mb-2">
-                                    <input class="form-check-input" type="checkbox" checked value="collection_poster" id="upload-collection_poster"/>
-                                    <label for="filter-collection_poster" class="form-check-label">Collection poster</label>
+                            <div class="row">
+                                <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="movie_poster" id="upload-movie_poster"/>
+                                        <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-8 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="collection_poster" id="upload-collection_poster"/>
+                                        <label for="filter-collection_poster" class="form-check-label">Collection poster</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>

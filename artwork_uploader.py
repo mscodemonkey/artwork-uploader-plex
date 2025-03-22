@@ -319,8 +319,6 @@ def scrape_and_upload(instance: Instance, url, options):
                 update_log(instance, f"x {str(error_unexpected)}")
                 update_status(instance, f"Error: {str(error_unexpected)}", "danger")
 
-
-
     if scraper.tv_artwork:
         for artwork in scraper.tv_artwork:
             try:
@@ -339,19 +337,23 @@ def scrape_and_upload(instance: Instance, url, options):
 
     return title
 
-def process_uploaded_artwork(instance: Instance, file_list):
+
+def process_uploaded_artwork(instance: Instance, file_list, filters):
 
     global plex
 
     # Upload the artwork to Plex
     processor = UploadProcessor(plex)
+    processor.set_options(Options(filters = filters))
+
     debug_me("Processing uploaded file and uploading to Plex...")
+
     for artwork in file_list:
         try:
             result = None
             line_status = f'Processing artwork for {artwork["media"].lower()} "{artwork["title"]}"{" - Season " + str(artwork["season"]) if artwork["season"] else ""}{", Episode " + str(artwork["episode"]) if artwork["episode"] else ""}'
-            debug_me(line_status)
             update_status(instance, line_status, spinner=True, sticky=True)
+            debug_me(line_status)
             if artwork['media'] == "Collection":
                 result = processor.process_collection_artwork(artwork)
             elif artwork['media'] == "Movie":
@@ -366,7 +368,7 @@ def process_uploaded_artwork(instance: Instance, file_list):
         except NotProcessedByFilter as not_processed:
             update_log(instance, f"- {str(not_processed)}")
         except Exception as error_unexpected:
-            update_log(instance, f"x {str(error_unexpected)}")
+            update_log(instance, f"x Unexpected during process_uploaded_artwork:  {str(error_unexpected)}")
             update_status(instance, f"Error: {str(error_unexpected)}", "danger")
 
 
@@ -672,9 +674,6 @@ def setup_web_sockets():
         config.schedules.append({"file": file_name, "time": new_time})
 
 
-
-
-
     # Temporary storage for chunks
     upload_chunks = {}
 
@@ -688,22 +687,66 @@ def setup_web_sockets():
         total_chunks = data["totalChunks"]
 
         if file_name not in upload_chunks:
-            upload_chunks[file_name] = []
+            upload_chunks[file_name] = {
+                "chunks": [],
+                "total_chunks": total_chunks,
+                "instance": instance
+            }
 
-        upload_chunks[file_name].append(base64.b64decode(chunk_data))
+        # Ensure decoding to bytes
+        try:
+            decoded_chunk = base64.b64decode(chunk_data)
+            upload_chunks[file_name]["chunks"].append(decoded_chunk)
+        except Exception as e:
+            print(f"Error decoding chunk {chunk_index}: {e}")
 
         debug_me(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}")
 
-        if len(upload_chunks[file_name]) == total_chunks:
-            save_uploaded_file(instance, file_name)
+    @globals.web_socket.on("upload_complete")
+    def handle_upload_complete(data):
 
-    def save_uploaded_file(instance: Instance, file_name):
+        """
+        Finalises the upload once all chunks are received
+        """
+
+        file_name = data.get("fileName")
+        filters = data.get("filters")
+
+        debug_me(f"Upload complete for {file_name}, processing...")
+
+        instance = Instance(data.get("instance_id"), "web")
+
+        if file_name in upload_chunks and len(upload_chunks[file_name]["chunks"]) == int(upload_chunks[file_name]["total_chunks"]):
+
+            debug_me(f"Upload complete for {file_name}, saving file...")
+            save_uploaded_file(instance, file_name, filters)
+
+            # Cleanup after saving the file
+            try:
+                del upload_chunks[file_name]
+            except:
+                pass
+        else:
+            debug_me(f'Upload complete event received for {file_name}, but with {len(upload_chunks[file_name]["chunks"])} of {int(upload_chunks[file_name]["total_chunks"])}, some chunks are missing.')
+            try:
+                del upload_chunks[file_name]
+            except:
+                pass
+
+    def save_uploaded_file(instance: Instance, file_name, filters):
         """Assembles chunks and saves the file"""
+
+        print(file_name, filters, type(upload_chunks[file_name]["chunks"][0]))  # Debugging
+
         temp_zip_path = tempfile.mktemp(suffix=".zip")
 
         with open(temp_zip_path, "wb") as f:
-            for chunk in upload_chunks[file_name]:
+            for chunk in upload_chunks[file_name]["chunks"]:
+                if isinstance(chunk, str):  # Convert strings to bytes if needed
+                    chunk = chunk.encode('utf-8')
                 f.write(chunk)
+
+        debug_me(f"File saved successfully: {temp_zip_path}")
 
         del upload_chunks[file_name]  # Free memory
         debug_me(f"Saved ZIP file: {temp_zip_path}")
@@ -712,7 +755,7 @@ def setup_web_sockets():
 
         debug_me(str(extracted_files))
 
-        process_uploaded_artwork(instance, extracted_files)
+        process_uploaded_artwork(instance, extracted_files, filters)
 
         notify_web(instance, "upload_complete", {"files": extracted_files})
         update_status(instance, "Finished processing uploaded file.", color="success")
@@ -728,6 +771,9 @@ def setup_web_sockets():
         zip_source = "theposterdb"
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+
+            # Pre-process the file list to try and determine if it's a mediux or tpdb file
+            # and ignore things that aren't files we're interested in
             for zip_info in zip_ref.infolist():
                 filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
 
@@ -778,6 +824,8 @@ def setup_web_sockets():
         sorted_data = sorted(file_list, key=sort_key)
 
         return sorted_data
+
+
 
     # Load the web server
     globals.web_socket.run(web_app, host="0.0.0.0", port=4567, debug=globals.debug) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
@@ -898,7 +946,7 @@ if __name__ == "__main__":
     # Regex pattern for movie poster filenames
     FILENAME_PATTERN = re.compile(r'^(.*) \((\d{4})\)\.png$')
 
-    globals.debug = False
+    globals.debug = True
 
     # Create an instance object including a unique id and "cli" mode to pass around
     cli_instance = Instance(uuid.uuid4(),"cli")

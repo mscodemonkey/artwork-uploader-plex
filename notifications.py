@@ -47,7 +47,7 @@ def update_status(instance: Instance, message, color="white", sticky=False, spin
 
     if instance.mode == "cli" or globals.debug:
         print(message)
-    elif instance.mode == "web":
+    if instance.mode == "web":
         notify_web(instance, "status_update",
                    {"message": message, "color": color, "sticky": sticky, "spinner": spinner, "icon": icon if icon else bootstrap_colors.get(color, {}).get('icon', None)})
 
@@ -68,11 +68,10 @@ def update_log(instance: Instance, update_text: str, artwork_title: str = None, 
         artwork_title (str):
         force_print (bool)
     """
-
     try:
         if instance.mode == "cli" or force_print or globals.debug:
-            print(update_text)
-        elif instance.mode == "web":
+            print(instance.mode, update_text)
+        if instance.mode == "web":
             notify_web(instance, "log_update", {"message": update_text, "artwork_title": artwork_title})
     except:
         pass
