@@ -7,10 +7,6 @@ import re
 import zipfile
 import tempfile
 
-from PIL import Image
-from flask import Flask, render_template
-from flask_socketio import SocketIO
-
 import schedule, time
 
 import globals
@@ -36,13 +32,28 @@ from plex_connector import PlexConnector
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
     NotProcessedByExclusion
 
+
+if sys.version_info[0] != 3 or sys.version_info[1] < 10:
+    print("Version: %s.%s.%s is not compatible with Artwork Uploader, please upgrade to Python 3.10+" % (sys.version_info[0], sys.version_info[1], sys.version_info[2]))
+    sys.exit(0)
+
+try:
+    from PIL import Image
+    from flask import Flask, render_template
+    from flask_socketio import SocketIO
+except (ModuleNotFoundError, ImportError):
+    print("Please install the requirements before running Artwork Uploader")
+    sys.exit(0)
+
+
+
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
 mode = "cli"
 scheduled_jobs = {}
 scheduled_jobs_by_file = {}
 
-# @ ---------------------- CORE FUNCTIONS ----------------------
+# ---------------------- CORE FUNCTIONS ----------------------
 
 def parse_bulk_file_from_cli(instance: Instance, file_path):
 
@@ -80,24 +91,9 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                 except:
                     print("Oops")
 
-def cleanup():
-
-    """Function to handle cleanup tasks on exit."""
-
-    debug_me("-----------------------------------------------------------------------------------")
-
-    try:
-        if plex:
-            debug_me("Closing Plex server connection...")
-        debug_me("Exiting application. Cleanup complete.")
-    except:
-        pass
 
 
-atexit.register(cleanup)
-
-
-# @ ---------------------- GUI FUNCTIONS ----------------------
+# ---------------------- GUI FUNCTIONS ----------------------
 
 # * UI helper functions ---
 
@@ -940,13 +936,12 @@ def update_scheduled_jobs():
     for each_schedule in config.schedules:
         each_schedule["jobReference"] = scheduled_jobs_by_file[each_schedule["file"]]
 
+
 # * Main Initialization ---
 if __name__ == "__main__":
 
     # Regex pattern for movie poster filenames
     FILENAME_PATTERN = re.compile(r'^(.*) \((\d{4})\)\.png$')
-
-    globals.debug = True
 
     # Create an instance object including a unique id and "cli" mode to pass around
     cli_instance = Instance(uuid.uuid4(),"cli")
@@ -955,6 +950,9 @@ if __name__ == "__main__":
 
     # Process command line arguments
     args = arguments.parse_arguments()
+
+    # Turn on debug mode if required
+    globals.debug = args.debug
 
     # Store what the user wants to do.  If it's blank we'll load the GUI.
     cli_command = args.command

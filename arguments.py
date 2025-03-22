@@ -23,5 +23,6 @@ def parse_arguments():
     parser.add_argument("--filters", nargs='+', help="Only these artwork types will be applied (e.g., title_card, background, season_cover, show_cover, movie_poster, collection_poster).")
     parser.add_argument("--exclude", nargs='+', help="Specify one or more IDs to exclude from any uploads.")
     parser.add_argument("--year", type=int, help="Override the year for matching (use the year in Plex)")
+    parser.add_argument("--debug", action='store_true', help="Spits out debugging information")
 
     return parser.parse_args()
