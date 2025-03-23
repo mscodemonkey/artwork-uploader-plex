@@ -185,7 +185,7 @@ function updateLog(message, color = null, artwork_title = null) {
     statusElement.innerHTML = '<div class="log_message">[' + timestamp +'] ' + message + '</div>' + statusElement.innerHTML;
 }
 socket.on("log_update", (data) => {
-    if (validResponse(data)) {
+    if (validResponse(data,true)) {
         updateLog(data.message, data.artwork_title);
     }
 });

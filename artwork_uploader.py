@@ -33,6 +33,10 @@ from plex_connector import PlexConnector
 from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
     NotProcessedByExclusion
 
+# ----------------------------------------------
+# Important for autoupdater
+current_version = "v0.3.1-beta"
+# ----------------------------------------------
 
 if sys.version_info[0] != 3 or sys.version_info[1] < 10:
     print("Version: %s.%s.%s is not compatible with Artwork Uploader, please upgrade to Python 3.10+" % (sys.version_info[0], sys.version_info[1], sys.version_info[2]))
@@ -54,7 +58,7 @@ mode = "cli"
 scheduled_jobs = {}
 scheduled_jobs_by_file = {}
 
-current_version = "v0.3.0-beta"
+
 github_repo = "mscodemonkey/artwork-uploader-plex"  # For autoupdater
 
 # ---------------------- CORE FUNCTIONS ----------------------
