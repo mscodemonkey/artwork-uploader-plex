@@ -35,7 +35,7 @@ from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowN
 
 # ----------------------------------------------
 # Important for autoupdater
-current_version = "v0.3.1-beta"
+current_version = "v0.3.2-beta"
 # ----------------------------------------------
 
 if sys.version_info[0] != 3 or sys.version_info[1] < 10:
@@ -98,7 +98,6 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                     scrape_and_upload(instance, parsed_url.url, parsed_url.options)
                 except:
                     print("Oops")
-
 
 
 # ---------------------- GUI FUNCTIONS ----------------------
@@ -224,7 +223,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
             else:
                 scrape_and_upload(instance, parsed_line.url, parsed_line.options)
 
-            notify_web(instance, "progress_bar", {"message": f"{i + 1} of {len(parsed_urls)}", "percent" : ((i + 1 / len(parsed_urls)) * 100)})
+            notify_web(instance, "progress_bar", {"message": f"{i + 1} of {len(parsed_urls)}", "percent" : ((i + 1) / len(parsed_urls)) * 100})
 
         # All done, update the UI
         notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
@@ -349,11 +348,16 @@ def process_uploaded_artwork(instance: Instance, file_list, filters):
     processor.set_options(Options(filters = filters))
 
     debug_me("Processing uploaded file and uploading to Plex...","process_uploaded_artwork")
+    notify_web(instance, "progress_bar", {"percent": 0})
+
+    processed_files = 0
 
     for artwork in file_list:
         try:
+            processed_files = processed_files + 1
             result = None
             line_status = f'Processing artwork for {artwork["media"].lower()} "{artwork["title"]}"{" - Season " + str(artwork["season"]) if artwork["season"] else ""}{", Episode " + str(artwork["episode"]) if artwork["episode"] else ""}'
+            notify_web(instance, "progress_bar", {"message": f"{processed_files} of {len(file_list)}", "percent" : (processed_files / len(file_list) * 100)})
             update_status(instance, message=line_status, spinner=True, sticky=True)
             debug_me(line_status,"process_uploaded_artwork")
             if artwork['media'] == "Collection":
@@ -373,6 +377,7 @@ def process_uploaded_artwork(instance: Instance, file_list, filters):
             update_log(instance, f"x Unexpected during process_uploaded_artwork:  {str(error_unexpected)}")
             update_status(instance, f"Error: {str(error_unexpected)}", "danger")
 
+    notify_web(instance, "progress_bar", {"message": f"{len(file_list)} of {len(file_list)}", "percent": 100})
 
 
 # * Bulk import file I/O functions ---
@@ -737,6 +742,7 @@ def setup_web_sockets():
     def handle_upload_chunk(data):
         """Handles chunked upload"""
         instance = Instance(data.get("instance_id"), "web")
+
         file_name = data["fileName"]
         chunk_data = data["chunkData"]
         chunk_index = data["chunkIndex"]
@@ -756,7 +762,9 @@ def setup_web_sockets():
         except Exception as e:
             print(f"Error decoding chunk {chunk_index}: {e}")
 
-        debug_me(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}","handle_upload_chunk")
+        #debug_me(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}","handle_upload_chunk")
+
+        notify_web(instance, "progress_bar", {"message": f"{chunk_index + 1} of {total_chunks}", "percent": ((chunk_index + 1) / total_chunks) * 100})
 
     @globals.web_socket.on("upload_complete")
     def handle_upload_complete(data):
@@ -767,8 +775,10 @@ def setup_web_sockets():
 
         file_name = data.get("fileName")
         filters = data.get("filters")
+        instance = Instance(data.get("instance_id"), "web")
 
         debug_me(f"Upload complete for {file_name}, processing...","handle_upload_complete")
+        notify_web(instance, "progress_bar", {"message": f"Upload complete", "percent": 100})
 
         instance = Instance(data.get("instance_id"), "web")
 
@@ -792,7 +802,7 @@ def setup_web_sockets():
     def save_uploaded_file(instance: Instance, file_name, filters):
         """Assembles chunks and saves the file"""
 
-        print(file_name, filters, type(upload_chunks[file_name]["chunks"][0]))  # Debugging
+        #print(file_name, filters, type(upload_chunks[file_name]["chunks"][0]))  # Debugging
 
         temp_zip_path = tempfile.mktemp(suffix=".zip")
 

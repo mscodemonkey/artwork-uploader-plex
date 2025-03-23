@@ -8,6 +8,7 @@ let statusTimeout;              // Store timeout reference
 let schedules = [];             // Scheduled imports
 let currentBulkImport = '';     // Current bulk import file
 let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
+let barTimer = null;            // Timer for progress bar
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -200,6 +201,9 @@ function progress_bar(percent, message = "") {
     percent = percent > 100 ? 100 : percent;
 
     if (percent <= 100) {
+        if (barTimer) {
+            clearTimeout(barTimer); // Cancel the previous timeout
+        }
         bar_container.classList.add("show")
         bar.style.width = percent + "%"
         bar_container.ariaValueNow = message
@@ -209,7 +213,7 @@ function progress_bar(percent, message = "") {
     if (percent == 100) {
         barTimer = setTimeout(() => {
             bar_container.classList.remove('show'); // Fade out the progress bar after a second
-        }, 1000);
+        }, 2000);
     }
 }
 socket.on("progress_bar", (data) => {
@@ -1179,7 +1183,6 @@ function uploadFile(file) {
 
                 offset += CHUNK_SIZE;
                 let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
-                progress_bar(progress);
 
                 if (offset < arrayBuffer.byteLength) {
                     setTimeout(sendChunk, 10);
