@@ -529,14 +529,21 @@ def setup_web_sockets():
         """
 
         try:
+            # Detect platform
+            python_cmd = "python3" if sys.platform == "darwin" else "python"
+            pip_cmd = f"{python_cmd} -m pip"
+
+            # Pull latest changes
             subprocess.run(["git", "pull"], check=True)
-            #subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
-            os.execlp("python", "python", "artwork_scraper.py")  # Restart app
+
+            # Install dependencies
+            subprocess.run([pip_cmd, "install", "-r", "requirements.txt"], check=True, shell=True)
+
+            # Restart the app
+            os.execlp(python_cmd, python_cmd, "artwork_scraper.py")
+
         except Exception as e:
             notify_web(instance,"update_failed", {"error": str(e)})
-
-
-
 
 
     @globals.web_socket.on("start_scrape")
