@@ -54,7 +54,7 @@ mode = "cli"
 scheduled_jobs = {}
 scheduled_jobs_by_file = {}
 
-current_version = "0.3.1-beta"
+current_version = "0.3.2-beta"
 github_repo = "mscodemonkey/artwork-uploader-plex"  # For autoupdater
 
 # ---------------------- CORE FUNCTIONS ----------------------
