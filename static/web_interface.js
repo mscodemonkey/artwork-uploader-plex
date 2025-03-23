@@ -1324,3 +1324,24 @@ socket.on("upload_complete", function (data) {
     function getScheduleDetails(fileName) {
         return schedules.find(s => s.file === fileName);
     }
+
+
+
+
+// Check for update on page load
+socket.emit("check_for_update", { instance_id: instanceId});
+
+socket.on("update_available", function(data) {
+    if(validResponse(data)){
+        document.getElementById("latest_version").innerText = data.version;
+        document.getElementById("version_notifier").style.display = "block";
+    }
+});
+
+function updateApp() {
+    socket.emit("update_app", { instance_id: instanceId});
+}
+
+socket.on("update_failed", function(data) {
+    alert("Update failed: " + data.error);
+});

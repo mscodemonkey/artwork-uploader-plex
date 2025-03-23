@@ -1,8 +1,8 @@
 
 class Instance:
 
-    def __init__(self, id, mode):
+    def __init__(self, id = None, mode = "web", broadcast = False):
 
         self.id = id
         self.mode = mode
-        self.broadcast = False
+        self.broadcast = broadcast

@@ -6,6 +6,9 @@ import os
 import re
 import zipfile
 import tempfile
+
+import requests
+import subprocess
 import schedule, time
 import globals
 import threading
@@ -50,6 +53,9 @@ interactive_cli = False  # Set to False when building the executable with PyInst
 mode = "cli"
 scheduled_jobs = {}
 scheduled_jobs_by_file = {}
+
+current_version = "0.0.1"
+github_repo = "mscodemonkey/artwork-uploader-plex"  # For autoupdater
 
 # ---------------------- CORE FUNCTIONS ----------------------
 
@@ -503,6 +509,36 @@ def setup_web_sockets():
         return render_template("web_interface.html", config=config)
 
 
+
+
+
+    @globals.web_socket.on("check_for_update")
+    def check_for_update(data):
+        """Check for updates when requested by the frontend."""
+        instance = Instance(data.get("instance_id"), "web")
+        latest_version = get_latest_version()
+        if latest_version and latest_version != current_version:
+            notify_web(instance, "update_available", {"version": latest_version})
+
+    @globals.web_socket.on("update_app")
+    def update_app(data):
+        instance = Instance(data.get("instance_id"), "web")
+
+        """
+        Pull updates from GitHub and restart the app.
+        """
+
+        try:
+            subprocess.run(["git", "pull"], check=True)
+            subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
+            os.execlp("python", "python", "artwork_scraper.py")  # Restart app
+        except Exception as e:
+            notify_web(instance,"update_failed", {"error": str(e)})
+
+
+
+
+
     @globals.web_socket.on("start_scrape")
     def handle_scrape_from_web(data):
         
@@ -667,10 +703,10 @@ def setup_web_sockets():
 
 
     def update_or_add_schedule(file_name, new_time):
-        for eacH_schedule in config.schedules:
-            if eacH_schedule["file"] == file_name:
+        for each_schedule in config.schedules:
+            if each_schedule["file"] == file_name:
                 # Update existing schedule
-                eacH_schedule["time"] = new_time
+                each_schedule["time"] = new_time
                 return
 
         # Add new schedule if not found
@@ -861,6 +897,25 @@ def sort_key(item):
 
     return item['media'], season_value, episode_value, source_value
 
+# Autoupdate functions
+
+def get_latest_version():
+    """Fetch the latest release version from GitHub."""
+    url = f"https://api.github.com/repos/{github_repo}/releases/latest"
+    response = requests.get(url)
+    debug_me(str(response.status_code),"get_latest_version")
+    if response.status_code == 200:
+        return response.json()["tag_name"]
+    return None
+
+def check_for_updates_periodically():
+    """Background task to check for updates every 30 minutes."""
+    while True:
+        latest_version = get_latest_version()
+        if latest_version and latest_version != current_version:
+            debug_me("Later version", "check_for_updates_periodically")
+            notify_web(Instance(broadcast = True),"update_available", {"version": latest_version})
+        time.sleep(1800)  # Wait 30 minutes before checking again
 
 
 
@@ -1063,5 +1118,6 @@ if __name__ == "__main__":
 
             web_app = Flask(__name__, template_folder="templates")
             globals.web_socket = SocketIO(web_app, cors_allowed_origins="*")
+            threading.Thread(target=check_for_updates_periodically, daemon=True).start()
             setup_web_sockets()
 
