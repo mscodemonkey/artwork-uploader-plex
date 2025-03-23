@@ -39,6 +39,7 @@ document.getElementById("switch_bulk_file").addEventListener("change", bulkFileS
 document.getElementById("bulk_import_text").addEventListener("input", updateBulkSaveButtonState);
 document.getElementById("scraper-filters-global").addEventListener("change", inheritGlobalFiltersForScraper);
 document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
+document.getElementById("btnUpdate").addEventListener("click", updateApp);
 
 // ==================================================
 // General helper functions

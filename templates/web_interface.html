@@ -26,9 +26,12 @@
         <div class="col">
             <h1><img src="/static/artwork_scraper.png" title="Artwork Scraper for Plex" style="height: 2.5rem">Artwork Uploader for Plex</h1>
         </div>
-        <div class="col" id="version_notifier" style="text-align: right; display: none;">
-            New version available: <span class="pe-3" id="latest_version"></span> <button class="btn btn-info btn-sm" onclick="updateApp()">Update Now</button>
     </div>
+    <div class="row p-2 mb-4 rounded bg-info">
+        <div class='col align-middle' id="version_notifier" style="display: none;">
+            <button class="float-end btn btn-primary btn-sm" id="btnUpdate">Update Now</button>
+            A new version is now available: <span class="pe-3" id="latest_version"></span>
+        </div>
     </div>
     <div class="row m-3 rounded fade fixed-top" id="status">
         <div class="col">
