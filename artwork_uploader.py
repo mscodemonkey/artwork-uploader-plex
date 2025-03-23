@@ -6,21 +6,19 @@ import os
 import re
 import zipfile
 import tempfile
-
 import schedule, time
-
 import globals
 import threading
-import atexit
 import sys
 
 import utils
+import arguments
 from instance import Instance
 from media_metadata import parse_title
 from notifications import update_log, update_status, notify_web, debug_me
 from config_exceptions import ConfigLoadError
 from plex_connector_exception import PlexConnectorException
-import arguments
+
 from config import Config
 from scraper_exceptions import ScraperException
 from theposterdb_scraper import ThePosterDBScraper
@@ -105,7 +103,7 @@ def get_exe_dir():
         return os.path.dirname(__file__)  # Path to script file
 
 
-def process_scrape_url_from_ui(instance: Instance, url: str) -> None:
+def process_scrape_url_from_web(instance: Instance, url: str) -> None:
 
     """
     Process the URL and any options, then scrape for posters and updates the GUI with the results
@@ -140,7 +138,7 @@ def process_scrape_url_from_ui(instance: Instance, url: str) -> None:
         update_status(instance, f"Processed all artwork at {parsed_line.url}", color="success")
 
         # Update the web ui bulk list with this URL and artwork (only if it's not already in the bulk list)
-        if parsed_line.options.add_to_bulk and title:
+        if instance.mode == "web" and parsed_line.options.add_to_bulk and title:
             notify_web(instance, "add_to_bulk_list", {"url": url, "title": title})
 
     except ScraperException as scraping_error:
@@ -151,7 +149,7 @@ def process_scrape_url_from_ui(instance: Instance, url: str) -> None:
             notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 
-def run_bulk_import_scrape_thread(instance: Instance, web_list = None):
+def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None):
 
     """Run the bulk import scrape in a separate thread."""
 
@@ -168,8 +166,7 @@ def run_bulk_import_scrape_thread(instance: Instance, web_list = None):
             parsed_urls.append(parsed_url)
 
     if not parsed_urls:
-        if instance.mode == "web":
-            update_status(instance, "No bulk import entries found.", color="danger")
+        update_status(instance, "No bulk import entries found.", color="danger")
 
     if instance.mode == "web":
         notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
@@ -223,13 +220,12 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
         notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
         update_status(instance, "Bulk import scraping completed.", color="success")
 
-    except Exception as e:
+    except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", {"percent": 100})
-        update_status(instance, f"Error during bulk import: {e}", color="danger")
+        update_status(instance, f"Error during bulk import: {bulk_import_exception}", color="danger")
 
     finally:
-        if instance.mode == "web":
-            notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
+        notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 
 # Scrape all pages of a TPDb user's uploaded artwork
@@ -244,7 +240,7 @@ def scrape_tpdb_user(instance: Instance, url, options):
         user_scraper.scrape_user_info()
         pages = user_scraper.user_pages
     except ScraperException as cannot_scrape:
-        debug_me(str(cannot_scrape))
+        debug_me(str(cannot_scrape),"scrape_tpdb_user")
         raise
 
     try:
@@ -342,14 +338,14 @@ def process_uploaded_artwork(instance: Instance, file_list, filters):
     processor = UploadProcessor(plex)
     processor.set_options(Options(filters = filters))
 
-    debug_me("Processing uploaded file and uploading to Plex...")
+    debug_me("Processing uploaded file and uploading to Plex...","process_uploaded_artwork")
 
     for artwork in file_list:
         try:
             result = None
             line_status = f'Processing artwork for {artwork["media"].lower()} "{artwork["title"]}"{" - Season " + str(artwork["season"]) if artwork["season"] else ""}{", Episode " + str(artwork["episode"]) if artwork["episode"] else ""}'
-            update_status(instance, line_status, spinner=True, sticky=True)
-            debug_me(line_status)
+            update_status(instance, message=line_status, spinner=True, sticky=True)
+            debug_me(line_status,"process_uploaded_artwork")
             if artwork['media'] == "Collection":
                 result = processor.process_collection_artwork(artwork)
             elif artwork['media'] == "Movie":
@@ -407,7 +403,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
 
     bulk_imports_path = "bulk_imports/"
 
-    debug_me(f"Renaming file from {old_name} to {new_name}")
+    debug_me(f"Renaming from {old_name} to {new_name}","rename_bulk_import_file")
 
     if old_name != new_name:
         try:
@@ -453,12 +449,10 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
 
             os.makedirs(os.path.dirname(bulk_import_file), exist_ok=True)
 
-            debug_me("Saving" + bulk_import_file)
+            debug_me("Saving" + bulk_import_file, "save_bulk_import_file")
 
             with open(bulk_import_file, "w", encoding="utf-8") as file:
                 file.write(contents)
-
-            debug_me(instance.id)
 
             update_status(instance, message="Bulk import file " + filename + " saved", color="success")
             notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
@@ -488,6 +482,20 @@ def check_for_bulk_import_file(instance: Instance):
         update_status(instance, message="Error creating bulk import file", color="danger")
 
 
+def find_bulk_file(filename: str = None):
+
+    bulk_imports_path = "bulk_imports/"
+
+    # Get the current bulk_txt value from the config
+    bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+
+    # Use get_exe_dir() to determine the correct path
+    bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
+
+    # Return the full path if it exists
+    return bulk_import_file if os.path.exists(bulk_import_file) else None
+
+
 def setup_web_sockets():
 
     @web_app.route("/")
@@ -512,14 +520,14 @@ def setup_web_sockets():
             if filters and len(filters) < 6:
                 url = url + " --filters " + " ".join(filters)
             notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
-            process_scrape_url_from_ui(instance, url)
+            process_scrape_url_from_web(instance, url)
 
     @globals.web_socket.on("start_bulk_import")
     def handle_bulk_import_from_web(data):
         
         instance = Instance(data.get("instance_id"),"web")
         bulk_list = data.get("bulk_list").lower()
-        run_bulk_import_scrape_thread(instance, bulk_list)
+        run_bulk_import_scrape_in_thread(instance, bulk_list)
 
 
     @globals.web_socket.on("save_bulk_import")
@@ -529,7 +537,6 @@ def setup_web_sockets():
         filename = data.get("filename")
         now_load = data.get("now_load")
         if content:
-            debug_me(instance.id)
             save_bulk_import_file(instance, content, filename, now_load)
 
     @globals.web_socket.on("load_config")
@@ -570,7 +577,7 @@ def setup_web_sockets():
 
     @globals.web_socket.on("display_message")
     def display_message(data):
-        debug_me(data.get("message"))
+        debug_me(data.get("message"),"display_message")
 
     @globals.web_socket.on("save_config")
     def save_config_web(data):
@@ -696,7 +703,7 @@ def setup_web_sockets():
         except Exception as e:
             print(f"Error decoding chunk {chunk_index}: {e}")
 
-        debug_me(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}")
+        debug_me(f"Received chunk {chunk_index + 1}/{total_chunks} for {file_name}","handle_upload_chunk")
 
     @globals.web_socket.on("upload_complete")
     def handle_upload_complete(data):
@@ -708,13 +715,13 @@ def setup_web_sockets():
         file_name = data.get("fileName")
         filters = data.get("filters")
 
-        debug_me(f"Upload complete for {file_name}, processing...")
+        debug_me(f"Upload complete for {file_name}, processing...","handle_upload_complete")
 
         instance = Instance(data.get("instance_id"), "web")
 
         if file_name in upload_chunks and len(upload_chunks[file_name]["chunks"]) == int(upload_chunks[file_name]["total_chunks"]):
 
-            debug_me(f"Upload complete for {file_name}, saving file...")
+            debug_me(f"Upload complete for {file_name}, saving file...","handle_upload_complete")
             save_uploaded_file(instance, file_name, filters)
 
             # Cleanup after saving the file
@@ -723,7 +730,7 @@ def setup_web_sockets():
             except:
                 pass
         else:
-            debug_me(f'Upload complete event received for {file_name}, but with {len(upload_chunks[file_name]["chunks"])} of {int(upload_chunks[file_name]["total_chunks"])}, some chunks are missing.')
+            debug_me(f'Upload complete event received for {file_name}, but with {len(upload_chunks[file_name]["chunks"])} of {int(upload_chunks[file_name]["total_chunks"])}, some chunks are missing.',"handle_upload_complete")
             try:
                 del upload_chunks[file_name]
             except:
@@ -742,23 +749,18 @@ def setup_web_sockets():
                     chunk = chunk.encode('utf-8')
                 f.write(chunk)
 
-        debug_me(f"File saved successfully: {temp_zip_path}")
-
         del upload_chunks[file_name]  # Free memory
-        debug_me(f"Saved ZIP file: {temp_zip_path}")
+        debug_me(f"Saved ZIP file: {temp_zip_path}","save_uploaded_file")
 
         extracted_files = extract_and_list_zip(temp_zip_path)
 
-        debug_me(str(extracted_files))
+        #debug_me(str(extracted_files),"save_uploaded_file")
 
         process_uploaded_artwork(instance, extracted_files, filters)
 
         notify_web(instance, "upload_complete", {"files": extracted_files})
         update_status(instance, "Finished processing uploaded file.", color="success")
 
-
-    # Updated regex: "Movie Title (YYYY).png" OR "Movie Title.png"
-    FILENAME_PATTERN = re.compile(r'^[^/]+(?:\.jpg|\.jpeg|\.png)$', re.IGNORECASE)
 
     def extract_and_list_zip(zip_path):
         """Extracts a ZIP file, flattens directories, and returns a list of valid image files."""
@@ -779,7 +781,7 @@ def setup_web_sockets():
 
                 if filename == "source.txt":
                     zip_source = "mediux"
-                elif FILENAME_PATTERN.match(filename):
+                elif filename_pattern.match(filename):
                     extracted_path = os.path.join(extract_dir, filename)
 
                     with zip_ref.open(zip_info.filename) as source, open(extracted_path, "wb") as target:
@@ -867,38 +869,27 @@ def add_file_to_schedule_thread(instance: Instance, filename):
     if instance:
         threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
 
-def process_bulk_file_on_schedule(instance, filename):
-    global config
+
+def process_bulk_file_on_schedule(instance: Instance, filename):
+
+    instance.broadcast = True
 
     try:
-        # Get the current bulk_txt value from the config
-        bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
-        bulk_imports_path = "bulk_imports/"
-
-        # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
-        bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
-
-        if not os.path.exists(bulk_import_file):
-            update_log(instance, f"Scheduled file does not exist: {bulk_import_file}")
+        bulk_import_file = find_bulk_file(filename)
+        if bulk_import_file:
+            with open(bulk_import_file, "r", encoding="utf-8") as file:
+                content = file.read()
+            if content:
+                update_log(instance, "@ *** Scheduled import started ***")
+                run_bulk_import_scrape_in_thread(instance, content)
+        else:
+            update_log(instance, f"Scheduled file does not exist: {filename}")
             return
-
-        with open(bulk_import_file, "r", encoding="utf-8") as file:
-            content = file.read()
-
-        if content:
-            update_log(instance, "@ *** Scheduled import started ***")
-            run_bulk_import_scrape_thread(instance, content)
-
     except FileNotFoundError:
         update_log(instance, f"@ Scheduled import failed due to missing file ({filename})")
     except Exception as e:
-        update_log(instance, f"@ Scheduled import failed ({str(e)})")
+        update_log(instance, f"@ Scheduled import unexpectedly failed ({str(e)})")
 
-# Function to run the scheduler in a separate thread
-def run_scheduler():
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Check every minute
 
 # Function to start the scheduler safely
 def start_scheduler():
@@ -906,12 +897,33 @@ def start_scheduler():
     if scheduler_thread is None or not scheduler_thread.is_alive():
         scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
         scheduler_thread.start()
-        debug_me("Scheduler started.")
+        debug_me("Scheduler started.","start_scheduler")
     else:
-        debug_me("Scheduler is already running.")
+        debug_me("Scheduler is already running.","start_scheduler")
 
-def setup_scheduler(instance: Instance):
 
+# Check for scheduled jobs every 60 seconds
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Check every minute
+
+
+#Initialises the scheduler when the script is run
+def setup_scheduler_on_first_load(instance: Instance):
+
+    """
+
+    Initialises the scheduler when the script is run and sets up each schedule from the config file
+
+    Args:
+        instance: Instance ID
+
+    Returns: None
+
+    """
+
+    # If there are no scheduled jobs already...
     if not scheduled_jobs:
         for each_schedule in config.schedules:
             schedule_file = each_schedule.get("file")
@@ -925,13 +937,14 @@ def setup_scheduler(instance: Instance):
             # Store job reference
             scheduled_jobs[job_id] = job
             scheduled_jobs_by_file[schedule_file] = job_id
-
             each_schedule["jobReference"] = job_id
 
         start_scheduler()
 
-        debug_me(config.schedules)
+        debug_me(config.schedules, "setup_scheduler_on_first_load")
 
+
+# Update the job references for any scheduled jobs if we reload the config file
 def update_scheduled_jobs():
     for each_schedule in config.schedules:
         each_schedule["jobReference"] = scheduled_jobs_by_file[each_schedule["file"]]
@@ -940,13 +953,13 @@ def update_scheduled_jobs():
 # * Main Initialization ---
 if __name__ == "__main__":
 
-    # Regex pattern for movie poster filenames
-    FILENAME_PATTERN = re.compile(r'^(.*) \((\d{4})\)\.png$')
-
     # Create an instance object including a unique id and "cli" mode to pass around
     cli_instance = Instance(uuid.uuid4(),"cli")
 
     scheduler_thread = None
+
+    # Updated regex: "Movie Title (YYYY).png" OR "Movie Title.png"
+    filename_pattern = re.compile(r'^[^/]+(?:\.jpg|\.jpeg|\.png)$', re.IGNORECASE)
 
     # Process command line arguments
     args = arguments.parse_arguments()
@@ -983,7 +996,7 @@ if __name__ == "__main__":
     plex = PlexConnector(config.base_url, config.token)
 
     # Setup scheduler
-    setup_scheduler(cli_instance)
+    setup_scheduler_on_first_load(cli_instance)
 
     # Check for CLI arguments regardless of interactive_cli flag
     if cli_command:
@@ -1021,7 +1034,7 @@ if __name__ == "__main__":
             try:
                 scrape_tpdb_user(cli_instance, cli_command, cli_options)
             except:
-                debug_me("Oops - handle this user error properly!")
+                debug_me("Oops - handle this user error properly!","__main__")
 
         # User passed in a poster or set URL, so let's process that
         else:

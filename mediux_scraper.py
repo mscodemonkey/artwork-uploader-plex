@@ -59,7 +59,7 @@ class MediuxScraper:
                     media_type = "Movie"
 
             for data in poster_data:
-                print(str(data["id"]))
+                debug_me(str(data["id"]),"MediuxScraper/scrape")
 
                 if media_type == "Show":
 

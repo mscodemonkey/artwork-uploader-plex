@@ -55,7 +55,7 @@ class Scraper:
             None
         """
         try:
-            debug_me(f"Scraping from {self.source}")
+            debug_me(f"Scraping from {self.source}","Scraper/scrape")
             if self.source == "theposterdb":
                 self.scrape_theposterdb()
             elif self.source == "mediux":

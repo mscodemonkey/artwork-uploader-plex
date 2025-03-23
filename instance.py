@@ -5,3 +5,4 @@ class Instance:
 
         self.id = id
         self.mode = mode
+        self.broadcast = False

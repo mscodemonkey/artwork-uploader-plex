@@ -46,7 +46,7 @@ document.getElementById("upload-filters-global").addEventListener("change", inhe
 
 // Check incoming socket message is for this instance
 function validResponse(data, broadcast = false) {
-    return data.instance_id === instanceId || (broadcast && data.instance_id === "broadcast");
+    return data.instance_id === instanceId || (broadcast && data.broadcast);
 }
 
 
