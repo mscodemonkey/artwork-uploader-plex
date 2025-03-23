@@ -134,6 +134,7 @@ class MediuxScraper:
                     tv_artwork["source"] = "mediux"
                     tv_artwork["year"] = year
                     tv_artwork["id"] = image_stub
+                    tv_artwork['type'] = file_type
 
                     print(tv_artwork)
                     self.tv_artwork.append(tv_artwork)

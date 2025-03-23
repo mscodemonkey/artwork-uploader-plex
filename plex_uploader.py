@@ -36,9 +36,9 @@ class PlexUploader:
             if self.artwork_exists_on_plex() is False or self.options.force:
                 if self.artwork_id == "BID:":
                     if self.type == "file":
-                        self.upload_target.uploadPoster( filepath = self.artwork['path'])
+                        self.upload_target.uploadArt( filepath = self.artwork['path'])
                     else:
-                        self.upload_target.uploadPoster( url = self.artwork["url"])
+                        self.upload_target.uploadArt( url = self.artwork["url"])
                 else:
                     if self.type == "file":
                         self.upload_target.uploadPoster( filepath = self.artwork['path'])
