@@ -530,7 +530,7 @@ def setup_web_sockets():
 
         try:
             subprocess.run(["git", "pull"], check=True)
-            subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
+            #subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
             os.execlp("python", "python", "artwork_scraper.py")  # Restart app
         except Exception as e:
             notify_web(instance,"update_failed", {"error": str(e)})
