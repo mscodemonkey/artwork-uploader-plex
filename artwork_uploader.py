@@ -54,7 +54,7 @@ mode = "cli"
 scheduled_jobs = {}
 scheduled_jobs_by_file = {}
 
-current_version = "0.3.2-beta"
+current_version = "0.3.0-beta"
 github_repo = "mscodemonkey/artwork-uploader-plex"  # For autoupdater
 
 # ---------------------- CORE FUNCTIONS ----------------------
@@ -529,6 +529,8 @@ def setup_web_sockets():
         """
 
         try:
+            update_status(Instance(broadcast=True),"Updating to the latest version, please wait...","info", sticky=True, spinner=True)
+
             # Detect platform
             python_cmd = "python3" if sys.platform == "darwin" else "python"
 
@@ -538,10 +540,15 @@ def setup_web_sockets():
             # Install dependencies
             subprocess.run([python_cmd, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
 
+            # Trigger the front-end to restart
+            update_status(Instance(broadcast=True),"Update complete, restarting the app...","success", sticky=True, spinner=True)
+            notify_web(Instance(broadcast=True), "backend_restarting",{})
+
             # Restart the app
             os.execlp(python_cmd, python_cmd, "artwork_uploader.py")
 
         except Exception as e:
+            update_status(Instance(broadcast=True),"Update failed, restarting the app...","danger")
             notify_web(instance,"update_failed", {"error": str(e)})
 
 
@@ -864,8 +871,6 @@ def setup_web_sockets():
         sorted_data = sorted(file_list, key=sort_key)
 
         return sorted_data
-
-
 
     # Load the web server
     globals.web_socket.run(web_app, host="0.0.0.0", port=4567, debug=globals.debug) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")

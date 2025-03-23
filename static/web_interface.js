@@ -168,7 +168,7 @@ function updateStatus(message, color = "info", sticky = false, spinner = false, 
 
 }
 socket.on("status_update", (data) => {
-    if (validResponse(data)) {
+    if (validResponse(data, true)) {
         updateStatus(data.message, data.color, data.sticky, data.spinner, data.icon);
     }
 });
@@ -1340,9 +1340,27 @@ socket.on("update_available", function(data) {
 });
 
 function updateApp() {
+    document.getElementById("version_notifier").style.display = "none";
     socket.emit("update_app", { instance_id: instanceId});
 }
 
 socket.on("update_failed", function(data) {
     alert("Update failed: " + data.error);
 });
+
+
+socket.on("backend_restarting", function() {
+    console.log("Backend restarting, refreshing frontend too...");
+    setTimeout(() => {
+        location.reload();  // Reload the page
+    }, 3000);  // Delay for 2 seconds to ensure restart
+});
+
+// Detect when the WebSocket connection is lost
+    socket.on("disconnect", function() {
+        console.log("WebSocket disconnected, attempting to reconnect...");
+        // Refresh the page to reconnect to the WebSocket
+        setTimeout(() => {
+            location.reload();  // Reload to attempt reconnection
+        }, 3000);  // Delay for 3 seconds before refresh to allow connection retry
+    });
