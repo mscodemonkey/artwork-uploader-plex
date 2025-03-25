@@ -126,7 +126,7 @@
                 <form id="config_form" class="needs-validation" novalidate>
                     <div class="row">
                         <div class="col-lg-5 mb-3">
-                            <div class="p-3 border bg-light">
+                            <div class="p-3 border">
                                 <h5 class="mb-3">Plex server settings</h5>
                                 <div class="mb-3">
                                     <label for="plex_base_url" class="form-label">Plex base URL:</label>
@@ -165,7 +165,7 @@
                         <div class="col-lg-7">
                             <div class="row mb-3">
                                 <div class="col">
-                                    <div class="p-3 border bg-light">
+                                    <div class="p-3 border">
                                         <h5 class="mb-3">Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB.com</h5>
                                         <div class="row mb-1">
                                             <div class="col-12 mb-2"><strong>TV shows</strong></div>
@@ -216,7 +216,7 @@
                             </div>
                             <div class="row mb-3">
                                 <div class="col">
-                                    <div class="p-3 border bg-light">
+                                    <div class="p-3 border">
                                         <h5 class="mb-3">Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX.pro</h5>
                                         <div class="row mb-1">
                                             <div class="col-12 mb-2"><strong>TV shows</strong></div>
@@ -265,7 +265,7 @@
                             </div>
                             <div class="row">
                                 <div class="col">
-                                    <div class="p-3 border bg-light">
+                                    <div class="p-3 border">
                                         <div class="form-check mb-3">
                                             <input class="form-check-input" type="checkbox" value="--force" id="track_artwork_ids"/>
                                             <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex labels (recommend to leave checked)</label>
@@ -291,7 +291,7 @@
 
                 <div class="row mb-3">
                     <div class="col">
-                        <div class="p-3 border bg-light d-flex align-items-center">
+                        <div class="p-3 border d-flex align-items-center">
                             <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select" required>
                                 <option selected disabled>Loading file list...</option>
                             </select>
@@ -317,7 +317,7 @@
                     </div>
 
                     <div class="col d-none"> <!-- Hides the file input -->
-                        <div class="p-3 border bg-light">
+                        <div class="p-3 border">
                             <div class="input-group">
                                 <input type="file" id="bulk_import_upload" class="form-control" accept=".txt" onchange="uploadBulkImportFile(event)">
                             </div>
@@ -326,7 +326,7 @@
                 </div>
 
                 <!-- Time Selector for scheduler -->
-                <div id="time_select_box" class="p-3 border bg-light">
+                <div id="time_select_box" class="p-3 border">
                     <div id="tooltip_arrow"></div>
                     <div class="row">
                         <div class="col-auto">
@@ -349,7 +349,7 @@
 
                 <div class="row mb-3">
                     <div class="col">
-                        <div class="p-3 border bg-light">
+                        <div class="p-3 border">
                             <textarea id="bulk_import_text" class="form-control w-100 font-monospace" rows="15"></textarea>
                         </div>
                     </div>
@@ -369,7 +369,7 @@
                 <form id="scraperForm" class="needs-validation" novalidate>
                     <div class="row">
                         <div class="col mb-3">
-                            <div class="p-3 border bg-light">
+                            <div class="p-3 border">
                                 <label for="scrape_url" class="form-label">URL to scrape:</label>
                                 <input type="text" id="scrape_url" name="plex_token" class="form-control"
                                     value="https://mediux.pro/sets/9133" required
@@ -380,7 +380,7 @@
                             </div>
                         </div>
                         <div class="mb-3 col-md-4 col-lg-3">
-                            <div class="p-3 border bg-light">
+                            <div class="p-3 border">
                                     <label for="scrape_url" class="form-label">Plex year:</label>
                                     <input type="text" id="year" name="year" class="form-control"
                                         value=""
@@ -393,7 +393,7 @@
                     </div>
                     <div class="row mb-3">
                         <div class="col">
-                            <div class="p-3 border bg-light">
+                            <div class="p-3 border">
                                 <h5 class="mb-3">Options</h5>
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" value="--force" id="option-force"/>
@@ -409,7 +409,7 @@
                             </div>
                         </div>
                         <div class="col theposterdb collapse">
-                            <div class="p-3 border bg-light">
+                            <div class="p-3 border">
                                 <h5 class="mb-3">The Poster DB options</h5>
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" value="--add-sets"
@@ -428,7 +428,7 @@
                     </div>
                     <div class="row mb-3">
                         <div class="col">
-                            <div class="p-3 border bg-light">
+                            <div class="p-3 border">
                                 <h5 class="mb-3">Artwork to include</h5>
                                 <div id="scraper-filters-inherit" class="collapse show row mb-1">
                                     <div class="col-6 col-md-4 col-lg-3">
@@ -516,7 +516,7 @@
                 </div>
                 <div class="row mb-3">
                     <div class="col">
-                        <div class="p-3 border bg-light">
+                        <div class="p-3 border">
                             <h5 class="mb-3">Artwork to include</h5>
                             <div id="upload-filters-inherit" class="collapse show row mb-1">
                                 <div class="col-6 col-md-4 col-lg-3">
