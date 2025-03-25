@@ -7,7 +7,6 @@ COPY . /artwork-uploader/
 RUN ls
 
 RUN pip install --no-cache-dir -r requirements.txt
-# RUN pip install gunicorn
 
 EXPOSE 4567
 
