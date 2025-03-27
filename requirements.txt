@@ -6,9 +6,9 @@ charset-normalizer==3.3.2
 click==8.1.8
 customtkinter==5.2.2
 darkdetect==0.8.0
+eventlet
 Flask==3.1.0
 Flask-SocketIO==5.5.1
-gevent==24.11.1
 h11==0.14.0
 idna==3.6
 itsdangerous==2.2.0
