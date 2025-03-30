@@ -1,0 +1,30 @@
+{
+    "base_url": "",
+    "token": "",
+    "bulk_txt": "bulk_import.txt",
+    "tv_library": [
+        "TV Shows"
+    ],
+    "movie_library": [
+        "Movies"
+    ],
+    "mediux_filters": [
+        "title_card",
+        "background",
+        "season_cover",
+        "show_cover",
+        "movie_poster",
+        "collection_poster"
+    ],
+    "tpdb_filters": [
+        "title_card",
+        "background",
+        "season_cover",
+        "show_cover",
+        "movie_poster",
+        "collection_poster"
+    ],
+    "tracK_artwork_ids": true,
+    "auto_manage_bulk_files": true,
+    "schedules": []
+}
