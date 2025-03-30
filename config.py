@@ -7,7 +7,7 @@ from notifications import debug_me
 
 class Config:
 
-    def __init__(self, config_path="config.json"):
+    def __init__(self, config_path="data/config.json"):
         self.path = config_path
         self.base_url = ""
         self.token = ""
@@ -25,7 +25,9 @@ class Config:
         """ Load the configuration from the JSON file """
 
         # If a config file doesn't exist, create one with default values
+        print("test")
         if not os.path.isfile(self.path):
+            print(self.path)
             self.create()
 
         # Load the configuration from the config.json file

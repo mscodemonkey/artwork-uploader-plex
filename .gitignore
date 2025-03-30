@@ -3,3 +3,5 @@ __pycache__
 tempCodeRunnerFile.py
 build/
 !dist/*.zip
+bulk_imports/
+bulk_import.txt

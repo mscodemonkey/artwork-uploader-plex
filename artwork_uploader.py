@@ -390,7 +390,7 @@ def load_bulk_import_file(instance: Instance, filename = None):
     try:
         # Get the current bulk_txt value from the config
         bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
-        bulk_imports_path = "bulk_imports/"
+        bulk_imports_path = "data/bulk_imports/"
 
         # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
         bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
@@ -416,7 +416,7 @@ def load_bulk_import_file(instance: Instance, filename = None):
 
 def rename_bulk_import_file(instance: Instance, old_name, new_name):
 
-    bulk_imports_path = "bulk_imports/"
+    bulk_imports_path = "data/bulk_imports/"
 
     debug_me(f"Renaming from {old_name} to {new_name}","rename_bulk_import_file")
 
@@ -437,7 +437,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
 
 def delete_bulk_import_file(instance: Instance, file_name):
 
-    bulk_imports_path = "bulk_imports/"
+    bulk_imports_path = "data/bulk_imports/"
 
     if file_name:
         try:
@@ -459,7 +459,7 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
     if contents:
         try:
             exe_path = get_exe_dir()
-            bulk_import_path = "bulk_imports/"
+            bulk_import_path = "data/bulk_imports/"
             bulk_import_file = os.path.join(exe_path, bulk_import_path, filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
 
             os.makedirs(os.path.dirname(bulk_import_file), exist_ok=True)
@@ -482,7 +482,7 @@ def check_for_bulk_import_file(instance: Instance):
 
     try:
         exe_path = get_exe_dir()
-        bulk_import_path = os.path.join(exe_path, "bulk_imports")
+        bulk_import_path = os.path.join(exe_path, "data/bulk_imports")
         bulk_import_file = os.path.join(bulk_import_path, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
 
         # Firstly, make sure the bulk_imports folder exists
@@ -499,7 +499,7 @@ def check_for_bulk_import_file(instance: Instance):
 
 def find_bulk_file(filename: str = None):
 
-    bulk_imports_path = "bulk_imports/"
+    bulk_imports_path = "data/bulk_imports/"
 
     # Get the current bulk_txt value from the config
     bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
@@ -610,7 +610,7 @@ def setup_web_sockets():
         instance = Instance(data.get("instance_id"),"web")
         bulk_files = None
         try:
-            folder_path = Path("bulk_imports")
+            folder_path = Path("data/bulk_imports")
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
         except:
             pass

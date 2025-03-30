@@ -231,3 +231,21 @@ Both the ```mediux_filters``` and ```tvdb_filters``` options in **config.json** 
 - After the URL in the Bulk Import tab of the Web UI or local GUI using the same format as you would on the command line
 - In the scraper tab in the Web UI, where you can simply check boxes to set options and filters.
 
+---
+# Docker purpose
+
+## Build image
+
+```
+cd artwork-uploader-plex
+docker build . -t artwork-uploader-plex:latest
+```
+
+## Use image
+
+```
+mkdir -p $(pwd)/data
+docker run -it -v $(pwd)/data:/app/data -p 4567:4567 artwork-uploader-plex:latest
+```
+
+* See http://localhost:4567
