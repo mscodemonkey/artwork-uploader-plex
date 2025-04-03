@@ -1,0 +1,10 @@
+services:
+  artwork_uploader:
+    build: .
+    ports:
+      - "4567:4567"
+    volumes:
+      - ./bulk_imports:/artwork-uploader/bulk_imports:rw
+      - ./config.json:/artwork-uploader/config.json:rw
+    environment:
+      - PYTHONUNBUFFERED=1
