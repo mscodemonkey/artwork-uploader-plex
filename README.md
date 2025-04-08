@@ -30,6 +30,7 @@ Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you
 ### Web UI
 Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
 
+
 ### Scheduler
 Basic scheduler, so that you can leave this running and update all your artwork every day. 
 
@@ -108,6 +109,32 @@ Both mediux_filters and tpdb_filters specify which artwork types to upload by in
 
 ---
 # Usage
+
+## Docker 
+
+If you want to use docker, there is a Dockerfile in the repo to allow it to be deployed in a cotnainer allongside a plex container. 
+
+Clone the repository and use the `docker-compose.yml` file to deploy it with docker compose. Or copy this block in a `docker-compose.yml` file pointing to the location of the repository to build the image instead of the `.` 
+
+```yaml
+services:
+  artwork_uploader:
+    build: .
+    ports:
+      - "4567:4567"
+    volumes:
+      - ./bulk_imports:/artwork-uploader/bulk_imports
+      - ./config.json:/artwork-uploader/config.json
+    environment:
+      - PYTHONUNBUFFERED=1
+```
+
+And run 
+```bash
+docker compose up -d
+```
+
+## Directly as a python script
 
 **NOTE**: THIS REQUIRES AT LEAST PYTHON 3.10.  You will encounter odd errors in the scraping log for earlier versions of Python, due to a bug that was fixed in 3.10.
 
