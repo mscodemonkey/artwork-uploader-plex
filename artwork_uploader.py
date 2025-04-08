@@ -35,7 +35,7 @@ from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowN
 
 # ----------------------------------------------
 # Important for autoupdater
-current_version = "v0.3.3-beta"
+current_version = "v0.3.4-beta"
 # ----------------------------------------------
 
 if sys.version_info[0] != 3 or sys.version_info[1] < 10:
@@ -127,7 +127,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
 
     try:
         # Check if the Plex TV and movie libraries are configured
-        if plex.tv_libraries is None or plex.movie_libraries is None:
+        if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please configure your settings.", color="warning")
             return
 
@@ -200,12 +200,10 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
         parsed_urls:    The URLs to scrape.  These can be theposterdb poster, set or user URL or a mediux set URL.
     """
 
-    global plex
-
     try:
 
         # Check if plex setup returned valid values
-        if plex.tv_libraries is None or plex.movie_libraries is None:
+        if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please check the settings.", color="red")
             return
 
@@ -263,11 +261,9 @@ def scrape_tpdb_user(instance: Instance, url, options):
 # Scraped the URL then uploads what it's scraped to Plex
 def scrape_and_upload(instance: Instance, url, options):
 
-    global plex
-
     # Check the connection to Plex
     try:
-        plex.connect()
+        globals.plex.connect()
     except PlexConnectorException as not_connected:
         update_status(instance, str(not_connected), "danger")
         raise
@@ -285,7 +281,7 @@ def scrape_and_upload(instance: Instance, url, options):
 
 
     # Now upload them to Plex
-    processor = UploadProcessor(plex)
+    processor = UploadProcessor(globals.plex)
     processor.set_options(options)
 
     if scraper.collection_artwork:
@@ -341,10 +337,8 @@ def scrape_and_upload(instance: Instance, url, options):
 
 def process_uploaded_artwork(instance: Instance, file_list, filters):
 
-    global plex
-
     # Upload the artwork to Plex
-    processor = UploadProcessor(plex)
+    processor = UploadProcessor(globals.plex)
     processor.set_options(Options(filters = filters))
 
     debug_me("Processing uploaded file and uploading to Plex...","process_uploaded_artwork")
@@ -651,7 +645,7 @@ def setup_web_sockets():
 
             # Reconnect to Plex because the Plex server or token might have changed
             update_log(instance, "Saving updated configuration and reconnecting to Plex")
-            plex.reconnect(config)
+            globals.plex.reconnect(config)
             notify_web(instance, "save_config",{"saved":True, "config": vars(config)})
         except Exception as config_error:
             update_status(instance, str(config_error), color="danger")
@@ -1073,7 +1067,7 @@ if __name__ == "__main__":
     check_for_bulk_import_file(cli_instance)
 
     # Create a connector for Plex
-    plex = PlexConnector(config.base_url, config.token)
+    globals.plex = PlexConnector(config.base_url, config.token)
 
     # Setup scheduler
     setup_scheduler_on_first_load(cli_instance)
@@ -1083,12 +1077,12 @@ if __name__ == "__main__":
 
         # Connect to the TV and Movie libraries
         try:
-            plex.set_tv_libraries(config.tv_library)
+            globals.plex.set_tv_libraries(config.tv_library)
         except PlexConnectorException as e:
             sys.exit(str(e))
 
         try:
-            plex.set_movie_libraries(config.movie_library)
+            globals.plex.set_movie_libraries(config.movie_library)
         except PlexConnectorException as e:
             sys.exit(str(e))
 
@@ -1129,12 +1123,12 @@ if __name__ == "__main__":
 
             # Connect to the TV and Movie libraries
             try:
-                plex.set_tv_libraries(config.tv_library)
+                globals.plex.set_tv_libraries(config.tv_library)
             except PlexConnectorException as e:
                 # sys.exit(str(e))
                 pass
             try:
-                plex.set_movie_libraries(config.movie_library)
+                globals.plex.set_movie_libraries(config.movie_library)
             except PlexConnectorException as e:
                # sys.exit(str(e))
                 pass
