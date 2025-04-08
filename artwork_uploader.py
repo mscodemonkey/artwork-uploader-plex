@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 import base64
 from pathlib import Path
 
@@ -1136,7 +1139,7 @@ if __name__ == "__main__":
             # Create the app and web server
 
             web_app = Flask(__name__, template_folder="templates")
-            globals.web_socket = SocketIO(web_app, cors_allowed_origins="*")
+            globals.web_socket = SocketIO(web_app, cors_allowed_origins="*", async_mode="eventlet")
             threading.Thread(target=check_for_updates_periodically, daemon=True).start()
             setup_web_sockets()
 
