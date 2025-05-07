@@ -18,6 +18,7 @@ class Config:
         self.tpdb_filters = ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"]
         self.track_artwork_ids = True
         self.auto_manage_bulk_files = True
+        self.reset_overlay = False
         self.schedules = []
 
 
@@ -42,6 +43,7 @@ class Config:
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
+            self.reset_overlay = config.get("reset_overlay", False)
             self.schedules = config.get("schedules",[])
 
         except Exception as e:
@@ -56,8 +58,9 @@ class Config:
             "movie_library": ["Movies"],
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover","movie_poster","collection_poster"],
             "tpdb_filters":["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
-            "tracK_artwork_ids": True,
+            "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
+            "reset_overlay": False,
             "schedules": []
         }
 
@@ -86,6 +89,7 @@ class Config:
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
+            "reset_overlay": self.reset_overlay,
             "schedules": self.schedules
         }
 

@@ -394,6 +394,9 @@ function saveConfig() {
     // Checkbox for managing bulk files
     save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
 
+    // Checkbox for reset overlay for Kometa
+    save_config.reset_overlay = document.getElementById("reset_overlay").checked;
+
     // Get selected mediux filters
     save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
         .map(checkbox => checkbox.value);
@@ -437,6 +440,7 @@ function loadConfig() {
             document.getElementById("movie_library").value = data.config.movie_library.join(", ");
             document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids;
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
+            document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
 
             if (Array.isArray(data.config.mediux_filters)) {

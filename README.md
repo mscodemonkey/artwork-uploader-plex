@@ -21,6 +21,9 @@ There are also a couple of new options for thePosterDb, which will allow you to 
 ### Per-URL filtering and artwork excludes 
 And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
 
+### Kometa support
+Reset Kometa's overlay tag so the overlay gets added to new artwork
+
 ### Year matching
 Sometimes the year on Plex and the year at the artwork provider is different.  Use the --year <year> argument to set the Plex year, so the artwork matches.  Also available in the Web UI and bulk files.
 
@@ -97,7 +100,11 @@ This is optional - if you don't do this, a new config.json will be created when 
 ```"auto_manage_bulk_files"```
 - Setting this to ```true``` will automatically add, label and sort URLs from the scrape tab into the currently loaded bulk import file.  At the moment it won't auto-save, but I might add that later.
 - Setting to ```false``` will leave the organisation of your bulk files up to you.
-   
+
+```reset_overlay```
+- Setting this to ```true``` will remove the Overlay label that Kometa uses when we upload new artwork, so Kometa can reapply any overlays in future
+- Setting to ```false``` will leave the Overlay label as it is, Kometa will not re-apply your overlays.
+
 ### Filter options
 Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
       - show_cover

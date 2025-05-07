@@ -1,5 +1,6 @@
 import time
 import utils
+from notifications import debug_me
 from options import Options
 
 class PlexUploader:
@@ -14,6 +15,7 @@ class PlexUploader:
         self.options = Options()
         self.type = None
         self.track_artwork_ids = True
+        self.reset_overlay = False
 
     def set_artwork(self, artwork):
         self.artwork = artwork
@@ -31,9 +33,19 @@ class PlexUploader:
         if isinstance(options, Options):
             self.options = options
 
+    def process_overlay_label(self):
+        if self.reset_overlay:
+            for label in self.upload_target.labels:
+                if str(label) == "Overlay":  # Kometa's label
+                    self.upload_target.removeLabel(label, False)  # Remove the Overlay label
+                    self.upload_target.reload()
+
     def upload_to_plex(self):
         try:
             if self.artwork_exists_on_plex() is False or self.options.force:
+
+                self.process_overlay_label()
+
                 if self.artwork_id == "BID:":
                     if self.type == "file":
                         self.upload_target.uploadArt( filepath = self.artwork['path'])
@@ -64,8 +76,10 @@ class PlexUploader:
                     existing_artwork = True
                     if not self.track_artwork_ids:
                         self.upload_target.removeLabel(existing_label, False)  # Remove the existing label as we're no longer tracking the artwork IDs
+                        self.upload_target.reload()
                 else:
                     self.upload_target.removeLabel(existing_label, False)  # Remove the existing label as we're replacing the artwork
+                    self.upload_target.reload()
 
         return existing_artwork
 

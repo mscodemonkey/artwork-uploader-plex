@@ -39,6 +39,7 @@ class UploadProcessor:
                         uploader = PlexUploader(collection_item, "Poster","P")
                         uploader.set_artwork(artwork)
                         uploader.track_artwork_ids = self.config.track_artwork_ids
+                        uploader.reset_overlay = self.config.reset_overlay
                         uploader.set_description(f"{artwork['title']} : {artwork['id']}")
                         uploader.set_options(self.options)
                         result = uploader.upload_to_plex()
@@ -74,6 +75,7 @@ class UploadProcessor:
                         uploader = PlexUploader(movie_item, "Poster", artwork_id="P")
                         uploader.set_artwork(artwork)
                         uploader.track_artwork_ids = self.config.track_artwork_ids
+                        uploader.reset_overlay = self.config.reset_overlay
                         uploader.set_description(f"{artwork['title']} : {artwork['id']}")
                         if artwork['year']:
                             uploader.set_description(f"{artwork['title']} ({artwork['year']}) : {artwork['id']}")
@@ -161,6 +163,7 @@ class UploadProcessor:
                                 uploader = PlexUploader(upload_target, artwork_type, artwork_id)
                                 uploader.set_artwork(artwork)
                                 uploader.track_artwork_ids = self.config.track_artwork_ids
+                                uploader.reset_overlay = self.config.reset_overlay
                                 uploader.set_description(description)
                                 uploader.set_options(self.options)
                                 result = uploader.upload_to_plex()
