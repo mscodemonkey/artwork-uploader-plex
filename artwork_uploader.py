@@ -38,7 +38,7 @@ from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowN
 
 # ----------------------------------------------
 # Important for autoupdater
-current_version = "v0.3.5-beta"
+current_version = "v0.3.6-beta"
 # ----------------------------------------------
 
 if sys.version_info[0] != 3 or sys.version_info[1] < 10:

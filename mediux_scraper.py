@@ -27,7 +27,7 @@ class MediuxScraper:
 
         self.soup = soup_utils.cook_soup(self.url)
 
-        base_url = "https://mediux.pro/_next/image?url=https%3A%2F%2Fapi.mediux.pro%2Fassets%2F"
+        base_url = "https://api.mediux.pro/assets/"
         quality_suffix = "&w=3840&q=80"
         scripts = self.soup.find_all('script')
         media_type = None
