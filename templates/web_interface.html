@@ -518,6 +518,32 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="col mb-3">
+                        <div class="p-3 border">
+                            <label for="plex_title" class="form-label">Plex title:</label>
+                            <input type="text" id="plex_title" name="plex_title" class="form-control"
+                                value=""
+                                placeholder="(if different to file title)"
+                                title="If your title in Plex is different to the title in the file(s), enter it here to process it correctly">
+                        </div>
+                    </div>
+                    <div class="mb-3 col-md-4 col-lg-3">
+                        <div class="p-3 border">
+                                <label for="plex_year" class="form-label">Plex year:</label>
+                                <input type="text" id="plex_year" name="plex_year" class="form-control"
+                                    value=""
+                                    placeholder="e.g. 1978 or 2023"
+                                    pattern="^(19|20)\d{2}$"
+                                    title="Use this if the year in Plex is different to that on MediUX or TPDb">
+                                <div class="invalid-feedback">Please use a valid year (eg 1978, 2023).</div>
+                        </div>
+                    </div>
+                </div>
+
+
+
                 <div class="row mb-3">
                     <div class="col">
                         <div class="p-3 border">

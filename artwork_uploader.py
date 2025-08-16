@@ -38,7 +38,7 @@ from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowN
 
 # ----------------------------------------------
 # Important for autoupdater
-current_version = "v0.3.6-beta"
+current_version = "v0.3.7-beta"
 # ----------------------------------------------
 
 if sys.version_info[0] != 3 or sys.version_info[1] < 10:
@@ -338,11 +338,11 @@ def scrape_and_upload(instance: Instance, url, options):
     return title
 
 
-def process_uploaded_artwork(instance: Instance, file_list, filters):
+def process_uploaded_artwork(instance: Instance, file_list, filters, plex_title = None, plex_year = None):
 
     # Upload the artwork to Plex
     processor = UploadProcessor(globals.plex)
-    processor.set_options(Options(filters = filters))
+    processor.set_options(Options(filters = filters, year=plex_year))
 
     debug_me("Processing uploaded file and uploading to Plex...","process_uploaded_artwork")
     notify_web(instance, "progress_bar", {"percent": 0})
@@ -351,6 +351,10 @@ def process_uploaded_artwork(instance: Instance, file_list, filters):
 
     for artwork in file_list:
         try:
+
+            if plex_title is not None:
+                artwork['title'] = plex_title
+
             processed_files = processed_files + 1
             result = None
             line_status = f'Processing artwork for {artwork["media"].lower()} "{artwork["title"]}"{" - Season " + str(artwork["season"]) if artwork["season"] else ""}{", Episode " + str(artwork["episode"]) if artwork["episode"] else ""}'
@@ -772,6 +776,9 @@ def setup_web_sockets():
 
         file_name = data.get("fileName")
         filters = data.get("filters")
+        plex_year = data.get("plex_year")
+        plex_title = data.get("plex_title")
+
         instance = Instance(data.get("instance_id"), "web")
 
         debug_me(f"Upload complete for {file_name}, processing...","handle_upload_complete")
@@ -782,7 +789,7 @@ def setup_web_sockets():
         if file_name in upload_chunks and len(upload_chunks[file_name]["chunks"]) == int(upload_chunks[file_name]["total_chunks"]):
 
             debug_me(f"Upload complete for {file_name}, saving file...","handle_upload_complete")
-            save_uploaded_file(instance, file_name, filters)
+            save_uploaded_file(instance, file_name, filters, plex_title, plex_year)
 
             # Cleanup after saving the file
             try:
@@ -796,7 +803,7 @@ def setup_web_sockets():
             except:
                 pass
 
-    def save_uploaded_file(instance: Instance, file_name, filters):
+    def save_uploaded_file(instance: Instance, file_name, filters, plex_title, plex_year):
         """Assembles chunks and saves the file"""
 
         #print(file_name, filters, type(upload_chunks[file_name]["chunks"][0]))  # Debugging
@@ -816,7 +823,7 @@ def setup_web_sockets():
 
         #debug_me(str(extracted_files),"save_uploaded_file")
 
-        process_uploaded_artwork(instance, extracted_files, filters)
+        process_uploaded_artwork(instance, extracted_files, filters, plex_title, plex_year)
 
         notify_web(instance, "upload_complete", {"files": extracted_files})
         update_status(instance, "Finished processing uploaded file.", color="success")

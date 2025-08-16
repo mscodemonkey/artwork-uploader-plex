@@ -1169,7 +1169,10 @@ function uploadFile(file) {
                     });
                 }
 
-                socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, filters: filters });
+                const plex_year = document.getElementById("plex_year").value;
+                const plex_title = document.getElementById("plex_title").value;
+
+                socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, filters: filters, plex_title: plex_title, plex_year: plex_year });
 
                 return; // Ensure no further execution in this function
             }
