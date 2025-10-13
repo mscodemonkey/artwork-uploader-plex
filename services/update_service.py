@@ -1,0 +1,110 @@
+"""
+Service for checking application updates from GitHub.
+
+Extracted from artwork_uploader.py to reduce file size and improve
+maintainability.
+"""
+
+from typing import Optional, Callable
+import threading
+import time
+import requests
+
+
+class UpdateService:
+    """Handles checking for application updates from GitHub."""
+
+    def __init__(
+        self,
+        github_repo: str,
+        current_version: str,
+        check_interval: int = 3600
+    ) -> None:
+        """
+        Initialize the update service.
+
+        Args:
+            github_repo: GitHub repository (e.g., "user/repo")
+            current_version: Current version of the application
+            check_interval: Seconds between update checks (default: 3600 = 1 hour)
+        """
+        self.github_repo = github_repo
+        self.current_version = current_version
+        self.check_interval = check_interval
+        self.update_thread: Optional[threading.Thread] = None
+        self.is_running = False
+
+    def get_latest_version(self) -> Optional[str]:
+        """
+        Fetch the latest release version from GitHub.
+
+        Returns:
+            Latest version tag if found, None otherwise
+        """
+        url = f"https://api.github.com/repos/{self.github_repo}/releases/latest"
+        try:
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                return response.json()["tag_name"]
+        except Exception:
+            pass
+        return None
+
+    def check_for_update(self) -> Optional[str]:
+        """
+        Check if a newer version is available.
+
+        Returns:
+            New version string if available, None if up to date or check failed
+        """
+        latest_version = self.get_latest_version()
+        if latest_version and latest_version != self.current_version:
+            return latest_version
+        return None
+
+    def start_periodic_check(
+        self,
+        on_update_available: Callable[[str], None]
+    ) -> bool:
+        """
+        Start periodic update checking in a background thread.
+
+        Args:
+            on_update_available: Callback function called with version string
+                                when update is available
+
+        Returns:
+            True if started, False if already running
+        """
+        if self.update_thread is None or not self.update_thread.is_alive():
+            self.is_running = True
+            self.update_thread = threading.Thread(
+                target=self._check_periodically,
+                args=(on_update_available,),
+                daemon=True
+            )
+            self.update_thread.start()
+            return True
+        return False
+
+    def stop_periodic_check(self) -> None:
+        """Stop the periodic update checking."""
+        self.is_running = False
+        if self.update_thread:
+            self.update_thread.join(timeout=2)
+
+    def _check_periodically(
+        self,
+        on_update_available: Callable[[str], None]
+    ) -> None:
+        """
+        Internal method that runs in the update checking thread.
+
+        Args:
+            on_update_available: Callback function for update notifications
+        """
+        while self.is_running:
+            new_version = self.check_for_update()
+            if new_version:
+                on_update_available(new_version)
+            time.sleep(self.check_interval)

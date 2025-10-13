@@ -43,6 +43,15 @@ from constants import (
     MIN_PYTHON_MINOR
 )
 from enums import InstanceMode, ScraperSource
+from services import (
+    BulkFileService,
+    ImageService,
+    ArtworkProcessor,
+    ProcessingCallbacks,
+    SchedulerService,
+    UpdateService,
+    UtilityService
+)
 
 # ----------------------------------------------
 # Important for autoupdater
@@ -82,8 +91,11 @@ except (ModuleNotFoundError, ImportError) as e:
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
 mode = InstanceMode.CLI.value
-scheduled_jobs = {}
-scheduled_jobs_by_file = {}
+scheduled_jobs = {}  # Legacy - kept for backwards compatibility
+scheduled_jobs_by_file = {}  # Legacy - kept for backwards compatibility
+bulk_file_service = None  # Initialized in main
+scheduler_service = None  # Initialized in main
+update_service = None  # Initialized in main
 
 
 github_repo = GITHUB_REPO  # For autoupdater
@@ -133,10 +145,7 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
 
 def get_exe_dir():
     """Get the directory of the executable or script file."""
-    if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)  # Path to executable
-    else:
-        return os.path.dirname(__file__)  # Path to script file
+    return UtilityService.get_exe_dir()
 
 
 def process_scrape_url_from_web(instance: Instance, url: str) -> None:
@@ -287,151 +296,90 @@ def scrape_tpdb_user(instance: Instance, url, options):
 
 # Scraped the URL then uploads what it's scraped to Plex
 def scrape_and_upload(instance: Instance, url, options):
+    """
+    Scrape artwork from a URL and upload to Plex.
 
-    # Check the connection to Plex
+    This is now a thin wrapper around ArtworkProcessor that handles
+    UI updates via callbacks.
+    """
+    # Create callbacks for UI updates
+    def status_callback(message: str, color: str, spinner: bool, sticky: bool):
+        update_status(instance, message, color, sticky=sticky, spinner=spinner)
+
+    def log_callback(message: str):
+        update_log(instance, message)
+
+    callbacks = ProcessingCallbacks(
+        on_status_update=status_callback,
+        on_log_update=log_callback
+    )
+
+    # Use the service to do the actual work
     try:
-        globals.plex.connect()
+        processor = ArtworkProcessor(globals.plex)
+        return processor.scrape_and_process(url, options, callbacks)
     except PlexConnectorException as not_connected:
         update_status(instance, str(not_connected), "danger")
         raise
 
-    # Let's scrape the posters first
-    scraper = Scraper(url)
-    scraper.set_options(options)
-    try:
-        scraper.scrape()
-        title = scraper.title
-    except ScraperException:
-        raise
-    except Exception as e:
-        raise Exception(e)
-
-
-    # Now upload them to Plex
-    processor = UploadProcessor(globals.plex)
-    processor.set_options(options)
-
-    if scraper.collection_artwork:
-        for artwork in scraper.collection_artwork:
-            try:
-                update_status(instance, f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
-                result = processor.process_collection_artwork(artwork)
-                update_log(instance, result)
-            except CollectionNotFound as not_found:
-                update_log(instance, f"∙ {str(not_found)}")
-            except NotProcessedByExclusion as excluded:
-                update_log(instance, f"- {str(excluded)}")
-            except NotProcessedByFilter as not_processed:
-                update_log(instance, f"- {str(not_processed)}")
-            except Exception as error_unexpected:
-                update_log(instance, f"x {str(error_unexpected)}")
-                update_status(instance, f"Error: {str(error_unexpected)}", "danger")
-
-    if scraper.movie_artwork:
-        for artwork in scraper.movie_artwork:
-            try:
-                update_status(instance, f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
-                result = processor.process_movie_artwork(artwork)
-                update_log(instance, result)
-            except MovieNotFound as not_found:
-                update_log(instance, f"∙ {str(not_found)}")
-            except NotProcessedByExclusion as excluded:
-                update_log(instance, f"- {str(excluded)}")
-            except NotProcessedByFilter as not_processed:
-                update_log(instance, f"- {str(not_processed)}")
-            except Exception as error_unexpected:
-                update_log(instance, f"x {str(error_unexpected)}")
-                update_status(instance, f"Error: {str(error_unexpected)}", "danger")
-
-    if scraper.tv_artwork:
-        for artwork in scraper.tv_artwork:
-            try:
-                update_status(instance, f'Processing artwork for {artwork["title"]}', spinner=True, sticky=True)
-                result = processor.process_tv_artwork(artwork)
-                update_log(instance, result)
-            except ShowNotFound as not_found:
-                update_log(instance, f"∙ {str(not_found)}")
-            except NotProcessedByExclusion as excluded:
-                update_log(instance, f"- {str(excluded)}")
-            except NotProcessedByFilter as not_processed:
-                update_log(instance, f"- {str(not_processed)}")
-            except Exception as error_unexpected:
-                update_log(instance, f"x {str(error_unexpected)}")
-                update_status(instance, f"Error: {str(error_unexpected)}", "danger")
-
-    return title
-
 
 def process_uploaded_artwork(instance: Instance, file_list, filters, plex_title = None, plex_year = None):
+    """
+    Process uploaded artwork files and upload to Plex.
 
-    # Upload the artwork to Plex
-    processor = UploadProcessor(globals.plex)
-    processor.set_options(Options(filters = filters, year=plex_year))
+    This is now a thin wrapper around ArtworkProcessor that handles
+    UI updates via callbacks.
+    """
+    # Create callbacks for UI updates
+    def status_callback(message: str, color: str, spinner: bool, sticky: bool):
+        update_status(instance, message, color, sticky=sticky, spinner=spinner)
 
-    debug_me("Processing uploaded file and uploading to Plex...","process_uploaded_artwork")
-    notify_web(instance, "progress_bar", {"percent": 0})
+    def log_callback(message: str):
+        update_log(instance, message)
 
-    processed_files = 0
+    def progress_callback(current: int, total: int):
+        percent = (current / total * 100) if total > 0 else 0
+        message = f"{current} of {total}" if current > 0 else ""
+        notify_web(instance, "progress_bar", {"message": message, "percent": percent})
 
-    for artwork in file_list:
-        try:
+    def debug_callback(message: str, context: str):
+        debug_me(message, context)
 
-            if plex_title is not None:
-                artwork['title'] = plex_title
+    callbacks = ProcessingCallbacks(
+        on_status_update=status_callback,
+        on_log_update=log_callback,
+        on_progress_update=progress_callback,
+        on_debug=debug_callback
+    )
 
-            processed_files = processed_files + 1
-            result = None
-            line_status = f'Processing artwork for {artwork["media"].lower()} "{artwork["title"]}"{" - Season " + str(artwork["season"]) if artwork["season"] else ""}{", Episode " + str(artwork["episode"]) if artwork["episode"] else ""}'
-            notify_web(instance, "progress_bar", {"message": f"{processed_files} of {len(file_list)}", "percent" : (processed_files / len(file_list) * 100)})
-            update_status(instance, message=line_status, spinner=True, sticky=True)
-            debug_me(line_status,"process_uploaded_artwork")
-            if artwork['media'] == "Collection":
-                result = processor.process_collection_artwork(artwork)
-            elif artwork['media'] == "Movie":
-                result = processor.process_movie_artwork(artwork)
-            elif artwork['media'] == "TV Show":
-                result = processor.process_tv_artwork(artwork)
-            update_log(instance, result)
-        except CollectionNotFound as not_found:
-            update_log(instance, f"∙ {str(not_found)}")
-        except NotProcessedByExclusion as excluded:
-            update_log(instance, f"- {str(excluded)}")
-        except NotProcessedByFilter as not_processed:
-            update_log(instance, f"- {str(not_processed)}")
-        except Exception as error_unexpected:
-            update_log(instance, f"x Unexpected during process_uploaded_artwork:  {str(error_unexpected)}")
-            update_status(instance, f"Error: {str(error_unexpected)}", "danger")
-
-    notify_web(instance, "progress_bar", {"message": f"{len(file_list)} of {len(file_list)}", "percent": 100})
+    # Use the service to do the actual work
+    options = Options(filters=filters, year=plex_year)
+    processor = ArtworkProcessor(globals.plex)
+    processor.process_uploaded_files(file_list, options, callbacks, override_title=plex_title)
 
 
 # * Bulk import file I/O functions ---
 def load_bulk_import_file(instance: Instance, filename = None):
-
     """Load the bulk import file into the text area."""
-
     global config
 
     try:
         # Get the current bulk_txt value from the config
         bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
-        bulk_imports_path = "bulk_imports/"
 
-        # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
-        bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
-
-        if not os.path.exists(bulk_import_file):
+        # Check if file exists
+        if not bulk_file_service.file_exists(bulk_import_filename):
             if instance.mode == "cli":
-                print(f"File does not exist: {bulk_import_file}")
+                print(f"File does not exist: {bulk_import_filename}")
             if instance.mode == "web":
-                update_status(instance, f"File does not exist: {bulk_import_file}")
+                update_status(instance, f"File does not exist: {bulk_import_filename}")
             return
 
-        with open(bulk_import_file, "r", encoding="utf-8") as file:
-            content = file.read()
+        # Read file using service
+        content = bulk_file_service.read_file(bulk_import_filename)
 
         if instance.mode == "web":
-            notify_web(instance, "load_bulk_import", {"loaded": True, "filename": bulk_import_filename, "bulk_import_text":content})
+            notify_web(instance, "load_bulk_import", {"loaded": True, "filename": bulk_import_filename, "bulk_import_text": content})
 
     except FileNotFoundError:
         notify_web(instance, "load_bulk_import", {"loaded": False})
@@ -440,19 +388,11 @@ def load_bulk_import_file(instance: Instance, filename = None):
 
 
 def rename_bulk_import_file(instance: Instance, old_name, new_name):
-
-    bulk_imports_path = "bulk_imports/"
-
-    debug_me(f"Renaming from {old_name} to {new_name}","rename_bulk_import_file")
+    debug_me(f"Renaming from {old_name} to {new_name}", "rename_bulk_import_file")
 
     if old_name != new_name:
         try:
-
-            # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
-            old_filename = os.path.join(get_exe_dir(), bulk_imports_path, old_name)
-            new_filename = os.path.join(get_exe_dir(), bulk_imports_path, new_name)
-            os.rename(old_filename, new_filename)
-
+            bulk_file_service.rename_file(old_name, new_name)
             notify_web(instance, "rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
             update_status(instance, f"Renamed to {new_name}", "success")
         except Exception as e:
@@ -461,16 +401,9 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
 
 
 def delete_bulk_import_file(instance: Instance, file_name):
-
-    bulk_imports_path = "bulk_imports/"
-
     if file_name:
         try:
-
-            # Use get_exe_dir() to determine the correct path for both frozen and non-frozen cases
-            filename = os.path.join(get_exe_dir(), bulk_imports_path, file_name)
-            os.remove(filename)
-
+            bulk_file_service.delete_file(file_name)
             notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
             update_status(instance, f"Deleted {file_name}", "success")
         except Exception as e:
@@ -480,21 +413,15 @@ def delete_bulk_import_file(instance: Instance, file_name):
 
 def save_bulk_import_file(instance: Instance, contents = None, filename = None, now_load = None):
     """Save the bulk import text area content to a file relative to the executable location."""
-
     if contents:
         try:
-            exe_path = get_exe_dir()
-            bulk_import_path = "bulk_imports/"
-            bulk_import_file = os.path.join(exe_path, bulk_import_path, filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
+            bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
 
-            os.makedirs(os.path.dirname(bulk_import_file), exist_ok=True)
+            debug_me(f"Saving {bulk_import_filename}", "save_bulk_import_file")
 
-            debug_me("Saving" + bulk_import_file, "save_bulk_import_file")
+            bulk_file_service.write_file(contents, bulk_import_filename)
 
-            with open(bulk_import_file, "w", encoding="utf-8") as file:
-                file.write(contents)
-
-            update_status(instance, message="Bulk import file " + filename + " saved", color="success")
+            update_status(instance, message=f"Bulk import file {filename} saved", color="success")
             notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
         except Exception as e:
             update_status(instance, message="Error saving bulk import file", color="danger")
@@ -503,37 +430,22 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
 
 def check_for_bulk_import_file(instance: Instance):
     """Check if any .txt files exist in the bulk_imports folder before creating bulk_import.txt."""
-    contents = "## This is a blank bulk import file\n// You can use comments with # or // like this"
-
     try:
-        exe_path = get_exe_dir()
-        bulk_import_path = os.path.join(exe_path, "bulk_imports")
-        bulk_import_file = os.path.join(bulk_import_path, config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt")
-
-        # Firstly, make sure the bulk_imports folder exists
-        os.makedirs(bulk_import_path, exist_ok=True)
-
-        # And that the default bulk file doesn't exist...
-        if not os.path.isfile(bulk_import_file):
-            with open(bulk_import_file, "w", encoding="utf-8") as file:
-                file.write(contents)
-
+        bulk_import_filename = config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+        bulk_file_service.ensure_default_file_exists(bulk_import_filename)
     except Exception as e:
         update_status(instance, message="Error creating bulk import file", color="danger")
 
 
 def find_bulk_file(filename: str = None):
-
-    bulk_imports_path = "bulk_imports/"
-
+    """Find a bulk import file - returns full path if exists, None otherwise."""
     # Get the current bulk_txt value from the config
     bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
 
-    # Use get_exe_dir() to determine the correct path
-    bulk_import_file = os.path.join(get_exe_dir(), bulk_imports_path, bulk_import_filename)
-
-    # Return the full path if it exists
-    return bulk_import_file if os.path.exists(bulk_import_file) else None
+    # Use the service to check if file exists
+    if bulk_file_service.file_exists(bulk_import_filename):
+        return bulk_file_service.get_bulk_file_path(bulk_import_filename)
+    return None
 
 
 def setup_web_sockets():
@@ -541,7 +453,6 @@ def setup_web_sockets():
     @web_app.route("/")
     def home():
         return render_template("web_interface.html", config=config)
-
 
 
 
@@ -921,57 +832,24 @@ def setup_web_sockets():
     globals.web_socket.run(web_app, host=DEFAULT_WEB_HOST, port=DEFAULT_WEB_PORT, debug=globals.debug) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
 
 def check_image_orientation(image_path):
-    with Image.open(image_path) as img:
-        width, height = img.size
-
-    if width > height:
-        return "landscape"
-    elif width < height:
-        return "portrait"
-    else:
-        return "square"
+    """Check image orientation using ImageService."""
+    return ImageService.check_orientation(image_path)
 
 def sort_key(item):
-    def parse_season(season):
-        # If the season is missing, None, or non-numeric, treat it as the highest possible value
-        if season is None or not isinstance(season, (int, str)) or (isinstance(season, str) and not season.isdigit()):
-            return float('inf')
-        return int(season)
-
-    def parse_episode(episode):
-        # Handle missing or non-numeric episodes
-        return int(episode) if isinstance(episode, int) else float('inf')
-
-    def parse_source(source):
-        # Treat missing source or invalid entries as empty string to ensure they are last
-        return source if source else ''
-
-    # Now safely get the values, even if they are missing
-    season_value = parse_season(item.get('season'))  # Using .get() to avoid KeyError
-    episode_value = parse_episode(item.get('episode'))  # Same for episode
-    source_value = parse_source(item.get('source'))  # Same for source
-
-    return item['media'], season_value, episode_value, source_value
+    """Sort key for artwork items - uses UtilityService."""
+    return UtilityService.sort_key(item)
 
 # Autoupdate functions
 
 def get_latest_version():
     """Fetch the latest release version from GitHub."""
-    url = f"https://api.github.com/repos/{github_repo}/releases/latest"
-    response = requests.get(url)
-    debug_me(str(response.status_code),"get_latest_version")
-    if response.status_code == 200:
-        return response.json()["tag_name"]
-    return None
+    return update_service.get_latest_version() if update_service else None
 
 def check_for_updates_periodically():
-    """Background task to check for updates periodically."""
-    while True:
-        latest_version = get_latest_version()
-        if latest_version and latest_version != current_version:
-            debug_me("Later version", "check_for_updates_periodically")
-            notify_web(Instance(broadcast = True),"update_available", {"version": latest_version})
-        time.sleep(UPDATE_CHECK_INTERVAL)
+    """Background task to check for updates periodically - now handled by UpdateService."""
+    # This function is kept for backwards compatibility but is no longer used
+    # The UpdateService handles periodic checks automatically
+    pass
 
 
 
@@ -1002,55 +880,44 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
         update_log(instance, f"@ Scheduled import unexpectedly failed ({str(e)})")
 
 
-# Function to start the scheduler safely
-def start_scheduler():
-    global scheduler_thread
-    if scheduler_thread is None or not scheduler_thread.is_alive():
-        scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-        scheduler_thread.start()
-        debug_me("Scheduler started.","start_scheduler")
-    else:
-        debug_me("Scheduler is already running.","start_scheduler")
-
-
-# Check for scheduled jobs periodically
-def run_scheduler():
-    while True:
-        schedule.run_pending()
-        time.sleep(SCHEDULER_CHECK_INTERVAL)
+# Legacy functions - now handled by SchedulerService
+# Kept for backwards compatibility but no longer used internally
 
 
 #Initialises the scheduler when the script is run
 def setup_scheduler_on_first_load(instance: Instance):
-
     """
-
-    Initialises the scheduler when the script is run and sets up each schedule from the config file
+    Initialises the scheduler when the script is run and sets up each schedule from the config file.
 
     Args:
         instance: Instance ID
 
     Returns: None
-
     """
-
     # If there are no scheduled jobs already...
-    if not scheduled_jobs:
+    if not scheduler_service.has_schedules():
         for each_schedule in config.schedules:
             schedule_file = each_schedule.get("file")
             schedule_time = each_schedule.get("time")
 
-            job = schedule.every().day.at(schedule_time).do(lambda: add_file_to_schedule_thread(instance, schedule_file))
+            # Create the callback for this schedule
+            def schedule_callback(filename=schedule_file):
+                add_file_to_schedule_thread(instance, filename)
 
-            # Create a unique job ID
-            job_id = str(uuid.uuid4())
+            # Add to scheduler service
+            job_id = scheduler_service.add_schedule(
+                schedule_file,
+                schedule_time,
+                schedule_callback
+            )
 
-            # Store job reference
-            scheduled_jobs[job_id] = job
-            scheduled_jobs_by_file[schedule_file] = job_id
+            # Store job reference in config and legacy dicts
             each_schedule["jobReference"] = job_id
+            scheduled_jobs_by_file[schedule_file] = job_id
 
-        start_scheduler()
+        # Start the scheduler
+        if scheduler_service.start():
+            debug_me("Scheduler started.", "setup_scheduler_on_first_load")
 
         debug_me(config.schedules, "setup_scheduler_on_first_load")
 
@@ -1099,6 +966,15 @@ if __name__ == "__main__":
         sys.exit("Can't load config.json file.  Please check that the file exists and is in the correct format.")
     except Exception as config_load_exception:
         sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
+
+    # Create services
+    bulk_file_service = BulkFileService(get_exe_dir())
+    scheduler_service = SchedulerService(check_interval=SCHEDULER_CHECK_INTERVAL)
+    update_service = UpdateService(
+        github_repo=GITHUB_REPO,
+        current_version=current_version,
+        check_interval=UPDATE_CHECK_INTERVAL
+    )
 
     # Make sure there's at least one bulk_import file
     check_for_bulk_import_file(cli_instance)
@@ -1201,6 +1077,13 @@ if __name__ == "__main__":
 
             web_app = Flask(__name__, template_folder="templates")
             globals.web_socket = SocketIO(web_app, cors_allowed_origins="*", async_mode="eventlet")
-            threading.Thread(target=check_for_updates_periodically, daemon=True).start()
+
+            # Start update checker using UpdateService
+            def on_update_available(version: str):
+                debug_me(f"Later version: {version}", "update_service")
+                notify_web(Instance(broadcast=True), "update_available", {"version": version})
+
+            update_service.start_periodic_check(on_update_available)
+
             setup_web_sockets()
 
