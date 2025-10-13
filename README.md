@@ -50,6 +50,14 @@ Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the o
 ## Disclaimer
 This is a first project for me, i'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that scraping breaks the terms of service of TPDb so please consider using the upload Zip feature from there.  Wish these sites had APIs!
 
+## For Developers
+If you're interested in contributing to this project or want to understand how it works under the hood, check out the [Technical Information for Contributors](TECHNICAL_INFO.md) which includes:
+- Architecture overview
+- Service layer documentation
+- How to add new features
+- Testing procedures
+- Code style guidelines
+
 ---
 # Installation
 

@@ -109,3 +109,6 @@ BATCH_*.md
 REFACTORING_*.md
 REMAINING_IMPROVEMENTS.md
 DEVELOPER_GUIDE.md
+
+# Keep technical documentation for contributors
+!TECHNICAL_INFO.md
