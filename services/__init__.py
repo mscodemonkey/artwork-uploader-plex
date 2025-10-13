@@ -11,6 +11,7 @@ from .artwork_processor import ArtworkProcessor, ProcessingCallbacks
 from .scheduler_service import SchedulerService
 from .update_service import UpdateService
 from .utility_service import UtilityService
+from .authentication_service import AuthenticationService
 
 __all__ = [
     'BulkFileService',
@@ -19,5 +20,6 @@ __all__ = [
     'ProcessingCallbacks',
     'SchedulerService',
     'UpdateService',
-    'UtilityService'
+    'UtilityService',
+    'AuthenticationService'
 ]

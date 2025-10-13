@@ -601,6 +601,7 @@ if __name__ == "__main__":
 
     # Create config as a global object
     config = Config()
+    globals.config = config  # Also store in globals for cross-module access
 
     # Load the config from the config.json file
     try:
@@ -719,6 +720,13 @@ if __name__ == "__main__":
             # Create the app and web server
 
             web_app = Flask(__name__, template_folder="templates")
+
+            # Configure session for authentication
+            import secrets
+            from datetime import timedelta
+            web_app.config['SECRET_KEY'] = secrets.token_hex(32)
+            web_app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+
             globals.web_socket = SocketIO(web_app, cors_allowed_origins="*", async_mode="eventlet")
 
             # Start update checker using UpdateService

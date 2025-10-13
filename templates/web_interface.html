@@ -112,6 +112,9 @@
             role="tab" aria-controls="uploader" aria-selected="true">Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
             role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block">Upload&nbsp;</span>Log</a>
+            <a class="nav-link ms-auto" id="logout-link" href="/logout" style="display: none;">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </a>
         </nav>
 
         <div class="progress mt-3 collapse" id="progress_bar_container" role="progressbar" aria-label="Progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
@@ -158,6 +161,30 @@
                                     <input type="text" id="movie_library" name="movie_library" class="form-control" required>
                                     <div class="invalid-feedback">
                                         Please provide your Movie library name. If more than one, separate using commas.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Authentication Settings -->
+                            <div class="p-3 border mt-3">
+                                <h5 class="mb-3">Authentication Settings</h5>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="auth_enabled"/>
+                                    <label for="auth_enabled" class="form-check-label">Enable password protection</label>
+                                </div>
+                                <div id="auth_settings" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="auth_username" class="form-label">Username:</label>
+                                        <input type="text" id="auth_username" name="auth_username" class="form-control" placeholder="admin">
+                                        <small class="form-text text-muted">Username for login</small>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="auth_password" class="form-label">Password:</label>
+                                        <input type="password" id="auth_password" name="auth_password" class="form-control" placeholder="Enter new password">
+                                        <small class="form-text text-muted">Leave blank to keep existing password</small>
+                                    </div>
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle"></i> You will need to log in with these credentials after saving. Sessions last 7 days with "Remember me" enabled.
                                     </div>
                                 </div>
                             </div>

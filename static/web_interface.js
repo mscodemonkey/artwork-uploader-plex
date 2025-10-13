@@ -405,10 +405,33 @@ function saveConfig() {
     save_config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
         .map(checkbox => checkbox.value);
 
-    // Save schedules (Ensure it’s an array)
+    // Save schedules (Ensure it's an array)
     save_config.schedules = Array.isArray(schedules) ? schedules : [];
 
-    socket.emit("save_config", { instance_id: instanceId, config: save_config });
+    // Authentication settings
+    save_config.auth_enabled = document.getElementById("auth_enabled").checked;
+    save_config.auth_username = document.getElementById("auth_username").value.trim();
+    // Don't send password in save_config - it's handled separately
+
+    // Check if we need to set a new password
+    const newPassword = document.getElementById("auth_password").value;
+    if (save_config.auth_enabled && newPassword) {
+        // First set the password
+        socket.emit("set_password", {
+            instance_id: instanceId,
+            username: save_config.auth_username,
+            password: newPassword
+        });
+        // Clear the password field
+        document.getElementById("auth_password").value = "";
+
+        // Wait a moment then save config
+        setTimeout(() => {
+            socket.emit("save_config", { instance_id: instanceId, config: save_config });
+        }, 500);
+    } else {
+        socket.emit("save_config", { instance_id: instanceId, config: save_config });
+    }
 
     // Prevent duplicate event listeners
     socket.once("save_config", (data) => {
@@ -442,6 +465,18 @@ function loadConfig() {
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
+
+            // Load authentication settings
+            document.getElementById("auth_enabled").checked = data.config.auth_enabled || false;
+            document.getElementById("auth_username").value = data.config.auth_username || "";
+            // Toggle auth settings visibility
+            toggleAuthSettings();
+            // Show/hide logout button based on auth enabled
+            if (data.config.auth_enabled) {
+                document.getElementById("logout-link").style.display = "block";
+            } else {
+                document.getElementById("logout-link").style.display = "none";
+            }
 
             if (Array.isArray(data.config.mediux_filters)) {
                 document.querySelectorAll('[id^="m_filter-"]').forEach(checkbox => {
@@ -1374,3 +1409,21 @@ socket.on("backend_restarting", function() {
             location.reload();  // Reload to attempt reconnection
         }, 3000);  // Delay for 3 seconds before refresh to allow connection retry
     });
+
+// ==================================================
+// Authentication Settings Toggle
+// ==================================================
+
+function toggleAuthSettings() {
+    const authEnabled = document.getElementById("auth_enabled").checked;
+    const authSettings = document.getElementById("auth_settings");
+    if (authEnabled) {
+        authSettings.style.display = "block";
+    } else {
+        authSettings.style.display = "none";
+    }
+}
+
+// Add event listener for auth_enabled checkbox
+document.getElementById("auth_enabled").addEventListener("change", toggleAuthSettings);
+

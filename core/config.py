@@ -42,6 +42,9 @@ class Config:
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
         self.schedules: List[Dict[str, Any]] = []
+        self.auth_enabled: bool = False
+        self.auth_username: str = ""
+        self.auth_password_hash: str = ""
 
 
     def load(self) -> None:
@@ -67,6 +70,9 @@ class Config:
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
             self.reset_overlay = config.get("reset_overlay", False)
             self.schedules = config.get("schedules", [])
+            self.auth_enabled = config.get("auth_enabled", False)
+            self.auth_username = config.get("auth_username", "")
+            self.auth_password_hash = config.get("auth_password_hash", "")
 
         except Exception as e:
             raise ConfigLoadError from e
@@ -113,7 +119,10 @@ class Config:
             "track_artwork_ids": self.track_artwork_ids,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
             "reset_overlay": self.reset_overlay,
-            "schedules": self.schedules
+            "schedules": self.schedules,
+            "auth_enabled": self.auth_enabled,
+            "auth_username": self.auth_username,
+            "auth_password_hash": self.auth_password_hash
         }
 
         try:

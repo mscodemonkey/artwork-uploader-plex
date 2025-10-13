@@ -21,8 +21,9 @@ import threading
 import subprocess
 from pathlib import Path
 
-from flask import render_template, send_from_directory
+from flask import render_template, send_from_directory, request, redirect, url_for, session
 import schedule
+from functools import wraps
 
 from core import globals
 from utils import utils
@@ -30,7 +31,26 @@ from models.instance import Instance
 from core.config import Config
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
-from services import UtilityService
+from services import UtilityService, AuthenticationService
+
+
+def login_required(f):
+    """Decorator to require authentication for routes."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Get config from globals
+        config = globals.config if hasattr(globals, 'config') and globals.config else None
+
+        # If auth not enabled, allow access
+        if not config or not config.auth_enabled:
+            return f(*args, **kwargs)
+
+        # Check if user is logged in
+        if not session.get('authenticated'):
+            return redirect(url_for('login'))
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 def setup_routes(web_app, config: Config):
@@ -41,18 +61,55 @@ def setup_routes(web_app, config: Config):
         web_app: Flask application instance
         config: Configuration object
     """
+    @web_app.route("/login", methods=["GET", "POST"])
+    def login():
+        """Handle user login."""
+        # If auth not enabled, redirect to home
+        if not config.auth_enabled:
+            return redirect(url_for('home'))
+
+        # Already logged in
+        if session.get('authenticated'):
+            return redirect(url_for('home'))
+
+        error = None
+
+        if request.method == "POST":
+            username = request.form.get('username', '')
+            password = request.form.get('password', '')
+            remember = request.form.get('remember') == 'on'
+
+            # Authenticate
+            if AuthenticationService.authenticate(username, password, config.auth_username, config.auth_password_hash):
+                session['authenticated'] = True
+                session.permanent = remember  # Set to 7 days if remember is checked
+                return redirect(url_for('home'))
+            else:
+                error = "Invalid username or password"
+
+        return render_template("login.html", error=error)
+
+    @web_app.route("/logout")
+    def logout():
+        """Handle user logout."""
+        session.clear()
+        return redirect(url_for('login'))
+
     @web_app.route("/")
+    @login_required
     def home():
         """Render the main web interface."""
         return render_template("web_interface.html", config=config)
 
     @web_app.route('/downloads/<path:filename>')
+    @login_required
     def download_file(filename):
         """Serve files from the downloads directory."""
         downloads_path = os.path.join(UtilityService.get_exe_dir(), 'downloads')
         return send_from_directory(downloads_path, filename, as_attachment=True)
 
     @web_app.route('/uploads/<path:filename>')
+    @login_required
     def uploaded_file(filename):
         """Serve files from the uploads directory."""
         uploads_path = os.path.join(UtilityService.get_exe_dir(), 'uploads')
@@ -228,6 +285,36 @@ def setup_socket_handlers(
         """Log a debug message from the frontend."""
         debug_me(data.get("message"), "display_message")
 
+    @globals.web_socket.on("set_password")
+    def set_password_web(data):
+        """Set a new password for authentication."""
+        instance = Instance(data.get("instance_id"), "web")
+
+        try:
+            username = data.get("username", "")
+            password = data.get("password", "")
+
+            if not username or not password:
+                notify_web(instance, "set_password", {"success": False, "error": "Username and password required"})
+                return
+
+            # Hash the password
+            password_hash = AuthenticationService.hash_password(password)
+
+            # Update config
+            config.auth_username = username
+            config.auth_password_hash = password_hash
+            config.auth_enabled = True
+            config.save()
+
+            # Also update globals
+            globals.config = config
+
+            notify_web(instance, "set_password", {"success": True})
+            update_log(instance, f"Authentication enabled for user '{username}'")
+        except Exception as e:
+            notify_web(instance, "set_password", {"success": False, "error": str(e)})
+
     @globals.web_socket.on("save_config")
     def save_config_web(data):
         """Save configuration from web UI."""
@@ -236,8 +323,14 @@ def setup_socket_handlers(
         try:
             # Unpack the config dictionary into the local config
             for key, value in data.get("config").items():
+                # Skip password_hash - it should only be set via set_password
+                if key == "auth_password_hash":
+                    continue
                 setattr(config, key, value)
             config.save()
+
+            # Also update globals
+            globals.config = config
 
             # Reconnect to Plex because the Plex server or token might have changed
             update_log(instance, "Saving updated configuration and reconnecting to Plex")
