@@ -35,6 +35,7 @@ class ProcessingCallbacks:
     on_log_update: Optional[Callable[[str], None]] = None  # (message)
     on_progress_update: Optional[Callable[[int, int], None]] = None  # (current, total) - for progress bars
     on_debug: Optional[Callable[[str, str], None]] = None  # (message, context) - for debug messages
+    success_counter: Optional[list] = None  # Mutable list to track successful uploads (contains count as single element)
 
 
 class ArtworkProcessor:
@@ -129,6 +130,10 @@ class ArtworkProcessor:
 
             # Process the artwork
             result = process_func(artwork)
+
+            # Track successful uploads (those starting with ✓)
+            if callbacks and callbacks.success_counter is not None and result.startswith('✓'):
+                callbacks.success_counter[0] += 1
 
             # Log the result
             if callbacks and callbacks.on_log_update:

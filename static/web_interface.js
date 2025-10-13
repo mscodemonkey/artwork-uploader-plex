@@ -791,7 +791,11 @@ function saveBulkImport(filename, nowLoad = null) {
 
 
 function runBulkImport() {
-    socket.emit("start_bulk_import",{instance_id: instanceId, bulk_list: document.getElementById("bulk_import_text").value});
+    socket.emit("start_bulk_import",{
+        instance_id: instanceId,
+        bulk_list: document.getElementById("bulk_import_text").value,
+        filename: currentBulkImport || document.getElementById("switch_bulk_file").value || "bulk_import.txt"
+    });
 }
 
 // Validation
@@ -1036,6 +1040,45 @@ document.getElementById("delete_icon").addEventListener("click", function () {
 });
 
 // Function to handle uploading a bulk file
+document.getElementById("create_icon").addEventListener("click", function () {
+    // Create a new bulk import file
+    socket.emit("create_bulk_file", { instance_id: instanceId });
+
+    socket.once("create_bulk_file", (data) => {
+        if (data.created) {
+            updateStatus("New bulk file created: " + data.filename, "success", false, false, "check-circle");
+            // Store the filename to load after refresh
+            const newFilename = data.filename;
+            // The backend will emit load_bulk_filelist, so we just need to handle it
+            socket.once("load_bulk_filelist", (listData) => {
+                if (validResponse(listData)) {
+                    const selectElement = document.getElementById("switch_bulk_file");
+                    // Clear existing options
+                    selectElement.innerHTML = "";
+
+                    if (listData.bulk_files && listData.bulk_files.length > 0) {
+                        // Populate the dropdown with filenames
+                        listData.bulk_files.forEach((filename) => {
+                            const option = document.createElement("option");
+                            option.value = filename;
+                            option.textContent = filename;
+                            // Preselect the newly created file
+                            if (filename === newFilename) {
+                                option.selected = true;
+                            }
+                            selectElement.appendChild(option);
+                        });
+                        // Load the newly created file
+                        loadBulkFile(newFilename);
+                    }
+                }
+            });
+        } else {
+            updateStatus("Failed to create new bulk file", "danger", false, false, "x-circle");
+        }
+    });
+});
+
 document.getElementById("upload_icon").addEventListener("click", function () {
     document.getElementById("bulk_import_upload").value = "";
     document.getElementById("bulk_import_upload").click(); // Trigger file input click

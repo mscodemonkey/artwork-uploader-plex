@@ -230,7 +230,8 @@ def setup_socket_handlers(
         """Handle bulk import request from web UI."""
         instance = Instance(data.get("instance_id"), "web")
         bulk_list = data.get("bulk_list").lower()
-        run_bulk_import_scrape_in_thread(instance, bulk_list)
+        filename = data.get("filename", "bulk_import.txt")
+        run_bulk_import_scrape_in_thread(instance, bulk_list, filename)
 
     @globals.web_socket.on("save_bulk_import")
     def handle_bulk_import(data):
@@ -279,6 +280,40 @@ def setup_socket_handlers(
         """Delete a bulk import file."""
         instance = Instance(data.get("instance_id"), "web")
         delete_bulk_import_file(instance, data.get("filename"))
+
+    @globals.web_socket.on("create_bulk_file")
+    def create_bulk_file(data):
+        """Create a new bulk import file."""
+        instance = Instance(data.get("instance_id"), "web")
+
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%d %b %Y %H:%M:%S")
+
+        # Generate a unique filename
+        base_name = "bulk_import_new"
+        extension = ".txt"
+        counter = 1
+        filename = f"{base_name}{extension}"
+
+        # Check if file exists and increment counter
+        while globals.bulk_file_service.file_exists(filename):
+            filename = f"{base_name}_{counter}{extension}"
+            counter += 1
+
+        # Create file with comment header
+        content = f"# Bulk import file created {timestamp}\n"
+
+        try:
+            globals.bulk_file_service.write_file(content, filename)
+            update_log(instance, f"Created new bulk file: {filename}")
+            notify_web(instance, "create_bulk_file", {"created": True, "filename": filename})
+            # Reload the file list
+            folder_path = Path("bulk_imports")
+            bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
+            notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
+        except Exception as e:
+            update_status(instance, f"Error creating file: {str(e)}", "danger")
+            notify_web(instance, "create_bulk_file", {"created": False, "error": str(e)})
 
     @globals.web_socket.on("display_message")
     def display_message(data):

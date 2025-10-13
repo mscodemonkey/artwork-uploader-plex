@@ -193,7 +193,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 
-def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None):
+def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None):
 
     """Run the bulk import scrape in a separate thread."""
 
@@ -218,12 +218,12 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None):
     # Pass the processing of the parsed URLs off to a thread
     if instance.mode == "web":
         try:
-            process_bulk_import_from_ui(instance, parsed_urls)
+            process_bulk_import_from_ui(instance, parsed_urls, filename)
         except Exception:
             raise
 
 
-def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
+def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None) -> None:
 
     """
     Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
@@ -233,7 +233,11 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
     Args:
         instance:
         parsed_urls:    The URLs to scrape.  These can be theposterdb poster, set or user URL or a mediux set URL.
+        filename:       The filename of the bulk import file being processed.
     """
+
+    # Track successful poster uploads (those with ✓)
+    success_counter = [0]
 
     try:
 
@@ -241,6 +245,10 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please check the settings.", color="red")
             return
+
+        # Log the start of the bulk import process
+        display_filename = filename if filename else "bulk_import.txt"
+        update_log(instance, f"> Bulk process started - {display_filename}")
 
         # Show the progress bar on the web UI
         notify_web(instance, "progress_bar", {"percent" : 0})
@@ -252,15 +260,25 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
 
             # Parse according to whether it's a user portfolio or poster / set URL
             if "/user/" in parsed_line.url:
-                scrape_tpdb_user(instance, parsed_line.url, parsed_line.options)
+                try:
+                    scrape_tpdb_user(instance, parsed_line.url, parsed_line.options, success_counter)
+                except Exception:
+                    pass
             else:
-                scrape_and_upload(instance, parsed_line.url, parsed_line.options)
+                try:
+                    scrape_and_upload(instance, parsed_line.url, parsed_line.options, success_counter)
+                except Exception:
+                    pass
 
             notify_web(instance, "progress_bar", {"message": f"{i + 1} of {len(parsed_urls)}", "percent" : ((i + 1) / len(parsed_urls)) * 100})
 
         # All done, update the UI
         notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
         update_status(instance, "Bulk import scraping completed.", color="success")
+
+        # Log the completion of the bulk import process
+        poster_count = success_counter[0]
+        update_log(instance, f"< Bulk process completed - {display_filename} - {poster_count} posters updated")
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", {"percent": 100})
@@ -271,7 +289,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list) -> None:
 
 
 # Scrape all pages of a TPDb user's uploaded artwork
-def scrape_tpdb_user(instance: Instance, url, options):
+def scrape_tpdb_user(instance: Instance, url, options, success_counter=None):
 
     if "?" in url:
         cleaned_url = url.split("?")[0]
@@ -288,13 +306,13 @@ def scrape_tpdb_user(instance: Instance, url, options):
     try:
         for page in range(pages):
             page_url = f"{url}?section=uploads&page={page + 1}"
-            scrape_and_upload(instance, page_url, options)
+            scrape_and_upload(instance, page_url, options, success_counter)
     except Exception:
         raise ScraperException(f"Failed to process and upload from URL: {url}")
 
 
 # Scraped the URL then uploads what it's scraped to Plex
-def scrape_and_upload(instance: Instance, url, options):
+def scrape_and_upload(instance: Instance, url, options, success_counter=None):
     """
     Scrape artwork from a URL and upload to Plex.
 
@@ -310,7 +328,8 @@ def scrape_and_upload(instance: Instance, url, options):
 
     callbacks = ProcessingCallbacks(
         on_status_update=status_callback,
-        on_log_update=log_callback
+        on_log_update=log_callback,
+        success_counter=success_counter
     )
 
     # Use the service to do the actual work
@@ -508,7 +527,7 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
                 content = file.read()
             if content:
                 update_log(instance, "@ *** Scheduled import started ***")
-                run_bulk_import_scrape_in_thread(instance, content)
+                run_bulk_import_scrape_in_thread(instance, content, filename)
         else:
             update_log(instance, f"Scheduled file does not exist: {filename}")
             return
