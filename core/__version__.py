@@ -5,8 +5,8 @@ This module provides version metadata for the application.
 Import version information from here rather than hardcoding it elsewhere.
 """
 
-__version__ = "0.4.0"
-__version_info__ = (0, 3, 7, "beta")
+__version__ = "v0.4.1"
+__version_info__ = (0, 4, 1, "")
 __author__ = "mscodemonkey"
 __license__ = "MIT"
 __url__ = "https://github.com/mscodemonkey/artwork-uploader-plex"

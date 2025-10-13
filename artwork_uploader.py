@@ -379,8 +379,6 @@ def process_uploaded_artwork(instance: Instance, file_list, filters, plex_title 
 # * Bulk import file I/O functions ---
 def load_bulk_import_file(instance: Instance, filename = None):
     """Load the bulk import file into the text area."""
-    global config
-
     try:
         # Get the current bulk_txt value from the config
         bulk_import_filename = filename if filename is not None else (config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
