@@ -119,7 +119,7 @@ Both mediux_filters and tpdb_filters specify which artwork types to upload by in
 
 ## Docker 
 
-If you want to use docker, there is a Dockerfile in the repo to allow it to be deployed in a cotnainer allongside a plex container. 
+If you want to use Docker, there is a Dockerfile in the repo to allow it to be deployed in a container alongside a plex container. 
 
 Clone the repository and use the `docker-compose.yml` file to deploy it with docker compose. Or copy this block in a `docker-compose.yml` file pointing to the location of the repository to build the image instead of the `.` 
 
@@ -145,11 +145,27 @@ docker compose up -d
 
 **NOTE**: THIS REQUIRES AT LEAST PYTHON 3.10.  You will encounter odd errors in the scraping log for earlier versions of Python, due to a bug that was fixed in 3.10.
 
-### In a terminal
-``` bash
-    python artwork_uploader.py
+### Running the Application
+
+**If you created a virtual environment (recommended):**
+```bash
+# Activate the virtual environment first
+source .venv/bin/activate  # macOS/Linux
+# or
+.venv\Scripts\activate     # Windows
+
+# Then run normally
+python artwork_uploader.py
 ```
-**NOTE**: You may need to use ```python3``` rather than ```python```, especially Mac users).
+
+**If NOT using a virtual environment:**
+```bash
+python artwork_uploader.py
+# or
+python3 artwork_uploader.py
+```
+
+**💡 Tip:** If you get dependency errors, you're probably not using the virtual environment. See [Troubleshooting](#troubleshooting) below.
 
 With no arguments, Artwork Uploader will start a webserver on port 4567 (this may change!)
 
@@ -207,6 +223,174 @@ The script supports various command-line arguments for flexible use.
    - The .txt file should contain one URL per line. Lines starting with # or // will be ignored as comments.
 
    - **If no text file parameter is provided, it will use the default value from config.json for bulk_txt.**
+
+---
+# Troubleshooting
+
+## Common Issues
+
+### "Required dependencies are missing or incompatible"
+
+This error occurs when Python packages can't be imported. Common causes:
+
+#### 1. **Requirements not installed**
+```bash
+pip install -r requirements.txt
+# or
+python3 -m pip install -r requirements.txt
+```
+
+#### 2. **Wrong Python version**
+Artwork Uploader requires Python 3.10 or later. Check your version:
+```bash
+python3 --version
+```
+
+#### 3. **Architecture mismatch (Apple Silicon Macs)**
+If you're on an Apple Silicon Mac (M1/M2/M3) and see errors about "incompatible architecture (have 'x86_64', need 'arm64')", your packages were compiled for Intel chips.
+
+**Solution: Reinstall packages for ARM64:**
+```bash
+pip3 uninstall Pillow Flask flask-socketio eventlet cffi cryptography -y
+pip3 install Pillow Flask flask-socketio eventlet cffi cryptography
+```
+
+#### 4. **Use a virtual environment (Recommended)**
+Virtual environments prevent conflicts and ensure clean installations:
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate it
+source .venv/bin/activate  # On macOS/Linux
+# or
+.venv\Scripts\activate     # On Windows
+
+# Install requirements
+pip install -r requirements.txt
+
+# Run the application
+python artwork_uploader.py
+```
+
+**IMPORTANT: Always activate the virtual environment before running!**
+
+If you created a `.venv` but are still getting import errors, you're likely using system Python instead of venv Python:
+
+```bash
+# Wrong - uses system Python ❌
+python3 artwork_uploader.py
+
+# Right - activate first, then run ✅
+source .venv/bin/activate
+python artwork_uploader.py
+
+# Alternative - run directly from venv ✅
+.venv/bin/python artwork_uploader.py
+```
+
+### "Cannot access localhost:4567" or "Server won't start"
+
+If you see the scheduler messages but can't access the web UI:
+
+1. **Check you're using the virtual environment** - See above section
+2. **Check if another process is using port 4567**:
+   ```bash
+   lsof -i :4567
+   # If something is using it, either kill it or change the port in config.json
+   ```
+3. **Try accessing with different URLs**:
+   - `http://localhost:4567`
+   - `http://127.0.0.1:4567`
+   - `http://0.0.0.0:4567`
+4. **Check firewall settings** - Ensure port 4567 is not blocked
+
+### Strange "400 Bad request" errors in logs with binary data
+
+If you see errors like this in your logs:
+```
+127.0.0.1 - - [13/Oct/2025 12:21:30] code 400, message Bad request version ('\x16\x03\x01...')
+```
+
+**This is completely normal and harmless!** These are TLS/SSL handshake attempts - something (your browser, browser extensions, or system security tools) is trying to connect via HTTPS to the HTTP-only Flask server.
+
+Flask correctly rejects these with a 400 error since it doesn't support HTTPS by default. You can safely ignore these messages - they don't affect functionality.
+
+### "eventlet monkey_patch" errors
+
+If you see errors related to eventlet on Python 3.13, consider using Python 3.11 or 3.12 instead, as eventlet has known compatibility issues with Python 3.13.
+
+```bash
+# Install Python 3.12 via Homebrew (macOS)
+brew install python@3.12
+
+# Create venv with Python 3.12
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Plex connection issues
+
+**"Cannot reach Plex server" or Application hangs on startup**
+
+The application now has a 3-second timeout for Plex connections and will show a clear error message if it can't connect:
+
+```
+======================================================================
+WARNING: Could not connect to Plex TV libraries
+======================================================================
+Cannot reach Plex server at http://192.168.1.4:32400. Please check
+that the server is running and the address is correct.
+
+The web UI will still start, but you won't be able to upload artwork
+until you fix the Plex connection in Settings.
+```
+
+**How to fix:**
+
+1. **Verify Plex is running** - Check that your Plex Media Server is started
+2. **Test connectivity manually**:
+   ```bash
+   curl http://your-plex-ip:32400
+   # Should return some XML if Plex is accessible
+   ```
+3. **Check IP address** - Your Plex server IP might have changed. Common locations:
+   - Plex Web App → Settings → Network → Show Advanced
+   - Look for "LAN Networks" or external IP
+4. **Update config.json**:
+   ```json
+   {
+     "base_url": "http://192.168.1.100:32400",
+     "token": "your-plex-token"
+   }
+   ```
+5. **Firewall/Network** - Ensure port 32400 isn't blocked
+
+**"Invalid Plex token or base URL"**
+- Verify your Plex token is correct in `config.json`
+- Get token from: [Finding your Plex token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)
+- Ensure the base URL includes the protocol and port (e.g., `http://192.168.1.100:32400`)
+
+**"Library not found"**
+- Check library names match exactly (case-sensitive)
+- Verify library type (TV vs Movie) matches your config
+- Library names in config must match exactly what's in Plex
+
+### Scraping issues
+
+**"Can't scrape URL"**
+- Verify the URL is from a supported source (ThePosterDB or MediUX)
+- Check your internet connection
+- Some scrapers may be rate-limited; wait a few minutes and try again
+
+### Performance issues
+
+**Slow upload speeds**
+- ThePosterDB has a 6-second rate limit between requests
+- Use `--filters` to only upload specific artwork types
+- Enable `track_artwork_ids` in config to skip already-uploaded artwork
 
 ---
 # Other features

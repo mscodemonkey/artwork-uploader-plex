@@ -10,7 +10,7 @@ def parse_show(media_title):
 
     try:
         year = int(media_title.split(" (")[1].split(")")[0])
-    except:
+    except (IndexError, ValueError):
         pass
 
     if " - " in media_title:
@@ -35,8 +35,8 @@ def parse_movie(movie_title):
             title = match.group(1).strip()
             year = int(match.group(2)) if match.group(2) else None
             return title, year
-    except:
-        debug_me("Couldn't match" + movie_title)
+    except (AttributeError, ValueError, TypeError) as e:
+        debug_me(f"Couldn't match {movie_title}", "parse_movie")
         return None, None
 
 

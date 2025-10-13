@@ -107,7 +107,51 @@ def is_not_comment(url):
     return True if re.match(pattern, url) else False
 
 
-# @todo add validation for the URL
+def validate_scraper_url(url: str) -> tuple:
+    """
+    Validate that URL is from a supported scraper source.
+
+    Args:
+        url: URL to validate
+
+    Returns:
+        Tuple of (is_valid, error_message). If valid, error_message is empty string.
+
+    Example:
+        >>> is_valid, error = validate_scraper_url("https://theposterdb.com/set/123")
+        >>> if not is_valid:
+        ...     print(f"Invalid URL: {error}")
+    """
+    from urllib.parse import urlparse
+
+    try:
+        parsed = urlparse(url)
+
+        # Check basic URL structure
+        if not parsed.scheme or not parsed.netloc:
+            return False, f"Invalid URL format: {url}"
+
+        # Check for supported sources
+        if parsed.netloc == "theposterdb.com":
+            if "/set/" in url or "/poster/" in url or "/user/" in url:
+                return True, ""
+            return False, "Unsupported ThePosterDB URL type. Must contain /set/, /poster/, or /user/"
+
+        elif parsed.netloc == "mediux.pro":
+            if "/sets/" in url:
+                return True, ""
+            return False, "Unsupported MediUX URL type. Must contain /sets/"
+
+        elif url.endswith('.html'):
+            return True, ""
+
+        else:
+            return False, f"Unsupported scraper source: {parsed.netloc}. Supported: theposterdb.com, mediux.pro"
+
+    except Exception as e:
+        return False, f"URL validation error: {str(e)}"
+
+
 def parse_url_and_options(line):
 
     """

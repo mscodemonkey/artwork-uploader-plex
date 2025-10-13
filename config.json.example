@@ -1,0 +1,51 @@
+{
+    "_comment": "Configuration template for Artwork Uploader for Plex",
+    "_instructions": "1. Copy this file to 'config.json' 2. Replace the placeholder values below 3. Restart the application",
+
+    "base_url": "http://your-plex-server:32400",
+    "_base_url_help": "The URL to your Plex server. Use http://localhost:32400 for local servers or http://IP:32400 for remote servers",
+
+    "token": "YOUR_PLEX_TOKEN_HERE",
+    "_token_help": "Your Plex authentication token. Find it at: https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/",
+
+    "bulk_txt": "bulk_import.txt",
+    "_bulk_txt_help": "Default filename for bulk import operations",
+
+    "tv_library": ["TV Shows"],
+    "_tv_library_help": "List of TV library names in Plex. Can be a single string or array of strings",
+
+    "movie_library": ["Movies"],
+    "_movie_library_help": "List of movie library names in Plex. Can be a single string or array of strings",
+
+    "mediux_filters": [
+        "title_card",
+        "background",
+        "season_cover",
+        "show_cover",
+        "movie_poster",
+        "collection_poster"
+    ],
+    "_mediux_filters_help": "Default artwork types to process from MediUX. Remove types you don't want to upload",
+
+    "tpdb_filters": [
+        "title_card",
+        "background",
+        "season_cover",
+        "show_cover",
+        "movie_poster",
+        "collection_poster"
+    ],
+    "_tpdb_filters_help": "Default artwork types to process from ThePosterDB. Remove types you don't want to upload",
+
+    "track_artwork_ids": true,
+    "_track_artwork_ids_help": "Use Plex labels to track uploaded artwork and prevent duplicate uploads",
+
+    "auto_manage_bulk_files": true,
+    "_auto_manage_bulk_files_help": "Automatically organize bulk import files after processing",
+
+    "reset_overlay": false,
+    "_reset_overlay_help": "Remove Kometa's 'Overlay' label when uploading new artwork",
+
+    "schedules": [],
+    "_schedules_help": "Scheduled bulk import jobs. Configure through the web UI"
+}

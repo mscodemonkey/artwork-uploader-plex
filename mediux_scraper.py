@@ -1,34 +1,38 @@
+from typing import Optional, Any
 
 import soup_utils
 import utils
 from notifications import debug_me
 from options import Options
-from scraper_exceptions import ScraperException
+from exceptions import ScraperException
+from enums import MediaType, ScraperSource, FileType
+from constants import MEDIUX_API_BASE_URL, MEDIUX_QUALITY_SUFFIX
+from artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 class MediuxScraper:
 
-    def __init__(self, url):
-        self.soup = None
-        self.url = url
-        self.title = None
-        self.options = Options()
+    def __init__(self, url: str) -> None:
+        self.soup: Optional[Any] = None
+        self.url: str = url
+        self.title: Optional[str] = None
+        self.options: Options = Options()
 
-        self.movie_artwork = []
-        self.tv_artwork = []
-        self.collection_artwork = []
+        self.movie_artwork: MovieArtworkList = []
+        self.tv_artwork: TVArtworkList = []
+        self.collection_artwork: CollectionArtworkList = []
 
 
     # Set options - otherwise will use defaults of False
-    def set_options(self, options):
+    def set_options(self, options: Options) -> None:
         self.options = options
 
 
-    def scrape(self):
+    def scrape(self) -> None:
 
         self.soup = soup_utils.cook_soup(self.url)
 
-        base_url = "https://api.mediux.pro/assets/"
-        quality_suffix = "&w=3840&q=80"
+        base_url = MEDIUX_API_BASE_URL
+        quality_suffix = MEDIUX_QUALITY_SUFFIX
         scripts = self.soup.find_all('script')
         media_type = None
 
@@ -54,48 +58,48 @@ class MediuxScraper:
             for data in poster_data:
                 if data["show_id"] is not None or data["show_id_backdrop"] is not None or data["episode_id"] is not None or \
                         data["season_id"] is not None or data["show_id"] is not None:
-                    media_type = "Show"
+                    media_type = MediaType.TV_SHOW.value
                 else:
-                    media_type = "Movie"
+                    media_type = MediaType.MOVIE.value
 
             for data in poster_data:
                 debug_me(str(data["id"]),"MediuxScraper/scrape")
 
-                if media_type == "Show":
+                if media_type == MediaType.TV_SHOW.value:
 
                     episodes = data_dict["set"]["show"]["seasons"]
                     show_name = data_dict["set"]["show"]["name"]
 
                     try:
                         year = int(data_dict["set"]["show"]["first_air_date"][:4])
-                    except:
+                    except (KeyError, ValueError, TypeError):
                         year = None
 
-                    if data["fileType"] == "title_card":
+                    if data["fileType"] == FileType.TITLE_CARD.value:
                         episode_id = data["episode_id"]["id"]
                         season = data["episode_id"]["season_id"]["season_number"]
                         title = data["title"]
                         try:
                             episode = int(title.rsplit(" E", 1)[1])
-                        except:
-                            debug_me(f"Error getting episode number for {title}.")
+                        except (IndexError, ValueError):
+                            debug_me(f"Error getting episode number for {title}.", "MediuxScraper/scrape")
 
-                        file_type = "title_card"
+                        file_type = FileType.TITLE_CARD.value
 
-                    elif data["fileType"] == "backdrop" and data["show_id_backdrop"] is not None:
-                        print ("Backdrop: "+ str(data["show_id_backdrop"]))
+                    elif data["fileType"] == FileType.BACKDROP.value and data["show_id_backdrop"] is not None:
+                        debug_me(f"Backdrop: {data['show_id_backdrop']}", "MediuxScraper/scrape")
                         season = "Backdrop"
                         episode = None
                         file_type = "background"
 
-                    elif data["fileType"] == "poster" and data["season_id"] is None:
-                        print ("Cover: " + str(data["show_id"]))
+                    elif data["fileType"] == FileType.POSTER.value and data["season_id"] is None:
+                        debug_me(f"Cover: {data['show_id']}", "MediuxScraper/scrape")
                         season = "Cover"
                         episode = None
                         file_type = "show_cover"
 
-                    elif data["fileType"] == "poster" and data["season_id"] is not None:
-                        print("Season cover: " + str(data["season_id"]))
+                    elif data["fileType"] == FileType.POSTER.value and data["season_id"] is not None:
+                        debug_me(f"Season cover: {data['season_id']}", "MediuxScraper/scrape")
                         season_id = data["season_id"]["id"]
                         season_data = [episode for episode in episodes if episode["id"] == season_id][0]
                         episode = "Cover"
@@ -107,7 +111,7 @@ class MediuxScraper:
                     #    episode = None
                     #    file_type = "show_cover"
 
-                elif media_type == "Movie":
+                elif media_type == MediaType.MOVIE.value:
 
                     if data["movie_id"]:
                         if data_dict["set"]["movie"]:
@@ -125,35 +129,37 @@ class MediuxScraper:
                 image_stub = data["id"]
                 poster_url = f"{base_url}{image_stub}{quality_suffix}"
 
-                if media_type == "Show":
+                if media_type == MediaType.TV_SHOW.value:
                     tv_artwork = {}
                     tv_artwork["title"] = show_name
                     tv_artwork["season"] = season
                     tv_artwork["episode"] = episode
                     tv_artwork["url"] = poster_url
-                    tv_artwork["source"] = "mediux"
+                    tv_artwork["source"] = ScraperSource.MEDIUX.value
                     tv_artwork["year"] = year
                     tv_artwork["id"] = image_stub
                     tv_artwork['type'] = file_type
 
-                    print(tv_artwork)
+                    debug_me(f"TV Artwork: {tv_artwork}", "MediuxScraper/scrape")
                     self.tv_artwork.append(tv_artwork)
 
-                elif media_type == "Movie":
+                elif media_type == MediaType.MOVIE.value:
                     if "Collection" in title:
                         collection_artwork = {}
                         collection_artwork["title"] = title
                         collection_artwork["url"] = poster_url
                         collection_artwork["id"] = image_stub
-                        collection_artwork["source"] = "mediux"
+                        collection_artwork["source"] = ScraperSource.MEDIUX.value
                         self.collection_artwork.append(collection_artwork)
                     else:
                         movie_artwork = {}
                         movie_artwork["title"] = title
                         movie_artwork["year"] = int(year)
                         movie_artwork["url"] = poster_url
-                        movie_artwork["source"] = "mediux"
+                        movie_artwork["source"] = ScraperSource.MEDIUX.value
                         movie_artwork["id"] = image_stub
                         self.movie_artwork.append(movie_artwork)
-        except:
-            raise ScraperException("Can't scrape from MediUX")
+        except ScraperException:
+            raise
+        except Exception as e:
+            raise ScraperException(f"Can't scrape from MediUX: {str(e)}") from e

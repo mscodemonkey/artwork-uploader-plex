@@ -1,27 +1,32 @@
+from typing import Optional
+import re
+
 from config import Config
 from options import Options
+from plex_connector import PlexConnector
 from plex_uploader import PlexUploader
-from upload_processor_exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound, \
+from exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound, \
     NotProcessedByExclusion
 from utils import is_numeric
-import re
+from enums import FilterType, ScraperSource
+from artwork_types import MovieArtwork, TVArtwork, CollectionArtwork
 
 class UploadProcessor:
 
-    def __init__(self, plex):
-        self.plex = plex
-        self.options = Options()
-        self.config = Config()
+    def __init__(self, plex: PlexConnector) -> None:
+        self.plex: PlexConnector = plex
+        self.options: Options = Options()
+        self.config: Config = Config()
         self.config.load()
 
-    def set_options(self, options):
+    def set_options(self, options: Options) -> None:
         self.options = options
 
-    def check_master_filters(self, check_filter, source):
-        master_filters = self.config.tpdb_filters if source == "theposterdb" else self.config.mediux_filters
+    def check_master_filters(self, check_filter: str, source: str) -> bool:
+        master_filters = self.config.tpdb_filters if source == ScraperSource.THEPOSTERDB.value else self.config.mediux_filters
         return check_filter in master_filters if master_filters else True
 
-    def process_collection_artwork(self, artwork):
+    def process_collection_artwork(self, artwork: CollectionArtwork) -> Optional[str]:
 
         collection_items = self.plex.find_collection(artwork["title"])
 
@@ -30,7 +35,7 @@ class UploadProcessor:
 
         result = None
         artwork_source = artwork["source"]
-        filter_type = "collection_poster"
+        filter_type = FilterType.COLLECTION_POSTER.value
 
         if collection_items:
             for collection_item in collection_items:
@@ -52,7 +57,7 @@ class UploadProcessor:
             raise CollectionNotFound(f'{artwork["title"]}: {artwork["id"]} | Collection not available on Plex')
         return result
 
-    def process_movie_artwork(self, artwork):
+    def process_movie_artwork(self, artwork: MovieArtwork) -> Optional[str]:
 
         year = self.options.year if self.options.year else artwork["year"]
 
@@ -66,7 +71,7 @@ class UploadProcessor:
 
         result = None
         artwork_source = artwork["source"]
-        filter_type = "movie_poster"
+        filter_type = FilterType.MOVIE_POSTER.value
 
         if movie_items:
             for movie_item in movie_items:
@@ -90,7 +95,7 @@ class UploadProcessor:
         return result
 
 
-    def process_tv_artwork(self, artwork):
+    def process_tv_artwork(self, artwork: TVArtwork) -> Optional[str]:
 
         description = "Target media"
         upload_target = None
@@ -130,30 +135,30 @@ class UploadProcessor:
                         upload_target = tv_show
                         artwork_id = "C"
                         artwork_type = "Show cover"
-                        filter_type = "show_cover"
+                        filter_type = FilterType.SHOW_COVER.value
                     elif artwork["season"] == "Backdrop":
                         upload_target = tv_show
                         artwork_id = "B"
                         artwork_type = "Background"
-                        filter_type="background"
+                        filter_type = FilterType.BACKGROUND.value
                     elif artwork["season"] >= 0:
                         if artwork["episode"] == "Cover":
                             upload_target = tv_show.season(artwork["season"])
                             artwork_id = "S"
                             artwork_type = "Season cover"
-                            filter_type = "season_cover"
+                            filter_type = FilterType.SEASON_COVER.value
                         elif artwork["episode"] is None:
                             upload_target = tv_show.season(artwork["season"])
                             artwork_id = "S"
                             artwork_type = "Season cover"
-                            filter_type = "season_cover"
+                            filter_type = FilterType.SEASON_COVER.value
                         elif artwork["episode"] >= 0:
                             upload_target = tv_show.season(artwork["season"]).episode(artwork["episode"])
                             artwork_id = "E"
                             artwork_type = "Title card"
-                            filter_type = "title_card"
-                except:
-                    raise ShowNotFound(f"{description} | Not available on Plex")
+                            filter_type = FilterType.TITLE_CARD.value
+                except (AttributeError, KeyError) as e:
+                    raise ShowNotFound(f"{description} | Not available on Plex") from e
 
                 try:
                     if upload_target:
@@ -177,5 +182,4 @@ class UploadProcessor:
             raise ShowNotFound(f"{artwork['title']} ({artwork['year']}) | Show not available on Plex")
 
         return result
-
 

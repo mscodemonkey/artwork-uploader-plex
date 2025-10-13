@@ -1,24 +1,33 @@
+from typing import Optional, List, Union
+import socket
 import requests
 from plexapi.server import PlexServer
+from plexapi.library import LibrarySection, MovieSection, ShowSection
+from plexapi.video import Movie, Show
+from plexapi.collection import Collection
 import plexapi.exceptions
 import xml.etree.ElementTree
-from plex_connector_exception import PlexConnectorException, LibraryNotFound
+from urllib.parse import urlparse
+
+from exceptions import PlexConnectorException, LibraryNotFound
 from options import Options
+from notifications import debug_me
+from config import Config
 
 class PlexConnector:
 
-    def __init__(self, base_url = None, token = None):
-        self.plex = None
-        self.base_url = base_url
-        self.token = token
-        self.tv_libraries = []
-        self.movie_libraries = []
-        self.options = Options()
+    def __init__(self, base_url: Optional[str] = None, token: Optional[str] = None) -> None:
+        self.plex: Optional[PlexServer] = None
+        self.base_url: Optional[str] = base_url
+        self.token: Optional[str] = token
+        self.tv_libraries: List[ShowSection] = []
+        self.movie_libraries: List[MovieSection] = []
+        self.options: Options = Options()
 
-    def set_options(self, options):
+    def set_options(self, options: Options) -> None:
         self.options = options
 
-    def reconnect(self, updated_config):
+    def reconnect(self, updated_config: Config) -> None:
         self.plex = None
         self.base_url = updated_config.base_url
         self.token = updated_config.token
@@ -27,21 +36,55 @@ class PlexConnector:
             self.connect()
             self.set_tv_libraries(updated_config.tv_library)
             self.set_movie_libraries(updated_config.movie_library)
-        except:
+        except PlexConnectorException:
+            raise
+        except Exception:
             raise
 
-    def connect(self):
+    def connect(self) -> None:
         if not self.plex:
             if not self.base_url or not self.token:
                 raise PlexConnectorException("Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.")
 
+            # Quick connectivity check before attempting full connection
             try:
-                self.plex = PlexServer(self.base_url, self.token)  # Initialize the Plex server connection
+                parsed = urlparse(self.base_url)
+                host = parsed.hostname or 'localhost'
+                port = parsed.port or 32400
+
+                # Try to connect with a short timeout using connect_ex (non-blocking check)
+                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                test_socket.settimeout(3)
+                result = test_socket.connect_ex((host, port))
+                test_socket.close()
+
+                if result != 0:
+                    raise PlexConnectorException(
+                        f'Cannot reach Plex server at {self.base_url}. Please check that the server is running and the address is correct.',
+                        f"Connection refused (error code: {result})")
+            except PlexConnectorException:
+                raise
+            except (socket.timeout, socket.error, OSError) as e:
+                raise PlexConnectorException(
+                    f'Cannot reach Plex server at {self.base_url}. Connection timed out after 3 seconds.',
+                    f"Connection failed: {str(e)}")
+
+            try:
+                self.plex = PlexServer(self.base_url, self.token, timeout=10)  # Initialize the Plex server connection with 10 second timeout
+
+            except requests.exceptions.Timeout as e:
+                # Handle timeout errors specifically
+                self.plex = None
+                raise PlexConnectorException(
+                    f'Connection to Plex server at {self.base_url} timed out after 10 seconds. Please check that the server is running and accessible.',
+                    f"Plex connection timeout: {str(e)}")
 
             except requests.exceptions.RequestException as e:
                 # Handle network-related errors (e.g., unable to reach the server)
                 self.plex = None
-                raise PlexConnectorException('Unable to connect to Plex server. Please check the "base_url" in config.json or provide one.', f"Unable to connect to Plex server: {str(e)}")
+                raise PlexConnectorException(
+                    f'Unable to connect to Plex server at {self.base_url}. Please check the "base_url" in config.json and ensure the server is accessible.',
+                    f"Unable to connect to Plex server: {str(e)}")
 
             except plexapi.exceptions.Unauthorized as e:
                 # Handle authentication-related errors (e.g., invalid token)
@@ -59,7 +102,7 @@ class PlexConnector:
                 raise PlexConnectorException(f"Unexpected error: {str(e)}", f"Unexpected error: {str(e)}")
 
 
-    def set_tv_libraries(self, tv_libraries):
+    def set_tv_libraries(self, tv_libraries: Union[str, List[str]]) -> List[ShowSection]:
 
         if not self.plex:
             self.connect()
@@ -80,7 +123,7 @@ class PlexConnector:
 
         return self.tv_libraries
 
-    def set_movie_libraries(self, movie_libraries):
+    def set_movie_libraries(self, movie_libraries: Union[str, List[str]]) -> List[MovieSection]:
 
         if not self.plex:
             self.connect()
@@ -103,7 +146,7 @@ class PlexConnector:
 
 
     # Find a specific collection in the movies library
-    def find_collection(self, collection_title):
+    def find_collection(self, collection_title: str) -> Optional[List[Collection]]:
 
         if not self.plex:
             self.connect()
@@ -116,7 +159,9 @@ class PlexConnector:
                 for collection in plex_collections:
                     if collection.title == collection_title:
                         collections.append(collection)
-            except:
+            except Exception as e:
+                # Continue checking other libraries if one fails
+                debug_me(f"Error searching collection in library: {e}", "PlexConnector/find_collection")
                 pass
 
         if collections:
@@ -125,7 +170,7 @@ class PlexConnector:
         return None
 
     # Find a specific movie or TV show in the given library
-    def find_in_library(self, item_type, item_title, item_year = None):
+    def find_in_library(self, item_type: str, item_title: str, item_year: Optional[int] = None) -> Optional[List[Union[Movie, Show]]]:
 
         if not self.plex:
             self.connect()
@@ -140,7 +185,9 @@ class PlexConnector:
                     library_item = library.get(item_title)
                 if library_item:
                     items.append(library_item)
-            except:
+            except Exception as e:
+                # Continue checking other libraries if one fails
+                debug_me(f"Error searching item in library: {e}", "PlexConnector/find_in_library")
                 pass
         if items:
             return items

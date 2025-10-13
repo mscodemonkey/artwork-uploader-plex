@@ -22,47 +22,71 @@ import arguments
 from instance import Instance
 from media_metadata import parse_title
 from notifications import update_log, update_status, notify_web, debug_me
-from config_exceptions import ConfigLoadError
-from plex_connector_exception import PlexConnectorException
-
 from config import Config
-from scraper_exceptions import ScraperException
+from exceptions import ConfigLoadError, PlexConnectorException, ScraperException
 from theposterdb_scraper import ThePosterDBScraper
 from upload_processor import UploadProcessor
 from scraper import Scraper
 from utils import is_not_comment, parse_url_and_options
 from options import Options
 from plex_connector import PlexConnector
-from upload_processor_exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
+from exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
     NotProcessedByExclusion
+from constants import (
+    CURRENT_VERSION,
+    GITHUB_REPO,
+    DEFAULT_WEB_PORT,
+    DEFAULT_WEB_HOST,
+    SCHEDULER_CHECK_INTERVAL,
+    UPDATE_CHECK_INTERVAL,
+    MIN_PYTHON_MAJOR,
+    MIN_PYTHON_MINOR
+)
+from enums import InstanceMode, ScraperSource
 
 # ----------------------------------------------
 # Important for autoupdater
-current_version = "v0.3.7-beta"
+current_version = CURRENT_VERSION
 # ----------------------------------------------
 
-if sys.version_info[0] != 3 or sys.version_info[1] < 10:
-    print("Version: %s.%s.%s is not compatible with Artwork Uploader, please upgrade to Python 3.10+" % (sys.version_info[0], sys.version_info[1], sys.version_info[2]))
+if sys.version_info[0] != MIN_PYTHON_MAJOR or sys.version_info[1] < MIN_PYTHON_MINOR:
+    print(f"Version: {sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]} is not compatible with Artwork Uploader, please upgrade to Python {MIN_PYTHON_MAJOR}.{MIN_PYTHON_MINOR}+")
     sys.exit(0)
 
 try:
     from PIL import Image
     from flask import Flask, render_template
     from flask_socketio import SocketIO
-except (ModuleNotFoundError, ImportError):
-    print("Please install the requirements before running Artwork Uploader")
-    sys.exit(0)
+except (ModuleNotFoundError, ImportError) as e:
+    print("=" * 70)
+    print("ERROR: Required dependencies are missing or incompatible")
+    print("=" * 70)
+    print(f"\nDetails: {str(e)}")
+    print("\nThis usually means one of the following:")
+    print("  1. Requirements not installed: Run 'pip install -r requirements.txt'")
+    print("  2. Wrong Python version: Requires Python 3.10+")
+    print("  3. Architecture mismatch (Apple Silicon): Reinstall dependencies")
+    print("\nFor architecture issues on Apple Silicon Macs:")
+    print("  pip uninstall Pillow Flask flask-socketio -y")
+    print("  pip install Pillow Flask flask-socketio")
+    print("\nOr use a virtual environment:")
+    print("  python3 -m venv .venv")
+    print("  source .venv/bin/activate")
+    print("  pip install -r requirements.txt")
+    print("\nSee README.md for more troubleshooting help.")
+    print("=" * 70)
+    sys.exit(1)
 
 
 
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
-mode = "cli"
+mode = InstanceMode.CLI.value
 scheduled_jobs = {}
 scheduled_jobs_by_file = {}
 
 
-github_repo = "mscodemonkey/artwork-uploader-plex"  # For autoupdater
+github_repo = GITHUB_REPO  # For autoupdater
 
 # ---------------------- CORE FUNCTIONS ----------------------
 
@@ -99,8 +123,8 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
             else:
                 try:
                     scrape_and_upload(instance, parsed_url.url, parsed_url.options)
-                except:
-                    print("Oops")
+                except Exception as e:
+                    print(f"Error processing {parsed_url.url}: {str(e)}")
 
 
 # ---------------------- GUI FUNCTIONS ----------------------
@@ -187,7 +211,7 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None):
     if instance.mode == "web":
         try:
             process_bulk_import_from_ui(instance, parsed_urls)
-        except:
+        except Exception:
             raise
 
 
@@ -613,7 +637,8 @@ def setup_web_sockets():
         try:
             folder_path = Path("bulk_imports")
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
-        except:
+        except (FileNotFoundError, PermissionError) as e:
+            debug_me(f"Error loading bulk file list: {e}", "load_bulk_filelist")
             pass
         notify_web(instance, "load_bulk_filelist",{"bulk_files": bulk_files})
 
@@ -667,7 +692,7 @@ def setup_web_sockets():
             if schedule_file:
                 try:
                     job_id = scheduled_jobs_by_file[schedule_file]
-                except:
+                except KeyError:
                     job_id = None
 
                 if job_id:
@@ -712,13 +737,15 @@ def setup_web_sockets():
                     scheduled_jobs_by_file[schedule_file] = job_id
 
                     notify_web(instance, "add_schedule", {"added": True, "file": schedule_file, "time": schedule_time, "jobReference": job_id})
-                except:
+                except Exception as e:
+                    debug_me(f"Error adding schedule: {e}", "add_tasks_to_scheduler")
                     raise
             # Start the scheduler in a background thread if it's not already started
                 start_scheduler()
 
-        except:
+        except Exception as e:
             if globals.debug:
+                debug_me(f"Error in scheduler setup: {e}", "add_tasks_to_scheduler")
                 raise
             else:
                 pass
@@ -794,13 +821,13 @@ def setup_web_sockets():
             # Cleanup after saving the file
             try:
                 del upload_chunks[file_name]
-            except:
+            except KeyError:
                 pass
         else:
             debug_me(f'Upload complete event received for {file_name}, but with {len(upload_chunks[file_name]["chunks"])} of {int(upload_chunks[file_name]["total_chunks"])}, some chunks are missing.',"handle_upload_complete")
             try:
                 del upload_chunks[file_name]
-            except:
+            except KeyError:
                 pass
 
     def save_uploaded_file(instance: Instance, file_name, filters, plex_title, plex_year):
@@ -891,7 +918,7 @@ def setup_web_sockets():
         return sorted_data
 
     # Load the web server
-    globals.web_socket.run(web_app, host="0.0.0.0", port=4567, debug=globals.debug) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
+    globals.web_socket.run(web_app, host=DEFAULT_WEB_HOST, port=DEFAULT_WEB_PORT, debug=globals.debug) #, ssl_context=("/path/to/fullchain.pem", "/path/to/privkey.pem")
 
 def check_image_orientation(image_path):
     with Image.open(image_path) as img:
@@ -938,13 +965,13 @@ def get_latest_version():
     return None
 
 def check_for_updates_periodically():
-    """Background task to check for updates every 30 minutes."""
+    """Background task to check for updates periodically."""
     while True:
         latest_version = get_latest_version()
         if latest_version and latest_version != current_version:
             debug_me("Later version", "check_for_updates_periodically")
             notify_web(Instance(broadcast = True),"update_available", {"version": latest_version})
-        time.sleep(1800)  # Wait 30 minutes before checking again
+        time.sleep(UPDATE_CHECK_INTERVAL)
 
 
 
@@ -986,11 +1013,11 @@ def start_scheduler():
         debug_me("Scheduler is already running.","start_scheduler")
 
 
-# Check for scheduled jobs every 60 seconds
+# Check for scheduled jobs periodically
 def run_scheduler():
     while True:
         schedule.run_pending()
-        time.sleep(60)  # Check every minute
+        time.sleep(SCHEDULER_CHECK_INTERVAL)
 
 
 #Initialises the scheduler when the script is run
@@ -1038,7 +1065,7 @@ def update_scheduled_jobs():
 if __name__ == "__main__":
 
     # Create an instance object including a unique id and "cli" mode to pass around
-    cli_instance = Instance(uuid.uuid4(),"cli")
+    cli_instance = Instance(uuid.uuid4(), InstanceMode.CLI.value)
 
     scheduler_thread = None
 
@@ -1089,12 +1116,26 @@ if __name__ == "__main__":
         try:
             globals.plex.set_tv_libraries(config.tv_library)
         except PlexConnectorException as e:
-            sys.exit(str(e))
+            print("=" * 70)
+            print("ERROR: Could not connect to Plex server")
+            print("=" * 70)
+            print(f"{e}\n")
+            print("Please check your config.json settings:")
+            print(f"  - base_url: {config.base_url}")
+            print(f"  - token: {config.token[:10]}..." if config.token else "  - token: (not set)")
+            print("\nEnsure your Plex server is running and accessible.")
+            print("=" * 70)
+            sys.exit(1)
 
         try:
             globals.plex.set_movie_libraries(config.movie_library)
         except PlexConnectorException as e:
-            sys.exit(str(e))
+            print("=" * 70)
+            print("ERROR: Could not connect to Plex movie libraries")
+            print("=" * 70)
+            print(f"{e}")
+            print("=" * 70)
+            sys.exit(1)
 
         # Handle the CLI options if we're not using the web ui
         if cli_command == 'bulk':
@@ -1117,8 +1158,9 @@ if __name__ == "__main__":
             cli_options.add_sets = False
             try:
                 scrape_tpdb_user(cli_instance, cli_command, cli_options)
-            except:
-                debug_me("Oops - handle this user error properly!","__main__")
+            except Exception as e:
+                debug_me(f"Error scraping user: {str(e)}","__main__")
+                print(f"Error scraping TPDb user: {str(e)}")
 
         # User passed in a poster or set URL, so let's process that
         else:
@@ -1132,16 +1174,28 @@ if __name__ == "__main__":
         if not interactive_cli:
 
             # Connect to the TV and Movie libraries
+            plex_connected = True
             try:
                 globals.plex.set_tv_libraries(config.tv_library)
             except PlexConnectorException as e:
-                # sys.exit(str(e))
-                pass
+                print("=" * 70)
+                print("WARNING: Could not connect to Plex TV libraries")
+                print("=" * 70)
+                print(f"{e}\n")
+                print("The web UI will still start, but you won't be able to upload artwork")
+                print("until you fix the Plex connection in Settings.\n")
+                plex_connected = False
+
             try:
                 globals.plex.set_movie_libraries(config.movie_library)
             except PlexConnectorException as e:
-               # sys.exit(str(e))
-                pass
+                if plex_connected:  # Only print if we didn't already print for TV
+                    print("=" * 70)
+                    print("WARNING: Could not connect to Plex Movie libraries")
+                    print("=" * 70)
+                    print(f"{e}\n")
+                    print("The web UI will still start, but you won't be able to upload artwork")
+                    print("until you fix the Plex connection in Settings.\n")
 
             # Create the app and web server
 

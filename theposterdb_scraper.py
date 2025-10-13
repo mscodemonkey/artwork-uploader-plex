@@ -1,36 +1,41 @@
 import math
+from typing import Optional, Any
+
 import media_metadata
 import soup_utils
 from notifications import debug_me
 
 from options import Options
-from scraper_exceptions import ScraperException
+from exceptions import ScraperException
 from utils import get_artwork_type
+from enums import MediaType, ScraperSource
+from constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE
+from artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 
 class ThePosterDBScraper:
 
-    def __init__(self, url):
-        self.soup = None
-        self.url = url
-        self.title = None
-        self.options = Options()
+    def __init__(self, url: str) -> None:
+        self.soup: Optional[Any] = None
+        self.url: str = url
+        self.title: Optional[str] = None
+        self.options: Options = Options()
 
-        self.movie_artwork = []
-        self.tv_artwork = []
-        self.collection_artwork = []
+        self.movie_artwork: MovieArtworkList = []
+        self.tv_artwork: TVArtworkList = []
+        self.collection_artwork: CollectionArtworkList = []
 
-        self.user_uploads = 0
-        self.user_pages = 0
+        self.user_uploads: int = 0
+        self.user_pages: int = 0
 
 
     # Set options - otherwise will use defaults of False
-    def set_options(self, options):
+    def set_options(self, options: Options) -> None:
         self.options = options
 
 
     # Scrape The Poster DB
-    def scrape(self):
+    def scrape(self) -> None:
 
         """
         If we were passed a poster link, it should have a link to its corresponding poster set.
@@ -65,26 +70,28 @@ class ThePosterDBScraper:
 
             else:
                 raise ScraperException(f"Invalid or unsupported URL for ThePosterDB: {self.url}")
-        except:
-            raise ScraperException(f"Could not process URL for ThePosterDB: {self.url}")
+        except ScraperException:
+            raise
+        except Exception as e:
+            raise ScraperException(f"Could not process URL for ThePosterDB: {self.url}") from e
 
-    def scrape_user_info(self):
+    def scrape_user_info(self) -> None:
         try:
             self.soup = soup_utils.cook_soup(self.url)
             span_tag = self.soup.find('span', class_='numCount')
             number_str = span_tag['data-count']
             self.user_uploads = int(number_str)
-            self.user_pages = math.ceil(self.user_uploads / 24)
-        except:
-            raise ScraperException(f"Can't get user information, please check the URL you're using")
+            self.user_pages = math.ceil(self.user_uploads / TPDB_USER_UPLOADS_PER_PAGE)
+        except (AttributeError, KeyError, ValueError, TypeError) as e:
+            raise ScraperException(f"Can't get user information, please check the URL you're using") from e
 
-    def get_set_title(self, soup):
+    def get_set_title(self, soup: Any) -> None:
         try:
             self.title = soup.find('p', id = "set-title").a.string
-        except:
-            debug_me(f"title lookup failed {soup}")
+        except (AttributeError, TypeError) as e:
+            debug_me(f"title lookup failed {soup}", "ThePosterDBScraper/get_set_title")
 
-    def get_posters(self, poster_div):
+    def get_posters(self, poster_div: Any) -> None:
 
         """
         Processes the given HTML section to extract poster information.
@@ -108,22 +115,22 @@ class ThePosterDBScraper:
 
            # if not self.options.is_excluded(poster_id):
 
-            poster_url = f"https://theposterdb.com/api/assets/{poster_id}"
+            poster_url = f"{TPDB_API_ASSETS_URL}/{poster_id}"
             title_p = poster.find('p', class_='p-0 mb-1 text-break').string
 
             if media_type == "Show":
                 title, season, year = media_metadata.parse_show(title_p)
-                show_poster = {"title": title, "url": poster_url, "season": season, "episode": None, "year": year, "source": "theposterdb", "id":poster_id}
+                show_poster = {"title": title, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id}
                 get_artwork_type(show_poster)
                 self.tv_artwork.append(show_poster)
-            elif media_type == "Movie":
+            elif media_type == MediaType.MOVIE.value:
                 title, year = media_metadata.parse_movie(title_p)
-                self.movie_artwork.append({"title": title, "url": poster_url, "year": year, "source": "theposterdb", "id":poster_id})
-            elif media_type == "Collection":
-                self.collection_artwork.append({"title": title_p, "url": poster_url, "source": "theposterdb", "id":poster_id})
+                self.movie_artwork.append({"title": title, "url": poster_url, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id})
+            elif media_type == MediaType.COLLECTION.value:
+                self.collection_artwork.append({"title": title_p, "url": poster_url, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id})
 
 
-    def scrape_additional_posters(self):
+    def scrape_additional_posters(self) -> None:
 
         """
 
@@ -140,7 +147,7 @@ class ThePosterDBScraper:
                 self.get_posters(poster_div)
 
 
-    def scrape_additional_sets(self):
+    def scrape_additional_sets(self) -> None:
 
         debug_me("⚲ Looking for additional sets...")
         mt4s = self.soup.find('main').find_all('div', class_='mt-4')
@@ -157,6 +164,6 @@ class ThePosterDBScraper:
 
 
 
-    def scrape_posters(self, soup):
+    def scrape_posters(self, soup: Any) -> None:
         poster_div = soup.find('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
         return self.get_posters(poster_div)

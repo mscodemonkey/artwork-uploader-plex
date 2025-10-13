@@ -1,9 +1,12 @@
+from typing import Optional
+from urllib.parse import urlparse
+
 from options import Options
-from scraper_exceptions import ScraperException
+from exceptions import ScraperException
 from theposterdb_scraper import ThePosterDBScraper
 from mediux_scraper import MediuxScraper
 from notifications import debug_me
-from urllib.parse import urlparse
+from artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 class Scraper:
 
@@ -21,14 +24,14 @@ class Scraper:
         scrape_html():          Scrapes a local HTML file using the Poster DB scraper
     """
 
-    def __init__(self, url):
-        self.url = url
-        self.options = Options()
-        self.movie_artwork = []
-        self.tv_artwork = []
-        self.collection_artwork = []
-        self.source = None
-        self.title = None
+    def __init__(self, url: str) -> None:
+        self.url: str = url
+        self.options: Options = Options()
+        self.movie_artwork: MovieArtworkList = []
+        self.tv_artwork: TVArtworkList = []
+        self.collection_artwork: CollectionArtworkList = []
+        self.source: Optional[str] = None
+        self.title: Optional[str] = None
 
         # Set source based on the contents of the URL
         parsed_url = urlparse(url)
@@ -42,11 +45,11 @@ class Scraper:
 
 
     # Set options - otherwise will use defaults of False
-    def set_options(self, options):
+    def set_options(self, options: Options) -> None:
         self.options = options
 
 
-    def scrape(self):
+    def scrape(self) -> None:
 
         """
         Runs the correct scraper based on the source of the URL (as set in the __init__ function)
@@ -67,7 +70,7 @@ class Scraper:
         except Exception as e:
             raise
 
-    def scrape_theposterdb(self):
+    def scrape_theposterdb(self) -> None:
         try:
             theposterdb_scraper = ThePosterDBScraper(self.url)
             theposterdb_scraper.set_options(self.options)
@@ -84,7 +87,7 @@ class Scraper:
             raise Exception(f"Unexpected error: {e}")
 
 
-    def scrape_mediux(self):
+    def scrape_mediux(self) -> None:
 
         """
         Scrape mediux.pro - this could be anything from a backdrop, posters or episode cards
@@ -112,7 +115,7 @@ class Scraper:
             raise Exception(f"Unexpected error: {e}")
 
 
-    def scrape_html(self):
+    def scrape_html(self) -> None:
 
         """
         Scrapes a local HTML file.  Not sure what this option is actually used for!

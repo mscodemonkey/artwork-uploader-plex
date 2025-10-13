@@ -1,10 +1,23 @@
-# A URL item stored with its options (force, add sets, add posters, filters, year)
+"""
+URL item with associated scraping options.
+"""
+
+from dataclasses import dataclass
+from options import Options
+
+
+@dataclass
 class URLItem:
-    def __init__(self, url, options):
+    """
+    Represents a URL paired with its scraping options.
 
-        """
-        :rtype: object
-        """
+    Used for parsing bulk import files where each line contains a URL
+    followed by optional command-line style arguments.
 
-        self.url = url
-        self.options = options
+    Attributes:
+        url: The URL to scrape (ThePosterDB or MediUX)
+        options: Associated Options object with filters, force flags, etc.
+    """
+
+    url: str
+    options: Options

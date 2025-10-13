@@ -1,5 +1,111 @@
+# Configuration
 config.json
-__pycache__
+cconfig.json
+!config.json.example
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Temporary files
 tempCodeRunnerFile.py
+*.tmp
+temp/
+tmp/
+
+# Distribution / packaging
 build/
+dist/*
 !dist/*.zip
+*.egg-info/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# OS files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+desktop.ini
+._*
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Logs
+logs/
+*.log
+pip-log.txt
+
+# Documentation
+docs/_build/
+site/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Installer logs
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Application-specific
+bulk_imports/*.txt
+!bulk_imports/example_bulk_import.txt
+uploads/
+downloads/
+
+# Refactoring/Development documentation (temporary)
+BATCH_*.md
+REFACTORING_*.md
+REMAINING_IMPROVEMENTS.md
+DEVELOPER_GUIDE.md
