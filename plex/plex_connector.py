@@ -9,10 +9,10 @@ import plexapi.exceptions
 import xml.etree.ElementTree
 from urllib.parse import urlparse
 
-from exceptions import PlexConnectorException, LibraryNotFound
-from options import Options
-from notifications import debug_me
-from config import Config
+from core.exceptions import PlexConnectorException, LibraryNotFound
+from models.options import Options
+from utils.notifications import debug_me
+from core.config import Config
 
 class PlexConnector:
 

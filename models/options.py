@@ -4,7 +4,7 @@ Command line or bulk file arguments, just a container to pass them around easily
 
 from dataclasses import dataclass, field
 from typing import List, Optional
-from enums import FilterType
+from core.enums import FilterType
 
 
 @dataclass

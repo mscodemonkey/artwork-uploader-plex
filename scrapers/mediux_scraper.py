@@ -1,13 +1,13 @@
 from typing import Optional, Any
 
-import soup_utils
-import utils
-from notifications import debug_me
-from options import Options
-from exceptions import ScraperException
-from enums import MediaType, ScraperSource, FileType
-from constants import MEDIUX_API_BASE_URL, MEDIUX_QUALITY_SUFFIX
-from artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
+from utils import soup_utils
+from utils import utils
+from utils.notifications import debug_me
+from models.options import Options
+from core.exceptions import ScraperException
+from core.enums import MediaType, ScraperSource, FileType
+from core.constants import MEDIUX_API_BASE_URL, MEDIUX_QUALITY_SUFFIX
+from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 class MediuxScraper:
 

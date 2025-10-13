@@ -8,11 +8,11 @@ it for upload to Plex, separating it from UI/notification concerns.
 from typing import Optional, Callable, Any
 from dataclasses import dataclass
 
-from scraper import Scraper
-from upload_processor import UploadProcessor
-from plex_connector import PlexConnector
-from options import Options
-from exceptions import (
+from scrapers.scraper import Scraper
+from processors.upload_processor import UploadProcessor
+from plex.plex_connector import PlexConnector
+from models.options import Options
+from core.exceptions import (
     PlexConnectorException,
     ScraperException,
     CollectionNotFound,

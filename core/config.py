@@ -6,8 +6,8 @@ import json
 import os
 from typing import List, Dict, Any
 
-from exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
-from notifications import debug_me
+from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
+from utils.notifications import debug_me
 
 
 class Config:

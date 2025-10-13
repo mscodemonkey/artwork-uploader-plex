@@ -1,15 +1,15 @@
 from typing import Optional
 import re
 
-from config import Config
-from options import Options
-from plex_connector import PlexConnector
-from plex_uploader import PlexUploader
-from exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound, \
+from core.config import Config
+from models.options import Options
+from plex.plex_connector import PlexConnector
+from plex.plex_uploader import PlexUploader
+from core.exceptions import CollectionNotFound, MovieNotFound, NotProcessedByFilter, ShowNotFound, \
     NotProcessedByExclusion
-from utils import is_numeric
-from enums import FilterType, ScraperSource
-from artwork_types import MovieArtwork, TVArtwork, CollectionArtwork
+from utils.utils import is_numeric
+from core.enums import FilterType, ScraperSource
+from models.artwork_types import MovieArtwork, TVArtwork, CollectionArtwork
 
 class UploadProcessor:
 

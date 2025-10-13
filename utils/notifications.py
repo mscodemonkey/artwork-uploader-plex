@@ -1,6 +1,6 @@
-import globals
-from instance import Instance
-from constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
+from core import globals
+from models.instance import Instance
+from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
 
 # For backwards compatibility
 bootstrap_colors = BOOTSTRAP_COLORS

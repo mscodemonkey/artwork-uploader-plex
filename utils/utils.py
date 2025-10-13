@@ -4,9 +4,9 @@ import re
 
 import validators
 
-from notifications import debug_me
-from options import Options
-from url_item import URLItem
+from utils.notifications import debug_me
+from models.options import Options
+from models.url_item import URLItem
 
 # ---------------------- HELPER CLASSES ----------------------
 

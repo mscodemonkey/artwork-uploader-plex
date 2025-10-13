@@ -3,7 +3,7 @@ URL item with associated scraping options.
 """
 
 from dataclasses import dataclass
-from options import Options
+from models.options import Options
 
 
 @dataclass

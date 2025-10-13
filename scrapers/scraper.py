@@ -1,12 +1,12 @@
 from typing import Optional
 from urllib.parse import urlparse
 
-from options import Options
-from exceptions import ScraperException
-from theposterdb_scraper import ThePosterDBScraper
-from mediux_scraper import MediuxScraper
-from notifications import debug_me
-from artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
+from models.options import Options
+from core.exceptions import ScraperException
+from scrapers.theposterdb_scraper import ThePosterDBScraper
+from scrapers.mediux_scraper import MediuxScraper
+from utils.notifications import debug_me
+from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 class Scraper:
 

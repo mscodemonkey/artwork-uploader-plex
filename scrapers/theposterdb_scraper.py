@@ -1,16 +1,16 @@
 import math
 from typing import Optional, Any
 
-import media_metadata
-import soup_utils
-from notifications import debug_me
+from processors import media_metadata
+from utils import soup_utils
+from utils.notifications import debug_me
 
-from options import Options
-from exceptions import ScraperException
-from utils import get_artwork_type
-from enums import MediaType, ScraperSource
-from constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE
-from artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
+from models.options import Options
+from core.exceptions import ScraperException
+from utils.utils import get_artwork_type
+from core.enums import MediaType, ScraperSource
+from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE
+from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 
 class ThePosterDBScraper:

@@ -24,12 +24,12 @@ from pathlib import Path
 from flask import render_template, send_from_directory
 import schedule
 
-import globals
-import utils
-from instance import Instance
-from config import Config
-from media_metadata import parse_title
-from notifications import update_log, update_status, notify_web, debug_me
+from core import globals
+from utils import utils
+from models.instance import Instance
+from core.config import Config
+from processors.media_metadata import parse_title
+from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService
 
 

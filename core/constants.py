@@ -2,7 +2,7 @@
 Application-wide constants.
 """
 
-from __version__ import __version__, __url__
+from core.__version__ import __version__, __url__
 
 # Application metadata
 APP_NAME = "Artwork Uploader for Plex"

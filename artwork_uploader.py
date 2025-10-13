@@ -13,26 +13,26 @@ import tempfile
 import requests
 import subprocess
 import schedule, time
-import globals
+from core import globals
 import threading
 import sys
 
-import utils
-import arguments
-from instance import Instance
-from media_metadata import parse_title
-from notifications import update_log, update_status, notify_web, debug_me
-from config import Config
-from exceptions import ConfigLoadError, PlexConnectorException, ScraperException
-from theposterdb_scraper import ThePosterDBScraper
-from upload_processor import UploadProcessor
-from scraper import Scraper
-from utils import is_not_comment, parse_url_and_options
-from options import Options
-from plex_connector import PlexConnector
-from exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
+from utils import utils
+from models import arguments
+from models.instance import Instance
+from processors.media_metadata import parse_title
+from utils.notifications import update_log, update_status, notify_web, debug_me
+from core.config import Config
+from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException
+from scrapers.theposterdb_scraper import ThePosterDBScraper
+from processors.upload_processor import UploadProcessor
+from scrapers.scraper import Scraper
+from utils.utils import is_not_comment, parse_url_and_options
+from models.options import Options
+from plex.plex_connector import PlexConnector
+from core.exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
     NotProcessedByExclusion
-from constants import (
+from core.constants import (
     CURRENT_VERSION,
     GITHUB_REPO,
     DEFAULT_WEB_PORT,
@@ -42,7 +42,7 @@ from constants import (
     MIN_PYTHON_MAJOR,
     MIN_PYTHON_MINOR
 )
-from enums import InstanceMode, ScraperSource
+from core.enums import InstanceMode, ScraperSource
 from services import (
     BulkFileService,
     ImageService,
@@ -93,9 +93,8 @@ interactive_cli = False  # Set to False when building the executable with PyInst
 mode = InstanceMode.CLI.value
 scheduled_jobs = {}  # Legacy - kept for backwards compatibility
 scheduled_jobs_by_file = {}  # Legacy - kept for backwards compatibility
-bulk_file_service = None  # Initialized in main
-scheduler_service = None  # Initialized in main
-update_service = None  # Initialized in main
+# Services moved to core.globals for proper cross-module access
+config = None  # Initialized in main
 
 
 github_repo = GITHUB_REPO  # For autoupdater
@@ -365,10 +364,10 @@ def load_bulk_import_file(instance: Instance, filename = None):
 
     try:
         # Get the current bulk_txt value from the config
-        bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+        bulk_import_filename = filename if filename is not None else (config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
 
         # Check if file exists
-        if not bulk_file_service.file_exists(bulk_import_filename):
+        if not globals.bulk_file_service.file_exists(bulk_import_filename):
             if instance.mode == "cli":
                 print(f"File does not exist: {bulk_import_filename}")
             if instance.mode == "web":
@@ -376,15 +375,19 @@ def load_bulk_import_file(instance: Instance, filename = None):
             return
 
         # Read file using service
-        content = bulk_file_service.read_file(bulk_import_filename)
+        content = globals.bulk_file_service.read_file(bulk_import_filename)
 
         if instance.mode == "web":
             notify_web(instance, "load_bulk_import", {"loaded": True, "filename": bulk_import_filename, "bulk_import_text": content})
 
-    except FileNotFoundError:
-        notify_web(instance, "load_bulk_import", {"loaded": False})
+    except FileNotFoundError as e:
+        debug_me(f"File not found: {str(e)}", "load_bulk_import_file")
+        notify_web(instance, "load_bulk_import", {"loaded": False, "error": f"File not found: {str(e)}"})
     except Exception as e:
-        notify_web(instance, "load_bulk_import", {"loaded": False})
+        debug_me(f"Error loading bulk import: {str(e)}", "load_bulk_import_file")
+        import traceback
+        traceback.print_exc()
+        notify_web(instance, "load_bulk_import", {"loaded": False, "error": str(e)})
 
 
 def rename_bulk_import_file(instance: Instance, old_name, new_name):
@@ -392,7 +395,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
 
     if old_name != new_name:
         try:
-            bulk_file_service.rename_file(old_name, new_name)
+            globals.bulk_file_service.rename_file(old_name, new_name)
             notify_web(instance, "rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
             update_status(instance, f"Renamed to {new_name}", "success")
         except Exception as e:
@@ -403,7 +406,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
 def delete_bulk_import_file(instance: Instance, file_name):
     if file_name:
         try:
-            bulk_file_service.delete_file(file_name)
+            globals.bulk_file_service.delete_file(file_name)
             notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
             update_status(instance, f"Deleted {file_name}", "success")
         except Exception as e:
@@ -415,11 +418,11 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
     """Save the bulk import text area content to a file relative to the executable location."""
     if contents:
         try:
-            bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+            bulk_import_filename = filename if filename is not None else (config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
 
             debug_me(f"Saving {bulk_import_filename}", "save_bulk_import_file")
 
-            bulk_file_service.write_file(contents, bulk_import_filename)
+            globals.bulk_file_service.write_file(contents, bulk_import_filename)
 
             update_status(instance, message=f"Bulk import file {filename} saved", color="success")
             notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
@@ -431,8 +434,8 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
 def check_for_bulk_import_file(instance: Instance):
     """Check if any .txt files exist in the bulk_imports folder before creating bulk_import.txt."""
     try:
-        bulk_import_filename = config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
-        bulk_file_service.ensure_default_file_exists(bulk_import_filename)
+        bulk_import_filename = config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt"
+        globals.bulk_file_service.ensure_default_file_exists(bulk_import_filename)
     except Exception as e:
         update_status(instance, message="Error creating bulk import file", color="danger")
 
@@ -440,11 +443,11 @@ def check_for_bulk_import_file(instance: Instance):
 def find_bulk_file(filename: str = None):
     """Find a bulk import file - returns full path if exists, None otherwise."""
     # Get the current bulk_txt value from the config
-    bulk_import_filename = filename if filename is not None else config.bulk_txt if config.bulk_txt is not None else "bulk_import.txt"
+    bulk_import_filename = filename if filename is not None else (config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
 
     # Use the service to check if file exists
-    if bulk_file_service.file_exists(bulk_import_filename):
-        return bulk_file_service.get_bulk_file_path(bulk_import_filename)
+    if globals.bulk_file_service.file_exists(bulk_import_filename):
+        return globals.bulk_file_service.get_bulk_file_path(bulk_import_filename)
     return None
 
 
@@ -478,7 +481,7 @@ def sort_key(item):
 
 def get_latest_version():
     """Fetch the latest release version from GitHub."""
-    return update_service.get_latest_version() if update_service else None
+    return globals.update_service.get_latest_version() if globals.update_service else None
 
 def check_for_updates_periodically():
     """Background task to check for updates periodically - now handled by UpdateService."""
@@ -529,8 +532,11 @@ def setup_scheduler_on_first_load(instance: Instance):
 
     Returns: None
     """
+    if config is None:
+        return
+
     # If there are no scheduled jobs already...
-    if not scheduler_service.has_schedules():
+    if not globals.scheduler_service.has_schedules():
         for each_schedule in config.schedules:
             schedule_file = each_schedule.get("file")
             schedule_time = each_schedule.get("time")
@@ -540,7 +546,7 @@ def setup_scheduler_on_first_load(instance: Instance):
                 add_file_to_schedule_thread(instance, filename)
 
             # Add to scheduler service
-            job_id = scheduler_service.add_schedule(
+            job_id = globals.scheduler_service.add_schedule(
                 schedule_file,
                 schedule_time,
                 schedule_callback
@@ -551,7 +557,7 @@ def setup_scheduler_on_first_load(instance: Instance):
             scheduled_jobs_by_file[schedule_file] = job_id
 
         # Start the scheduler
-        if scheduler_service.start():
+        if globals.scheduler_service.start():
             debug_me("Scheduler started.", "setup_scheduler_on_first_load")
 
         debug_me(config.schedules, "setup_scheduler_on_first_load")
@@ -559,6 +565,8 @@ def setup_scheduler_on_first_load(instance: Instance):
 
 # Update the job references for any scheduled jobs if we reload the config file
 def update_scheduled_jobs():
+    if config is None:
+        return
     for each_schedule in config.schedules:
         each_schedule["jobReference"] = scheduled_jobs_by_file[each_schedule["file"]]
 
@@ -603,9 +611,9 @@ if __name__ == "__main__":
         sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
 
     # Create services
-    bulk_file_service = BulkFileService(get_exe_dir())
-    scheduler_service = SchedulerService(check_interval=SCHEDULER_CHECK_INTERVAL)
-    update_service = UpdateService(
+    globals.bulk_file_service = BulkFileService(get_exe_dir())
+    globals.scheduler_service = SchedulerService(check_interval=SCHEDULER_CHECK_INTERVAL)
+    globals.update_service = UpdateService(
         github_repo=GITHUB_REPO,
         current_version=current_version,
         check_interval=UPDATE_CHECK_INTERVAL
@@ -718,7 +726,7 @@ if __name__ == "__main__":
                 debug_me(f"Later version: {version}", "update_service")
                 notify_web(Instance(broadcast=True), "update_available", {"version": version})
 
-            update_service.start_periodic_check(on_update_available)
+            globals.update_service.start_periodic_check(on_update_available)
 
             setup_web_sockets()
 

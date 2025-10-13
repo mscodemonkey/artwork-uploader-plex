@@ -1,6 +1,6 @@
 import re
 
-from notifications import debug_me
+from utils.notifications import debug_me
 
 
 def parse_show(media_title):

@@ -4,12 +4,12 @@ import time
 from plexapi.video import Movie, Show, Season, Episode
 from plexapi.collection import Collection
 
-import utils
-from notifications import debug_me
-from options import Options
-from enums import ScraperSource, ArtworkIDPrefix
-from constants import TPDB_RATE_LIMIT_DELAY, KOMETA_OVERLAY_LABEL
-from artwork_types import AnyArtwork
+from utils import utils
+from utils.notifications import debug_me
+from models.options import Options
+from core.enums import ScraperSource, ArtworkIDPrefix
+from core.constants import TPDB_RATE_LIMIT_DELAY, KOMETA_OVERLAY_LABEL
+from models.artwork_types import AnyArtwork
 
 class PlexUploader:
 

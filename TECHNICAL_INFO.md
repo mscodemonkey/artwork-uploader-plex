@@ -59,10 +59,43 @@ The application follows a layered architecture pattern to separate concerns and 
 plex-poster-set-helper/
 ├── artwork_uploader.py          # Main application entry point (724 lines)
 ├── web_routes.py                # Flask routes and Socket.IO handlers (568 lines)
-├── instance.py                  # Instance/scraper classes
-├── options.py                   # Configuration and options
+├── logging_config.py            # Logging configuration
 ├── config.json                  # User configuration
 ├── requirements.txt             # Python dependencies
+│
+├── core/                        # Core application modules
+│   ├── config.py               # Application configuration
+│   ├── constants.py            # Application constants
+│   ├── enums.py                # Enumerations
+│   ├── exceptions.py           # Custom exceptions
+│   ├── globals.py              # Global state
+│   └── __version__.py          # Version information
+│
+├── models/                      # Data models
+│   ├── instance.py             # Instance/scraper classes
+│   ├── options.py              # Configuration and options
+│   ├── arguments.py            # Command-line arguments
+│   ├── artwork_types.py        # Artwork type definitions
+│   └── url_item.py             # URL item model
+│
+├── scrapers/                    # Website scrapers
+│   ├── scraper.py              # Base scraper class
+│   ├── mediux_scraper.py       # MediUX scraper
+│   └── theposterdb_scraper.py  # ThePosterDB scraper
+│
+├── processors/                  # Processing logic
+│   ├── bulk_import.py          # Bulk import processing
+│   ├── upload_processor.py     # Upload processing logic
+│   └── media_metadata.py       # Media metadata handling
+│
+├── plex/                        # Plex-specific modules
+│   ├── plex_connector.py       # Plex server connection
+│   └── plex_uploader.py        # Plex artwork uploader
+│
+├── utils/                       # Utility modules
+│   ├── utils.py                # General utilities
+│   ├── soup_utils.py           # BeautifulSoup utilities
+│   └── notifications.py        # Notification handling
 │
 ├── services/                    # Service layer (831 lines total)
 │   ├── __init__.py             # Service exports
@@ -72,10 +105,6 @@ plex-poster-set-helper/
 │   ├── scheduler_service.py    # Job scheduling (158 lines)
 │   ├── update_service.py       # GitHub update checking (110 lines)
 │   └── utility_service.py      # General utilities (62 lines)
-│
-├── scrapers/                    # Website scrapers
-│   ├── mediux_scraper.py
-│   └── tpdb_scraper.py
 │
 ├── static/                      # Web UI assets (CSS, JS, images)
 ├── templates/                   # Flask HTML templates

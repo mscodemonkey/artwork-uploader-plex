@@ -2,7 +2,7 @@ import sys
 import requests
 from bs4 import BeautifulSoup
 
-from utils import is_valid_url
+from utils.utils import is_valid_url
 
 
 # -------------------------------------------------
