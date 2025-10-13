@@ -58,8 +58,13 @@ class UpdateService:
             New version string if available, None if up to date or check failed
         """
         latest_version = self.get_latest_version()
-        if latest_version and latest_version != self.current_version:
-            return latest_version
+        if latest_version:
+            # Normalize versions by removing 'v' prefix for comparison
+            latest_normalized = latest_version.lstrip('v')
+            current_normalized = self.current_version.lstrip('v')
+
+            if latest_normalized != current_normalized:
+                return latest_version
         return None
 
     def start_periodic_check(
