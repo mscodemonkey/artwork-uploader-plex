@@ -64,6 +64,8 @@ class PlexUploader:
                         self.upload_target.uploadArt( filepath = self.artwork['path'])
                     else:
                         self.upload_target.uploadArt( url = self.artwork["url"])
+                    if self.track_artwork_ids:
+                        self.upload_target.addLabel(self.label)
                 else:
                     if self.type == "file":
                         self.upload_target.uploadPoster( filepath = self.artwork['path'])

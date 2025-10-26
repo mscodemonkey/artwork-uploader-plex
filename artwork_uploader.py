@@ -614,7 +614,9 @@ if __name__ == "__main__":
                           force=args.force,
                           filters=args.filters,
                           exclude=args.exclude,
-                          year=args.year)  # Arguments per url to process
+                          year=args.year,
+                          kometa=args.kometa,
+                          temp=args.temp)  # Arguments per url to process
 
     # Create config as a global object
     config = Config()

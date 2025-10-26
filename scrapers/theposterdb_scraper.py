@@ -1,5 +1,7 @@
 import math
 from typing import Optional, Any
+from pprint import pprint
+from core import globals
 
 from processors import media_metadata
 from utils import soup_utils
@@ -59,6 +61,23 @@ class ThePosterDBScraper:
 
                 # Get the standard set of posters on the TPDb page
                 self.scrape_posters(self.soup)
+
+                if globals.debug:
+                    if self.collection_artwork:
+                        debug_me(f"Found {len(self.collection_artwork)} collection asset(s) for {len({item["title"] for item in self.collection_artwork})} collection(s):", "ThePosterDBScraper/scrape")
+                        print(f"\033[1m\033[32m*************************************************************")
+                        pprint(self.collection_artwork)
+                        print("*************************************************************\033[0m")  
+                    if self.movie_artwork:
+                        debug_me(f"Found {len(self.movie_artwork)} movie asset(s) for {len({item["title"] for item in self.movie_artwork})} movie(s):","ThePosterDBScraper/scrape")
+                        print(f"\033[1m\033[32m*************************************************************")
+                        pprint(self.movie_artwork)
+                        print(f"*************************************************************\033[0m")
+                    if self.tv_artwork:
+                        debug_me(f"Found {len(self.tv_artwork)} TV show asset(s) for {len({item["title"] for item in self.tv_artwork})} TV show(s):", "ThePosterDBScraper/scrape")
+                        print(f"\033[1m\033[32m*************************************************************")
+                        pprint(self.tv_artwork)
+                        print("*************************************************************\033[0m")
 
                 # Get the additional posters if required
                 if self.options.add_posters:
@@ -120,14 +139,17 @@ class ThePosterDBScraper:
 
             if media_type == "Show":
                 title, season, year = media_metadata.parse_show(title_p)
-                show_poster = {"title": title, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id}
+                if season == "Cover":
+                    show_poster = {"title": title, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "show_cover"}
+                else:
+                    show_poster = {"title": title, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "season_cover"}
                 get_artwork_type(show_poster)
                 self.tv_artwork.append(show_poster)
             elif media_type == MediaType.MOVIE.value:
                 title, year = media_metadata.parse_movie(title_p)
-                self.movie_artwork.append({"title": title, "url": poster_url, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id})
+                self.movie_artwork.append({"title": title, "url": poster_url, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "poster"})
             elif media_type == MediaType.COLLECTION.value:
-                self.collection_artwork.append({"title": title_p, "url": poster_url, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id})
+                self.collection_artwork.append({"title": title_p, "url": poster_url, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "collection poster"})
 
 
     def scrape_additional_posters(self) -> None:

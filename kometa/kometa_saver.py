@@ -1,0 +1,109 @@
+from typing import Union, Optional
+import time
+
+from plexapi.video import Movie, Show, Season, Episode
+from plexapi.collection import Collection
+
+from utils import utils
+from utils.notifications import debug_me
+from models.options import Options
+from core.enums import ScraperSource, ArtworkIDPrefix
+from core.constants import TPDB_RATE_LIMIT_DELAY, KOMETA_OVERLAY_LABEL
+from models.artwork_types import AnyArtwork
+from pprint import pprint
+import os
+import requests
+import mimetypes
+
+class KometaSaver:
+
+    def __init__(
+        self,
+        upload_target: Union[Movie, Show, Season, Episode, Collection],
+        artwork_type: str,
+        #artwork_id: str
+    ) -> None:
+        self.upload_target: Union[Movie, Show, Season, Episode, Collection] = upload_target
+        self.artwork_type: str = artwork_type
+        self.description: str = "item"
+        self.kometa_base: str = ""
+        self.dest_dir: str = ""
+        self.dest_file_name: str = "poster"
+        self.dest_file_ext: str = ".jpg"
+        self.label: Optional[str] = None
+        self.artwork: Optional[AnyArtwork] = None
+        self.options: Options = Options()
+        self.type: Optional[str] = None
+        self.track_artwork_ids: bool = True
+        self.reset_overlay: bool = False
+
+    def set_artwork(self, artwork: AnyArtwork) -> None:
+        self.artwork = artwork
+
+    def set_description(self, description: str) -> None:
+        self.description = description
+
+    def set_options(self, options: Options) -> None:
+        if isinstance(options, Options):
+            self.options = options
+
+    def save_to_kometa(self) -> str:
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
+        }
+
+        replaced_file: str = ""
+
+        try:
+            for check_ext in [".jpg", ".png", ".jpeg"]:
+                existing_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{check_ext}")
+                if os.path.exists(existing_file) and not self.options.force:
+                    time.sleep(0.1)
+                    return f"- {self.description} | {self.artwork_type} skipped (already exists) for {self.upload_target.librarySectionTitle}"
+                elif os.path.exists(existing_file) and self.options.force:
+                    os.remove(existing_file)
+                    replaced_file = os.path.basename(existing_file)
+        except OSError as e:
+            return f"x {self.description} | failed to save {self.artwork_type} asset: {e}"
+
+        try:
+            url = self.artwork["url"]
+            r = requests.get(url, headers=headers, stream=True)
+            r.raise_for_status()
+            content_type = r.headers.get('Content-Type', '')
+            ext = mimetypes.guess_extension(content_type.split(';')[0])
+            if self.dest_file_ext is None:
+                self.dest_file_ext = '.jpg' # fallback
+        except Exception as e:
+            return f"x {self.description} | error saving {self.artwork_type}: Error fetching URL: {e}"
+
+        dest_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
+        try:
+            os.makedirs(self.dest_dir, exist_ok=True)
+            with open(dest_file, 'wb') as f:
+                for chunk in r.iter_content(1024):
+                    f.write(chunk)
+            if replaced_file:
+                return f"✓ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.upload_target.librarySectionTitle}"
+            else:
+                return f"✓ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.upload_target.librarySectionTitle}"
+        except OSError as e:
+            return f"x Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
+            
+            
+        return(f"✓ {self.description} | {self.artwork_type} SAVED")
+        #except Exception as e:
+        #    return f"x {self.description} | failed to save {self.artwork_type} asset."
+
+

@@ -152,6 +152,7 @@ class PlexConnector:
             self.connect()
 
         collections = []
+        libs = []
 
         for movie_library in self.movie_libraries:
             try:
@@ -159,36 +160,44 @@ class PlexConnector:
                 for collection in plex_collections:
                     if collection.title == collection_title:
                         collections.append(collection)
+                        libs.append(movie_library.title)
             except Exception as e:
                 # Continue checking other libraries if one fails
                 debug_me(f"Error searching collection in library: {e}", "PlexConnector/find_collection")
                 pass
 
         if collections:
-            return collections
+            return collections, libs
 
-        return None
+        return None, None
 
     # Find a specific movie or TV show in the given library
-    def find_in_library(self, item_type: str, item_title: str, item_year: Optional[int] = None) -> Optional[List[Union[Movie, Show]]]:
+    def find_in_library(self, item_type: str, item_title: str, item_year: Optional[int] = None) -> Optional[List[[Union[Movie, Show], str]]]:
 
         if not self.plex:
             self.connect()
 
         items = []
+        libs = []
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
         for library in libraries:
             try:
                 if item_year is not None:
                     library_item = library.get(item_title, year = item_year)
+                    library_name = library.title
+                    debug_me(f"Found '{library_item.title} ({item_year})' in '{library_name}'", "PlexConnector/find_in_library")
                 else:
                     library_item = library.get(item_title)
+                    library_name = library.title
                 if library_item:
                     items.append(library_item)
+                    libs.append(library_name)
+                    #debug_me(f"ITEMS: {items}", "PlexConnector/find_in_library")
+                    #debug_me(f"LIBRARIES: {libs}", "PlexConnector/find_in_library")
             except Exception as e:
                 # Continue checking other libraries if one fails
                 debug_me(f"Error searching item in library: {e}", "PlexConnector/find_in_library")
                 pass
         if items:
-            return items
-        return None
+            return items, libs
+        return None, None

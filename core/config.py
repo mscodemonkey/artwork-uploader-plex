@@ -38,6 +38,9 @@ class Config:
         self.movie_library: List[str] = ["Movies"]
         self.mediux_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"]
         self.tpdb_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"]
+        self.kometa_base: str = "C:\\Temp\\assets"
+        self.temp_dir: str = "C:\\Temp\\assets\\temp"
+        self.save_to_kometa: bool = False
         self.track_artwork_ids: bool = True
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
@@ -65,6 +68,9 @@ class Config:
             self.movie_library = config.get("movie_library", [])
             self.mediux_filters = config.get("mediux_filters", [])
             self.tpdb_filters = config.get("tpdb_filters", [])
+            self.kometa_base = config.get("kometa_base", "")
+            self.temp_dir = config.get("temp_dir", "")
+            self.save_to_kometa = config.get("save_to_kometa", False)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
@@ -87,6 +93,9 @@ class Config:
             "movie_library": ["Movies"],
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
             "tpdb_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
+            "kometa_base": "C:\\Temp\\assets",
+            "temp_dir": "C:\\Temp\\assets\\temp",
+            "save_to_kometa": False,
             "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
             "reset_overlay": False,
@@ -115,6 +124,9 @@ class Config:
             "movie_library": self.movie_library,
             "mediux_filters": self.mediux_filters,
             "tpdb_filters": self.tpdb_filters,
+            "kometa_base": self.kometa_base,
+            "temp_dir": self.temp_dir,
+            "save_to_kometa": self.save_to_kometa,
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
