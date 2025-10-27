@@ -6,5 +6,6 @@ services:
     volumes:
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
       - ./config.json:/artwork-uploader/config.json:rw
+      - C:\Users\jtarr\Kometa\config\assets:/assets:rw
     environment:
       - PYTHONUNBUFFERED=1

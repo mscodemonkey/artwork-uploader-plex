@@ -112,6 +112,7 @@ class PlexConnector:
         elif not isinstance(tv_libraries, list):
             raise PlexConnectorException("tv_libraries must be either a string or a list")
 
+        self.tv_libraries = []
         for tv_library in tv_libraries:
             try:
                 plex_tv = self.plex.library.section(tv_library)
@@ -120,7 +121,7 @@ class PlexConnector:
                 raise LibraryNotFound(
                     f'TV library named "{tv_library}" not found. Please check the "tv_library" in config.json or provide one.',
                     f'TV library named "{tv_library}" not found.')
-
+        debug_me(f"The following TV libraries have been set: {[library.title for library in self.tv_libraries]}", "PlexConnector/set_tv_libraries")
         return self.tv_libraries
 
     def set_movie_libraries(self, movie_libraries: Union[str, List[str]]) -> List[MovieSection]:
@@ -133,6 +134,7 @@ class PlexConnector:
         elif not isinstance(movie_libraries, list):
             raise PlexConnectorException("movie_libraries must be either a string or a list")
 
+        self.movie_libraries = []
         for movie_library in movie_libraries:
             try:
                 plex_movies = self.plex.library.section(movie_library)
@@ -141,7 +143,7 @@ class PlexConnector:
                 raise LibraryNotFound(
                     f'Movie library named "{movie_library}" not found. Please check the "movie_library" in config.json or provide one.',
                     f'Movie library named "{movie_library}" not found')
-
+        debug_me(f"The following movie libraries have been set: {[library.title for library in self.movie_libraries]}", "PlexConnector/set_movie_libraries")
         return self.movie_libraries
 
 
@@ -159,6 +161,7 @@ class PlexConnector:
                 plex_collections = movie_library.collections()
                 for collection in plex_collections:
                     if collection.title == collection_title:
+                        debug_me(f"Found '{collection_title}' in '{movie_library.title}'", "PlexConnector/find_collection")
                         collections.append(collection)
                         libs.append(movie_library.title)
             except Exception as e:
@@ -180,7 +183,7 @@ class PlexConnector:
         items = []
         libs = []
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
-        for library in libraries:
+        for i, library in enumerate(libraries):
             try:
                 if item_year is not None:
                     library_item = library.get(item_title, year = item_year)
@@ -192,11 +195,9 @@ class PlexConnector:
                 if library_item:
                     items.append(library_item)
                     libs.append(library_name)
-                    #debug_me(f"ITEMS: {items}", "PlexConnector/find_in_library")
-                    #debug_me(f"LIBRARIES: {libs}", "PlexConnector/find_in_library")
             except Exception as e:
                 # Continue checking other libraries if one fails
-                debug_me(f"Error searching item in library: {e}", "PlexConnector/find_in_library")
+                debug_me(f"Unable to find '{item_title} ({item_year})' in '{libraries[i].title}': {e}", "PlexConnector/find_in_library")
                 pass
         if items:
             return items, libs
