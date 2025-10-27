@@ -117,8 +117,8 @@ The structure of your Kometa asset directories should look like this:
       ·   └── background.png
       │
       └── Tales From The Loop
-  │       ├── poster.png
-  │       └── background.png
+          ├── poster.png
+          └── background.png
 
 ```
 
