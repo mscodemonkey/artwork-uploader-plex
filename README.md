@@ -22,7 +22,123 @@ There are also a couple of new options for thePosterDb, which will allow you to 
 And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
 
 ### Kometa support
-Reset Kometa's overlay tag so the overlay gets added to new artwork
+Kometa can be supported in two different ways. The simplest way is for the script to reset Kometa's overlay label so the next time Kometa runs the overlay gets added to the new artwork (`reset_overlay` set to `true` in config.json). Alternatively, if you're using Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) to manage all your Plex custom art, you can check the option to save the artwork to the Kometa asset directory instead of applying it direectly to Plex (either in the GUI or by setting `save_to_kometa` to `true` in the config.json file). In that case, whenever Kometa runs again it will apply all new or updated artwork with its corresponding overlays. If this option is enabled, you will have to set the Kometa base directory (`kometa_base` in the config file, or with the appropriate text field in the GUI) to the base asset directory.
+
+Kometa asset directory support works on the following assumptions:
+
+- `asset_folders` is set to `true` in Kometa's config.yml, so that each TV show or movie has its own dedicated folder for its artwork assets
+- `assets_for_all` should be set to `true` in each library
+- `assets_for_all_collections` should be set to `true` in each library (if you want ot manage collection assets)
+- `create_asset_folders` should be set to `true`
+- Each library has a folder that matches the library name under the base asset directory
+- Collections have their assets stored in the same folders as the movies or TV shows in the same library
+
+Here's a snippet of the config.yml file:
+
+```
+libraries:                           # This is called out once within the config.yml file
+  Movies:                            # These are names of libraries in your Plex
+    settings:
+      asset_directory:
+        - config/assets/Movies
+      create_asset_folders: true
+    operations:
+      assets_for_all: true
+      assets_for_all_collections: true        
+  [...]
+
+  TV Shows:
+    settings:
+      asset_directory:
+        - config/assets/TV Shows
+      create_asset_folders: true
+    operations:
+      assets_for_all: true
+      assets_for_all_collections: true
+   [...]
+
+settings:
+  [...]
+  asset_directory:
+  - config/assets
+  asset_folders: true
+  asset_depth: 2
+  create_asset_folders: true
+  [...]
+```
+
+The structure of your Kometa asset directories should look like this:
+
+```
+  path/to/base/asset/directory
+  ├── Movies
+  │   ├── Death in Venice (1971)
+  │   │   ├── poster.jpg
+  │   │   └── background.jpg
+  │   ├── Die Another Day (2002)
+  │   │   └── poster.png
+  │   ├── Spy Kids Collection
+  ·   ·   ├── poster.jpg
+  ·   ·   └── background.png
+  │   └── The Amazing Spider-Man (2012)
+  │       └── background.jpg
+  ├── Movies 4K
+  │   ├── 10 Cloverfield Lane (2016)
+  │   │   ├── poster.jpg
+  │   │   └── background.png
+  │   ├── 28 Weeks Later (2007)
+  │   │   └── poster.png
+  ·   ·
+  ·   ·
+  │   └── Zootopia (2016)
+  │       └── poster.jpg
+  ├── TV Shows
+  │   ├── Ted Lasso (2020) {tmdb-97546}
+  │   │   ├── poster.png
+  │   │   ├── Season01.jpg
+  │   │   ├── Season02.jpg
+  │   │   ├── Season03.jpg
+  │   │   ├── S01E01.jpg
+  │   │   ├── S01E02.jpg
+  │   ·   ·
+  │   ·   ·
+  │   │   └── S03E12.jpg
+  ·   ·
+  ·   ·
+  │   └── Alien - Earth
+  │       ├── poster.jpg
+  │       └── background.png
+  └── TV Shows 4K
+      ├── Foundation (2021)
+      │   ├── poster.png
+      │   ├── Season01.jpg
+      │   ├── Season02.jpg
+      ·   ├── Season03.jpg
+      ·   └── background.png
+      │
+      └── Tales From The Loop
+  │       ├── poster.png
+  │       └── background.png
+
+```
+
+Finally, of you're using the Kometa asset directory and you're running the script in a Docker container, you must map the asset directory base folder to a path inside the container. For example:
+
+```
+services:
+  artwork_uploader:
+    build: .
+    ports:
+      - "4567:4567"
+    volumes:
+      - ./bulk_imports:/artwork-uploader/bulk_imports:rw
+      - ./config.json:/artwork-uploader/config.json:rw
+      - C:\Users\NakedRoboticCore\Kometa\config\assets:/assets:rw
+    environment:
+      - PYTHONUNBUFFERED=1
+```
+
+And then in the config.json file you just set `kometa_base` to `/assets`.
 
 ### Year matching
 Sometimes the year on Plex and the year at the artwork provider is different.  Use the --year <year> argument to set the Plex year, so the artwork matches.  Also available in the Web UI and bulk files.
