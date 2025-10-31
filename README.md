@@ -122,7 +122,7 @@ The structure of your Kometa asset directories should look like this:
 
 ```
 
-Finally, of you're using the Kometa asset directory and you're running the script in a Docker container, you must map the asset directory base folder to a path inside the container. For example:
+Finally, if you're using the Kometa asset directory and you're running the script in a Docker container, the script will detect that it's running in Docker (via the RUNNING_IN_DOCKER environment variable) and will hardcode the Kometa base directory to ```/assets``` and the temp directory to ```/temp```. You must therefore map the asset directory base and temp folders to these paths inside the container. This allows you to keep your real paths to your Kometa base and temp folders in the config.json file so if you run the script manually from outside the container it will also work. Your ```docker-compose.yml``` file should look like this:
 
 ```
 services:
@@ -133,12 +133,13 @@ services:
     volumes:
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
       - ./config.json:/artwork-uploader/config.json:rw
-      - C:\Users\NakedRoboticCore\Kometa\config\assets:/assets:rw
+      - C:\Users\<USERNAME>\Kometa\config\assets:/assets:rw
+      - C:\Temp\assets:/temp:rw
     environment:
+      - TZ=Etc/UTC
       - PYTHONUNBUFFERED=1
+      - RUNNING_IN_DOCKER=1
 ```
-
-And then in the config.json file you just set `kometa_base` to `/assets`.
 
 ### Year matching
 Sometimes the year on Plex and the year at the artwork provider is different.  Use the --year <year> argument to set the Plex year, so the artwork matches.  Also available in the Web UI and bulk files.
