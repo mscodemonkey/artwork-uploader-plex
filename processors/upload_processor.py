@@ -44,7 +44,7 @@ class UploadProcessor:
         results = []
         artwork_source = artwork["source"]
         description = f"{artwork["title"]} : {artwork["id"]}"
-        filter_type = FilterType.COLLECTION_POSTER.value if artwork_type == "collection poster" else FilterType.BACKGROUND.value
+        filter_type = FilterType.COLLECTION_POSTER.value if artwork["type"] == "collection poster" else FilterType.BACKGROUND.value
         artwork_type = "Poster" if artwork["type"] == "collection poster" else "Background"
         artwork_id = artwork_type[0]
         #artwork_id = "P" if artwork["type"] == "collection poster" else "B"
@@ -257,7 +257,7 @@ class UploadProcessor:
 
                 except (AttributeError, KeyError, NotFound) as e:
                     raise ShowNotFound(f"{description} | Not available on Plex in {library}: {e}") from e
-
+                    
                 try:
                     if upload_target or (self.options.kometa or globals.config.save_to_kometa):
                         if (self.options.has_no_filters() and self.check_master_filters(filter_type, artwork_source)) or self.options.has_filter(filter_type):
