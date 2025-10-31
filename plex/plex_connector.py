@@ -154,7 +154,7 @@ class PlexConnector:
             self.connect()
 
         collections = []
-        libs = []
+        libraries = []
 
         for movie_library in self.movie_libraries:
             try:
@@ -163,14 +163,14 @@ class PlexConnector:
                     if collection.title == collection_title:
                         debug_me(f"Found '{collection_title}' in '{movie_library.title}'", "PlexConnector/find_collection")
                         collections.append(collection)
-                        libs.append(movie_library.title)
+                        libraries.append(movie_library.title)
             except Exception as e:
                 # Continue checking other libraries if one fails
                 debug_me(f"Error searching collection in library: {e}", "PlexConnector/find_collection")
                 pass
 
         if collections:
-            return collections, libs
+            return collections, libraries
 
         return None, None
 

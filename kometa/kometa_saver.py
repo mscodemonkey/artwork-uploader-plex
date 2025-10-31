@@ -19,23 +19,18 @@ class KometaSaver:
 
     def __init__(
         self,
-        upload_target: Union[Movie, Show, Season, Episode, Collection],
         artwork_type: str,
-        #artwork_id: str
+        library: str,
     ) -> None:
-        self.upload_target: Union[Movie, Show, Season, Episode, Collection] = upload_target
         self.artwork_type: str = artwork_type
+        self.library: str = library
         self.description: str = "item"
         self.kometa_base: str = ""
         self.dest_dir: str = ""
         self.dest_file_name: str = "poster"
         self.dest_file_ext: str = ".jpg"
-        self.label: Optional[str] = None
         self.artwork: Optional[AnyArtwork] = None
         self.options: Options = Options()
-        self.type: Optional[str] = None
-        self.track_artwork_ids: bool = True
-        self.reset_overlay: bool = False
 
     def set_artwork(self, artwork: AnyArtwork) -> None:
         self.artwork = artwork
@@ -70,7 +65,7 @@ class KometaSaver:
                 existing_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{check_ext}")
                 if os.path.exists(existing_file) and not self.options.force:
                     time.sleep(0.1)
-                    return f"- {self.description} | {self.artwork_type} skipped (already exists) for {self.upload_target.librarySectionTitle}"
+                    return f"- {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
                 elif os.path.exists(existing_file) and self.options.force:
                     os.remove(existing_file)
                     replaced_file = os.path.basename(existing_file)
@@ -95,9 +90,9 @@ class KometaSaver:
                 for chunk in r.iter_content(1024):
                     f.write(chunk)
             if replaced_file:
-                return f"✓ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.upload_target.librarySectionTitle}"
+                return f"✓ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
             else:
-                return f"✓ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.upload_target.librarySectionTitle}"
+                return f"✓ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
         except OSError as e:
             return f"x Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
             
