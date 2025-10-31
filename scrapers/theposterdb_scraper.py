@@ -51,7 +51,7 @@ class ThePosterDBScraper:
             if "/poster/" in self.url:
                 debug_me(f"★ Got a poster URL {self.url}, looking up the correct set URL...")
                 poster_soup = soup_utils.cook_soup(self.url)
-                self.url = poster_soup.find('a', class_='rounded view_all')['href']
+                self.url = poster_soup.find('a', title='View Set Page')['href']
 
             if self.url and ("/set/" in self.url or "/user/" in self.url):
                 debug_me(f"★ Got a valid URL {self.url}")
