@@ -129,15 +129,16 @@ class ArtworkProcessor:
                 )
 
             # Process the artwork
-            result = process_func(artwork)
+            results = process_func(artwork)
 
+            for result in results:
             # Track successful uploads (those starting with ✓)
-            if callbacks and callbacks.success_counter is not None and result.startswith('✓'):
-                callbacks.success_counter[0] += 1
+                if callbacks and callbacks.success_counter is not None and result.startswith('✓'):
+                    callbacks.success_counter[0] += 1
 
             # Log the result
-            if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(result)
+                if callbacks and callbacks.on_log_update:
+                    callbacks.on_log_update(result)
 
         except CollectionNotFound as e:
             if callbacks and callbacks.on_log_update:

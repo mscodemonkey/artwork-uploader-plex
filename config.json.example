@@ -37,6 +37,15 @@
     ],
     "_tpdb_filters_help": "Default artwork types to process from ThePosterDB. Remove types you don't want to upload",
 
+    "kometa_base": "C:\\Users\\jtarr\\Kometa\\config\\assets",
+    "_kometa_base_help": "Path to your Kometa asset base folder"
+
+    "temp_dir": "C:\\Temp\\assets\\temp",
+    "_temp_dir_help": "Path to a temporary directory to use instead of the Kometa asset directory, for testing purposes"
+
+    "save_to_kometa": true,
+    "_save_to_kometa_help": "Saves artwork to Kometa asset directory instead of applying it to Plex directly"
+
     "track_artwork_ids": true,
     "_track_artwork_ids_help": "Use Plex labels to track uploaded artwork and prevent duplicate uploads",
 

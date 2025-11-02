@@ -7,6 +7,7 @@ import validators
 from utils.notifications import debug_me
 from models.options import Options
 from models.url_item import URLItem
+from pathlib import PureWindowsPath, PurePosixPath
 
 # ---------------------- HELPER CLASSES ----------------------
 
@@ -202,6 +203,8 @@ def parse_url_and_options(line):
         add_sets='--add-sets' in parts,
         add_to_bulk='--add-to-bulk' in parts,
         force='--force' in parts,
+        kometa= '--kometa' in parts,
+        temp='--temp' in parts,
         filters=filters,  # Store the list of filters or None
         exclude=exclude,
         year=year  # Store the year or None
@@ -244,3 +247,19 @@ def get_artwork_type(artwork):
             filter_type = "title_card"
 
     return artwork_type, filter_type
+
+def get_path_parts(path: str) -> list:
+    if path is None:
+        return None
+
+    is_windows_drive = re.match(r"^[A-Za-z]:\\", path) is not None
+    is_unc = path.startswith("\\\\")
+    has_backslashes_only = "\\" in path and "/" not in path
+
+    if is_windows_drive or is_unc or has_backslashes_only:
+        return PureWindowsPath(path).parts
+    else:
+        return PurePosixPath(path).parts
+
+
+

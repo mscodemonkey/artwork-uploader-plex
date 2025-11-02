@@ -25,6 +25,8 @@ class Options:
 
     add_posters: bool = False
     add_sets: bool = False
+    kometa: bool = False
+    temp: bool = False
     force: bool = False
     filters: List[str] = field(default_factory=list)
     exclude: Optional[List[str]] = None

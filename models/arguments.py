@@ -24,5 +24,7 @@ def parse_arguments():
     parser.add_argument("--exclude", nargs='+', help="Specify one or more IDs to exclude from any uploads.")
     parser.add_argument("--year", type=int, help="Override the year for matching (use the year in Plex)")
     parser.add_argument("--debug", action='store_true', help="Spits out debugging information")
+    parser.add_argument("--kometa", action='store_true', help="Saves artwork to Kometa asset directory (specified in config file) instead of uploading to Plex.")
+    parser.add_argument("--temp", action='store_true', help="Uses a temporary directory (specified in config file) instead of the Kometa asset directory.")
 
     return parser.parse_args()

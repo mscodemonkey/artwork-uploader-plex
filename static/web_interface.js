@@ -375,6 +375,7 @@ function saveConfig() {
 
     save_config.base_url = document.getElementById("plex_base_url").value.trim();
     save_config.token = document.getElementById("plex_token").value.trim();
+    save_config.kometa_base = document.getElementById("kometa_base").value.trim();
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
 
     // Convert comma-separated library inputs to arrays
@@ -390,6 +391,9 @@ function saveConfig() {
 
     // Checkbox for tracking artwork IDs
     save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
+
+    // Checkbox for saving artwork to Kometa asset directory
+    save_config.save_to_kometa = document.getElementById("save_to_kometa").checked;
 
     // Checkbox for managing bulk files
     save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
@@ -462,6 +466,8 @@ function loadConfig() {
             document.getElementById("tv_library").value = data.config.tv_library.join(", ");
             document.getElementById("movie_library").value = data.config.movie_library.join(", ");
             document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids;
+            document.getElementById("save_to_kometa").checked = data.config.save_to_kometa;
+            document.getElementById("kometa_base").value = data.config.kometa_base;
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
@@ -469,8 +475,13 @@ function loadConfig() {
             // Load authentication settings
             document.getElementById("auth_enabled").checked = data.config.auth_enabled || false;
             document.getElementById("auth_username").value = data.config.auth_username || "";
+            
+            // Toggle Kometa settings visibility
+            toggleKometaSettings();
+
             // Toggle auth settings visibility
             toggleAuthSettings();
+
             // Show/hide logout button based on auth enabled
             if (data.config.auth_enabled) {
                 document.getElementById("logout-link").style.display = "block";
@@ -1470,3 +1481,19 @@ function toggleAuthSettings() {
 // Add event listener for auth_enabled checkbox
 document.getElementById("auth_enabled").addEventListener("change", toggleAuthSettings);
 
+// ==================================================
+// Kometa Settings Toggle
+// ==================================================
+
+function toggleKometaSettings() {
+    const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const kometaSettings = document.getElementById("kometa_settings");
+    if (saveToKometa) {
+        kometaSettings.style.display = "block";
+    } else {
+        kometaSettings.style.display = "none";
+    }
+}
+
+// Add event listener for save_to_kometa checkbox
+document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);

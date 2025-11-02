@@ -20,6 +20,7 @@ class MovieArtwork(TypedDict):
     year: Optional[int]
     source: str  # Should be ScraperSource value
     id: str
+    type: Optional[str] # Added by me
 
 
 class TVArtwork(TypedDict):
@@ -52,6 +53,8 @@ class CollectionArtwork(TypedDict):
     url: str
     source: str  # Should be ScraperSource value
     id: str
+    type: Optional[str] # Added by me
+    year: Optional[int] # Added by me
 
 
 class UploadedFileArtwork(TypedDict):

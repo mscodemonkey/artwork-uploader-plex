@@ -1,4 +1,6 @@
 from typing import Optional, Any
+from core import globals
+from pprint import pprint
 
 from utils import soup_utils
 from utils import utils
@@ -106,25 +108,47 @@ class MediuxScraper:
                         season = season_data["season_number"]
                         file_type = "season_cover"
 
-                    #elif data["show_id"] is not None:
-                    #    season = "Cover"
-                    #    episode = None
-                    #    file_type = "show_cover"
-
                 elif media_type == MediaType.MOVIE.value:
 
                     if data["movie_id"]:
                         if data_dict["set"]["movie"]:
+                            # This is a movie poster
                             title = data_dict["set"]["movie"]["title"]
                             year = int(data_dict["set"]["movie"]["release_date"][:4])
+                            file_type = "poster"
                         elif data_dict["set"]["collection"]:
+                            # This is a movie poster inside a collection set
                             movie_id = data["movie_id"]["id"]
                             movies = data_dict["set"]["collection"]["movies"]
                             movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
                             title = movie_data["title"]
                             year = int(movie_data["release_date"][:4])
+                            file_type = "poster"
                     elif data["collection_id"]:
+                        # This is a collection poster
                         title = data_dict["set"]["collection"]["collection_name"]
+                        file_type = "collection poster"
+                    else:
+                        if data["fileType"] == "poster":
+                            # This is a collection poster
+                            file_type = "collection poster"
+                            title = data_dict["set"]["collection"]["collection_name"]
+                        elif data["fileType"] == "backdrop":
+                            # This is a movie background
+                            if data["movie_id_backdrop"]:
+                                movie_id = data["movie_id_backdrop"]["id"]
+                                if data_dict["set"]["collection"] is not None:
+                                    movies = data_dict["set"]["collection"]["movies"]
+                                    movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
+                                else:
+                                    movie_data = data_dict["set"]["movie"]
+                                title = movie_data["title"]
+                                year = int(movie_data["release_date"][:4])
+                                file_type = "background"
+                            else:
+                                # The only remaining artwork can be the collection background
+                                title = data_dict["set"]["collection"]["collection_name"]
+                                file_type = "background"        
 
                 image_stub = data["id"]
                 poster_url = f"{base_url}{image_stub}{quality_suffix}"
@@ -150,6 +174,9 @@ class MediuxScraper:
                         collection_artwork["url"] = poster_url
                         collection_artwork["id"] = image_stub
                         collection_artwork["source"] = ScraperSource.MEDIUX.value
+                        collection_artwork["type"] = file_type # Added by me
+                        collection_artwork["year"] = None
+                        debug_me(f"Collection Artwork: {collection_artwork}", "MediuxScraper/scrape")
                         self.collection_artwork.append(collection_artwork)
                     else:
                         movie_artwork = {}
@@ -158,7 +185,27 @@ class MediuxScraper:
                         movie_artwork["url"] = poster_url
                         movie_artwork["source"] = ScraperSource.MEDIUX.value
                         movie_artwork["id"] = image_stub
+                        movie_artwork["type"] = file_type # Added by me
+                        debug_me(f"Movie Artwork: {movie_artwork}", "MediuxScraper/scrape")
                         self.movie_artwork.append(movie_artwork)
+
+            if globals.debug:
+                if self.collection_artwork:
+                    debug_me(f"Found {len(self.collection_artwork)} collection asset(s) for {len({item["title"] for item in self.collection_artwork})} collection(s):", "MediuxScraper/scrape")
+                    print(f"\033[1m\033[32m*************************************************************")
+                    pprint(self.collection_artwork)
+                    print("*************************************************************\033[0m")  
+                if self.movie_artwork:
+                    debug_me(f"Found {len(self.movie_artwork)} movie asset(s) for {len({item["title"] for item in self.movie_artwork})} movie(s):","MediuxScraper/scrape")
+                    print(f"\033[1m\033[32m*************************************************************")
+                    pprint(self.movie_artwork)
+                    print(f"*************************************************************\033[0m")
+                if self.tv_artwork:
+                    debug_me(f"Found {len(self.tv_artwork)} TV show asset(s) for {len({item["title"] for item in self.tv_artwork})} TV show(s):", "MediuxScraper/scrape")
+                    print(f"\033[1m\033[32m*************************************************************")
+                    pprint(self.tv_artwork)
+                    print("*************************************************************\033[0m")
+
         except ScraperException:
             raise
         except Exception as e:

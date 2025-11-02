@@ -111,7 +111,7 @@
             <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
             role="tab" aria-controls="uploader" aria-selected="true">Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
-            role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block">Upload&nbsp;</span>Log</a>
+            role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block">Scrape&nbsp;</span>Log</a>
             <a class="nav-link ms-auto" id="logout-link" href="/logout" style="display: none;">
                 <i class="bi bi-box-arrow-right"></i> Logout
             </a>
@@ -161,6 +161,19 @@
                                     <input type="text" id="movie_library" name="movie_library" class="form-control" required>
                                     <div class="invalid-feedback">
                                         Please provide your Movie library name. If more than one, separate using commas.
+                                    </div>
+                                </div>
+                                <h5 class="mb-3">Kometa settings</h5>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
+                                    <label for="save_to_kometa" class="form-check-label">Save artwork to Kometa asset directory instead of uploading to Plex</label>
+                                </div>
+                                <div class="collapse" id="kometa_settings">
+                                    <label for="kometa_settings" class="form-label">Kometa Asset Directory:</label>
+                                    <input type="text" id="kometa_base" name="kometa_base" class="form-control" required
+                                        title="Enter your Kometa asset directory.">
+                                    <div class="invalid-feedback">
+                                        Please provide your Kometa asset directory.
                                     </div>
                                 </div>
                             </div>
@@ -402,8 +415,8 @@
                         <div class="col mb-3">
                             <div class="p-3 border">
                                 <label for="scrape_url" class="form-label">URL to scrape:</label>
-                                <input type="text" id="scrape_url" name="plex_token" class="form-control"
-                                    value="https://mediux.pro/sets/9133" required
+                                <input type="text" id="scrape_url" name="scrape_url" class="form-control"
+                                    value="" required
                                     placeholder="theposterdb.com (poster/set/user) or mediux.pro (sets) URL"
                                     pattern="https://(theposterdb\.com/(poster/\d+|set/\d+|user/[A-Za-z0-9]+)|mediux\.pro/sets/\d+)"
                                     title="Please enter a valid URL (e.g., https://theposterdb.com/set/12345 or https://mediux.pro/sets/12345)">
@@ -412,13 +425,13 @@
                         </div>
                         <div class="mb-3 col-md-4 col-lg-3">
                             <div class="p-3 border">
-                                    <label for="scrape_url" class="form-label">Plex year:</label>
-                                    <input type="text" id="year" name="year" class="form-control"
-                                        value=""
-                                        placeholder="e.g. 1978 or 2023"
-                                        pattern="^(19|20)\d{2}$"
-                                        title="Use this if the year in Plex is different to that on MediUX or TPDb">
-                                    <div class="invalid-feedback">Please use a valid year (eg 1978, 2023).</div>
+                                <label for="scrape_url" class="form-label">Plex year:</label>
+                                <input type="text" id="year" name="year" class="form-control"
+                                    value=""
+                                    placeholder="e.g. 1978 or 2023"
+                                    pattern="^(19|20)\d{2}$"
+                                    title="Use this if the year in Plex is different to that on MediUX or TPDb">
+                                <div class="invalid-feedback">Please use a valid year (eg 1978, 2023).</div>    
                             </div>
                         </div>
                     </div>
