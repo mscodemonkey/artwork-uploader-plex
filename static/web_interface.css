@@ -24,8 +24,26 @@
             margin-top: 1rem;
         }
 
-        h1 {font-weight: 400; letter-spacing: -1px;}
-        h1 img {position: relative;  top: -0.2rem; margin-right:1rem;}
+        h1 {
+            font-weight: 400;
+            letter-spacing: -1px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .app-logo {
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .app-logo:hover {
+            transform: scale(1.1);
+        }
+
+        .app-title {
+            line-height: 1.2;
+        }
 
         .log_message {
             font-family: 'JetBrains Mono', monospace;
