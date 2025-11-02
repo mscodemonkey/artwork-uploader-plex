@@ -549,12 +549,12 @@ def setup_scheduler_on_first_load(instance: Instance):
 
     Returns: None
     """
-    if config is None:
+    if globals.config is None:
         return
 
     # If there are no scheduled jobs already...
     if not globals.scheduler_service.has_schedules():
-        for each_schedule in config.schedules:
+        for each_schedule in globals.config.schedules:
             schedule_file = each_schedule.get("file")
             schedule_time = each_schedule.get("time")
 
@@ -577,14 +577,14 @@ def setup_scheduler_on_first_load(instance: Instance):
         if globals.scheduler_service.start():
             debug_me("Scheduler started.", "setup_scheduler_on_first_load")
 
-        debug_me(config.schedules, "setup_scheduler_on_first_load")
+        debug_me(globals.config.schedules, "setup_scheduler_on_first_load")
 
 
 # Update the job references for any scheduled jobs if we reload the config file
 def update_scheduled_jobs():
-    if config is None:
+    if globals.config is None:
         return
-    for each_schedule in config.schedules:
+    for each_schedule in globals.config.schedules:
         each_schedule["jobReference"] = scheduled_jobs_by_file[each_schedule["file"]]
 
 
