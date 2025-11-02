@@ -585,7 +585,9 @@ def update_scheduled_jobs():
     if globals.config is None:
         return
     for each_schedule in globals.config.schedules:
-        each_schedule["jobReference"] = scheduled_jobs_by_file[each_schedule["file"]]
+        schedule_file = each_schedule.get("file", "")
+        if schedule_file and schedule_file in scheduled_jobs_by_file:
+            each_schedule["jobReference"] = scheduled_jobs_by_file[schedule_file]
 
 
 # * Main Initialization ---
