@@ -45,9 +45,53 @@ class Options:
         """Remove all filters."""
         self.filters = []
 
-    def is_excluded(self, item_id: str) -> bool:
-        """Check if an artwork ID should be excluded."""
-        return self.exclude is not None and item_id in self.exclude
+    def is_excluded(self, item_id: str, season: Optional[int] = None, episode: Optional[int] = None) -> bool:
+        """
+        Check if an artwork ID should be excluded.
+
+        Args:
+            item_id: The artwork ID to check
+            season: Optional season number for TV shows
+            episode: Optional episode number for TV shows
+
+        Returns:
+            True if the item should be excluded, False otherwise
+
+        Examples:
+            - exclude=['123'] excludes artwork ID '123'
+            - exclude=['s01e05'] excludes season 1 episode 5
+            - exclude=['s01'] excludes all of season 1
+            - exclude=['s00e01', 's02'] excludes specials episode 1 and all of season 2
+        """
+        if self.exclude is None:
+            return False
+
+        # Check if the artwork ID itself is excluded
+        if item_id in self.exclude:
+            return True
+
+        # Check season/episode exclusions for TV shows
+        if season is not None:
+            # Format: s01e05 or s1e5 (case insensitive)
+            if episode is not None:
+                episode_patterns = [
+                    f"s{season:02d}e{episode:02d}",  # s01e05
+                    f"s{season}e{episode}",          # s1e5
+                ]
+                for pattern in episode_patterns:
+                    if any(pattern.lower() == excl.lower() for excl in self.exclude):
+                        return True
+
+            # Format: s01 or s1 (whole season exclusion)
+            season_patterns = [
+                f"s{season:02d}",  # s01
+                f"s{season}",      # s1
+            ]
+            for pattern in season_patterns:
+                if any(pattern.lower() == excl.lower() for excl in self.exclude):
+                    return True
+
+        return False
 
     def __post_init__(self) -> None:
         """Validate options after initialization."""

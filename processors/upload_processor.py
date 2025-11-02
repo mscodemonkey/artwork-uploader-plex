@@ -261,7 +261,10 @@ class UploadProcessor:
                 try:
                     if upload_target or (self.options.kometa or globals.config.save_to_kometa):
                         if (self.options.has_no_filters() and self.check_master_filters(filter_type, artwork_source)) or self.options.has_filter(filter_type):
-                            if not self.options.is_excluded(artwork["id"]):
+                            # Pass season/episode info for TV show exclusion checks
+                            season_num = artwork['season'] if isinstance(artwork['season'], int) else None
+                            episode_num = artwork['episode'] if isinstance(artwork['episode'], int) else None
+                            if not self.options.is_excluded(artwork["id"], season_num, episode_num):
                                 if self.options.kometa or globals.config.save_to_kometa:
                                     saver = KometaSaver(artwork_type, library)
                                     saver.set_artwork(artwork)

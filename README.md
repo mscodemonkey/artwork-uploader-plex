@@ -327,6 +327,12 @@ The script supports various command-line arguments for flexible use.
 ```--exclude <id1> [<id2> <id3> ...]``` will exclude the poster or artwork with the specified ID from being uploaded.  Grab the ID from the session log...
 - ThePosterDB is a number
 - MediUX is a UUID
+- For TV shows, you can also exclude specific episodes or entire seasons:
+  - ```--exclude s01e05``` - Excludes season 1 episode 5
+  - ```--exclude s1e5``` - Same as above (both formats work)
+  - ```--exclude s02``` - Excludes all episodes in season 2
+  - ```--exclude s00e01 s02``` - Excludes specials episode 1 and all of season 2
+  - You can mix artwork IDs and episode/season patterns in the same command
     
 ```--filters <filter1> [<filter2> <filter3> ...]``` will **only** upload the selected artwork types, based on the options below
 - show_cover
