@@ -133,7 +133,7 @@ class ArtworkProcessor:
 
             for result in results:
             # Track successful uploads (those starting with ✓)
-                if callbacks and callbacks.success_counter is not None and result.startswith('✓'):
+                if callbacks and callbacks.success_counter is not None and (result.startswith('✅') or result.startswith('♻️')):
                     callbacks.success_counter[0] += 1
 
             # Log the result
@@ -142,27 +142,27 @@ class ArtworkProcessor:
 
         except CollectionNotFound as e:
             if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"∙ {str(e)}")
+                callbacks.on_log_update(f"⚠️ {str(e)}")
 
         except MovieNotFound as e:
             if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"∙ {str(e)}")
+                callbacks.on_log_update(f"⚠️ {str(e)}")
 
         except ShowNotFound as e:
             if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"∙ {str(e)}")
+                callbacks.on_log_update(f"⚠️ {str(e)}")
 
         except NotProcessedByExclusion as e:
             if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"- {str(e)}")
+                callbacks.on_log_update(f"⏩ {str(e)}")
 
         except NotProcessedByFilter as e:
             if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"- {str(e)}")
+                callbacks.on_log_update(f"⏩ {str(e)}")
 
         except Exception as e:
             if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"x {str(e)}")
+                callbacks.on_log_update(f"❌ {str(e)}")
             if callbacks and callbacks.on_status_update:
                 callbacks.on_status_update(
                     f"Error: {str(e)}",
@@ -217,7 +217,7 @@ class ArtworkProcessor:
                 process_func = processor.process_tv_artwork
             else:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"x Unknown media type: {media_type}")
+                    callbacks.on_log_update(f"❌ Unknown media type: {media_type}")
                 continue
 
             # Build status message
@@ -246,27 +246,27 @@ class ArtworkProcessor:
 
             except CollectionNotFound as e:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"∙ {str(e)}")
+                    callbacks.on_log_update(f"⚠️ {str(e)}")
 
             except MovieNotFound as e:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"∙ {str(e)}")
+                    callbacks.on_log_update(f"⚠️ {str(e)}")
 
             except ShowNotFound as e:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"∙ {str(e)}")
+                    callbacks.on_log_update(f"⚠️ {str(e)}")
 
             except NotProcessedByExclusion as e:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"- {str(e)}")
+                    callbacks.on_log_update(f"⏩ {str(e)}")
 
             except NotProcessedByFilter as e:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"- {str(e)}")
+                    callbacks.on_log_update(f"⏩ {str(e)}")
 
             except Exception as e:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"x Unexpected during process_uploaded_artwork: {str(e)}")
+                    callbacks.on_log_update(f"❌ Unexpected during process_uploaded_artwork: {str(e)}")
                 if callbacks and callbacks.on_status_update:
                     callbacks.on_status_update(
                         f"Error: {str(e)}",

@@ -65,12 +65,12 @@ class KometaSaver:
                 existing_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{check_ext}")
                 if os.path.exists(existing_file) and not self.options.force:
                     time.sleep(0.1)
-                    return f"- {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
+                    return f"⏩ {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
                 elif os.path.exists(existing_file) and self.options.force:
                     os.remove(existing_file)
                     replaced_file = os.path.basename(existing_file)
         except OSError as e:
-            return f"x {self.description} | failed to save {self.artwork_type} asset: {e}"
+            return f"❌ {self.description} | failed to save {self.artwork_type} asset: {e}"
 
         try:
             url = self.artwork["url"]
@@ -81,7 +81,7 @@ class KometaSaver:
             if self.dest_file_ext is None:
                 self.dest_file_ext = '.jpg' # fallback
         except Exception as e:
-            return f"x {self.description} | error saving {self.artwork_type}: Error fetching URL: {e}"
+            return f"❌ {self.description} | error saving {self.artwork_type}: Error fetching URL: {e}"
 
         dest_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
         try:
@@ -90,14 +90,14 @@ class KometaSaver:
                 for chunk in r.iter_content(1024):
                     f.write(chunk)
             if replaced_file:
-                return f"✓ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
+                return f"♻️ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
             else:
-                return f"✓ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
+                return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
         except OSError as e:
             return f"x Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
             
             
-        return(f"✓ {self.description} | {self.artwork_type} SAVED")
+        return(f"✅ {self.description} | {self.artwork_type} SAVED")
         #except Exception as e:
         #    return f"x {self.description} | failed to save {self.artwork_type} asset."
 
