@@ -237,6 +237,9 @@ This is optional - if you don't do this, a new config.json will be created when 
 ```"kometa_base"```
 - Path to your Kometa base asset directory
 
+```"temp_dir"```
+- (Optional) Path to temporary save directory that can be used for testing purposes when using the ```--temp``` argument in the CLI
+
 ### Filter options
 Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
       - show_cover
