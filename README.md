@@ -35,7 +35,7 @@ Kometa asset directory support works on the following assumptions:
 
 Here's a snippet of the config.yml file:
 
-```
+```yaml
 libraries:                           # This is called out once within the config.yml file
   Movies:                            # These are names of libraries in your Plex
     settings:
@@ -124,7 +124,7 @@ The structure of your Kometa asset directories should look like this:
 
 Finally, if you're using the Kometa asset directory and you're running the script in a Docker container, the script will detect that it's running in Docker (via the RUNNING_IN_DOCKER environment variable) and will hardcode the Kometa base directory to ```/assets``` and the temp directory to ```/temp```. You must therefore map the asset directory base and temp folders to these paths inside the container. This allows you to keep your real paths to your Kometa base and temp folders in the config.json file so if you run the script manually from outside the container it will also work. Your ```docker-compose.yml``` file should look like this:
 
-```
+```yaml
 services:
   artwork_uploader:
     build: .
