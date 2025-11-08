@@ -192,14 +192,24 @@
                                 <h5 class="mb-3">Kometa settings</h5>
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
-                                    <label for="save_to_kometa" class="form-check-label">Save artwork to Kometa asset directory instead of uploading to Plex</label>
+                                    <label for="save_to_kometa" class="form-check-label">Save artwork to Kometa asset directory</label>
                                 </div>
-                                <div class="collapse" id="kometa_settings">
-                                    <label for="kometa_settings" class="form-label">Kometa Asset Directory:</label>
-                                    <input type="text" id="kometa_base" name="kometa_base" class="form-control" required
-                                        title="Enter your Kometa asset directory.">
-                                    <div class="invalid-feedback">
-                                        Please provide your Kometa asset directory.
+                                <div class="form-check mb-3" style="display: none;">
+                                    <input class="form-check-input" type="checkbox" value="reset_overlay" id="reset_overlay"/>
+                                    <label for="reset_overlay" class="form-check-label">Reset the Overlay tag for Kometa if artwork updated</label>
+                                </div>                                
+                                <div id="kometa_settings" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="kometa_base" class="form-label">Kometa Asset Directory:</label>
+                                        <input type="text" id="kometa_base" name="kometa_base" class="form-control" placeholder="X:\path\to\kometa\assets">
+                                        <div class="invalid-feedback">
+                                            Please provide your Kometa asset directory.
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="temp_dir" class="form-label">Temp Directory (optional):</label>
+                                        <input type="text" id="temp_dir" name="temp_dir" class="form-control" placeholder="X:\path\to\temp\dir">
+                                        <small class="form-text text-muted">(Optional) Specify a temporary directory for Kometa operations.</small>
                                     </div>
                                 </div>
                             </div>
@@ -331,17 +341,14 @@
                             <div class="row">
                                 <div class="col">
                                     <div class="p-3 border">
-                                        <div class="form-check mb-3">
+                                        <h5 class="mb-3">Additional settings</h5>
+                                        <div class="form-check mb-3" style="display: none;">
                                             <input class="form-check-input" type="checkbox" value="--force" id="track_artwork_ids"/>
                                             <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex labels (recommend to leave checked)</label>
                                         </div>
                                         <div class="form-check mb-3">
                                             <input class="form-check-input" type="checkbox" value="auto_manage" id="auto_manage_bulk_files"/>
                                             <label for="auto_manage_bulk_files" class="form-check-label">Sort and label bulk files automatically</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" value="reset_overlay" id="reset_overlay"/>
-                                            <label for="reset_overlay" class="form-check-label">Reset the Overlay tag for Kometa if artwork updated</label>
                                         </div>
                                     </div>
                                 </div>
@@ -470,7 +477,12 @@
                                     <label for="option-force" class="form-check-label">Force upload the artwork, even if it
                                         already exists</label>
                                 </div>
-                                <div class="form-check">
+                                <div class="form-check mb-2" style="display: none;">
+                                    <input class="form-check-input" type="checkbox" value="--temp"
+                                        id="option-temp"/>
+                                    <label for="option-temp" class="form-check-label">Use temporary directory for downloaded assets</label>
+                                </div>
+                                <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" value="--add-to-bulk"
                                         id="option-add-to-bulk"/>
                                     <label for="option-add-to-bulk" class="form-check-label">Automatically add this URL to
