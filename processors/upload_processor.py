@@ -234,7 +234,7 @@ class UploadProcessor:
                                 file_name = f"Season{artwork["season"]:02}"
                                 filter_type = FilterType.SEASON_COVER.value
                             else:
-                                result = f"∙ {description} | {season} not available in {library}"
+                                result = f"⚠️ {description} | {season} not available in {library}"
                                 results.append(result)
                                 continue
                         elif artwork["episode"] >= 0:
@@ -247,11 +247,11 @@ class UploadProcessor:
                                     file_name = f"S{artwork["season"]:02}E{artwork["episode"]:02}"
                                     filter_type = FilterType.TITLE_CARD.value
                                 else:
-                                    result = f"∙ {description} | {season}, Episode {artwork["episode"]:02} not available in {library}"
+                                    result = f"⚠️ {description} | {season}, Episode {artwork["episode"]:02} not available in {library}"
                                     results.append(result)
                                     continue
                             else:
-                                result = f"∙ {description} | {season} not available in {library}"
+                                result = f"⚠️ {description} | {season} not available in {library}"
                                 results.append(result)
                                 continue
 

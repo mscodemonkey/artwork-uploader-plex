@@ -248,7 +248,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # Log the start of the bulk import process
         display_filename = filename if filename else "bulk_import.txt"
-        update_log(instance, f"> Bulk process started - {display_filename}")
+        update_log(instance, f"🎬 Bulk process started - {display_filename}")
 
         # Show the progress bar on the web UI
         notify_web(instance, "progress_bar", {"percent" : 0})
@@ -278,7 +278,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # Log the completion of the bulk import process
         poster_count = success_counter[0]
-        update_log(instance, f"< Bulk process completed - {display_filename} - {poster_count} posters updated")
+        update_log(instance, f"🏁 Bulk process completed - {display_filename} - {poster_count} assets updated")
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", {"percent": 100})
