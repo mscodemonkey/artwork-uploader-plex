@@ -58,7 +58,7 @@ class KometaSaver:
             'Cache-Control': 'max-age=0'
         }
 
-        replaced_file: str = ""
+        replaced_file: bool = False
 
         try:
             for check_ext in [".jpg", ".png", ".jpeg"]:
@@ -68,20 +68,20 @@ class KometaSaver:
                     return f"⏩ {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
                 elif os.path.exists(existing_file) and self.options.force:
                     os.remove(existing_file)
-                    replaced_file = os.path.basename(existing_file)
+                    replaced_file = True
         except OSError as e:
             return f"❌ {self.description} | failed to save {self.artwork_type} asset: {e}"
 
         try:
             url = self.artwork["url"]
-            r = requests.get(url, headers=headers, stream=True)
+            r = requests.get(url, headers=headers, stream=True, timeout=5)
             r.raise_for_status()
             content_type = r.headers.get('Content-Type', '')
             ext = mimetypes.guess_extension(content_type.split(';')[0])
             if self.dest_file_ext is None:
                 self.dest_file_ext = '.jpg' # fallback
         except Exception as e:
-            return f"❌ {self.description} | error saving {self.artwork_type}: Error fetching URL: {e}"
+            return f"❌ {self.description} | Error saving {self.artwork_type}: Error fetching URL: {e}"
 
         dest_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
         try:
@@ -94,11 +94,6 @@ class KometaSaver:
             else:
                 return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
         except OSError as e:
-            return f"x Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
-            
-            
-        return(f"✅ {self.description} | {self.artwork_type} SAVED")
-        #except Exception as e:
-        #    return f"x {self.description} | failed to save {self.artwork_type} asset."
-
-
+            return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
+        except Exception as e:
+            return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"

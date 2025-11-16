@@ -17,6 +17,7 @@ class MediuxScraper:
         self.soup: Optional[Any] = None
         self.url: str = url
         self.title: Optional[str] = None
+        self.author: Optional[str] = None
         self.options: Options = Options()
 
         self.movie_artwork: MovieArtworkList = []
@@ -31,7 +32,10 @@ class MediuxScraper:
 
     def scrape(self) -> None:
 
-        self.soup = soup_utils.cook_soup(self.url)
+        try:
+            self.soup = soup_utils.cook_soup(self.url)
+        except Exception as e:
+            raise ScraperException(f"Can't scrape from MediUX: {str(e)}") from e
 
         base_url = MEDIUX_API_BASE_URL
         quality_suffix = MEDIUX_QUALITY_SUFFIX
@@ -50,10 +54,13 @@ class MediuxScraper:
 
                             if data_dict["set"]["show"] is not None:
                                 self.title = data_dict["set"]["show"]["name"]
+                                show_id = data_dict["set"]["show"].get("id", None)
                             elif data_dict["set"]["movie"] is not None:
                                 self.title = data_dict["set"]["movie"]["title"]
                             elif data_dict["set"]["collection"] is not None:
                                 self.title = data_dict["set"]["collection"]["collection_name"]
+                            
+                            self.author = data_dict["set"]["user_created"]["username"]
 
                             poster_data = data_dict["set"]["files"]
 
@@ -111,6 +118,7 @@ class MediuxScraper:
                 elif media_type == MediaType.MOVIE.value:
 
                     if data["movie_id"]:
+                        movie_id = data["movie_id"]["id"]
                         if data_dict["set"]["movie"]:
                             # This is a movie poster
                             title = data_dict["set"]["movie"]["title"]
@@ -118,7 +126,7 @@ class MediuxScraper:
                             file_type = "poster"
                         elif data_dict["set"]["collection"]:
                             # This is a movie poster inside a collection set
-                            movie_id = data["movie_id"]["id"]
+#                            movie_id = data["movie_id"]["id"]
                             movies = data_dict["set"]["collection"]["movies"]
                             movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
                             title = movie_data["title"]
@@ -163,8 +171,9 @@ class MediuxScraper:
                     tv_artwork["year"] = year
                     tv_artwork["id"] = image_stub
                     tv_artwork['type'] = file_type
-
-                    debug_me(f"TV Artwork: {tv_artwork}", "MediuxScraper/scrape")
+                    tv_artwork["author"] = self.author
+                    tv_artwork["tmdb_id"] = show_id
+                    # debug_me(f"TV Artwork: {tv_artwork}", "MediuxScraper/scrape")
                     self.tv_artwork.append(tv_artwork)
 
                 elif media_type == MediaType.MOVIE.value:
@@ -176,7 +185,8 @@ class MediuxScraper:
                         collection_artwork["source"] = ScraperSource.MEDIUX.value
                         collection_artwork["type"] = file_type # Added by me
                         collection_artwork["year"] = None
-                        debug_me(f"Collection Artwork: {collection_artwork}", "MediuxScraper/scrape")
+                        collection_artwork["author"] = self.author
+                        # debug_me(f"Collection Artwork: {collection_artwork}", "MediuxScraper/scrape")
                         self.collection_artwork.append(collection_artwork)
                     else:
                         movie_artwork = {}
@@ -186,7 +196,9 @@ class MediuxScraper:
                         movie_artwork["source"] = ScraperSource.MEDIUX.value
                         movie_artwork["id"] = image_stub
                         movie_artwork["type"] = file_type # Added by me
-                        debug_me(f"Movie Artwork: {movie_artwork}", "MediuxScraper/scrape")
+                        movie_artwork["author"] = self.author
+                        movie_artwork["tmdb_id"] = movie_id
+                        # debug_me(f"Movie Artwork: {movie_artwork}", "MediuxScraper/scrape")
                         self.movie_artwork.append(movie_artwork)
 
             if globals.debug:

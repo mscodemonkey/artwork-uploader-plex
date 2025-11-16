@@ -78,6 +78,7 @@ class ArtworkProcessor:
         processor = UploadProcessor(self.plex)
         processor.set_options(options)
 
+        callbacks.on_log_update(f"🔍 Scraping artwork{f" for '{title}'" if title else ""} by '{scraper.author}'")
         # Process collections
         for artwork in scraper.collection_artwork:
             self._process_single_artwork(
@@ -101,7 +102,7 @@ class ArtworkProcessor:
                 processor.process_tv_artwork,
                 callbacks
             )
-
+        callbacks.on_log_update("✔️ Scraping completed")
         return title
 
     def _process_single_artwork(
