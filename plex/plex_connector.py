@@ -1,4 +1,4 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Tuple, Union
 import socket
 import requests
 from plexapi.server import PlexServer
@@ -176,7 +176,7 @@ class PlexConnector:
         return None, None
 
     # Find a specific movie or TV show in the given library
-    def find_in_library(self, item_type: str, artwork: AnyArtwork) -> Optional[List[[Union[Movie, Show], str]]]:
+    def find_in_library(self, item_type: str, artwork: AnyArtwork) -> Optional[List[Tuple[Union[Movie, Show], str]]]:
         if not self.plex:
             self.connect()
 
