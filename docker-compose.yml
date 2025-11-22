@@ -1,6 +1,7 @@
 services:
   artwork_uploader:
     build: .
+    container_name: artwork-uploader
     ports:
       - "4567:4567"
     volumes:
@@ -12,3 +13,4 @@ services:
       - TZ=Europe/Madrid
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
+    restart: unless-stopped

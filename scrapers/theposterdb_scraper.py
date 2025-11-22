@@ -6,7 +6,7 @@ from core import globals
 from processors import media_metadata
 from utils import soup_utils
 from utils.notifications import debug_me
-
+import time
 from models.options import Options
 from core.exceptions import ScraperException
 from utils.utils import get_artwork_type
@@ -143,6 +143,7 @@ class ThePosterDBScraper:
         Returns:
             None
         """
+        cache_buster = f"&_cb={int(time.time())}"
 
         posters = poster_div.find_all('div', class_='col-6 col-lg-2 p-1')
 
@@ -156,7 +157,7 @@ class ThePosterDBScraper:
 
            # if not self.options.is_excluded(poster_id):
 
-            poster_url = f"{TPDB_API_ASSETS_URL}/{poster_id}"
+            poster_url = f"{TPDB_API_ASSETS_URL}/{poster_id}{cache_buster}"
             title_p = poster.find('p', class_='p-0 mb-1 text-break').string
 
             if media_type == "Show":

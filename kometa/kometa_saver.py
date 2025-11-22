@@ -1,16 +1,12 @@
 from typing import Union, Optional
 import time
 
-from plexapi.video import Movie, Show, Season, Episode
-from plexapi.collection import Collection
-
 from utils import utils
 from utils.notifications import debug_me
 from models.options import Options
 from core.enums import ScraperSource, ArtworkIDPrefix
-from core.constants import TPDB_RATE_LIMIT_DELAY, KOMETA_OVERLAY_LABEL
+from core.constants import IMAGE_EXTENSIONS, TPDB_RATE_LIMIT_DELAY
 from models.artwork_types import AnyArtwork
-from pprint import pprint
 import os
 import requests
 import mimetypes
@@ -41,7 +37,7 @@ class KometaSaver:
     def set_options(self, options: Options) -> None:
         if isinstance(options, Options):
             self.options = options
-
+        
     def save_to_kometa(self) -> str:
 
         headers = {
@@ -55,13 +51,14 @@ class KometaSaver:
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Site': 'none',
-            'Cache-Control': 'max-age=0'
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
         }
 
         replaced_file: bool = False
 
         try:
-            for check_ext in [".jpg", ".png", ".jpeg"]:
+            for check_ext in IMAGE_EXTENSIONS:
                 existing_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{check_ext}")
                 if os.path.exists(existing_file) and not self.options.force:
                     time.sleep(0.1)
@@ -74,12 +71,12 @@ class KometaSaver:
 
         try:
             url = self.artwork["url"]
+            debug_me(f"Downloading {self.artwork_type} from URL: {url}", "KometaSaver/save_to_kometa")
             r = requests.get(url, headers=headers, stream=True, timeout=5)
             r.raise_for_status()
             content_type = r.headers.get('Content-Type', '')
             ext = mimetypes.guess_extension(content_type.split(';')[0])
-            if self.dest_file_ext is None:
-                self.dest_file_ext = '.jpg' # fallback
+            self.dest_file_ext = ext if ext is not None else self.dest_file_ext
         except Exception as e:
             return f"❌ {self.description} | Error saving {self.artwork_type}: Error fetching URL: {e}"
 
@@ -97,3 +94,4 @@ class KometaSaver:
             return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
         except Exception as e:
             return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
+

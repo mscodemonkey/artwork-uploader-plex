@@ -37,7 +37,7 @@ class PlexUploader:
             self.label = self.artwork_id + artwork['checksum']
         else:
             self.type = "url"
-            self.label = self.artwork_id + utils.calculate_md5(self.artwork["url"])
+            self.label = self.artwork_id + utils.calculate_md5(self.artwork["url"].split('&_cb=')[0])  # Remove any cache buster before calculating the MD5
 
     def set_description(self, description: str) -> None:
         self.description = description

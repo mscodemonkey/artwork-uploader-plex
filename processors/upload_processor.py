@@ -109,6 +109,7 @@ class UploadProcessor:
         if movie_items:
             debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' in {len(libraries)} libraries.", "UploadProcessor/process_movie_artwork")
             for movie_item, library in zip(movie_items, libraries):
+                # Use the actual movie title from Plex in case it differs from the artwork title (if it's a foreign title, etc.)
                 desc = description.replace(artwork["title"], movie_item.title) if movie_item.title != artwork["title"] else description
                 if (self.options.has_no_filters() and self.check_master_filters(filter_type,artwork_source)) or self.options.has_filter(filter_type):
                     if not self.options.is_excluded(artwork["id"]):
@@ -138,9 +139,9 @@ class UploadProcessor:
                             result = uploader.upload_to_plex()
                             results.append(result)
                     else:
-                        raise NotProcessedByExclusion(f"{description} | {artwork_type} Poster excluded")
+                        raise NotProcessedByExclusion(f"{desc} | {artwork_type} Poster excluded")
                 else:
-                    raise NotProcessedByFilter(f"{description} | {artwork_type} filtered by {'request' if not self.options.has_filter(filter_type) else artwork_source}")
+                    raise NotProcessedByFilter(f"{desc} | {artwork_type} filtered by {'request' if not self.options.has_filter(filter_type) else artwork_source}")
         else:
             raise MovieNotFound(f'{description} | Movie not available on Plex')
         return results
@@ -185,7 +186,8 @@ class UploadProcessor:
         if tv_show_items:
             debug_me(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.", "UploadProcessor/process_movie_artwork")
             for tv_show, library in zip(tv_show_items, libraries):
-                desc = description.replace(artwork["title"], tv_show.title) if tv_show.title != artwork["title"] else description
+                # Use the actual TV show title from Plex in case it differs from the artwork title (if it's a foreign title, etc.)
+                desc = description.replace(artwork["title"], tv_show.title.split(' (')[0]) if tv_show.title.split(' (')[0] != artwork["title"] else description
                 item_path = tv_show.seasons()[0].episodes()[0].media[0].parts[0].file
                 path_parts = []
                 path_parts = get_path_parts(item_path)
@@ -212,7 +214,7 @@ class UploadProcessor:
                                 file_name = f"Season{artwork["season"]:02}"
                                 filter_type = FilterType.SEASON_COVER.value
                             else:
-                                result = f"⚠️ {description} | {season} not available in {library}"
+                                result = f"⚠️ {desc} | {season} not available in {library}"
                                 results.append(result)
                                 continue
                         elif artwork["episode"] >= 0:
@@ -225,16 +227,16 @@ class UploadProcessor:
                                     file_name = f"S{artwork["season"]:02}E{artwork["episode"]:02}"
                                     filter_type = FilterType.TITLE_CARD.value
                                 else:
-                                    result = f"⚠️ {description} | {season}, Episode {artwork["episode"]:02} not available in {library}"
+                                    result = f"⚠️ {desc} | {season}, Episode {artwork["episode"]:02} not available in {library}"
                                     results.append(result)
                                     continue
                             else:
-                                result = f"⚠️ {description} | {season} not available in {library}"
+                                result = f"⚠️ {desc} | {season} not available in {library}"
                                 results.append(result)
                                 continue
 
                 except (AttributeError, KeyError, NotFound) as e:
-                    raise ShowNotFound(f"{description} | Not available on Plex in {library}: {e}") from e
+                    raise ShowNotFound(f"{desc} | Not available on Plex in {library}: {e}") from e
                     
                 try:
                     if upload_target or (self.options.kometa or globals.config.save_to_kometa):
@@ -265,9 +267,9 @@ class UploadProcessor:
                                     result = uploader.upload_to_plex()
                                     results.append(result)
                             else:
-                                raise NotProcessedByExclusion(f"{description} | {artwork_type} excluded")
+                                raise NotProcessedByExclusion(f"{desc} | {artwork_type} excluded")
                         else:
-                            raise NotProcessedByFilter(f"{description} | {artwork_type} not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
+                            raise NotProcessedByFilter(f"{desc} | {artwork_type} not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
                 except Exception:
                     raise
         else:

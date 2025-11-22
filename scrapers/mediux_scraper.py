@@ -1,15 +1,15 @@
 from typing import Optional, Any
 from core import globals
 from pprint import pprint
-
 from utils import soup_utils
 from utils import utils
 from utils.notifications import debug_me
 from models.options import Options
 from core.exceptions import ScraperException
 from core.enums import MediaType, ScraperSource, FileType
-from core.constants import MEDIUX_API_BASE_URL, MEDIUX_QUALITY_SUFFIX
+from core.constants import ANSI_BOLD, ANSI_RESET, BOOTSTRAP_COLORS, MEDIUX_API_BASE_URL, MEDIUX_QUALITY_SUFFIX
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
+import time
 
 class MediuxScraper:
 
@@ -39,8 +39,10 @@ class MediuxScraper:
 
         base_url = MEDIUX_API_BASE_URL
         quality_suffix = MEDIUX_QUALITY_SUFFIX
+        cache_buster = f"&_cb={int(time.time())}"
         scripts = self.soup.find_all('script')
         media_type = None
+        poster_data = []
 
         year = 0  # Default year value
         title = "Untitled"  # Default title value
@@ -53,16 +55,21 @@ class MediuxScraper:
                             data_dict = utils.parse_string_to_dict(script.text)
 
                             if data_dict["set"]["show"] is not None:
-                                self.title = data_dict["set"]["show"]["name"]
+                                self.title = f"{data_dict["set"]["show"]["name"]} ({data_dict["set"]["show"]["first_air_date"][:4]})"
                                 show_id = data_dict["set"]["show"].get("id", None)
                             elif data_dict["set"]["movie"] is not None:
-                                self.title = data_dict["set"]["movie"]["title"]
+                                self.title = f"{data_dict["set"]["movie"]["title"]} ({data_dict["set"]["movie"]["release_date"][:4]})"
                             elif data_dict["set"]["collection"] is not None:
                                 self.title = data_dict["set"]["collection"]["collection_name"]
                             
                             self.author = data_dict["set"]["user_created"]["username"]
 
                             poster_data = data_dict["set"]["files"]
+                            
+            if not poster_data:
+                raise ScraperException("No poster data found in MediUX set.")
+            
+            pprint(poster_data)
 
             for data in poster_data:
                 if data["show_id"] is not None or data["show_id_backdrop"] is not None or data["episode_id"] is not None or \
@@ -159,7 +166,7 @@ class MediuxScraper:
                                 file_type = "background"        
 
                 image_stub = data["id"]
-                poster_url = f"{base_url}{image_stub}{quality_suffix}"
+                poster_url = f"{base_url}{image_stub}{quality_suffix}{cache_buster}"
 
                 if media_type == MediaType.TV_SHOW.value:
                     tv_artwork = {}
@@ -204,19 +211,19 @@ class MediuxScraper:
             if globals.debug:
                 if self.collection_artwork:
                     debug_me(f"Found {len(self.collection_artwork)} collection asset(s) for {len({item["title"] for item in self.collection_artwork})} collection(s):", "MediuxScraper/scrape")
-                    print(f"\033[1m\033[32m*************************************************************")
+                    print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.collection_artwork)
-                    print("*************************************************************\033[0m")  
+                    print(f"*************************************************************{ANSI_RESET}")  
                 if self.movie_artwork:
                     debug_me(f"Found {len(self.movie_artwork)} movie asset(s) for {len({item["title"] for item in self.movie_artwork})} movie(s):","MediuxScraper/scrape")
-                    print(f"\033[1m\033[32m*************************************************************")
+                    print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.movie_artwork)
-                    print(f"*************************************************************\033[0m")
+                    print(f"*************************************************************{ANSI_RESET}")
                 if self.tv_artwork:
                     debug_me(f"Found {len(self.tv_artwork)} TV show asset(s) for {len({item["title"] for item in self.tv_artwork})} TV show(s):", "MediuxScraper/scrape")
-                    print(f"\033[1m\033[32m*************************************************************")
+                    print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.tv_artwork)
-                    print("*************************************************************\033[0m")
+                    print(f"*************************************************************{ANSI_RESET}")
 
         except ScraperException:
             raise

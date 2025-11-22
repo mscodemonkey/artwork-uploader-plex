@@ -186,17 +186,17 @@ class PlexConnector:
         for i, library in enumerate(libraries):
             library_item = None
             try:
-                debug_me(f"Searching for TMDb ID '{artwork.get("tmdb_id")}' in '{library.title}'", "PlexConnector/find_in_library")
-                library_item = library.getGuid(f"tmdb://{artwork.get("tmdb_id")}")
+                debug_me(f"Searching for TMDb ID '{artwork.get('tmdb_id')}' in '{library.title}'", "PlexConnector/find_in_library")
+                library_item = library.getGuid(f"tmdb://{artwork.get('tmdb_id')}")
                 library_name = library.title
-                debug_me(f"Found TMDb ID '{artwork.get("tmdb_id")}' as '{library_item.title} ({library_item.year})' in '{library_name}'", "PlexConnector/find_in_library")
+                debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'", "PlexConnector/find_in_library")
 
                 if library_item:
                     items.append(library_item)
                     libs.append(library_name)
             except Exception as e:
                 # Continue checking other libraries if one fails
-                debug_me(f"Unable to find '{artwork.get("title")} ({artwork.get("year")})' as TMDb ID '{artwork.get("tmdb_id")}' in '{libraries[i].title}'", "PlexConnector/find_in_library")
+                debug_me(f"Unable to find '{artwork.get('title')} ({artwork.get('year')})' as TMDb ID '{artwork.get('tmdb_id')}' in '{libraries[i].title}': {e}", "PlexConnector/find_in_library")
                 pass
         if items:
             return items, libs
