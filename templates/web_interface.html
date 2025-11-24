@@ -199,6 +199,11 @@
                                     <label for="reset_overlay" class="form-check-label">Reset the Overlay tag for Kometa if artwork updated</label>
                                 </div>                                
                                 <div id="kometa_settings" style="display: none;">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" value="stage_assets" id="stage_assets"/>
+                                        <label for="stage_assets" class="form-check-label">Download assets for seasons and episodes not yet in Plex</label>
+                                        <br><small class="form-text text-muted">(Excluding Specials)</small>
+                                    </div>
                                     <div class="mb-3">
                                         <label for="kometa_base" class="form-label">Kometa Asset Directory:</label>
                                         <input type="text" id="kometa_base" name="kometa_base" class="form-control" placeholder="X:\path\to\kometa\assets">
@@ -477,10 +482,16 @@
                                     <label for="option-force" class="form-check-label">Force upload the artwork, even if it
                                         already exists</label>
                                 </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" value="--stage" id="option-stage"/>
+                                    <label for="option-stage" class="form-check-label">Download assets for seasons and 
+                                        episodes not yet in Plex (excluding Specials)</label>
+                                </div>
                                 <div class="form-check mb-2" style="display: none;">
                                     <input class="form-check-input" type="checkbox" value="--temp"
                                         id="option-temp"/>
-                                    <label for="option-temp" class="form-check-label">Use temporary directory for downloaded assets</label>
+                                    <label for="option-temp" class="form-check-label">Use temporary directory for downloaded 
+                                        assets</label>
                                 </div>
                                 <div class="form-check mb-2">
                                     <input class="form-check-input" type="checkbox" value="--add-to-bulk"

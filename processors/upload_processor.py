@@ -25,6 +25,7 @@ class UploadProcessor:
         self.config: Config = Config()
         self.config.load()
         self.docker: bool = os.getenv("RUNNING_IN_DOCKER") == "1"
+        self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
 
     def set_options(self, options: Options) -> None:
         self.options = options
@@ -157,6 +158,7 @@ class UploadProcessor:
         artwork_source = artwork["source"]
         result = "none"
         results = []
+        self.staging: bool = self.kometa and (globals.config.stage_assets or self.options.stage)
 
         season = artwork['season']
         if is_numeric(season) and season == 0:
@@ -207,8 +209,10 @@ class UploadProcessor:
                         filter_type = FilterType.BACKGROUND.value
                     elif artwork["season"] >= 0:
                         if artwork["episode"] == "Cover" or artwork["episode"] is None:
-                            if artwork["season"] in [S.index for S in tv_show.seasons()]:
-                                upload_target = tv_show.season(artwork["season"])
+                            if artwork["season"] in [S.index for S in tv_show.seasons()] or (self.staging and season != "Specials"):
+                                debug_me(f"Staging is {'enabled' if self.staging else 'disabled'}.", "UploadProcessor/process_tv_artwork")
+                                if not self.kometa:
+                                    upload_target = tv_show.season(artwork["season"])
                                 artwork_id = "S"
                                 artwork_type = "Season cover"
                                 file_name = f"Season{artwork["season"]:02}"
@@ -218,9 +222,9 @@ class UploadProcessor:
                                 results.append(result)
                                 continue
                         elif artwork["episode"] >= 0:
-                            if (artwork["season"] in [S.index for S in tv_show.seasons()]):
-                                if (artwork["episode"] in [E.index for E in tv_show.season(artwork["season"]).episodes()]) or (self.options.kometa or globals.config.save_to_kometa):
-                                    if not(self.options.kometa or globals.config.save_to_kometa):
+                            if (artwork["season"] in [S.index for S in tv_show.seasons()]) or (self.staging and season != "Specials"):
+                                if ((artwork["season"] in [S.index for S in tv_show.seasons()]) and (artwork["episode"] in [E.index for E in tv_show.season(artwork["season"]).episodes()])) or self.staging:
+                                    if not self.kometa:
                                         upload_target = tv_show.season(artwork["season"]).episode(artwork["episode"])
                                     artwork_id = "E"
                                     artwork_type = "Title card"
@@ -245,7 +249,7 @@ class UploadProcessor:
                             season_num = artwork['season'] if isinstance(artwork['season'], int) else None
                             episode_num = artwork['episode'] if isinstance(artwork['episode'], int) else None
                             if not self.options.is_excluded(artwork["id"], season_num, episode_num):
-                                if self.options.kometa or globals.config.save_to_kometa:
+                                if self.kometa:
                                     saver = KometaSaver(artwork_type, library)
                                     saver.set_artwork(artwork)
                                     base_dir = ("/temp" if self.options.temp else "/assets") if self.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)

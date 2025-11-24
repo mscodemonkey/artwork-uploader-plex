@@ -618,6 +618,7 @@ if __name__ == "__main__":
                           exclude=args.exclude,
                           year=args.year,
                           kometa=args.kometa,
+                          stage=args.stage,
                           temp=args.temp)  # Arguments per url to process
 
     # Create config as a global object

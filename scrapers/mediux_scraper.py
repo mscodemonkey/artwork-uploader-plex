@@ -69,8 +69,6 @@ class MediuxScraper:
             if not poster_data:
                 raise ScraperException("No poster data found in MediUX set.")
             
-            pprint(poster_data)
-
             for data in poster_data:
                 if data["show_id"] is not None or data["show_id_backdrop"] is not None or data["episode_id"] is not None or \
                         data["season_id"] is not None or data["show_id"] is not None:

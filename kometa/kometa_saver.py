@@ -61,7 +61,6 @@ class KometaSaver:
             for check_ext in IMAGE_EXTENSIONS:
                 existing_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{check_ext}")
                 if os.path.exists(existing_file) and not self.options.force:
-                    time.sleep(0.1)
                     return f"⏩ {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
                 elif os.path.exists(existing_file) and self.options.force:
                     os.remove(existing_file)

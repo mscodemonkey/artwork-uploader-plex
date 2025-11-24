@@ -128,6 +128,7 @@ Finally, if you're using the Kometa asset directory and you're running the scrip
 services:
   artwork_uploader:
     build: .
+    container_name: artwork-uploader
     ports:
       - "4567:4567"
     volumes:
@@ -139,6 +140,7 @@ services:
       - TZ=Etc/UTC
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
+    restart: unless-stopped      
 ```
 
 ### Year matching
@@ -240,6 +242,9 @@ This is optional - if you don't do this, a new config.json will be created when 
 ```"temp_dir"```
 - (Optional) Path to temporary save directory that can be used for testing purposes when using the ```--temp``` argument in the CLI
 
+```"stage_assets"```
+- Set to ```true``` to download assets for TV show seasons and episodes not yet available in Plex. This can be useful if the scheduled run happens before a particular season or episode is downloaded by your automation. This feature does not apply to the Specials season (Seaon 0).
+
 ### Filter options
 Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
       - show_cover
@@ -262,13 +267,19 @@ Clone the repository and use the `docker-compose.yml` file to deploy it with doc
 services:
   artwork_uploader:
     build: .
+    container_name: artwork-uploader
     ports:
       - "4567:4567"
     volumes:
-      - ./bulk_imports:/artwork-uploader/bulk_imports
-      - ./config.json:/artwork-uploader/config.json
+      - ./bulk_imports:/artwork-uploader/bulk_imports:rw
+      - ./config.json:/artwork-uploader/config.json:rw
+      - C:\Users\<USERNAME>\Kometa\config\assets:/assets:rw # Optional, only if you want to save the assets locally to your Kometa asset directory
+      - C:\Temp\assets:/temp:rw # Optional, only if you're saving assets locally and want to have a temp dir for testing purposes
     environment:
+      - TZ=Etc/UTC
       - PYTHONUNBUFFERED=1
+      - RUNNING_IN_DOCKER=1
+    restart: unless-stopped    
 ```
 
 And run 
@@ -347,9 +358,11 @@ The script supports various command-line arguments for flexible use.
     
 ```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
 
-```--kometa``` will save artwork your Kometa asset directory instead of applying it to Plex directly. If ```save_to_kometa``` is set to ```true``` in config.json then this argument is not necessary. If a specific artwork already exists in the Kometa asset directory, it will not be overwritten unles the ```--force``` argument is also specified.
+```--kometa``` will save artwork your Kometa asset directory instead of applying it to Plex directly. If ```save_to_kometa``` is set to ```true``` in ```config.json``` then this argument is not necessary. If a specific artwork already exists in the Kometa asset directory, it will not be overwritten unles the ```--force``` argument is also specified.
 
-```--temp``` for testing purposes, will save artwork to a temporary directory ```temp_dir``` specified in config.json instead of the Kometa asset directory.
+```--temp``` for testing purposes, will save artwork to a temporary directory ```temp_dir``` specified in ```config.json``` instead of the Kometa asset directory.
+
+```--stage```, in conjuction with --kometa (or if ```save_to_kometa```is true in ```config.json```), will download assets for TV show seasons and episodes not yet available in Plex. This can be useful if you run the script before a particular season or episode is downloaded by your automation. If ```stage_assets``` is set to ```true``` in ```config.json``` then this argument is not necessary. This option does not apply to the Specials season (Season 0).
 
 ### Using these options in files and GUI
 
