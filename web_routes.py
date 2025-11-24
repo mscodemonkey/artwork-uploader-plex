@@ -20,6 +20,7 @@ import zipfile
 import threading
 import subprocess
 from pathlib import Path
+from packaging import version
 
 from flask import render_template, send_from_directory, request, redirect, url_for, session
 import schedule
@@ -159,7 +160,7 @@ def setup_socket_handlers(
         """Check for updates when requested by the frontend."""
         instance = Instance(data.get("instance_id"), "web")
         latest_version = get_latest_version()
-        if latest_version and latest_version != current_version:
+        if latest_version and version.parse(latest_version.lstrip('v')) > version.parse(current_version.lstrip('v')):
             notify_web(instance, "update_available", {"version": latest_version})
 
     @globals.web_socket.on("update_app")

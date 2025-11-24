@@ -1411,6 +1411,7 @@ socket.emit("check_for_update", { instance_id: instanceId});
 
 socket.on("update_available", function(data) {
     if(validResponse(data)){
+        updateLog("Update available: " + data.version, "info");
         document.getElementById("latest_version").innerText = data.version;
         document.getElementById("version_notifier").style.display = "block";
     }

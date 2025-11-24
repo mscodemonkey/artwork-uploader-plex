@@ -753,7 +753,7 @@ if __name__ == "__main__":
 
             # Start update checker using UpdateService
             def on_update_available(version: str):
-                debug_me(f"Later version: {version}", "update_service")
+                debug_me(f"Update available. Latest version: {version}", "update_service")
                 notify_web(Instance(broadcast=True), "update_available", {"version": version})
 
             globals.update_service.start_periodic_check(on_update_available)
