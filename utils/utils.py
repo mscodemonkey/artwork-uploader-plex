@@ -193,10 +193,18 @@ def parse_url_and_options(line):
     if '--year' in parts:
         index = parts.index('--year') + 1
         if index < len(parts) and not parts[index].startswith('--'):
-            year = ""
+            year_str = ""
             while index < len(parts) and not parts[index].startswith('--'):
-                year = year + parts[index]
+                year_str = year_str + parts[index]
                 index += 1
+            # Convert to integer if we got a value, otherwise leave as None
+            if year_str:
+                try:
+                    year = int(year_str)
+                except ValueError:
+                    # If conversion fails, leave as None
+                    debug_me(f"Invalid year value: {year_str}, ignoring")
+                    year = None
 
     options = Options(
         add_posters='--add-posters' in parts,
@@ -208,7 +216,7 @@ def parse_url_and_options(line):
         temp='--temp' in parts,
         filters=filters,  # Store the list of filters or None
         exclude=exclude,
-        year=year  # Store the year or None
+        year=year  # Store the year as int or None
     )
 
     return URLItem(url, options)

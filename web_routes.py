@@ -119,8 +119,6 @@ def setup_routes(web_app, config: Config):
 
 def setup_socket_handlers(
     config: Config,
-    scheduled_jobs: dict,
-    scheduled_jobs_by_file: dict,
     filename_pattern: re.Pattern
 ):
     """
@@ -128,12 +126,11 @@ def setup_socket_handlers(
 
     Args:
         config: Configuration object
-        scheduled_jobs: Dictionary of scheduled jobs by job_id
-        scheduled_jobs_by_file: Dictionary mapping filename to job_id
         filename_pattern: Regex pattern for validating filenames
 
     Note: This function imports from artwork_uploader to avoid circular dependencies.
           It uses globals.web_socket which must be initialized before calling.
+          Scheduled jobs are now managed through globals.scheduler_service.
     """
     # Import functions from artwork_uploader (to avoid circular imports at module level)
     from artwork_uploader import (
@@ -383,15 +380,12 @@ def setup_socket_handlers(
             schedule_file = data.get("file")
 
             if schedule_file:
-                try:
-                    job_id = scheduled_jobs_by_file[schedule_file]
-                except KeyError:
-                    job_id = None
+                # Get job ID from scheduler service
+                job_id = globals.scheduler_service.get_job_id_by_file(schedule_file)
 
                 if job_id:
-                    # Cancel the scheduled job and delete it from the job list
-                    schedule.cancel_job(scheduled_jobs[job_id])
-                    del scheduled_jobs[job_id]
+                    # Remove from scheduler service
+                    globals.scheduler_service.remove_schedule(job_id)
 
                     # Make sure it's also removed from the config file
                     config.load()
@@ -427,16 +421,16 @@ def setup_socket_handlers(
                 config.save()
 
                 try:
-                    job = schedule.every().day.at(data.get("time")).do(
-                        lambda: add_file_to_schedule_thread(instance, schedule_file)
+                    # Create the callback for this schedule
+                    def schedule_callback(filename=schedule_file):
+                        add_file_to_schedule_thread(instance, filename)
+
+                    # Add to scheduler service
+                    job_id = globals.scheduler_service.add_schedule(
+                        schedule_file,
+                        schedule_time,
+                        schedule_callback
                     )
-
-                    # Create a unique job ID
-                    job_id = str(uuid.uuid4())
-
-                    # Store job reference
-                    scheduled_jobs[job_id] = job
-                    scheduled_jobs_by_file[schedule_file] = job_id
 
                     notify_web(
                         instance,
@@ -452,9 +446,8 @@ def setup_socket_handlers(
                     debug_me(f"Error adding schedule: {e}", "add_tasks_to_scheduler")
                     raise
 
-                # Start the scheduler in a background thread if it's not already started
-                from artwork_uploader import start_scheduler
-                start_scheduler()
+                # Start the scheduler if it's not already started
+                globals.scheduler_service.start()
 
         except Exception as e:
             if globals.debug:
