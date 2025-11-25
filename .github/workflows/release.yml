@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   create-release:
@@ -97,17 +98,28 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ steps.get_version.outputs.TAG }}
-          name: Release ${{ steps.get_version.outputs.TAG }}
-          bodyFile: CHANGELOG.md
-          draft: false
-          prerelease: ${{ contains(steps.get_version.outputs.VERSION, 'alpha') || contains(steps.get_version.outputs.VERSION, 'beta') || contains(steps.get_version.outputs.VERSION, 'rc') }}
-          artifacts: "dist/*.zip,dist/*.tar.gz"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          allowUpdates: true
-          makeLatest: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Determine if this is a prerelease
+          if [[ "${{ steps.get_version.outputs.VERSION }}" =~ (alpha|beta|rc) ]]; then
+            PRERELEASE="--prerelease"
+          else
+            PRERELEASE="--latest"
+          fi
+
+          # Create or update release
+          if gh release view "${{ steps.get_version.outputs.TAG }}" >/dev/null 2>&1; then
+            echo "Release exists, deleting and recreating..."
+            gh release delete "${{ steps.get_version.outputs.TAG }}" --yes
+          fi
+
+          # Create release with artifacts
+          gh release create "${{ steps.get_version.outputs.TAG }}" \
+            --title "Release ${{ steps.get_version.outputs.TAG }}" \
+            --notes-file CHANGELOG.md \
+            ${PRERELEASE} \
+            dist/*.zip dist/*.tar.gz
 
       - name: Update latest tag
         run: |
