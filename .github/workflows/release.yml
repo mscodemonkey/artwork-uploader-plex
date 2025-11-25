@@ -97,17 +97,25 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Release ${{ steps.get_version.outputs.TAG }}
-          body_path: CHANGELOG.md
-          draft: false
-          prerelease: ${{ contains(steps.get_version.outputs.VERSION, 'alpha') || contains(steps.get_version.outputs.VERSION, 'beta') || contains(steps.get_version.outputs.VERSION, 'rc') }}
-          files: |
-            dist/*.zip
-            dist/*.tar.gz
-          make_latest: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Determine if this is a prerelease
+          if [[ "${{ steps.get_version.outputs.VERSION }}" == *"alpha"* ]] || \
+             [[ "${{ steps.get_version.outputs.VERSION }}" == *"beta"* ]] || \
+             [[ "${{ steps.get_version.outputs.VERSION }}" == *"rc"* ]]; then
+            PRERELEASE="--prerelease"
+          else
+            PRERELEASE=""
+          fi
+
+          # Create the release using gh CLI
+          gh release create ${{ steps.get_version.outputs.TAG }} \
+            --title "Release ${{ steps.get_version.outputs.TAG }}" \
+            --notes-file CHANGELOG.md \
+            $PRERELEASE \
+            dist/*.zip \
+            dist/*.tar.gz || true
 
       - name: Update latest tag
         run: |
