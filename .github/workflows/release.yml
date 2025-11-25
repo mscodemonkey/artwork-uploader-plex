@@ -1,0 +1,115 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on tags like v0.5.2, v1.0.0, etc.
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for changelog generation
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Verify version matches __version__.py
+        run: |
+          PYTHON_VERSION=$(python3 -c "from core.__version__ import __version__; print(__version__)")
+          TAG_VERSION="${{ steps.get_version.outputs.VERSION }}"
+          if [ "$PYTHON_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: Version mismatch!"
+            echo "Python version: $PYTHON_VERSION"
+            echo "Tag version: $TAG_VERSION"
+            exit 1
+          fi
+          echo "Version verified: $PYTHON_VERSION"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            # First release - get all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            # Get commits since last tag
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+
+          # Save to file for the release
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "$CHANGELOG" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${{ steps.get_version.outputs.TAG }}" >> CHANGELOG.md
+
+          cat CHANGELOG.md
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || echo "No requirements.txt found"
+
+      - name: Create source distribution
+        run: |
+          # Create a clean source archive
+          mkdir -p dist
+          git archive --format=zip --prefix=artwork-uploader-plex-${{ steps.get_version.outputs.VERSION }}/ HEAD -o dist/artwork-uploader-plex-${{ steps.get_version.outputs.VERSION }}-source.zip
+          git archive --format=tar.gz --prefix=artwork-uploader-plex-${{ steps.get_version.outputs.VERSION }}/ HEAD -o dist/artwork-uploader-plex-${{ steps.get_version.outputs.VERSION }}-source.tar.gz
+
+      - name: Build with PyInstaller (if spec file exists)
+        id: build
+        continue-on-error: true
+        run: |
+          if [ -f "artwork_uploader.spec" ]; then
+            pip install pyinstaller
+            pyinstaller artwork_uploader.spec
+
+            # Create archives of the built executables
+            if [ -d "dist/artwork_uploader" ]; then
+              cd dist
+              zip -r artwork-uploader-plex-${{ steps.get_version.outputs.VERSION }}-linux.zip artwork_uploader/
+              tar czf artwork-uploader-plex-${{ steps.get_version.outputs.VERSION }}-linux.tar.gz artwork_uploader/
+              cd ..
+            fi
+          else
+            echo "No PyInstaller spec file found, skipping binary build"
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.TAG }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.VERSION, 'alpha') || contains(steps.get_version.outputs.VERSION, 'beta') || contains(steps.get_version.outputs.VERSION, 'rc') }}
+          files: |
+            dist/*.zip
+            dist/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update latest tag
+        run: |
+          git tag -f latest
+          git push -f origin latest
