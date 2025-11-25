@@ -97,25 +97,17 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Determine if this is a prerelease
-          if [[ "${{ steps.get_version.outputs.VERSION }}" == *"alpha"* ]] || \
-             [[ "${{ steps.get_version.outputs.VERSION }}" == *"beta"* ]] || \
-             [[ "${{ steps.get_version.outputs.VERSION }}" == *"rc"* ]]; then
-            PRERELEASE="--prerelease"
-          else
-            PRERELEASE=""
-          fi
-
-          # Create the release using gh CLI
-          gh release create ${{ steps.get_version.outputs.TAG }} \
-            --title "Release ${{ steps.get_version.outputs.TAG }}" \
-            --notes-file CHANGELOG.md \
-            $PRERELEASE \
-            dist/*.zip \
-            dist/*.tar.gz || true
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.get_version.outputs.TAG }}
+          name: Release ${{ steps.get_version.outputs.TAG }}
+          bodyFile: CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(steps.get_version.outputs.VERSION, 'alpha') || contains(steps.get_version.outputs.VERSION, 'beta') || contains(steps.get_version.outputs.VERSION, 'rc') }}
+          artifacts: "dist/*.zip,dist/*.tar.gz"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          allowUpdates: true
+          makeLatest: true
 
       - name: Update latest tag
         run: |
