@@ -1,8 +1,8 @@
-from typing import Optional, List, Union
+from typing import Optional, List, Tuple, Union
 import socket
 import requests
 from plexapi.server import PlexServer
-from plexapi.library import LibrarySection, MovieSection, ShowSection
+from plexapi.library import MovieSection, ShowSection
 from plexapi.video import Movie, Show
 from plexapi.collection import Collection
 import plexapi.exceptions
@@ -10,6 +10,7 @@ import xml.etree.ElementTree
 from urllib.parse import urlparse
 
 from core.exceptions import PlexConnectorException, LibraryNotFound
+from models.artwork_types import AnyArtwork
 from models.options import Options
 from utils.notifications import debug_me
 from core.config import Config
@@ -175,8 +176,7 @@ class PlexConnector:
         return None, None
 
     # Find a specific movie or TV show in the given library
-    def find_in_library(self, item_type: str, item_title: str, item_year: Optional[int] = None) -> Optional[List[[Union[Movie, Show], str]]]:
-
+    def find_in_library(self, item_type: str, artwork: AnyArtwork) -> Optional[List[Tuple[Union[Movie, Show], str]]]:
         if not self.plex:
             self.connect()
 
@@ -184,20 +184,19 @@ class PlexConnector:
         libs = []
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
         for i, library in enumerate(libraries):
+            library_item = None
             try:
-                if item_year is not None:
-                    library_item = library.get(item_title, year = item_year)
-                    library_name = library.title
-                    debug_me(f"Found '{library_item.title} ({item_year})' in '{library_name}'", "PlexConnector/find_in_library")
-                else:
-                    library_item = library.get(item_title)
-                    library_name = library.title
+                debug_me(f"Searching for TMDb ID '{artwork.get('tmdb_id')}' in '{library.title}'", "PlexConnector/find_in_library")
+                library_item = library.getGuid(f"tmdb://{artwork.get('tmdb_id')}")
+                library_name = library.title
+                debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'", "PlexConnector/find_in_library")
+
                 if library_item:
                     items.append(library_item)
                     libs.append(library_name)
             except Exception as e:
                 # Continue checking other libraries if one fails
-                debug_me(f"Unable to find '{item_title} ({item_year})' in '{libraries[i].title}': {e}", "PlexConnector/find_in_library")
+                debug_me(f"Unable to find '{artwork.get('title')} ({artwork.get('year')})' as TMDb ID '{artwork.get('tmdb_id')}' in '{libraries[i].title}': {e}", "PlexConnector/find_in_library")
                 pass
         if items:
             return items, libs

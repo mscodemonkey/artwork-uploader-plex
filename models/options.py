@@ -16,6 +16,9 @@ class Options:
     Attributes:
         add_posters: Include additional posters from ThePosterDB set
         add_sets: Include additional sets from ThePosterDB
+        kometa: Save artwork to Kometa asset directory instead of uploading to Plex
+        stage: Download artwork for seasons and episodes not yet in Plex (except Specials)
+        temp: Use temporary directory instead of Kometa asset directory
         force: Force re-upload even if artwork hasn't changed
         filters: List of artwork types to include (e.g., ['show_cover', 'title_card'])
         exclude: List of artwork IDs to skip
@@ -26,6 +29,7 @@ class Options:
     add_posters: bool = False
     add_sets: bool = False
     kometa: bool = False
+    stage: bool = False
     temp: bool = False
     force: bool = False
     filters: List[str] = field(default_factory=list)

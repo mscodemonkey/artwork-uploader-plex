@@ -23,10 +23,17 @@ class Config:
         movie_library: List of movie library names in Plex
         mediux_filters: Default filters for MediUX scraping
         tpdb_filters: Default filters for ThePosterDB scraping
+        kometa_base: Base directory for Kometa asset storage
+        temp_dir: (Optional) Temporary directory for testing purposes
+        save_to_kometa: Whether to save artwork to Kometa
+        stage_assets: Whether to download assets for seasons and episodes that are not in Plex yet (except Specials)
         track_artwork_ids: Whether to track artwork IDs using Plex labels
         auto_manage_bulk_files: Whether to auto-organize bulk files
         reset_overlay: Whether to reset Kometa overlay labels on upload
         schedules: List of scheduled bulk import jobs
+        auth_enabled: Whether authentication is enabled for the web server
+        auth_username: Username for web server authentication
+        auth_password_hash: Hashed password for web server authentication
     """
 
     def __init__(self, config_path: str = "config.json") -> None:
@@ -41,6 +48,7 @@ class Config:
         self.kometa_base: str = "C:\\Temp\\assets"
         self.temp_dir: str = "C:\\Temp\\assets\\temp"
         self.save_to_kometa: bool = False
+        self.stage_assets: bool = True
         self.track_artwork_ids: bool = True
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
@@ -71,6 +79,7 @@ class Config:
             self.kometa_base = config.get("kometa_base", "")
             self.temp_dir = config.get("temp_dir", "")
             self.save_to_kometa = config.get("save_to_kometa", False)
+            self.stage_assets = config.get("stage_assets", True)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
@@ -96,6 +105,7 @@ class Config:
             "kometa_base": "",
             "temp_dir": "",
             "save_to_kometa": False,
+            "stage_assets": False,
             "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
             "reset_overlay": False,
@@ -127,6 +137,7 @@ class Config:
             "kometa_base": self.kometa_base,
             "temp_dir": self.temp_dir,
             "save_to_kometa": self.save_to_kometa,
+            "stage_assets": self.stage_assets,
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,

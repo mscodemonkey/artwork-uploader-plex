@@ -21,6 +21,8 @@ class MovieArtwork(TypedDict):
     source: str  # Should be ScraperSource value
     id: str
     type: Optional[str] # Added by me
+    author: Optional[str] # Added by me
+    tmdb_id: Optional[int]  # Added by me
 
 
 class TVArtwork(TypedDict):
@@ -41,6 +43,8 @@ class TVArtwork(TypedDict):
     source: str  # Should be ScraperSource value
     id: str
     type: Optional[str]  # Should be FilterType value (optional, used by MediUX)
+    author: Optional[str]  # Added by me
+    tmdb_id: Optional[int]  # Added by me
 
 
 class CollectionArtwork(TypedDict):
@@ -55,6 +59,7 @@ class CollectionArtwork(TypedDict):
     id: str
     type: Optional[str] # Added by me
     year: Optional[int] # Added by me
+    author: Optional[str]  # Added by me
 
 
 class UploadedFileArtwork(TypedDict):

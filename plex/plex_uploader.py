@@ -37,7 +37,7 @@ class PlexUploader:
             self.label = self.artwork_id + artwork['checksum']
         else:
             self.type = "url"
-            self.label = self.artwork_id + utils.calculate_md5(self.artwork["url"])
+            self.label = self.artwork_id + utils.calculate_md5(self.artwork["url"].split('&_cb=')[0])  # Remove any cache buster before calculating the MD5
 
     def set_description(self, description: str) -> None:
         self.description = description
@@ -75,11 +75,11 @@ class PlexUploader:
                         self.upload_target.addLabel(self.label)
                 if self.artwork["source"] == ScraperSource.THEPOSTERDB.value:
                     time.sleep(TPDB_RATE_LIMIT_DELAY)
-                return f'✓ {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}'
+                return f'{"♻️" if self.options.force else "✅"} {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}'
             else:
-                return f'- {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}'
+                return f'⏩ {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}'
         except Exception as e:
-            return f'x {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle} - More info: {str(e)}'
+            return f'❌ {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle} - More info: {str(e)}'
 
     def artwork_exists_on_plex(self) -> bool:
         existing_artwork = False

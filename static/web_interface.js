@@ -376,6 +376,8 @@ function saveConfig() {
     save_config.base_url = document.getElementById("plex_base_url").value.trim();
     save_config.token = document.getElementById("plex_token").value.trim();
     save_config.kometa_base = document.getElementById("kometa_base").value.trim();
+    save_config.temp_dir = document.getElementById("temp_dir").value.trim();
+    toggleTempCheckbox();
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
 
     // Convert comma-separated library inputs to arrays
@@ -394,6 +396,10 @@ function saveConfig() {
 
     // Checkbox for saving artwork to Kometa asset directory
     save_config.save_to_kometa = document.getElementById("save_to_kometa").checked;
+
+    // Checkbox for staging assets
+    save_config.stage_assets = document.getElementById("stage_assets").checked;
+    toggleScraperStageCheckbox();
 
     // Checkbox for managing bulk files
     save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
@@ -467,7 +473,9 @@ function loadConfig() {
             document.getElementById("movie_library").value = data.config.movie_library.join(", ");
             document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids;
             document.getElementById("save_to_kometa").checked = data.config.save_to_kometa;
+            document.getElementById("stage_assets").checked = data.config.stage_assets;
             document.getElementById("kometa_base").value = data.config.kometa_base;
+            document.getElementById("temp_dir").value = data.config.temp_dir || "";
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
@@ -481,6 +489,15 @@ function loadConfig() {
 
             // Toggle auth settings visibility
             toggleAuthSettings();
+            
+            // Make sure Plex options visibility is set correctly on load
+            togglePlexOptions();
+
+            // Make sure temp option visibility is set correctly on load
+            toggleTempCheckbox();
+
+            // Make sure scraper stage option visibility is set correctly on load
+            toggleScraperStageCheckbox();
 
             // Show/hide logout button based on auth enabled
             if (data.config.auth_enabled) {
@@ -509,11 +526,6 @@ function loadConfig() {
         }
     });
 }
-
-
-
-
-
 
 // ==================================================
 // Switch the bulk import file to use
@@ -557,6 +569,7 @@ function saveBulkChangesModal(filename) {
 
 function startScrape() {
     var form = document.getElementById('scraperForm');
+    const logTab = document.querySelector('#scraping-log-tab');
 
     // Check if the form is valid
     if (form.checkValidity()) {
@@ -579,12 +592,13 @@ function startScrape() {
         const year = document.getElementById("year").value;
         const url = document.getElementById("scrape_url").value;
         socket.emit("start_scrape", { url: url, year: year, options: options, filters: filters, instance_id: instanceId });
+        // Switch to the log tab
+        bootstrap.Tab.getOrCreateInstance(logTab).show();
     } else {
         // Trigger Bootstrap validation styles
         form.classList.add('was-validated');
     }
 }
-
 
 // Function to check for changes and enable/disable the save button
 function updateBulkSaveButtonState() {
@@ -600,8 +614,6 @@ function updateBulkSaveButtonState() {
 }
 
 // Attach event listener to track changes
-
-
 
 // ==================================================
 // ThePosterDB Options
@@ -636,10 +648,6 @@ function toggleThePosterDBElements() {
 if (scrapeUrlInput) {
     scrapeUrlInput.addEventListener("input", toggleThePosterDBElements);
 }
-
-
-
-
 
 function configureTabs(afterSave = false) {
         if (config.base_url && config.token) {
@@ -698,14 +706,11 @@ function loadBulkFile(bulkImport = null) {
 
 }
 
-
 function checkBulkImportFileToSave() {
 
     saveBulkImport(currentBulkImport);
 
 }
-
-
 
 /* Loading the list of available bulk files */
 
@@ -797,11 +802,11 @@ function saveBulkImport(filename, nowLoad = null) {
     });
 }
 
-
-
-
-
 function runBulkImport() {
+    const logTab = document.querySelector('#scraping-log-tab');
+    // Switch to the log tab
+    bootstrap.Tab.getOrCreateInstance(logTab).show();
+
     socket.emit("start_bulk_import",{
         instance_id: instanceId,
         bulk_list: document.getElementById("bulk_import_text").value,
@@ -829,14 +834,11 @@ function runBulkImport() {
     });
 })();
 
-
-
 /* =============================================
    Bulk file handling rename, delete, uploading
    ============================================*/
 
 // Set up variables
-
 
 function bulkFileSwitched() {
 
@@ -904,7 +906,6 @@ function handleDefaultCheckbox() {
         defaultIcon.classList.remove("disabled"); // Enable the icon
     }
 }
-
 
 // Function to handle renaming the bulk file
 document.getElementById("rename_icon").addEventListener("click", function () {
@@ -1163,8 +1164,6 @@ function uploadBulkImportFile(event) {
     }
 }
 
-
-
 // Listen for clicks on the "Default bulk file" icon
 document.getElementById("default_bulk_file_icon").addEventListener("click", function () {
     const selectElement = document.getElementById("switch_bulk_file");
@@ -1223,7 +1222,6 @@ dropArea.addEventListener("click", () => {
     input.click();
 });
 
-
 function uploadFile(file) {
     const reader = new FileReader();
     let offset = 0;
@@ -1243,7 +1241,6 @@ function uploadFile(file) {
                 reader.readAsDataURL(blob);
             });
         }
-
 
         function sendChunk() {
             if (offset >= arrayBuffer.byteLength) {
@@ -1295,8 +1292,6 @@ function uploadFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-
-
 socket.on("upload_progress", function (data) {
     if(validResponse(data)) {
         progress_bar(data.progress);
@@ -1309,17 +1304,9 @@ socket.on("upload_complete", function (data) {
     }
 });
 
-
-
-
-
-
 // =====================
 // Scheduler
 // =====================
-
-
-
 
     function updateOrAddSchedule(fileName, newTime, jobReference = null) {
         const schedule = schedules.find(s => s.file === fileName);
@@ -1330,7 +1317,6 @@ socket.on("upload_complete", function (data) {
             schedules.push({ file: fileName, time: newTime });
         }
     }
-
 
     // Show the time selector when the clock icon is clicked
     scheduleIcon.addEventListener("click", function () {
@@ -1394,11 +1380,6 @@ socket.on("upload_complete", function (data) {
 
     });
 
-
-
-
-
-
     function updateSchedulerIcon(){
         let details = getScheduleDetails(currentBulkImport);
         // console.log(schedules)
@@ -1425,14 +1406,12 @@ socket.on("upload_complete", function (data) {
         return schedules.find(s => s.file === fileName);
     }
 
-
-
-
 // Check for update on page load
 socket.emit("check_for_update", { instance_id: instanceId});
 
 socket.on("update_available", function(data) {
     if(validResponse(data)){
+        updateLog("Update available: " + data.version, "info");
         document.getElementById("latest_version").innerText = data.version;
         document.getElementById("version_notifier").style.display = "block";
     }
@@ -1488,12 +1467,94 @@ document.getElementById("auth_enabled").addEventListener("change", toggleAuthSet
 function toggleKometaSettings() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const kometaSettings = document.getElementById("kometa_settings");
+    const kometaBase = document.getElementById("kometa_base");
     if (saveToKometa) {
         kometaSettings.style.display = "block";
+        if (kometaBase) {
+            kometaBase.required = true;
+            // Optionally clear any previous invalid state so the user can re-validate
+            kometaBase.classList.remove('is-invalid');
+        }
     } else {
         kometaSettings.style.display = "none";
+        if (kometaBase) {
+            kometaBase.required = false;
+            // Clear invalid styling when hiding
+            kometaBase.classList.remove('is-invalid');
+        }
+    }
+    // Update the label for the "force" option depending on Kometa mode
+    const forceLabel = document.querySelector('label[for="option-force"]');
+    if (forceLabel) {
+        if (saveToKometa) {
+            forceLabel.textContent = 'Force save the artwork, replacing any existing asset';
+        } else {
+            forceLabel.textContent = 'Force upload the artwork, even if it already exists';
+        }
+    }
+
+    // Check if temp option should be shown, the Plex options should be hidden, and the stage option in the scraper tab should be hidden
+    toggleTempCheckbox();
+    togglePlexOptions();
+    toggleScraperStageCheckbox();
+}
+
+function toggleScraperStageCheckbox() {
+    const globalStageSetting = document.getElementById("stage_assets").checked;
+    const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const scraperStageOption = document.getElementById("option-stage");
+
+    // Hide and uncheck the scraper stage option if global stage setting is enabled
+    if (globalStageSetting) {
+        scraperStageOption.parentElement.style.display = "none";
+        scraperStageOption.checked = false;
+    } else {
+        if (saveToKometa) {
+            scraperStageOption.parentElement.style.display = "block";
+        } else {
+            scraperStageOption.parentElement.style.display = "none";
+            scraperStageOption.checked = false;
+        }
+    }
+}
+
+function toggleTempCheckbox() {
+    const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const tempDir = document.getElementById("temp_dir").value.trim();
+    const tempCheckbox = document.getElementById("option-temp");
+    
+    // Only show temp option in the scraper tab if Kometa is enabled AND temp dir has a value
+    if (saveToKometa && tempDir) {
+        tempCheckbox.parentElement.style.display = "block";
+    } else {
+        // Hide and uncheck the option when conditions aren't met
+        tempCheckbox.parentElement.style.display = "none";
+        tempCheckbox.checked = false;
+    }
+}
+
+function togglePlexOptions() {
+    const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const trackArtworkIDs = document.getElementById("track_artwork_ids").parentElement;
+    const resetOverlay = document.getElementById("reset_overlay").parentElement;
+
+    // Ony show the Track Artwork IDs and Reset Overlay options if Kometa is disabled
+    if (!saveToKometa) {
+        trackArtworkIDs.style.display = "block";
+        resetOverlay.style.display = "block";
+    } else {
+        trackArtworkIDs.style.display = "none";
+        resetOverlay.style.display = "none";
+        document.getElementById("track_artwork_ids").checked = true;
+    //    document.getElementById("reset_overlay").checked = false;
     }
 }
 
 // Add event listener for save_to_kometa checkbox
 document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);
+
+// Add event listener for temp_dir input to toggle temp option visibility
+document.getElementById("temp_dir").addEventListener("input", toggleTempCheckbox);
+
+// Add event listener for stage_assets checkbox
+document.getElementById("stage_assets").addEventListener("change", toggleScraperStageCheckbox);
