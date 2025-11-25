@@ -97,7 +97,7 @@ jobs:
           fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ steps.get_version.outputs.TAG }}
           body_path: CHANGELOG.md
@@ -106,8 +106,8 @@ jobs:
           files: |
             dist/*.zip
             dist/*.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          make_latest: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update latest tag
         run: |
