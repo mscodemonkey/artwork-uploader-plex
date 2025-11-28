@@ -11,6 +11,7 @@ The routes are organized into:
 """
 
 import os
+import pprint
 import sys
 import re
 import uuid
@@ -19,6 +20,7 @@ import tempfile
 import zipfile
 import threading
 import subprocess
+import pprint
 from pathlib import Path
 from packaging import version
 
@@ -505,6 +507,8 @@ def setup_socket_handlers(
         filters = data.get("filters")
         plex_year = data.get("plex_year")
         plex_title = data.get("plex_title")
+        options = data.get("options")
+        debug_me(f"Obtained options from web form: {options}", "handle_upload_complete")
 
         instance = Instance(data.get("instance_id"), "web")
 
@@ -518,6 +522,7 @@ def setup_socket_handlers(
             save_uploaded_file(
                 instance,
                 file_name,
+                options,
                 filters,
                 plex_title,
                 plex_year,
@@ -548,6 +553,7 @@ def setup_socket_handlers(
 def save_uploaded_file(
     instance: Instance,
     file_name: str,
+    options: list,
     filters: list,
     plex_title: str,
     plex_year: int,
@@ -572,7 +578,10 @@ def save_uploaded_file(
     """
     from artwork_uploader import process_uploaded_artwork
 
-    temp_zip_path = tempfile.mktemp(suffix=".zip")
+    #temp_zip_path = tempfile.mktemp(suffix=".zip")
+    temp_zip_folder = tempfile.mkdtemp()
+    temp_zip_path = os.path.join(temp_zip_folder, file_name)
+    debug_me(f"Saving uploaded file {file_name} to temporary path: {temp_zip_folder}", "save_uploaded_file")
 
     with open(temp_zip_path, "wb") as f:
         for chunk in upload_chunks[file_name]["chunks"]:
@@ -590,7 +599,15 @@ def save_uploaded_file(
         sort_key_func
     )
 
-    process_uploaded_artwork(instance, extracted_files, filters, plex_title, plex_year)
+    # Delete the ZIP file after extraction
+    try:
+        os.remove(temp_zip_path)
+        os.rmdir(temp_zip_folder)
+        debug_me(f"Deleted temporary ZIP file: {temp_zip_path}", "save_uploaded_file")
+    except Exception as e:
+        debug_me(f"Error deleting temporary ZIP file: {e}", "save_uploaded_file")
+
+    process_uploaded_artwork(instance, extracted_files, options, filters, plex_title, plex_year)
 
     notify_web(instance, "upload_complete", {"files": extracted_files})
     update_status(instance, "Finished processing uploaded file.", color="success")
@@ -618,9 +635,12 @@ def extract_and_list_zip(
     valid_files = []
     zip_source = "theposterdb"
 
+    debug_me(f"Extracting ZIP file: {zip_path} to {extract_dir}", "extract_and_list_zip")
+
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         # Pre-process the file list to determine source and extract valid files
         for zip_info in zip_ref.infolist():
+            debug_me(f"Processing ZIP entry: {zip_info.filename}", "extract_and_list_zip")
             filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
 
             # Skip directories and unwanted metadata files
@@ -629,6 +649,16 @@ def extract_and_list_zip(
 
             if filename == "source.txt":
                 zip_source = "mediux"
+                with zip_ref.open(zip_info.filename) as source, open(os.path.join(extract_dir, "source.txt"), "wb") as target:
+                    target.write(source.read())
+                with open(os.path.join(extract_dir, "source.txt"), "r", encoding="utf-8") as source_file:
+                    for line in source_file:
+                        if line.startswith("Author:"):
+                            author = line.split("Author:")[1].strip()
+                            debug_me(f"Detected MediUX source, author: {author}", "extract_and_list_zip")
+                            break
+                os.remove(os.path.join(extract_dir, "source.txt"))  # Clean up source.txt after obtaining author info
+                
             elif filename_pattern.match(filename):
                 extracted_path = os.path.join(extract_dir, filename)
 
@@ -640,6 +670,11 @@ def extract_and_list_zip(
     file_list = []
     tv_flag = False
 
+    if zip_source == "theposterdb":
+        match = re.search(f"set by (.+?) -", os.path.basename(zip_path))
+        author = match.group(1).strip() if match else None
+        debug_me(f"Detected ThePosterDB source, author: {author}", "extract_and_list_zip")
+
     for file in os.listdir(extract_dir):
         full_path = os.path.join(extract_dir, file)
         md5 = utils.calculate_file_md5(full_path)
@@ -649,6 +684,7 @@ def extract_and_list_zip(
         artwork["path"] = full_path
         artwork["checksum"] = md5
         artwork["id"] = "Upload"
+        artwork["author"] = author
         if artwork['media'] == "TV Show":
             tv_flag = True
 
@@ -668,6 +704,9 @@ def extract_and_list_zip(
                 file['season'] = "Backdrop"
 
     sorted_data = sorted(file_list, key=sort_key_func)
+
+    debug_me(f"Obtained {len(sorted_data)} artwork items:", "extract_and_list_zip")
+    pprint.pprint(sorted_data)
 
     return sorted_data
 

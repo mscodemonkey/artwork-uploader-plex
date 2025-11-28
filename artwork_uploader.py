@@ -341,7 +341,7 @@ def scrape_and_upload(instance: Instance, url, options, success_counter=None):
         raise
 
 
-def process_uploaded_artwork(instance: Instance, file_list, filters, plex_title = None, plex_year = None):
+def process_uploaded_artwork(instance: Instance, file_list, options, filters, plex_title = None, plex_year = None):
     """
     Process uploaded artwork files and upload to Plex.
 
@@ -371,9 +371,13 @@ def process_uploaded_artwork(instance: Instance, file_list, filters, plex_title 
     )
 
     # Use the service to do the actual work
-    options = Options(filters=filters, year=plex_year)
+    if plex_year:
+        plex_year = int(plex_year)
+        opts = Options(filters=filters, year=plex_year, temp=True if "temp" in options else False, stage=True if "stage" in options else False, force=True if "force" in options else False)
+    else:
+        opts = Options(filters=filters, temp=True if "temp" in options else False, stage=True if "stage" in options else False, force=True if "force" in options else False)
     processor = ArtworkProcessor(globals.plex)
-    processor.process_uploaded_files(file_list, options, callbacks, override_title=plex_title)
+    processor.process_uploaded_files(file_list, opts, callbacks, override_title=plex_title)
 
 
 # * Bulk import file I/O functions ---
@@ -689,7 +693,7 @@ if __name__ == "__main__":
             cli_options.clear_filters()
 
             # Process using the bulk filename if supplied, else the bulk file set in the config
-            parse_bulk_file_from_cli(cli_instance, args.bulk_file if args.bulk_file else config.bulk_txt)
+            parse_bulk_file_from_cli(cli_instance, args.bulk_file if args.bulk_file else os.path.join("bulk_imports", config.bulk_txt))
 
         # Now we're looking at URLs - firstly one containing a TPDb user
         elif "/user/" in cli_command:

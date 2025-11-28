@@ -1,3 +1,4 @@
+import os
 from typing import Union, Optional
 import time
 
@@ -73,7 +74,7 @@ class PlexUploader:
                         self.upload_target.uploadPoster( url = self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
-                if self.artwork["source"] == ScraperSource.THEPOSTERDB.value:
+                if self.artwork["source"] == ScraperSource.THEPOSTERDB.value and self.type == "url":
                     time.sleep(TPDB_RATE_LIMIT_DELAY)
                 return f'{"♻️" if self.options.force else "✅"} {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}'
             else:
