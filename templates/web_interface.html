@@ -455,9 +455,9 @@
                                 <label for="scrape_url" class="form-label">URL to scrape:</label>
                                 <input type="text" id="scrape_url" name="scrape_url" class="form-control"
                                     value="" required
-                                    placeholder="theposterdb.com (poster/set/user) or mediux.pro (sets) URL"
-                                    pattern="https://(theposterdb\.com/(poster/\d+|set/\d+|user/[A-Za-z0-9]+)|mediux\.pro/sets/\d+)"
-                                    title="Please enter a valid URL (e.g., https://theposterdb.com/set/12345 or https://mediux.pro/sets/12345)">
+                                    placeholder="theposterdb.com (poster/set/user) or mediux.pro (sets/boxsets) URL"
+                                    pattern="https://(theposterdb\.com/(poster/\d+|set/\d+|user/[A-Za-z0-9]+)|mediux\.pro/(sets|boxsets)/\d+)"
+                                    title="Please enter a valid URL (e.g., https://theposterdb.com/set/12345 or https://mediux.pro/sets/12345 or https://mediux.pro/boxsets/1153)">
                                 <div class="invalid-feedback">Please provide a valid URL to scrape.</div>
                             </div>
                         </div>

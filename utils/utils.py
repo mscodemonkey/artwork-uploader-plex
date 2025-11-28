@@ -139,9 +139,9 @@ def validate_scraper_url(url: str) -> tuple:
             return False, "Unsupported ThePosterDB URL type. Must contain /set/, /poster/, or /user/"
 
         elif parsed.netloc == "mediux.pro":
-            if "/sets/" in url:
+            if "/sets/" in url or "/boxsets/" in url:
                 return True, ""
-            return False, "Unsupported MediUX URL type. Must contain /sets/"
+            return False, "Unsupported MediUX URL type. Must contain /sets/ or /boxsets/"
 
         elif url.endswith('.html'):
             return True, ""

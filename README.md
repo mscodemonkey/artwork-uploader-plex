@@ -2,7 +2,7 @@
 # Artwork Uploader for Plex 
 Adapted from a fork of plex-poster-set-helper by Brian Brown
 
-Artwork Uploader is a tool to help upload sets of posters from ThePosterDB or MediUX or scrape posters from MediUX and upload them to your Plex server in seconds!
+Artwork Uploader is a tool to help upload sets of posters from ThePosterDB or MediUX (including sets and boxsets) or scrape posters from MediUX and upload them to your Plex server in seconds!
 
 # What's different from Brian's original app?
 ### Upload Zip files
@@ -319,16 +319,20 @@ With no arguments, Artwork Uploader will start a webserver on port 4567 (this ma
 
 The script supports various command-line arguments for flexible use.
 
-### 1. Single link import  
-   Provide a link directly to set posters from a single set of posters:
-   
+### 1. Single link import
+   Provide a link directly to set posters from a single set or boxset:
+
 ```bash
    python artwork_uploader.py https://mediux.pro/sets/9242
-   
+
+   # Or for a boxset (collection of multiple sets)
+   python artwork_uploader.py https://mediux.pro/boxsets/1153
+
    or, depending on your environment
-   
+
    python3 artwork_uploader.py https://mediux.pro/sets/9242
-   
+   python3 artwork_uploader.py https://mediux.pro/boxsets/1153
+
 ```
 #### Optional command line arguments
 

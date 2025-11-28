@@ -39,7 +39,7 @@ class Scraper:
         host = parsed_url.hostname
         if host == "theposterdb.com":
             self.source = "theposterdb"
-        elif host == "mediux.pro" and "sets" in url:
+        elif host == "mediux.pro" and ("/sets/" in url or "/boxsets/" in url):
             self.source = "mediux"
         elif ".html" in url:
             self.source = "html"
