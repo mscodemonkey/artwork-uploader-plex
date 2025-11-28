@@ -280,11 +280,12 @@ class MediuxScraper:
                 elif data["fileType"] == FileType.POSTER.value:
                     # Posters can be show covers or season covers
                     # Try to get full metadata from cache if needed
-                    show_id = data.get("show_id")
+                    # Note: file_show_id is just used to determine poster type, NOT for tmdb_id
+                    file_show_id = data.get("show_id")
                     season_id_data = data.get("season_id")
 
                     # If boxset data is missing metadata, try cache
-                    if (not show_id or not season_id_data) and full_set_cache and data.get("set_id"):
+                    if (not file_show_id or not season_id_data) and full_set_cache and data.get("set_id"):
                         set_id = data["set_id"]["id"]
                         file_id = data["id"]
 
@@ -292,8 +293,8 @@ class MediuxScraper:
                             full_set = full_set_cache[set_id]
                             matching_file = next((f for f in full_set.get("files", []) if f.get("id") == file_id), None)
                             if matching_file:
-                                if not show_id:
-                                    show_id = matching_file.get("show_id")
+                                if not file_show_id:
+                                    file_show_id = matching_file.get("show_id")
                                 if not season_id_data:
                                     season_id_data = matching_file.get("season_id")
                                 # Also update seasons array from cached data if needed
@@ -320,9 +321,9 @@ class MediuxScraper:
                             season = season_id_data.get("season_number", 0)
                         episode = "Cover"
                         file_type = "season_cover"
-                    elif show_id is not None:
+                    elif file_show_id is not None:
                         # This is a show cover
-                        debug_me(f"Cover: {show_id}", "MediuxScraper/_process_set")
+                        debug_me(f"Show cover detected", "MediuxScraper/_process_set")
                         season = "Cover"
                         episode = None
                         file_type = "show_cover"
