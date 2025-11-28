@@ -43,21 +43,36 @@ class MediuxScraper:
             data_dict = None
             for script in scripts:
                 if 'files' in script.text:
-                    if 'boxset' in script.text:
+                    # Parse the data first to determine type
+                    data_dict = utils.parse_string_to_dict(script.text)
+
+                    if "boxset" in data_dict:
                         # This is a boxset - contains multiple sets
-                        data_dict = utils.parse_string_to_dict(script.text)
                         self.title = data_dict["boxset"]["name"]
                         self.author = data_dict["boxset"]["user_created"]["username"]
 
-                        # Process each set in the boxset
+                        # Build cache of full set data for boxsets
+                        # Collect all unique set_ids from files
+                        set_ids = set()
                         for set_data in data_dict["boxset"]["sets"]:
-                            self._process_set(set_data)
+                            for file in set_data.get("files", []):
+                                if file.get("set_id") and file["set_id"].get("id"):
+                                    set_ids.add(file["set_id"]["id"])
+
+                        # Fetch full set data for each unique set_id
+                        full_set_cache = {}
+                        for set_id in set_ids:
+                            full_data = self._fetch_full_set_data(set_id)
+                            if full_data:
+                                full_set_cache[set_id] = full_data
+
+                        # Process each set in the boxset with the cache
+                        for set_data in data_dict["boxset"]["sets"]:
+                            self._process_set(set_data, full_set_cache)
                         break
-                    elif 'set' in script.text:
+                    elif "set" in data_dict:
                         if 'Set Link\\' not in script.text:
                             # This is a regular set
-                            data_dict = utils.parse_string_to_dict(script.text)
-
                             if data_dict["set"]["show"] is not None:
                                 self.title = f"{data_dict["set"]["show"]["name"]} ({data_dict["set"]["show"]["first_air_date"][:4]})"
                             elif data_dict["set"]["movie"] is not None:
@@ -97,13 +112,44 @@ class MediuxScraper:
             raise ScraperException(f"Can't scrape from MediUX: {str(e)}") from e
 
 
-    def _process_set(self, set_data: dict) -> None:
+    def _fetch_full_set_data(self, set_id: str) -> Optional[dict]:
+        """
+        Fetch full set data from MediUX for a given set ID.
+        This is used to get complete metadata for boxset files.
+
+        Args:
+            set_id: The set ID to fetch
+
+        Returns:
+            Dictionary containing full set data with complete metadata, or None if fetch fails
+        """
+        try:
+            set_url = f"https://mediux.pro/sets/{set_id}"
+            debug_me(f"Fetching full set data from {set_url}", "MediuxScraper/_fetch_full_set_data")
+
+            set_soup = soup_utils.cook_soup(set_url)
+            scripts = set_soup.find_all('script')
+
+            for script in scripts:
+                if 'set' in script.text and 'files' in script.text and 'Set Link\\' not in script.text:
+                    data_dict = utils.parse_string_to_dict(script.text)
+                    if 'set' in data_dict:
+                        return data_dict['set']
+
+            return None
+        except Exception as e:
+            debug_me(f"Failed to fetch set {set_id}: {str(e)}", "MediuxScraper/_fetch_full_set_data")
+            return None
+
+
+    def _process_set(self, set_data: dict, full_set_cache: Optional[dict] = None) -> None:
         """
         Process a single set's data and extract artwork.
         This method is used for both individual sets and sets within boxsets.
 
         Args:
             set_data: Dictionary containing set information (show/movie/collection and files)
+            full_set_cache: Optional cache of full set data keyed by set_id (for boxsets)
         """
         base_url = MEDIUX_API_BASE_URL
         quality_suffix = MEDIUX_QUALITY_SUFFIX
@@ -140,22 +186,62 @@ class MediuxScraper:
                     year = None
 
                 if data["fileType"] == FileType.TITLE_CARD.value:
-                    # Box sets have simplified episode_id structure without full metadata
-                    # Skip title cards in boxsets as they lack episode identification
-                    if "title" not in data:
-                        debug_me(f"Skipping title card from boxset - missing episode metadata", "MediuxScraper/_process_set")
+                    # Check if this is from a boxset with cached full set data
+                    if full_set_cache and data.get("set_id") and data["set_id"].get("id"):
+                        set_id = data["set_id"]["id"]
+                        file_id = data["id"]
+
+                        # Look up this file in the cached full set data
+                        if set_id in full_set_cache:
+                            full_set = full_set_cache[set_id]
+                            # Find the matching file by ID in the full set data
+                            matching_file = next((f for f in full_set.get("files", []) if f.get("id") == file_id), None)
+
+                            if matching_file and "title" in matching_file:
+                                # Use the full metadata from the cached set
+                                season = matching_file["episode_id"]["season_id"]["season_number"]
+                                title = matching_file["title"]
+                                try:
+                                    episode = int(title.rsplit(" E", 1)[1])
+                                except (IndexError, ValueError):
+                                    debug_me(f"Error getting episode number for {title}.", "MediuxScraper/_process_set")
+                                    episode = None
+                                file_type = FileType.TITLE_CARD.value
+                            else:
+                                # Fallback to partial data if full metadata not found
+                                if data.get("episode_id") and data["episode_id"].get("season_id"):
+                                    season = data["episode_id"]["season_id"]["season_number"]
+                                    episode = None
+                                    file_type = FileType.TITLE_CARD.value
+                                else:
+                                    debug_me(f"Skipping title card - no metadata in cache", "MediuxScraper/_process_set")
+                                    continue
+                        else:
+                            # Set not in cache, use partial data
+                            if data.get("episode_id") and data["episode_id"].get("season_id"):
+                                season = data["episode_id"]["season_id"]["season_number"]
+                                episode = None
+                                file_type = FileType.TITLE_CARD.value
+                            else:
+                                debug_me(f"Skipping title card - set not in cache", "MediuxScraper/_process_set")
+                                continue
+
+                    # Regular sets have full episode metadata with title
+                    elif "title" in data:
+                        episode_id = data.get("episode_id", {}).get("id")
+                        season = data["episode_id"]["season_id"]["season_number"]
+                        title = data["title"]
+                        try:
+                            episode = int(title.rsplit(" E", 1)[1])
+                        except (IndexError, ValueError):
+                            debug_me(f"Error getting episode number for {title}.", "MediuxScraper/_process_set")
+                            episode = None
+                        file_type = FileType.TITLE_CARD.value
+
+                    else:
+                        # No usable metadata, skip
+                        debug_me(f"Skipping title card - missing episode metadata", "MediuxScraper/_process_set")
                         continue
-
-                    episode_id = data.get("episode_id", {}).get("id")
-                    season = data["episode_id"]["season_id"]["season_number"]
-                    title = data["title"]
-                    try:
-                        episode = int(title.rsplit(" E", 1)[1])
-                    except (IndexError, ValueError):
-                        debug_me(f"Error getting episode number for {title}.", "MediuxScraper/_process_set")
-                        episode = None
-
-                    file_type = FileType.TITLE_CARD.value
 
                 elif data["fileType"] == FileType.BACKDROP.value and data.get("show_id_backdrop") is not None:
                     debug_me(f"Backdrop: {data['show_id_backdrop']}", "MediuxScraper/_process_set")
