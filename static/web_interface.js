@@ -1204,6 +1204,12 @@ dropArea.addEventListener("drop", (e) => {
     dropArea.classList.remove("highlight");
 
     const file = e.dataTransfer.files[0];
+    const form = document.getElementById("upload_form");
+
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+    }
     if (file && file.name.endsWith(".zip")) {
         uploadFile(file);
     } else {
@@ -1212,6 +1218,13 @@ dropArea.addEventListener("drop", (e) => {
 });
 
 dropArea.addEventListener("click", () => {
+
+    const form = document.getElementById("upload_form");
+    
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+    }
     let input = document.createElement("input");
     input.type = "file";
     input.accept = ".zip";
@@ -1223,7 +1236,12 @@ dropArea.addEventListener("click", () => {
 });
 
 function uploadFile(file) {
+    // Switch to the log tab
+    const logTab = document.querySelector('#scraping-log-tab');
+    bootstrap.Tab.getOrCreateInstance(logTab).show();
+
     const reader = new FileReader();
+
     let offset = 0;
 
     reader.onload = function (event) {
@@ -1246,19 +1264,24 @@ function uploadFile(file) {
             if (offset >= arrayBuffer.byteLength) {
                 console.log("All chunks sent, emitting upload_complete event.");
 
+                // Collect checked input fields with ids starting with "upload-option-"
+                let options = [];
+                document.querySelectorAll('[id^="upload-option-"]:checked').forEach(checkbox => {
+                    options.push(checkbox.value);
+                });   
+                
+                // Collect checked checkboxes with ids starting with "upload-filter-"
                 let filters = [];
                 if (!document.getElementById("upload-filters-global").checked) {
-                    document.querySelectorAll('[id^=upload]').forEach(checkbox => {
-                        if (checkbox.checked) {
-                            filters.push(checkbox.value);
-                        }
+                    document.querySelectorAll('[id^=upload-filter-]:checked').forEach(checkbox => {
+                        filters.push(checkbox.value);
                     });
                 }
 
                 const plex_year = document.getElementById("plex_year").value;
                 const plex_title = document.getElementById("plex_title").value;
 
-                socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, filters: filters, plex_title: plex_title, plex_year: plex_year });
+                socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, options: options, filters: filters, plex_title: plex_title, plex_year: plex_year });
 
                 return; // Ensure no further execution in this function
             }
@@ -1485,11 +1508,14 @@ function toggleKometaSettings() {
     }
     // Update the label for the "force" option depending on Kometa mode
     const forceLabel = document.querySelector('label[for="option-force"]');
+    const forceLabelUpload = document.querySelector('label[for="upload-option-force"]');
     if (forceLabel) {
         if (saveToKometa) {
             forceLabel.textContent = 'Force save the artwork, replacing any existing asset';
+            forceLabelUpload.textContent = 'Force save the artwork, replacing any existing asset';
         } else {
             forceLabel.textContent = 'Force upload the artwork, even if it already exists';
+            forceLabelUpload.textContent = 'Force upload the artwork, even if it already exists';
         }
     }
 
@@ -1503,17 +1529,23 @@ function toggleScraperStageCheckbox() {
     const globalStageSetting = document.getElementById("stage_assets").checked;
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const scraperStageOption = document.getElementById("option-stage");
+    const scraperStageOptionUpload = document.getElementById("upload-option-stage");
 
     // Hide and uncheck the scraper stage option if global stage setting is enabled
     if (globalStageSetting) {
         scraperStageOption.parentElement.style.display = "none";
         scraperStageOption.checked = false;
+        scraperStageOptionUpload.parentElement.style.display = "none";
+        scraperStageOptionUpload.checked = false;
     } else {
         if (saveToKometa) {
             scraperStageOption.parentElement.style.display = "block";
+            scraperStageOptionUpload.parentElement.style.display = "block";
         } else {
             scraperStageOption.parentElement.style.display = "none";
             scraperStageOption.checked = false;
+            scraperStageOptionUpload.parentElement.style.display = "none";
+            scraperStageOptionUpload.checked = false;
         }
     }
 }
@@ -1522,14 +1554,18 @@ function toggleTempCheckbox() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const tempDir = document.getElementById("temp_dir").value.trim();
     const tempCheckbox = document.getElementById("option-temp");
+    const tempCheckboxUpload = document.getElementById("upload-option-temp");
     
     // Only show temp option in the scraper tab if Kometa is enabled AND temp dir has a value
     if (saveToKometa && tempDir) {
         tempCheckbox.parentElement.style.display = "block";
+        tempCheckboxUpload.parentElement.style.display = "block";
     } else {
         // Hide and uncheck the option when conditions aren't met
         tempCheckbox.parentElement.style.display = "none";
         tempCheckbox.checked = false;
+        tempCheckboxUpload.parentElement.style.display = "none";
+        tempCheckboxUpload.checked = false;
     }
 }
 

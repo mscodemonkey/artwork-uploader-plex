@@ -189,6 +189,9 @@
                                         Please provide your Movie library name. If more than one, separate using commas.
                                     </div>
                                 </div>
+                            </div>
+                            <!-- Kometa settings -->                           
+                            <div class="p-3 border mt-3">
                                 <h5 class="mb-3">Kometa settings</h5>
                                 <div class="form-check mb-3">
                                     <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
@@ -469,7 +472,7 @@
                                     placeholder="e.g. 1978 or 2023"
                                     pattern="^(19|20)\d{2}$"
                                     title="Use this if the year in Plex is different to that on MediUX or TPDb">
-                                <div class="invalid-feedback">Please use a valid year (eg 1978, 2023).</div>    
+                                <div class="invalid-feedback">Please use a valid year (1900-2099).</div>    
                             </div>
                         </div>
                     </div>
@@ -607,32 +610,53 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="row">
-                    <div class="col mb-3">
-                        <div class="p-3 border">
-                            <label for="plex_title" class="form-label">Plex title:</label>
-                            <input type="text" id="plex_title" name="plex_title" class="form-control"
-                                value=""
-                                placeholder="(if different to file title)"
-                                title="If your title in Plex is different to the title in the file(s), enter it here to process it correctly">
+                <form id="upload_form" class="needs-validation" novalidate>
+                    <div class="row">
+                        <div class="col mb-3">
+                            <div class="p-3 border mt-3">
+                                <label for="plex_title" class="form-label">Plex title:</label>
+                                <input type="text" id="plex_title" name="plex_title" class="form-control"
+                                    value=""
+                                    placeholder="(if different to file title)"
+                                    title="If your title in Plex is different to the title in the file(s), enter it here to process it correctly">
+                            </div>
+                        </div>
+                        <div class="mb-3 col-md-4 col-lg-3">
+                            <div class="p-3 border mt-3">
+                                    <label for="plex_year" class="form-label">Plex year:</label>
+                                    <input type="text" id="plex_year" name="plex_year" class="form-control"
+                                        value=""
+                                        placeholder="e.g. 1978 or 2023"
+                                        pattern="^(19|20)\d{2}$"
+                                        title="Use this if the year in Plex is different to that on MediUX or TPDb">
+                                    <div class="invalid-feedback">Please use a valid year (1900-2099).</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="mb-3 col-md-4 col-lg-3">
+                </form>
+                <div class="row mb-3">
+                    <div class="col">
                         <div class="p-3 border">
-                                <label for="plex_year" class="form-label">Plex year:</label>
-                                <input type="text" id="plex_year" name="plex_year" class="form-control"
-                                    value=""
-                                    placeholder="e.g. 1978 or 2023"
-                                    pattern="^(19|20)\d{2}$"
-                                    title="Use this if the year in Plex is different to that on MediUX or TPDb">
-                                <div class="invalid-feedback">Please use a valid year (eg 1978, 2023).</div>
+                            <h5 class="mb-3">Options</h5>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" value="force" id="upload-option-force"/>
+                                <label for="upload-option-force" class="form-check-label">Force upload the artwork, even if it
+                                    already exists</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" value="stage" id="upload-option-stage"/>
+                                <label for="upload-option-stage" class="form-check-label">Apply assets for seasons and 
+                                    episodes not yet in Plex (excluding Specials)</label>
+                            </div>
+                            <div class="form-check mb-2" style="display: none;">
+                                <input class="form-check-input" type="checkbox" value="temp"
+                                    id="upload-option-temp"/>
+                                <label for="upload-option-temp" class="form-check-label">Use temporary directory for downloaded 
+                                    assets</label>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-
-
                 <div class="row mb-3">
                     <div class="col">
                         <div class="p-3 border">
@@ -650,25 +674,25 @@
                                     <div class="col-12 mb-2"><strong>TV shows</strong></div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="upload-show_cover"/>
+                                            <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="upload-filter-show_cover"/>
                                             <label for="filter-show_cover" class="form-check-label">Show cover</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="upload-season_cover"/>
+                                            <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="upload-filter-season_cover"/>
                                             <label for="filter-season_cover" class="form-check-label">Season covers</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-background"/>
+                                            <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-filter-background"/>
                                             <label for="filter-background" class="form-check-label">Background</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="upload-title_card"/>
+                                            <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="upload-filter-title_card"/>
                                             <label for="filter-title_card" class="form-check-label">Title cards</label>
                                         </div>
                                     </div>
@@ -677,13 +701,13 @@
                                     <div class="col-12 mb-2"><strong>Movies</strong></div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" checked value="movie_poster" id="upload-movie_poster"/>
+                                            <input class="form-check-input" type="checkbox" checked value="movie_poster" id="upload-filter-movie_poster"/>
                                             <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-8 col-lg-3">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" checked value="collection_poster" id="upload-collection_poster"/>
+                                            <input class="form-check-input" type="checkbox" checked value="collection_poster" id="upload-filter-collection_poster"/>
                                             <label for="filter-collection_poster" class="form-check-label">Collection poster</label>
                                         </div>
                                     </div>

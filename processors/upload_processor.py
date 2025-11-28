@@ -90,8 +90,8 @@ class UploadProcessor:
         artwork["year"] = self.options.year if self.options.year else artwork["year"]
 
         # Since the TBDb scraper doesn't fetch the TMDb ID up front for each poster, we need to get it here
-        if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value:
-            poster_id=artwork.get("id")
+        if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value and artwork.get("id") != "Upload":
+            poster_id=artwork.get("id", None)
             poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
             debug_me(f"Fetching TMDb ID from '{poster_page_url}'", "UploadProcessor/process_movie_artwork")
             poster_page_soup = soup_utils.cook_soup(poster_page_url)
@@ -176,7 +176,7 @@ class UploadProcessor:
         artwork["year"] = self.options.year if self.options.year else artwork["year"]
         
         # Since the TBDb scraper doesn't fetch the TMDb ID up front for each poster, we need to get it here
-        if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value:
+        if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value and artwork.get("id") != "Upload":
             poster_id=artwork.get("id", None)
             poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
             debug_me(f"Fetching TMDb ID from {poster_page_url}", "UploadProcessor/process_movie_artwork")

@@ -61,7 +61,8 @@ def parse_title(title: str):
             "title": episode_match.group('title').strip(),
             "year": episode_match.group('year'),
             "season": int(episode_match.group('season_number')),
-            "episode": int(episode_match.group('episode_number'))
+            "episode": int(episode_match.group('episode_number')),
+            "author": None
         }
 
     # Check if it's a TV show (season or specials)
@@ -72,7 +73,8 @@ def parse_title(title: str):
             "title": tv_match.group('title').strip(),
             "year": tv_match.group('year'),
             "season": int(tv_match.group('season_number')) if tv_match.group('season_number') else 0,
-            "episode": None
+            "episode": None,
+            "author": None
         }
 
     # Check if it's a collection (case insensitive)
@@ -82,7 +84,8 @@ def parse_title(title: str):
             "media": "Collection",
             "title": title.strip(),
             "season": None,
-            "episode": None
+            "episode": None,
+            "author": None
         }
 
     # Check if it's a TV show background
@@ -93,7 +96,8 @@ def parse_title(title: str):
             "title": background_match.group('title').strip(),
             "year": background_match.group('year'),
             "season": "Backdrop",
-            "episode": None
+            "episode": None,
+            "author": None
         }
 
     # Check if it's a movie
@@ -104,7 +108,8 @@ def parse_title(title: str):
             "title": movie_match.group('title').strip(),
             "year": movie_match.group('year'),
             "season": None,
-            "episode": None
+            "episode": None,
+            "author": None
 
         }
 

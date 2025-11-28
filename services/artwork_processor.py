@@ -5,6 +5,7 @@ This service handles the business logic of scraping artwork and processing
 it for upload to Plex, separating it from UI/notification concerns.
 """
 
+import os
 from typing import Optional, Callable, Any
 from dataclasses import dataclass
 
@@ -192,12 +193,19 @@ class ArtworkProcessor:
         processor.set_options(options)
 
         total_files = len(file_list)
+        file_source = file_list[0].get('source', 'unknown')
+        source = "Mediux" if file_source == "mediux" else "ThePosterDB" if file_source == "theposterdb" else "Unknown"
+        author = file_list[0].get('author', 'unknown')
+        title = override_title if override_title else file_list[0].get('title', 'unknown')
+        year = file_list[0].get('year', 'unknown')
 
         # Initial progress update
         if callbacks and callbacks.on_debug:
-            callbacks.on_debug("Processing uploaded file and uploading to Plex...", "process_uploaded_artwork")
+            callbacks.on_debug("Processing uploaded file...", "process_uploaded_artwork")
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(0, total_files)
+
+        callbacks.on_log_update(f"⚙️ Processing {source} ZIP file by {author} for {title} ({year}).")
 
         for index, artwork in enumerate(file_list, start=1):
             # Update progress
@@ -241,9 +249,11 @@ class ArtworkProcessor:
 
             # Process the artwork
             try:
-                result = process_func(artwork)
-                if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(result)
+                results = process_func(artwork)
+
+                for result in results:
+                    if callbacks and callbacks.on_log_update:
+                        callbacks.on_log_update(result)
 
             except CollectionNotFound as e:
                 if callbacks and callbacks.on_log_update:
@@ -275,7 +285,14 @@ class ArtworkProcessor:
                         False,  # no spinner
                         False   # not sticky
                     )
-
+            os.remove(artwork['path'])  # Remove the temporary file after processing
+            try:
+                os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
+                callbacks.on_debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}", "process_uploaded_artwork")
+            except OSError:
+                pass
         # Final progress update
+        if callbacks and callbacks.on_log_update:
+            callbacks.on_log_update("✔️ Finished processing uploaded ZIP file.")
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(total_files, total_files)

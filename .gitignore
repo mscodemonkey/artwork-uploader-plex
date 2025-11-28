@@ -53,6 +53,7 @@ htmlcov/
 .tox/
 nosetests.xml
 coverage.xml
+docker-compose.override.yml
 *.cover
 
 # Type checking
@@ -112,3 +113,4 @@ DEVELOPER_GUIDE.md
 
 # Keep technical documentation for contributors
 !TECHNICAL_INFO.md
+.gitignore
