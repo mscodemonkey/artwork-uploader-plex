@@ -185,6 +185,16 @@ class MediuxScraper:
                 except (KeyError, ValueError, TypeError, IndexError):
                     year = None
 
+                # If year is missing and we have a cache, try to get it from there
+                if year is None and full_set_cache and data.get("set_id"):
+                    set_id = data["set_id"]["id"]
+                    if set_id in full_set_cache:
+                        full_set = full_set_cache[set_id]
+                        try:
+                            year = int(full_set.get("show", {}).get("first_air_date", "")[:4])
+                        except (KeyError, ValueError, TypeError, IndexError):
+                            pass
+
                 if data["fileType"] == FileType.TITLE_CARD.value:
                     # Check if this is from a boxset with cached full set data
                     if full_set_cache and data.get("set_id") and data["set_id"].get("id"):
