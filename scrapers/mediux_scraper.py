@@ -243,40 +243,82 @@ class MediuxScraper:
                         debug_me(f"Skipping title card - missing episode metadata", "MediuxScraper/_process_set")
                         continue
 
-                elif data["fileType"] == FileType.BACKDROP.value and data.get("show_id_backdrop") is not None:
-                    debug_me(f"Backdrop: {data['show_id_backdrop']}", "MediuxScraper/_process_set")
-                    season = "Backdrop"
-                    episode = None
-                    file_type = "background"
+                elif data["fileType"] == FileType.BACKDROP.value:
+                    # Check if we can get backdrop metadata from cache
+                    show_id_backdrop = data.get("show_id_backdrop")
 
-                elif data["fileType"] == FileType.POSTER.value and data.get("season_id") is None:
-                    # Skip if missing show_id (can happen in boxsets)
-                    if "show_id" not in data or data.get("show_id") is None:
-                        debug_me(f"Skipping show cover from boxset - missing show_id", "MediuxScraper/_process_set")
-                        continue
-                    debug_me(f"Cover: {data.get('show_id')}", "MediuxScraper/_process_set")
-                    season = "Cover"
-                    episode = None
-                    file_type = "show_cover"
+                    if not show_id_backdrop and full_set_cache and data.get("set_id"):
+                        # Try to get from cached full set data
+                        set_id = data["set_id"]["id"]
+                        file_id = data["id"]
 
-                elif data["fileType"] == FileType.POSTER.value and data.get("season_id") is not None:
-                    debug_me(f"Season cover: {data['season_id']}", "MediuxScraper/_process_set")
-                    # Try to get season number from seasons array if available, otherwise from season_id directly
-                    if seasons:
-                        season_id = data["season_id"].get("id")
-                        if season_id:
-                            season_data = [s for s in seasons if s["id"] == season_id]
-                            if season_data:
-                                season = season_data[0]["season_number"]
-                            else:
-                                season = data["season_id"].get("season_number", 0)
-                        else:
-                            season = data["season_id"].get("season_number", 0)
+                        if set_id in full_set_cache:
+                            full_set = full_set_cache[set_id]
+                            matching_file = next((f for f in full_set.get("files", []) if f.get("id") == file_id), None)
+                            if matching_file:
+                                show_id_backdrop = matching_file.get("show_id_backdrop")
+
+                    if show_id_backdrop is not None:
+                        debug_me(f"Backdrop: {show_id_backdrop}", "MediuxScraper/_process_set")
+                        season = "Backdrop"
+                        episode = None
+                        file_type = "background"
                     else:
-                        # Boxsets don't have seasons array, get directly from season_id
-                        season = data["season_id"].get("season_number", 0)
-                    episode = "Cover"
-                    file_type = "season_cover"
+                        debug_me(f"Skipping backdrop - missing show_id_backdrop", "MediuxScraper/_process_set")
+                        continue
+
+                elif data["fileType"] == FileType.POSTER.value:
+                    # Posters can be show covers or season covers
+                    # Try to get full metadata from cache if needed
+                    show_id = data.get("show_id")
+                    season_id_data = data.get("season_id")
+
+                    # If boxset data is missing metadata, try cache
+                    if (not show_id or not season_id_data) and full_set_cache and data.get("set_id"):
+                        set_id = data["set_id"]["id"]
+                        file_id = data["id"]
+
+                        if set_id in full_set_cache:
+                            full_set = full_set_cache[set_id]
+                            matching_file = next((f for f in full_set.get("files", []) if f.get("id") == file_id), None)
+                            if matching_file:
+                                if not show_id:
+                                    show_id = matching_file.get("show_id")
+                                if not season_id_data:
+                                    season_id_data = matching_file.get("season_id")
+                                # Also update seasons array from cached data if needed
+                                if not seasons:
+                                    seasons = full_set.get("show", {}).get("seasons", [])
+
+                    # Determine if this is a show cover or season cover
+                    if season_id_data:
+                        # This is a season cover
+                        debug_me(f"Season cover: {season_id_data}", "MediuxScraper/_process_set")
+                        # Try to get season number from seasons array if available
+                        if seasons:
+                            season_id = season_id_data.get("id")
+                            if season_id:
+                                season_data = [s for s in seasons if s["id"] == season_id]
+                                if season_data:
+                                    season = season_data[0]["season_number"]
+                                else:
+                                    season = season_id_data.get("season_number", 0)
+                            else:
+                                season = season_id_data.get("season_number", 0)
+                        else:
+                            # No seasons array, get directly from season_id
+                            season = season_id_data.get("season_number", 0)
+                        episode = "Cover"
+                        file_type = "season_cover"
+                    elif show_id is not None:
+                        # This is a show cover
+                        debug_me(f"Cover: {show_id}", "MediuxScraper/_process_set")
+                        season = "Cover"
+                        episode = None
+                        file_type = "show_cover"
+                    else:
+                        debug_me(f"Skipping poster - missing show_id and season_id", "MediuxScraper/_process_set")
+                        continue
 
                 else:
                     # Unknown file type or structure, skip
