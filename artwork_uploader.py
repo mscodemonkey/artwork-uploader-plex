@@ -236,7 +236,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         filename:       The filename of the bulk import file being processed.
     """
 
-    # Track successful poster uploads (those with ✓)
+    # Track successful poster uploads (those with ✅ or ♻️)
     success_counter = [0]
 
     try:
@@ -270,10 +270,11 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 except Exception:
                     pass
 
-            notify_web(instance, "progress_bar", {"message": f"{i + 1} of {len(parsed_urls)}", "percent" : ((i + 1) / len(parsed_urls)) * 100})
+            percent = ((i + 1) / len(parsed_urls)) * 100
+            notify_web(instance, "progress_bar", {"message": f"{i + 1} / {len(parsed_urls)} ({percent.__round__()}%)", "percent" : percent})
 
         # All done, update the UI
-        notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)}", "percent" : 100})
+        notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)} (100%)", "percent" : 100})
         update_status(instance, "Bulk import scraping completed.", color="success")
 
         # Log the completion of the bulk import process
@@ -343,7 +344,7 @@ def scrape_and_upload(instance: Instance, url, options, success_counter=None):
 
 def process_uploaded_artwork(instance: Instance, file_list, options, filters, plex_title = None, plex_year = None):
     """
-    Process uploaded artwork files and upload to Plex.
+    Process uploaded artwork files and upload to Plex or save to Kometa asset directory.
 
     This is now a thin wrapper around ArtworkProcessor that handles
     UI updates via callbacks.
@@ -357,7 +358,7 @@ def process_uploaded_artwork(instance: Instance, file_list, options, filters, pl
 
     def progress_callback(current: int, total: int):
         percent = (current / total * 100) if total > 0 else 0
-        message = f"{current} of {total}" if current > 0 else ""
+        message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
         notify_web(instance, "progress_bar", {"message": message, "percent": percent})
 
     def debug_callback(message: str, context: str):

@@ -30,7 +30,7 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 
 // Event listeners
 document.addEventListener("DOMContentLoaded", function () {
-    updateLog("> New session started with ID: " + instanceId)
+    updateLog("📍 New session started with ID: " + instanceId)
     loadConfig()
     toggleThePosterDBElements();
 });
@@ -1240,6 +1240,8 @@ function uploadFile(file) {
     const logTab = document.querySelector('#scraping-log-tab');
     bootstrap.Tab.getOrCreateInstance(logTab).show();
 
+    socket.emit("display_message", {"message": `Uploading '${file.name}'...`, "title": "uploadFile"});
+
     const reader = new FileReader();
 
     let offset = 0;
@@ -1281,7 +1283,9 @@ function uploadFile(file) {
                 const plex_year = document.getElementById("plex_year").value;
                 const plex_title = document.getElementById("plex_title").value;
 
+                socket.emit("display_message", {"message": `Successfully uploaded '${file.name}'`, "title": "uploadFile"});
                 socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, options: options, filters: filters, plex_title: plex_title, plex_year: plex_year });
+                progress_bar(100, "Upload complete!");
 
                 return; // Ensure no further execution in this function
             }
@@ -1299,6 +1303,8 @@ function uploadFile(file) {
 
                 offset += CHUNK_SIZE;
                 let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
+                updateStatus(`Uploading '${file.name}'...`, "info", false, false, "cloud-upload");
+                progress_bar(progress, `${progress}%`);
 
                 if (offset < arrayBuffer.byteLength) {
                     setTimeout(sendChunk, 10);

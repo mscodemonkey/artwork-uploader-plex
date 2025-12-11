@@ -47,5 +47,5 @@ def notify_web(instance: Instance, event, data_to_include = None):
     if instance.mode == "web":
         instance_data = {"instance_id": instance.id, "broadcast": instance.broadcast}
         merged_arguments = data_to_include | instance_data
-        debug_me(merged_arguments, "notify_web")
+        debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}", "notify_web")
         globals.web_socket.emit(event, merged_arguments)

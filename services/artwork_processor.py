@@ -79,7 +79,12 @@ class ArtworkProcessor:
         processor = UploadProcessor(self.plex)
         processor.set_options(options)
 
-        callbacks.on_log_update(f"🔍 Scraping artwork{f" for '{title}'" if title else ""} by '{scraper.author}'")
+        if callbacks and callbacks.on_log_update:
+            #callbacks.on_log_update(f"🔍 Scraping artwork{f" for '{title}'" if title else ""} by '{scraper.author}'")
+            callbacks.on_log_update(f"🔍 {title} : {scraper.author} | Scraping from {f"ThePosterDB" if scraper.source == "theposterdb" else "Mediux"}")
+            if scraper.exclusions > 0:
+                callbacks.on_log_update(f"⏩ {title} : {scraper.author} | Skipped {scraper.exclusions} asset(s) based on exclusions.")
+
         # Process collections
         for artwork in scraper.collection_artwork:
             self._process_single_artwork(
@@ -134,7 +139,7 @@ class ArtworkProcessor:
             results = process_func(artwork)
 
             for result in results:
-            # Track successful uploads (those starting with ✓)
+            # Track successful uploads (those starting with ✅ or ♻️)
                 if callbacks and callbacks.success_counter is not None and (result.startswith('✅') or result.startswith('♻️')):
                     callbacks.success_counter[0] += 1
 
@@ -198,6 +203,7 @@ class ArtworkProcessor:
         author = file_list[0].get('author', 'unknown')
         title = override_title if override_title else file_list[0].get('title', 'unknown')
         year = file_list[0].get('year', 'unknown')
+        success_counter = 0  # Mutable counter to track successful uploads
 
         # Initial progress update
         if callbacks and callbacks.on_debug:
@@ -205,7 +211,9 @@ class ArtworkProcessor:
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(0, total_files)
 
-        callbacks.on_log_update(f"⚙️ Processing {source} ZIP file by {author} for {title} ({year}).")
+        if callbacks and callbacks.on_log_update:
+            #callbacks.on_log_update(f"⚙️ Processing {source} ZIP file by {author} for {title} ({year}).")
+            callbacks.on_log_update(f"⚙️ {title}{f" ({year})" if year else ''} : {author} | Processing uploaded {source} ZIP file.")
 
         for index, artwork in enumerate(file_list, start=1):
             # Update progress
@@ -215,15 +223,25 @@ class ArtworkProcessor:
             if override_title:
                 artwork['title'] = override_title
 
-            # Determine the processor method based on media type
-            media_type = artwork.get('media', 'Unknown')
+            media_type = artwork.get('media')
 
+            # Call the appropriate processor method based on media type
             if media_type == "Collection":
                 process_func = processor.process_collection_artwork
             elif media_type == "Movie":
                 process_func = processor.process_movie_artwork
             elif media_type == "TV Show":
                 process_func = processor.process_tv_artwork
+            elif media_type == "unavailable":
+                if callbacks and callbacks.on_log_update:
+                    callbacks.on_log_update(f"⚠️ {artwork['title']} {f"({artwork['year']})" if artwork.get('year') else ''} : {artwork['author']} | Not available in Plex.")
+                    os.remove(artwork['path'])  # Remove the temporary file after processing
+                    try:
+                        os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
+                        callbacks.on_debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}", "process_uploaded_artwork")
+                    except OSError as e:
+                        pass
+                    continue
             else:
                 if callbacks and callbacks.on_log_update:
                     callbacks.on_log_update(f"❌ Unknown media type: {media_type}")
@@ -252,6 +270,11 @@ class ArtworkProcessor:
                 results = process_func(artwork)
 
                 for result in results:
+                    # Track successful uploads (those starting with ✅ or ♻️)
+                    if result.startswith('✅') or result.startswith('♻️'):
+                        success_counter += 1
+
+                    # Log the result
                     if callbacks and callbacks.on_log_update:
                         callbacks.on_log_update(result)
 
@@ -293,6 +316,6 @@ class ArtworkProcessor:
                 pass
         # Final progress update
         if callbacks and callbacks.on_log_update:
-            callbacks.on_log_update("✔️ Finished processing uploaded ZIP file.")
+            callbacks.on_log_update(f"✔️ Finished processing uploaded ZIP file. {success_counter} assets updated.")
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(total_files, total_files)
