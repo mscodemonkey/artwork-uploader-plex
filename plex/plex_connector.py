@@ -176,28 +176,32 @@ class PlexConnector:
         return None, None
 
     # Find a specific movie or TV show in the given library
-    def find_in_library(self, item_type: str, artwork: AnyArtwork) -> Optional[List[Tuple[Union[Movie, Show], str]]]:
+    def find_in_library(self, item_type: str, artwork: AnyArtwork) -> Tuple[Optional[List[Union[Movie, Show]]], Optional[List[str]]]:
+        """
+        Finds a specific movie or TV show in the appropriate library based on the provided artwork information.
+
+        Args:
+            item_type: The type of item to search for ("movie" or "tv").
+            artwork: The artwork information containing title and year.
+
+        Returns:
+            A tuple containing:
+            - A list of found Movie or Show objects, or None if not found.
+            - A list of library names where the items were found, or None if not found.
+        """
         if not self.plex:
             self.connect()
 
         items = []
         libs = []
+
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
         for i, library in enumerate(libraries):
             library_item = None
             try:
-                if artwork.get("tmdb_id") is None:
-                    debug_me(f"TMDb ID not available. Searching by title '{artwork.get('title')}' and year '{artwork.get('year')}' in '{library.title}'", "PlexConnector/find_in_library")
-                    search_results = library.search(title=artwork.get("title"), year=artwork.get("year"))
-                    if search_results:
-                        library_item = search_results[0]
-                        library_name = library.title
-                        debug_me(f"Found '{library_item.title} ({library_item.year})' in '{library_name}'", "PlexConnector/find_in_library")
-                else:
-                    debug_me(f"Searching for TMDb ID '{artwork.get('tmdb_id')}' in '{library.title}'", "PlexConnector/find_in_library")
-                    library_item = library.getGuid(f"tmdb://{artwork.get('tmdb_id')}")
-                    library_name = library.title
-                    debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'", "PlexConnector/find_in_library")
+                library_item = library.getGuid(f"tmdb://{artwork.get('tmdb_id')}")
+                library_name = library.title
+                debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'", "PlexConnector/find_in_library")
 
                 if library_item:
                     items.append(library_item)
@@ -209,3 +213,57 @@ class PlexConnector:
         if items:
             return items, libs
         return None, None
+    
+    def movie_or_show(self, title:str, year:Optional[int] = None) -> Tuple[Optional[str], Optional[int], Optional[str], Optional[int]]:
+        """
+        Looks up a title in the Plex libraries.
+
+        Args:
+            title: The title of the movie or TV show to look up.
+            year: Optional year to narrow down the search.
+
+        Returns:
+            A tuple containing:
+            - media_type (str | None): "Movie" or "TV Show" if found, else None
+            - tmdb_id (int | None): The TMDb ID if found, else None
+            - found_title (str | None): The exact title found in Plex, else None
+            - found_year (int | None): The year of the title found in Plex, else None
+        """
+
+        if not self.plex:
+            self.connect()
+
+        # First check movie libraries
+        libraries_with_type = (
+            [(lib, "Movie") for lib in self.movie_libraries] +
+            [(lib, "TV Show") for lib in self.tv_libraries]
+        )
+        for library, media_type in libraries_with_type:
+            try:
+                search_kwargs = {'title': title}
+                if year is not None:
+                    search_kwargs['year'] = year
+                search_results = library.search(**search_kwargs)
+                if search_results:
+                    tmdb_id: Optional[int] = None
+                    result = search_results[0]
+                    found_title = result.title
+                    found_year = result.year
+                    for guid in result.guids:
+                       if "tmdb://" in guid.id:
+                           try:
+                               tmdb_id = int(guid.id.split("tmdb://", 1)[-1])
+                           except ValueError:
+                               pass
+                           break
+                    if tmdb_id is not None:
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} with TMDb ID: {tmdb_id}", "PlexConnector/movie_or_show")
+                    else:
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} but TMDb ID not found", "PlexConnector/movie_or_show")
+                    return media_type, tmdb_id, found_title, found_year
+            except Exception as e:
+                debug_me(f"Error searching for movie in library '{library.title}': {e}", "PlexConnector/movie_or_show")
+                pass
+
+        debug_me(f"'{title} ({year})' not found in any library", "PlexConnector/movie_or_show")
+        return None, None, None, None

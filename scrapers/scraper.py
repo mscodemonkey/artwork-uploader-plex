@@ -33,6 +33,7 @@ class Scraper:
         self.source: Optional[str] = None
         self.title: Optional[str] = None
         self.author: Optional[str] = None
+        self.exclusions: int = 0
 
         # Set source based on the contents of the URL
         parsed_url = urlparse(url)
@@ -75,7 +76,7 @@ class Scraper:
         try:
             theposterdb_scraper = ThePosterDBScraper(self.url)
             theposterdb_scraper.set_options(self.options)
-            theposterdb_scraper.scrape()
+            self.exclusions = theposterdb_scraper.scrape()
 
             self.title = theposterdb_scraper.title
             self.author = theposterdb_scraper.author
@@ -104,7 +105,7 @@ class Scraper:
 
             mediux_scraper = MediuxScraper(self.url)
             mediux_scraper.set_options(self.options)
-            mediux_scraper.scrape()
+            self.exclusions = mediux_scraper.scrape()
 
             self.title = mediux_scraper.title
             self.author = mediux_scraper.author

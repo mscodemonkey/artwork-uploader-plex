@@ -103,12 +103,12 @@ class UploadProcessor:
         results = []
         artwork_source = artwork["source"]
         description = f"{artwork['title']} ({artwork['year']}) : {artwork['author']}"
-        filter_type = FilterType.MOVIE_POSTER.value if artwork["type"] == "poster" else FilterType.BACKGROUND.value
-        artwork_type = "Poster" if artwork["type"] == "poster" else "Background"
+        filter_type = FilterType.MOVIE_POSTER.value if artwork.get("type") == "poster" else FilterType.BACKGROUND.value
+        artwork_type = "Poster" if artwork.get("type") == "poster" else "Background"
         artwork_id = artwork_type[0]
 
         if movie_items:
-            debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' in {len(libraries)} libraries.", "UploadProcessor/process_movie_artwork")
+            debug_me(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.", "UploadProcessor/process_movie_artwork")
             for movie_item, library in zip(movie_items, libraries):
                 # Use the actual movie title from Plex in case it differs from the artwork title (if it's a foreign title, etc.)
                 desc = description.replace(artwork["title"], movie_item.title) if movie_item.title != artwork["title"] else description
@@ -156,11 +156,11 @@ class UploadProcessor:
         filter_type = None
         artwork_id = None
         artwork_source = artwork["source"]
-        result = "none"
+        result = None
         results = []
         self.staging: bool = self.kometa and (globals.config.stage_assets or self.options.stage)
 
-        season = artwork['season']
+        season = artwork.get('season')
         if is_numeric(season) and season == 0:
             season = "Specials"
         else:
@@ -193,7 +193,7 @@ class UploadProcessor:
                 item_path = tv_show.seasons()[0].episodes()[0].media[0].parts[0].file
                 path_parts = []
                 path_parts = get_path_parts(item_path)
-                asset_folder = path_parts[-3] if path_parts[-2].lower().startswith("season") else path_parts[-2]
+                asset_folder = path_parts[-3] if path_parts[-2].lower().startswith("season") or path_parts[-2].lower().startswith("specials") else path_parts[-2]
                 try:
                     if artwork["season"] == "Cover":
                         upload_target = tv_show

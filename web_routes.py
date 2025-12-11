@@ -318,7 +318,7 @@ def setup_socket_handlers(
     @globals.web_socket.on("display_message")
     def display_message(data):
         """Log a debug message from the frontend."""
-        debug_me(data.get("message"), "display_message")
+        debug_me(data.get("message"), data.get("title", "web_message"))
 
     @globals.web_socket.on("set_password")
     def set_password_web(data):
@@ -491,15 +491,6 @@ def setup_socket_handlers(
         except Exception as e:
             print(f"Error decoding chunk {chunk_index}: {e}")
 
-        notify_web(
-            instance,
-            "progress_bar",
-            {
-                "message": f"{chunk_index + 1} of {total_chunks}",
-                "percent": ((chunk_index + 1) / total_chunks) * 100
-            }
-        )
-
     @globals.web_socket.on("upload_complete")
     def handle_upload_complete(data):
         """Finalize the upload once all chunks are received."""
@@ -511,9 +502,6 @@ def setup_socket_handlers(
         debug_me(f"Obtained options from web form: {options}", "handle_upload_complete")
 
         instance = Instance(data.get("instance_id"), "web")
-
-        debug_me(f"Upload complete for {file_name}, processing...", "handle_upload_complete")
-        notify_web(instance, "progress_bar", {"message": "Upload complete", "percent": 100})
 
         if file_name in upload_chunks and len(upload_chunks[file_name]["chunks"]) == int(
             upload_chunks[file_name]["total_chunks"]
@@ -595,6 +583,8 @@ def save_uploaded_file(
     extracted_files = extract_and_list_zip(
         temp_zip_path,
         filename_pattern,
+        plex_title,
+        plex_year,
         check_image_orientation_func,
         sort_key_func
     )
@@ -616,6 +606,8 @@ def save_uploaded_file(
 def extract_and_list_zip(
     zip_path: str,
     filename_pattern: re.Pattern,
+    plex_title: str,
+    plex_year: int,
     check_image_orientation_func,
     sort_key_func
 ) -> list:
@@ -668,7 +660,6 @@ def extract_and_list_zip(
                 valid_files.append(extracted_path)
 
     file_list = []
-    tv_flag = False
 
     if zip_source == "theposterdb":
         match = re.search(f"set by (.+?) -", os.path.basename(zip_path))
@@ -679,29 +670,42 @@ def extract_and_list_zip(
         full_path = os.path.join(extract_dir, file)
         md5 = utils.calculate_file_md5(full_path)
 
+        # Obtain artwork title, year, media type, season, episode and artwork type by parsing the filename
         artwork = parse_title(os.path.splitext(file)[0])
+        # Override title and year if provided
+        artwork["title"] = plex_title if plex_title else artwork["title"]
+        artwork["year"] = plex_year if plex_year else artwork.get("year")
+        # Add additional metadata
         artwork["source"] = zip_source
         artwork["path"] = full_path
         artwork["checksum"] = md5
         artwork["id"] = "Upload"
         artwork["author"] = author
+        # Determine media type via Plex lookup if not a collection
+        if artwork["media"] != "Collection":
+            media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
+            if media_type is None:
+                # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
+                artwork["title"] = re.sub(r'-', '', artwork.get('title')).replace('...', '').strip()
+                media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
+            artwork["media"] = media_type if media_type else "unavailable"
+            artwork["title"] = title if title and title != artwork.get('title') else artwork.get('title')
+            artwork["tmdb_id"] = tmdb_id
+            if artwork.get('year') is None and year is not None:
+                artwork['year'] = year
         if artwork['media'] == "TV Show":
-            tv_flag = True
+            if artwork['season'] is None:
+                artwork['season'] = "Cover"
+            if artwork['season'] == "Cover" and check_image_orientation_func(artwork["path"]) == "landscape":
+                artwork['season'] = "Backdrop"
+        if artwork['media'] == "Movie":
+            if check_image_orientation_func(artwork["path"]) == "landscape":
+                artwork['type'] = "background"
+        if artwork['media'] == "Collection":
+            if check_image_orientation_func(artwork["path"]) == "landscape":
+                artwork['type'] = "backdrop"
 
         file_list.append(artwork)
-
-    if tv_flag:
-        for file in file_list:
-            if file['media'] != "TV Show":
-                file['media'] = "TV Show"
-                if not file['season']:
-                    file['season'] = "Cover"
-                file['episode'] = None
-
-            # Take into account that MediUX downloads sometimes don't label backdrops as backdrops
-            # So let's correct that before backdrops get uploaded as covers by checking whether it's a landscape image
-            if file['season'] == "Cover" and check_image_orientation_func(file["path"]) == "landscape":
-                file['season'] = "Backdrop"
 
     sorted_data = sorted(file_list, key=sort_key_func)
 

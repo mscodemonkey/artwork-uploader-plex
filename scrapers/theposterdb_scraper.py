@@ -24,6 +24,7 @@ class ThePosterDBScraper:
         self.options: Options = Options()
         self.author: Optional[str] = None
         self.tmdb_id: Optional[int] = None
+        self.exclusions: int = 0
 
         self.movie_artwork: MovieArtworkList = []
         self.tv_artwork: TVArtworkList = []
@@ -77,6 +78,7 @@ class ThePosterDBScraper:
                         pprint(self.movie_artwork)
                         print(f"*************************************************************{ANSI_RESET}")
                     if self.tv_artwork:
+                        debug_me(f"Skipped {self.exclusions} assets(s) based on exclusions.", "ThePosterDBScraper/scrape")
                         debug_me(f"Found {len(self.tv_artwork)} TV show asset(s) for {len({item["title"] for item in self.tv_artwork})} TV show(s):", "ThePosterDBScraper/scrape")
                         print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                         pprint(self.tv_artwork)
@@ -89,6 +91,9 @@ class ThePosterDBScraper:
                 # Get the additional sets if required
                 if self.options.add_sets:
                     self.scrape_additional_sets()
+
+                # Return the number of excluded assets
+                return self.exclusions
 
             else:
                 raise ScraperException(f"Invalid or unsupported URL for ThePosterDB: {self.url}")
@@ -162,12 +167,16 @@ class ThePosterDBScraper:
 
             if media_type == "Show":
                 title, season, year = media_metadata.parse_show(title_p)
-                if season == "Cover":
-                    show_poster = {"title": title, "author": self.author, "tmdb_id": self.tmdb_id, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "show_cover"}
+                if not self.options.is_excluded(poster_id, season if isinstance(season, int) else None, None):
+                    if season == "Cover":
+                        show_poster = {"title": title, "author": self.author, "tmdb_id": self.tmdb_id, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "show_cover"}
+                    else:
+                        show_poster = {"title": title, "author": self.author, "tmdb_id": self.tmdb_id, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "season_cover"}
+                    get_artwork_type(show_poster)
+                    self.tv_artwork.append(show_poster)
                 else:
-                    show_poster = {"title": title, "author": self.author, "tmdb_id": self.tmdb_id, "url": poster_url, "season": season, "episode": None, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "season_cover"}
-                get_artwork_type(show_poster)
-                self.tv_artwork.append(show_poster)
+                    self.exclusions += 1
+                    debug_me(f"Skipping season cover for '{title} ({year})', Season {season} based on exclusions.", "ThePosterDBScraper/get_posters")
             elif media_type == MediaType.MOVIE.value:
                 title, year = media_metadata.parse_movie(title_p)
                 self.movie_artwork.append({"title": title, "author": self.author, "tmdb_id": self.tmdb_id, "url": poster_url, "year": year, "source": ScraperSource.THEPOSTERDB.value, "id":poster_id, "type": "poster"})
