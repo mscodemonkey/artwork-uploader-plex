@@ -1,5 +1,5 @@
 bcrypt==4.3.0
-beautifulsoup4==4.12.2
+beautifulsoup4==4.14.3
 bidict==0.23.1
 blinker==1.9.0
 certifi==2023.11.17
