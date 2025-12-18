@@ -18,7 +18,7 @@ MarkupSafe==3.0.3
 packaging==24.2
 pillow==10.4.0
 PlexAPI==4.17.2
-python-engineio==4.11.2
+python-engineio==4.12.3
 python-socketio==5.12.1
 requests==2.31.0
 schedule==1.2.2
