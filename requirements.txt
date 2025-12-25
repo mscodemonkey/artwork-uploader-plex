@@ -9,7 +9,7 @@ customtkinter==5.2.2
 darkdetect==0.8.0
 eventlet
 Flask==3.1.2
-Flask-SocketIO==5.5.1
+Flask-SocketIO==5.6.0
 h11==0.16.0
 idna==3.11
 itsdangerous==2.2.0
