@@ -626,8 +626,11 @@ if __name__ == "__main__":
                           stage=args.stage,
                           temp=args.temp)  # Arguments per url to process
 
+    # Determine config path: environment variable (for Docker) takes precedence over CLI argument
+    config_path = os.environ.get("CONFIG_PATH", args.config)
+
     # Create config as a global object
-    config = Config()
+    config = Config(config_path=config_path)
     globals.config = config  # Also store in globals for cross-module access
 
     # Load the config from the config.json file

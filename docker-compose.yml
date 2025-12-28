@@ -7,10 +7,12 @@ services:
     volumes:
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
       - ./config.json:/artwork-uploader/config.json:rw
-      - C:/Users/jtarr/Kometa/config/assets:/assets:rw
-      - C:/Temp/assets:/temp:rw
+      # Optional: mount a custom config file from a different location
+      # - /path/to/your/custom-config.json:/artwork-uploader/custom-config.json:rw
     environment:
-      - TZ=Europe/Madrid
+      - TZ=America/Los_Angeles
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
+      # Optional: specify a custom config path (must match the volume mount above)
+      # - CONFIG_PATH=/artwork-uploader/custom-config.json
     restart: unless-stopped

@@ -60,6 +60,7 @@ class PlexConnector:
                 test_socket.close()
 
                 if result != 0:
+                    print(f"Connection refused (error code: {result})")
                     raise PlexConnectorException(
                         f'Cannot reach Plex server at {self.base_url}. Please check that the server is running and the address is correct.',
                         f"Connection refused (error code: {result})")
@@ -213,7 +214,7 @@ class PlexConnector:
         if items:
             return items, libs
         return None, None
-    
+
     def movie_or_show(self, title:str, year:Optional[int] = None) -> Tuple[Optional[str], Optional[int], Optional[str], Optional[int]]:
         """
         Looks up a title in the Plex libraries.
