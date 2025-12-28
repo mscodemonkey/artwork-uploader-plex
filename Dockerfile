@@ -1,4 +1,4 @@
-FROM python:3.14-slim-bookworm
+FROM dhi.io/python:3.14.2
 
 WORKDIR /artwork-uploader
 
