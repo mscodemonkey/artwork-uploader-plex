@@ -1,19 +1,22 @@
-import math
-import time
-from pprint import pprint
-from typing import Optional, Any
-
-from core import globals
+from utils.utils import get_artwork_type
+from utils.notifications import debug_me
+from utils import soup_utils
+from processors import media_metadata
+from models.options import Options
+from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
+from core.exceptions import ScraperException
+from core.enums import MediaType, ScraperSource
 from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD, \
     TPBD_SET_BASE_PATH, TPBD_USER_BASE_PATH
-from core.enums import MediaType, ScraperSource
-from core.exceptions import ScraperException
-from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
-from models.options import Options
-from processors import media_metadata
-from utils import soup_utils
-from utils.notifications import debug_me
-from utils.utils import get_artwork_type
+from core import globals
+import math
+import time
+from pprint import pformat
+from typing import Optional, Any
+from logging_config import get_logger
+
+logger = get_logger(__name__)
+
 
 POSTER_DIV_SELECTOR = 'row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1'
 
@@ -76,19 +79,20 @@ class ThePosterDBScraper:
                         debug_me(
                             f"Found {len(self.collection_artwork)} collection asset(s) for {len({item["title"] for item in self.collection_artwork})} collection(s):",
                             DB_SCRAPER_NAME)
-                        print(
+                        logger.debug(
                             f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                        pprint(self.collection_artwork)
-                        print(
+
+                        logger.debug(pformat(self.collection_artwork))
+                        logger.debug(
                             f"*************************************************************{ANSI_RESET}")
                     if self.movie_artwork:
                         debug_me(
                             f"Found {len(self.movie_artwork)} movie asset(s) for {len({item["title"] for item in self.movie_artwork})} movie(s):",
                             DB_SCRAPER_NAME)
-                        print(
+                        logger.debug(
                             f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                        pprint(self.movie_artwork)
-                        print(
+                        logger.debug(pformat(self.movie_artwork))
+                        logger.debug(
                             f"*************************************************************{ANSI_RESET}")
                     if self.tv_artwork:
                         debug_me(f"Skipped {self.exclusions} assets(s) based on exclusions.",
@@ -96,10 +100,10 @@ class ThePosterDBScraper:
                         debug_me(
                             f"Found {len(self.tv_artwork)} TV show asset(s) for {len({item["title"] for item in self.tv_artwork})} TV show(s):",
                             DB_SCRAPER_NAME)
-                        print(
+                        logger.debug(
                             f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                        pprint(self.tv_artwork)
-                        print(
+                        logger.debug(pformat(self.tv_artwork))
+                        logger.debug(
                             f"*************************************************************{ANSI_RESET}")
 
                 # Get the additional posters if required

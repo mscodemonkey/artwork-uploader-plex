@@ -8,7 +8,9 @@ from typing import List, Dict, Any
 
 from core.constants import DEFAULT_CONFIG_PATH, DEFAULT_BULK_IMPORT_FILE, DEFAULT_TV_LIBRARY, DEFAULT_MOVIE_LIBRARY, DEFAULT_IP_BINDING
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
-from utils.notifications import debug_me
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class Config:
@@ -36,6 +38,7 @@ class Config:
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
         ip_binding: IP binding mode - "auto" (default), "ipv4", or "ipv6"
+        debug: Enable debug logging
     """
 
     def __init__(self, config_path: str = DEFAULT_CONFIG_PATH) -> None:
@@ -61,21 +64,23 @@ class Config:
         self.auth_username: str = ""
         self.auth_password_hash: str = ""
         self.ip_binding: str = DEFAULT_IP_BINDING
+        self.debug: bool = False
 
     def load(self) -> None:
         """Load the configuration from the JSON file."""
-        print(f"[DEBUG Config.load] Config path: {self.path}")
-        print(f"[DEBUG Config.load] File exists: {os.path.isfile(self.path)}")
+        logger.debug(f"Config path: {self.path}")
+        logger.debug(f"File exists: {os.path.isfile(self.path)}")
 
         # If a config file doesn't exist, create one with default values
         if not os.path.isfile(self.path):
-            print("[DEBUG Config.load] Config file does not exist, calling create()")
+            logger.debug("Config file does not exist, calling create()")
             self.create()
-            print(
-                f"[DEBUG Config.load] After create(), file exists: {os.path.isfile(self.path)}")
+            logger.debug(
+                f"After create(), file exists: {os.path.isfile(self.path)}")
 
         # Load the configuration from the config.json file
-        print(f"[DEBUG Config.load] Attempting to open config file for reading: {self.path}")
+        logger.debug(
+            f"Attempting to open config file for reading: {self.path}")
         try:
             with open(self.path, "r", encoding="utf-8") as config_file:
                 config = json.load(config_file)
@@ -100,6 +105,7 @@ class Config:
             self.auth_username = config.get("auth_username", "")
             self.auth_password_hash = config.get("auth_password_hash", "")
             self.ip_binding = config.get("ip_binding", DEFAULT_IP_BINDING)
+            self.debug = config.get("debug", False)
 
         except Exception as e:
             raise ConfigLoadError(
@@ -107,13 +113,12 @@ class Config:
 
     def create(self) -> None:
         """Create a new configuration file with default values."""
-        print(f"[DEBUG Config.create] Creating config at: {self.path}")
-        print(
-            f"[DEBUG Config.create] Path is absolute: {os.path.isabs(self.path)}")
-        print(
-            f"[DEBUG Config.create] Parent directory: {os.path.dirname(self.path)}")
-        print(
-            f"[DEBUG Config.create] Parent dir exists: {os.path.isdir(os.path.dirname(self.path)) if os.path.dirname(self.path) else 'N/A (current dir)'}")
+        logger.debug(f"Creating config at: {self.path}")
+        logger.debug(f"Path is absolute: {os.path.isabs(self.path)}")
+        logger.debug(f"Parent directory: {os.path.dirname(self.path)}")
+        parent_exists = os.path.isdir(os.path.dirname(self.path)) if os.path.dirname(
+            self.path) else 'N/A (current dir)'
+        logger.debug(f"Parent dir exists: {parent_exists}")
 
         config_json = {
             "base_url": "",
@@ -132,36 +137,33 @@ class Config:
             "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
             "reset_overlay": False,
-            "schedules": []
+            "schedules": [],
+            "debug": False
         }
 
         # Create the config.json file if it doesn't exist
         if not os.path.isfile(self.path):
-            print("[DEBUG Config.create] File does not exist, attempting to create")
+            logger.debug("File does not exist, attempting to create")
             try:
                 # Ensure parent directory exists
                 parent_dir = os.path.dirname(self.path)
                 if parent_dir and not os.path.isdir(parent_dir):
-                    print(
-                        f"[DEBUG Config.create] Creating parent directory: {parent_dir}")
+                    logger.debug(f"Creating parent directory: {parent_dir}")
                     os.makedirs(parent_dir, exist_ok=True)
 
-                print(
-                    f"[DEBUG Config.create] Opening file for writing: {self.path}")
+                logger.debug(f"Opening file for writing: {self.path}")
                 with open(self.path, "w", encoding="utf-8") as config_file:
                     json.dump(config_json, config_file, indent=4)
-                print("[DEBUG Config.create] File written successfully")
-                debug_me(
-                    f"Config file '{self.path}' created with default settings.", "Config/create")
+                logger.debug("File written successfully")
+                logger.info(
+                    f"Config file '{self.path}' created with default settings.")
             except Exception as e:
-                print(
-                    f"[ERROR Config.create] Exception: {type(e).__name__}: {str(e)}")
-                import traceback
-                traceback.print_exc()
+                logger.error(
+                    f"Failed to create config file at {self.path}", exc_info=True)
                 raise ConfigCreationError(
                     f"Failed to create config file at {self.path}: {str(e)}") from e
         else:
-            print("[DEBUG Config.create] File already exists, skipping creation")
+            logger.debug("File already exists, skipping creation")
 
     def save(self) -> None:
         """Save the current configuration to the file."""
@@ -188,7 +190,8 @@ class Config:
             "auth_enabled": self.auth_enabled,
             "auth_username": self.auth_username,
             "auth_password_hash": self.auth_password_hash,
-            "ip_binding": self.ip_binding
+            "ip_binding": self.ip_binding,
+            "debug": self.debug
         }
 
         try:

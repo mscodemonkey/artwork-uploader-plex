@@ -10,6 +10,14 @@ The routes are organized into:
 - Helper functions for file uploads and processing
 """
 
+from utils.notifications import update_log, update_status, notify_web, debug_me
+from utils import utils
+from services import UtilityService, AuthenticationService
+from processors.media_metadata import parse_title
+from models.instance import Instance
+from core.constants import SOURCE_MEDIUX, SOURCE_THEPOSTERDB
+from core.config import Config
+from core import globals
 import base64
 import os
 import pprint
@@ -23,15 +31,10 @@ from functools import wraps
 
 from flask import render_template, send_from_directory, request, redirect, url_for, session
 from packaging import version
+from logging_config import get_logger
 
-from core import globals
-from core.config import Config
-from core.constants import SOURCE_MEDIUX, SOURCE_THEPOSTERDB
-from models.instance import Instance
-from processors.media_metadata import parse_title
-from services import UtilityService, AuthenticationService
-from utils import utils
-from utils.notifications import update_log, update_status, notify_web, debug_me
+logger = get_logger(__name__)
+
 
 SOURCE_TXT = "source.txt"
 
@@ -598,7 +601,8 @@ def setup_socket_handlers(
             decoded_chunk = base64.b64decode(chunk_data)
             upload_chunks[file_name]["chunks"].append(decoded_chunk)
         except Exception as e:
-            print(f"Error decoding chunk {chunk_index}: {e}")
+            logger.error(
+                f"Error decoding chunk {chunk_index}: {e}", exc_info=True)
 
     @globals.web_socket.on("upload_complete")
     def handle_upload_complete(data):
@@ -859,44 +863,47 @@ def start_web_server(web_app, web_port: int, debug: bool = False, ip_binding: st
     if ip_binding == "auto":
         # Dual-stack: Listen on both IPv4 and IPv6
         if ipv6_available:
-            print("Checking dual-stack support...")
+            logger.info("Checking dual-stack support...")
             dual_stack_supported = is_dual_stack_supported()
             if dual_stack_supported:
                 # "::" enables both IPv4 and IPv6
                 binding_host = "::"
-                print(
-                    f"✓ Starting web server on dual-stack (IPv4 and IPv6) at port {web_port}")
-                print(f"  - IPv4: http://127.0.0.1:{web_port}")
-                print(f"  - IPv6: http://[::1]:{web_port}")
+                logger.info(
+                    f"✓ Starting web server on dual-stack (IPv4 and IPv6) at port {web_port}\n"
+                    f"  - IPv4: http://127.0.0.1:{web_port}\n"
+                    f"  - IPv6: http://[::1]:{web_port}")
             else:
                 # Dual-stack not supported, fall back to IPv4 only
                 binding_host = "0.0.0.0"
-                print(
-                    f"! Dual-stack not supported on this system, using IPv4 only at port {web_port}")
-                print(f"  - IPv4: http://127.0.0.1:{web_port}")
+                logger.info(
+                    f"! Dual-stack not supported on this system, using IPv4 only at port {web_port}\n"
+                    f"  - IPv4: http://127.0.0.1:{web_port}")
         else:
             # IPv6 not available, fall back to IPv4 only
             binding_host = "0.0.0.0"
-            print(f"! IPv6 not available, using IPv4 only at port {web_port}")
-            print(f"  - IPv4: http://127.0.0.1:{web_port}")
+            logger.info(
+                f"! IPv6 not available, using IPv4 only at port {web_port}\n"
+                f"  - IPv4: http://127.0.0.1:{web_port}")
     elif ip_binding == "ipv6":
         # Prefer IPv6; may also accept IPv4 connections on dual-stack systems
         if ipv6_available:
             binding_host = "::"
-            print(f"Starting web server with IPv6 binding at port {web_port}")
-            print(f"  - IPv6: http://[::1]:{web_port}")
-            print("    Note: On some systems this binding may also accept IPv4 connections due to dual-stack behavior.")
+            logger.info(
+                f"Starting web server with IPv6 binding at port {web_port}\n"
+                f"  - IPv6: http://[::1]:{web_port}\n"
+                "    Note: On some systems this binding may also accept IPv4 connections due to dual-stack behavior.")
         else:
             # IPv6 requested but not available, fall back to IPv4
             binding_host = "0.0.0.0"
-            print(
-                f"! IPv6 requested but not available, falling back to IPv4 at port {web_port}")
-            print(f"  - IPv4: http://127.0.0.1:{web_port}")
+            logger.info(
+                f"! IPv6 requested but not available, falling back to IPv4 at port {web_port}\n"
+                f"  - IPv4: http://127.0.0.1:{web_port}")
     else:
         # IPv4 only (default fallback)
         binding_host = "0.0.0.0"
-        print(f"Starting web server on IPv4 only at port {web_port}")
-        print(f"  - IPv4: http://127.0.0.1:{web_port}")
+        logger.info(
+            f"Starting web server on IPv4 only at port {web_port}\n"
+            f"  - IPv4: http://127.0.0.1:{web_port}")
 
     globals.web_socket.run(web_app, host=binding_host,
                            port=web_port, debug=debug)

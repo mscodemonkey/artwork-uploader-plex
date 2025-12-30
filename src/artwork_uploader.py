@@ -1,13 +1,14 @@
-from services import (
-    BulkFileService,
-    ImageService,
-    ArtworkProcessor,
-    ProcessingCallbacks,
-    SchedulerService,
-    UpdateService,
-    UtilityService
-)
-from core.enums import InstanceMode
+import os
+import re
+import sys
+import threading
+import traceback
+import uuid
+
+import eventlet
+
+from core import globals
+from core.config import Config
 from core.constants import (
     CURRENT_VERSION,
     GITHUB_REPO,
@@ -19,26 +20,30 @@ from core.constants import (
     MIN_PYTHON_MAJOR,
     MIN_PYTHON_MINOR, TPBD_USER_BASE_PATH
 )
-from plex.plex_connector import PlexConnector
-from models.options import Options
-from utils.utils import is_not_comment, parse_url_and_options
-from scrapers.theposterdb_scraper import ThePosterDBScraper
+from core.enums import InstanceMode
 from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException
-from core.config import Config
-from utils.notifications import update_log, update_status, notify_web, debug_me
-from models.instance import Instance
+from logging_config import setup_logging, get_logger
 from models import arguments
-import sys
-import threading
-from core import globals
-import traceback
-import re
-import os
-import uuid
-import eventlet
+from models.instance import Instance
+from models.options import Options
+from plex.plex_connector import PlexConnector
+from scrapers.theposterdb_scraper import ThePosterDBScraper
+from services import (
+    BulkFileService,
+    ImageService,
+    ArtworkProcessor,
+    ProcessingCallbacks,
+    SchedulerService,
+    UpdateService,
+    UtilityService
+)
+from utils.notifications import update_log, update_status, notify_web, debug_me
+from utils.utils import is_not_comment, parse_url_and_options
 
 eventlet.monkey_patch()
 
+# Module logger - will be properly configured after config is loaded
+module_logger = None
 
 # ----------------------------------------------
 # Important for autoupdater
@@ -55,23 +60,28 @@ try:
     from flask import Flask, render_template
     from flask_socketio import SocketIO
 except ImportError as e:
-    print("=" * 70)
-    print("ERROR: Required dependencies are missing or incompatible")
-    print("=" * 70)
-    print(f"\nDetails: {str(e)}")
-    print("\nThis usually means one of the following:")
-    print("  1. Requirements not installed: Run 'pip install -r requirements.txt'")
-    print("  2. Wrong Python version: Requires Python 3.10+")
-    print("  3. Architecture mismatch (Apple Silicon): Reinstall dependencies")
-    print("\nFor architecture issues on Apple Silicon Macs:")
-    print("  pip uninstall Pillow Flask flask-socketio -y")
-    print("  pip install Pillow Flask flask-socketio")
-    print("\nOr use a virtual environment:")
-    print("  python3 -m venv .venv")
-    print("  source .venv/bin/activate")
-    print("  pip install -r requirements.txt")
-    print("\nSee README.md for more troubleshooting help.")
-    print("=" * 70)
+    print(f"""{'=' * 70}
+    ERROR: Required dependencies are missing or incompatible
+    {'=' * 70}
+    
+    Details: {e}
+    
+    This usually means one of the following:
+      1. Requirements not installed: Run 'pip install -r requirements.txt'
+      2. Wrong Python version: Requires Python 3.10+
+      3. Architecture mismatch (Apple Silicon): Reinstall dependencies
+    
+    For architecture issues on Apple Silicon Macs:
+      pip uninstall Pillow Flask flask-socketio -y
+      pip install Pillow Flask flask-socketio
+    
+    Or use a virtual environment:
+      python3 -m venv .venv
+      source .venv/bin/activate
+      pip install -r requirements.txt
+    
+    See README.md for more troubleshooting help.
+    {'=' * 70}""")
     sys.exit(1)
 
 # ! Interactive CLI mode flag
@@ -98,7 +108,8 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
             urls = file.readlines()
     except FileNotFoundError:
-        print("File not found. Please enter a valid file path.")
+        module_logger.error(
+            "File not found. Please enter a valid file path.", exc_info=True)
 
     # Loop through the file, process the URL and options, then scrape according to the URL
     for line in urls:
@@ -115,15 +126,16 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                     scrape_tpdb_user(instance, parsed_url.url,
                                      parsed_url.options)
                 except ScraperException as scraper_error:
-                    print(str(scraper_error))
+                    module_logger.error(str(scraper_error), exc_info=True)
                 except Exception as unknown_error:
-                    print(str(unknown_error))
+                    module_logger.error(str(unknown_error), exc_info=True)
             else:
                 try:
                     scrape_and_upload(
                         instance, parsed_url.url, parsed_url.options)
                 except Exception as e:
-                    print(f"Error processing {parsed_url.url}: {str(e)}")
+                    module_logger.error(
+                        f"Error processing {parsed_url.url}: {str(e)}", exc_info=True)
 
 
 # ---------------------- GUI FUNCTIONS ----------------------
@@ -211,10 +223,7 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list=None, filename
 
     # Pass the processing of the parsed URLs off to a thread
     if instance.mode == "web":
-        try:
-            process_bulk_import_from_ui(instance, parsed_urls, filename)
-        except Exception:
-            raise
+        process_bulk_import_from_ui(instance, parsed_urls, filename)
 
 
 def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None) -> None:
@@ -251,7 +260,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         for i, parsed_line in enumerate(parsed_urls):
 
             notify_web(instance, "element_disable", {
-                       "element": ["bulk_button"], "mode": True})
+                "element": ["bulk_button"], "mode": True})
 
             # Parse according to whether it's a user portfolio or poster / set URL
             if TPBD_USER_BASE_PATH in parsed_line.url:
@@ -364,7 +373,7 @@ def process_uploaded_artwork(instance: Instance, file_list, options, filters, pl
         percent = (current / total * 100) if total > 0 else 0
         message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
         notify_web(instance, "progress_bar", {
-                   "message": message, "percent": percent})
+            "message": message, "percent": percent})
 
     def debug_callback(message: str, context: str):
         debug_me(message, context)
@@ -400,7 +409,8 @@ def load_bulk_import_file(instance: Instance, filename=None):
         # Check if file exists
         if not globals.bulk_file_service.file_exists(bulk_import_filename):
             if instance.mode == "cli":
-                print(f"File does not exist: {bulk_import_filename}")
+                module_logger.error(
+                    f"File does not exist: {bulk_import_filename}")
             if instance.mode == "web":
                 update_status(
                     instance, f"File does not exist: {bulk_import_filename}")
@@ -416,14 +426,14 @@ def load_bulk_import_file(instance: Instance, filename=None):
     except FileNotFoundError as e:
         debug_me(f"File not found: {str(e)}", "load_bulk_import_file")
         notify_web(instance, "load_bulk_import", {
-                   "loaded": False, "error": f"File not found: {str(e)}"})
+            "loaded": False, "error": f"File not found: {str(e)}"})
     except Exception as e:
         debug_me(
             f"Error loading bulk import: {str(e)}", "load_bulk_import_file")
         import traceback
         traceback.print_exc()
         notify_web(instance, "load_bulk_import", {
-                   "loaded": False, "error": str(e)})
+            "loaded": False, "error": str(e)})
 
 
 def rename_bulk_import_file(instance: Instance, old_name, new_name):
@@ -438,7 +448,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
             update_status(instance, f"Renamed to {new_name}", "success")
         except Exception:
             notify_web(instance, "rename_bulk_file", {
-                       "renamed": False, "old_filename": old_name})
+                "renamed": False, "old_filename": old_name})
             update_status(instance, f"Could not rename {old_name}", "warning")
 
 
@@ -447,11 +457,11 @@ def delete_bulk_import_file(instance: Instance, file_name):
         try:
             globals.bulk_file_service.delete_file(file_name)
             notify_web(instance, "delete_bulk_file", {
-                       "deleted": True, "filename": file_name})
+                "deleted": True, "filename": file_name})
             update_status(instance, f"Deleted {file_name}", "success")
         except Exception:
             notify_web(instance, "delete_bulk_file", {
-                       "deleted": False, "filename": file_name})
+                "deleted": False, "filename": file_name})
             update_status(instance, f"Could not delete {file_name}", "warning")
 
 
@@ -470,12 +480,12 @@ def save_bulk_import_file(instance: Instance, contents=None, filename=None, now_
             update_status(
                 instance, message=f"Bulk import file {filename} saved", color="success")
             notify_web(instance, "save_bulk_import", {
-                       "saved": True, "now_load": now_load})
+                "saved": True, "now_load": now_load})
         except Exception:
             update_status(
                 instance, message="Error saving bulk import file", color="danger")
             notify_web(instance, "save_bulk_import", {
-                       "saved": False, "now_load": now_load})
+                "saved": False, "now_load": now_load})
 
 
 def check_for_bulk_import_file(instance: Instance):
@@ -669,6 +679,7 @@ if __name__ == "__main__":
     globals.config = config  # Also store in globals for cross-module access
 
     # Load the config from the config.json file
+    # Note: We use print here since logging is not yet configured
     print(f"[DEBUG] Attempting to load config from: {config_path}")
     print(f"[DEBUG] Config file exists: {os.path.isfile(config_path)}")
     print(f"[DEBUG] Current working directory: {os.getcwd()}")
@@ -690,6 +701,16 @@ if __name__ == "__main__":
         traceback.print_exc()
         sys.exit(
             f"Unexpected error when loading config.json file: {str(config_load_exception)}")
+
+    # Initialize logging with debug flag from config or CLI args
+    debug_mode = args.debug or config.debug
+    logger = setup_logging(debug=debug_mode)
+    logger.info(
+        f"Logging initialized (debug={'enabled' if debug_mode else 'disabled'})")
+
+    # Set module logger for use in functions
+    global module_logger
+    module_logger = get_logger(__name__)
 
     # Create services
     # Initialize bulk file service with optional custom path from environment variable
@@ -722,26 +743,30 @@ if __name__ == "__main__":
         try:
             globals.plex.set_tv_libraries(config.tv_library)
         except PlexConnectorException as e:
-            print("=" * 70)
-            print("ERROR: Could not connect to Plex server")
-            print("=" * 70)
-            print(f"{e}\n")
-            print("Please check your config.json settings:")
-            print(f"  - base_url: {config.base_url}")
-            print(
-                f"  - token: {config.token[:10]}..." if config.token else "  - token: (not set)")
-            print("\nEnsure your Plex server is running and accessible.")
-            print("=" * 70)
+            token_display = f"{config.token[:10]}..." if config.token else "(not set)"
+            logger.error(
+                f"{'=' * 70}\n"
+                f"ERROR: Could not connect to Plex server\n"
+                f"{'=' * 70}\n"
+                f"{e}\n\n"
+                f"Please check your config.json settings:\n"
+                f"  - base_url: {config.base_url}\n"
+                f"  - token: {token_display}\n\n"
+                f"Ensure your Plex server is running and accessible.\n"
+                f"{'=' * 70}", exc_info=True
+            )
             sys.exit(1)
 
         try:
             globals.plex.set_movie_libraries(config.movie_library)
         except PlexConnectorException as e:
-            print("=" * 70)
-            print("ERROR: Could not connect to Plex movie libraries")
-            print("=" * 70)
-            print(f"{e}")
-            print("=" * 70)
+            logger.error(
+                f"{'=' * 70}\n"
+                f"ERROR: Could not connect to Plex movie libraries\n"
+                f"{'=' * 70}\n"
+                f"{e}\n"
+                f"{'=' * 70}", exc_info=True
+            )
             sys.exit(1)
 
         # Handle the CLI options if we're not using the web ui
@@ -770,7 +795,10 @@ if __name__ == "__main__":
                 scrape_tpdb_user(cli_instance, cli_command, cli_options)
             except Exception as e:
                 debug_me(f"Error scraping user: {str(e)}", "__main__")
-                print(f"Error scraping TPDb user: {str(e)}")
+                logger.error(
+                    f"Error scraping TPDb user: {str(e)}",
+                    exc_info=True
+                )
 
         # User passed in a poster or set URL, so let's process that
         else:
@@ -788,26 +816,28 @@ if __name__ == "__main__":
             try:
                 globals.plex.set_tv_libraries(config.tv_library)
             except PlexConnectorException as e:
-                print("=" * 70)
-                print("WARNING: Could not connect to Plex TV libraries")
-                print("=" * 70)
-                print(f"{e}\n")
-                print(
-                    "The web UI will still start, but you won't be able to upload artwork")
-                print("until you fix the Plex connection in Settings.\n")
+                logger.warning(
+                    f"{'=' * 70}\n"
+                    f"WARNING: Could not connect to Plex TV libraries\n"
+                    f"{'=' * 70}\n"
+                    f"{e}\n\n"
+                    f"The web UI will still start, but you won't be able to upload artwork\n"
+                    f"until you fix the Plex connection in Settings.\n"
+                )
                 plex_connected = False
 
             try:
                 globals.plex.set_movie_libraries(config.movie_library)
             except PlexConnectorException as e:
-                if plex_connected:  # Only print if we didn't already print for TV
-                    print("=" * 70)
-                    print("WARNING: Could not connect to Plex Movie libraries")
-                    print("=" * 70)
-                    print(f"{e}\n")
-                    print(
-                        "The web UI will still start, but you won't be able to upload artwork")
-                    print("until you fix the Plex connection in Settings.\n")
+                if plex_connected:  # Only log if we didn't already log for TV
+                    logger.warning(
+                        f"{'=' * 70}\n"
+                        f"WARNING: Could not connect to Plex Movie libraries\n"
+                        f"{'=' * 70}\n"
+                        f"{e}\n\n"
+                        f"The web UI will still start, but you won't be able to upload artwork\n"
+                        f"until you fix the Plex connection in Settings.\n"
+                    )
 
             # Create the app and web server
 
