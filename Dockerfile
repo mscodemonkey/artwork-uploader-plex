@@ -1,15 +1,16 @@
-FROM dhi.io/python:3.14.2-dev AS builder
+FROM dhi.io/python:3.12.12-dev AS builder
 
 ENV PATH="/app/venv/bin:$PATH"
 
 WORKDIR /app
 
 RUN python -m venv /app/venv
+
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-FROM dhi.io/python:3.14.2
+FROM dhi.io/python:3.12.12
 
 # Copy only runtime code from src/
 COPY src/ /app/src/

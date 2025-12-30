@@ -42,8 +42,7 @@ from utils.utils import is_not_comment, parse_url_and_options
 
 eventlet.monkey_patch()
 
-# Module logger - will be properly configured after config is loaded
-module_logger = None
+module_logger = get_logger(__name__)
 
 # ----------------------------------------------
 # Important for autoupdater
@@ -708,10 +707,6 @@ if __name__ == "__main__":
     logger = setup_logging(debug=debug_mode)
     logger.info(
         f"Logging initialized (debug={'enabled' if debug_mode else 'disabled'})")
-
-    # Set module logger for use in functions
-    global module_logger
-    module_logger = get_logger(__name__)
 
     # Create services
     # Initialize bulk file service with optional custom path from environment variable
