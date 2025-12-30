@@ -17,7 +17,7 @@ MIN_PYTHON_MINOR = 10
 
 # Server configuration
 DEFAULT_WEB_PORT = 4567
-DEFAULT_WEB_HOST = "0.0.0.0"
+DEFAULT_IP_BINDING = "auto"  # Options: "auto", "ipv4", "ipv6"
 
 # Detect Docker environment
 RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER") == "1"

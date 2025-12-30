@@ -6,7 +6,7 @@ import json
 import os
 from typing import List, Dict, Any
 
-from core.constants import DEFAULT_CONFIG_PATH, DEFAULT_BULK_IMPORT_FILE, DEFAULT_TV_LIBRARY, DEFAULT_MOVIE_LIBRARY
+from core.constants import DEFAULT_CONFIG_PATH, DEFAULT_BULK_IMPORT_FILE, DEFAULT_TV_LIBRARY, DEFAULT_MOVIE_LIBRARY, DEFAULT_IP_BINDING
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 from utils.notifications import debug_me
 
@@ -35,6 +35,7 @@ class Config:
         auth_enabled: Whether authentication is enabled for the web server
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
+        ip_binding: IP binding mode - "auto" (default), "ipv4", or "ipv6"
     """
 
     def __init__(self, config_path: str = DEFAULT_CONFIG_PATH) -> None:
@@ -59,6 +60,7 @@ class Config:
         self.auth_enabled: bool = False
         self.auth_username: str = ""
         self.auth_password_hash: str = ""
+        self.ip_binding: str = DEFAULT_IP_BINDING
 
     def load(self) -> None:
         """Load the configuration from the JSON file."""
@@ -95,6 +97,7 @@ class Config:
             self.auth_enabled = config.get("auth_enabled", False)
             self.auth_username = config.get("auth_username", "")
             self.auth_password_hash = config.get("auth_password_hash", "")
+            self.ip_binding = config.get("ip_binding", DEFAULT_IP_BINDING)
 
         except Exception as e:
             raise ConfigLoadError(f"Failed to load config from {self.path}: {str(e)}") from e
@@ -173,7 +176,8 @@ class Config:
             "schedules": self.schedules,
             "auth_enabled": self.auth_enabled,
             "auth_username": self.auth_username,
-            "auth_password_hash": self.auth_password_hash
+            "auth_password_hash": self.auth_password_hash,
+            "ip_binding": self.ip_binding
         }
 
         try:

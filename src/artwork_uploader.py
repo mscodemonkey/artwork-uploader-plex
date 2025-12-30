@@ -25,7 +25,6 @@ from core.constants import (
     GITHUB_REPO,
     DEFAULT_CONFIG_PATH,
     DEFAULT_WEB_PORT,
-    DEFAULT_WEB_HOST,
     SCHEDULER_CHECK_INTERVAL,
     UPDATE_CHECK_INTERVAL,
     MIN_PYTHON_MAJOR,
@@ -485,7 +484,7 @@ def setup_web_sockets():
     web_routes.setup_socket_handlers(config, filename_pattern)
 
     # Start the web server
-    web_routes.start_web_server(web_app, DEFAULT_WEB_HOST, DEFAULT_WEB_PORT, globals.debug)
+    web_routes.start_web_server(web_app, DEFAULT_WEB_PORT, globals.debug, config.ip_binding)
 
 
 def check_image_orientation(image_path):
