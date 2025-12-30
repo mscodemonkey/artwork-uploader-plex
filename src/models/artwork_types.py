@@ -38,11 +38,13 @@ class TVArtwork(TypedDict):
     title: str
     url: str
     season: Union[int, str]  # int for season number, or "Cover"/"Backdrop"
-    episode: Optional[Union[int, str]]  # int for episode number, "Cover", or None
+    # int for episode number, "Cover", or None
+    episode: Optional[Union[int, str]]
     year: Optional[int]
     source: str  # Should be ScraperSource value
     id: str
-    type: Optional[str]  # Should be FilterType value (optional, used by MediUX)
+    # Should be FilterType value (optional, used by MediUX)
+    type: Optional[str]
     author: Optional[str]  # Added by me
     tmdb_id: Optional[int]  # Added by me
 
@@ -85,4 +87,5 @@ TVArtworkList = list[TVArtwork]
 CollectionArtworkList = list[CollectionArtwork]
 
 # Union type for any artwork
-AnyArtwork = Union[MovieArtwork, TVArtwork, CollectionArtwork, UploadedFileArtwork]
+AnyArtwork = Union[MovieArtwork, TVArtwork,
+                   CollectionArtwork, UploadedFileArtwork]

@@ -1,36 +1,3 @@
-import eventlet
-
-eventlet.monkey_patch()
-
-import uuid
-import os
-import re
-import traceback
-
-from core import globals
-import threading
-import sys
-
-from models import arguments
-from models.instance import Instance
-from utils.notifications import update_log, update_status, notify_web, debug_me
-from core.config import Config
-from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException
-from scrapers.theposterdb_scraper import ThePosterDBScraper
-from utils.utils import is_not_comment, parse_url_and_options
-from models.options import Options
-from plex.plex_connector import PlexConnector
-from core.constants import (
-    CURRENT_VERSION,
-    GITHUB_REPO,
-    DEFAULT_CONFIG_PATH,
-    DEFAULT_WEB_PORT,
-    SCHEDULER_CHECK_INTERVAL,
-    UPDATE_CHECK_INTERVAL,
-    MIN_PYTHON_MAJOR,
-    MIN_PYTHON_MINOR
-)
-from core.enums import InstanceMode
 from services import (
     BulkFileService,
     ImageService,
@@ -40,6 +7,38 @@ from services import (
     UpdateService,
     UtilityService
 )
+from core.enums import InstanceMode
+from core.constants import (
+    CURRENT_VERSION,
+    GITHUB_REPO,
+    DEFAULT_BULK_IMPORT_FILE,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_WEB_PORT,
+    SCHEDULER_CHECK_INTERVAL,
+    UPDATE_CHECK_INTERVAL,
+    MIN_PYTHON_MAJOR,
+    MIN_PYTHON_MINOR, TPBD_USER_BASE_PATH
+)
+from plex.plex_connector import PlexConnector
+from models.options import Options
+from utils.utils import is_not_comment, parse_url_and_options
+from scrapers.theposterdb_scraper import ThePosterDBScraper
+from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException
+from core.config import Config
+from utils.notifications import update_log, update_status, notify_web, debug_me
+from models.instance import Instance
+from models import arguments
+import sys
+import threading
+from core import globals
+import traceback
+import re
+import os
+import uuid
+import eventlet
+
+eventlet.monkey_patch()
+
 
 # ----------------------------------------------
 # Important for autoupdater
@@ -55,7 +54,7 @@ try:
     from PIL import Image
     from flask import Flask, render_template
     from flask_socketio import SocketIO
-except (ModuleNotFoundError, ImportError) as e:
+except ImportError as e:
     print("=" * 70)
     print("ERROR: Required dependencies are missing or incompatible")
     print("=" * 70)
@@ -76,7 +75,8 @@ except (ModuleNotFoundError, ImportError) as e:
     sys.exit(1)
 
 # ! Interactive CLI mode flag
-interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
+# Set to False when building the executable with PyInstaller for it launches the web UI by default
+interactive_cli = False
 mode = InstanceMode.CLI.value
 scheduled_jobs = {}  # Legacy - kept for backwards compatibility
 scheduled_jobs_by_file = {}  # Legacy - kept for backwards compatibility
@@ -110,16 +110,18 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
             parsed_url = parse_url_and_options(line)
 
             # Parse according to whether it's a user portfolio or poster / set URL
-            if "/user/" in parsed_url.url:
+            if TPBD_USER_BASE_PATH in parsed_url.url:
                 try:
-                    scrape_tpdb_user(instance, parsed_url.url, parsed_url.options)
+                    scrape_tpdb_user(instance, parsed_url.url,
+                                     parsed_url.options)
                 except ScraperException as scraper_error:
                     print(str(scraper_error))
                 except Exception as unknown_error:
                     print(str(unknown_error))
             else:
                 try:
-                    scrape_and_upload(instance, parsed_url.url, parsed_url.options)
+                    scrape_and_upload(
+                        instance, parsed_url.url, parsed_url.options)
                 except Exception as e:
                     print(f"Error processing {parsed_url.url}: {str(e)}")
 
@@ -148,27 +150,32 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
     try:
         # Check if the Plex TV and movie libraries are configured
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
-            update_status(instance, "Plex setup incomplete. Please configure your settings.", color="warning")
+            update_status(
+                instance, "Plex setup incomplete. Please configure your settings.", color="warning")
             return
 
         # Process the URL and options passed from the GUI or website
         parsed_line = parse_url_and_options(url)
 
         # Update the UI before we start
-        update_status(instance, f"Scraping: {parsed_line.url}", color="info", sticky=True, spinner=True)
+        update_status(
+            instance, f"Scraping: {parsed_line.url}", color="info", sticky=True, spinner=True)
 
         # Scrape the URL indicated, with the required options
-        if "/user/" in parsed_line.url:
+        if TPBD_USER_BASE_PATH in parsed_line.url:
             scrape_tpdb_user(instance, parsed_line.url, parsed_line.options)
         else:
-            title = scrape_and_upload(instance, parsed_line.url, parsed_line.options)
+            title = scrape_and_upload(
+                instance, parsed_line.url, parsed_line.options)
 
         # And update the UI when we're done
-        update_status(instance, f"Processed all artwork at {parsed_line.url}", color="success")
+        update_status(
+            instance, f"Processed all artwork at {parsed_line.url}", color="success")
 
         # Update the web ui bulk list with this URL and artwork (only if it's not already in the bulk list)
         if instance.mode == "web" and parsed_line.options.add_to_bulk and title:
-            notify_web(instance, "add_to_bulk_list", {"url": url, "title": title})
+            notify_web(instance, "add_to_bulk_list",
+                       {"url": url, "title": title})
 
     except ScraperException as scraping_error:
         update_status(instance, f"{scraping_error}", color="danger")
@@ -195,7 +202,8 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list=None, filename
             parsed_urls.append(parsed_url)
 
     if not parsed_urls:
-        update_status(instance, "No bulk import entries found.", color="danger")
+        update_status(instance, "No bulk import entries found.",
+                      color="danger")
 
     if instance.mode == "web":
         notify_web(instance, "element_disable",
@@ -228,11 +236,12 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # Check if plex setup returned valid values
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
-            update_status(instance, "Plex setup incomplete. Please check the settings.", color="red")
+            update_status(
+                instance, "Plex setup incomplete. Please check the settings.", color="red")
             return
 
         # Log the start of the bulk import process
-        display_filename = filename if filename else "bulk_import.txt"
+        display_filename = filename if filename else DEFAULT_BULK_IMPORT_FILE
         update_log(instance, f"🎬 Bulk process started - {display_filename}")
 
         # Show the progress bar on the web UI
@@ -241,17 +250,20 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         # Loop through the bulk list
         for i, parsed_line in enumerate(parsed_urls):
 
-            notify_web(instance, "element_disable", {"element": ["bulk_button"], "mode": True})
+            notify_web(instance, "element_disable", {
+                       "element": ["bulk_button"], "mode": True})
 
             # Parse according to whether it's a user portfolio or poster / set URL
-            if "/user/" in parsed_line.url:
+            if TPBD_USER_BASE_PATH in parsed_line.url:
                 try:
-                    scrape_tpdb_user(instance, parsed_line.url, parsed_line.options, success_counter)
+                    scrape_tpdb_user(instance, parsed_line.url,
+                                     parsed_line.options, success_counter)
                 except Exception:
                     pass
             else:
                 try:
-                    scrape_and_upload(instance, parsed_line.url, parsed_line.options, success_counter)
+                    scrape_and_upload(instance, parsed_line.url,
+                                      parsed_line.options, success_counter)
                 except Exception:
                     pass
 
@@ -262,15 +274,18 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         # All done, update the UI
         notify_web(instance, "progress_bar",
                    {"message": f"{len(parsed_urls)} of {len(parsed_urls)} (100%)", "percent": 100})
-        update_status(instance, "Bulk import scraping completed.", color="success")
+        update_status(
+            instance, "Bulk import scraping completed.", color="success")
 
         # Log the completion of the bulk import process
         poster_count = success_counter[0]
-        update_log(instance, f"🏁 Bulk process completed - {display_filename} - {poster_count} assets updated")
+        update_log(
+            instance, f"🏁 Bulk process completed - {display_filename} - {poster_count} assets updated")
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", {"percent": 100})
-        update_status(instance, f"Error during bulk import: {bulk_import_exception}", color="danger")
+        update_status(
+            instance, f"Error during bulk import: {bulk_import_exception}", color="danger")
 
     finally:
         notify_web(instance, "element_disable",
@@ -348,7 +363,8 @@ def process_uploaded_artwork(instance: Instance, file_list, options, filters, pl
     def progress_callback(current: int, total: int):
         percent = (current / total * 100) if total > 0 else 0
         message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
-        notify_web(instance, "progress_bar", {"message": message, "percent": percent})
+        notify_web(instance, "progress_bar", {
+                   "message": message, "percent": percent})
 
     def debug_callback(message: str, context: str):
         debug_me(message, context)
@@ -369,7 +385,8 @@ def process_uploaded_artwork(instance: Instance, file_list, options, filters, pl
         opts = Options(filters=filters, temp=True if "temp" in options else False,
                        stage=True if "stage" in options else False, force=True if "force" in options else False)
     processor = ArtworkProcessor(globals.plex)
-    processor.process_uploaded_files(file_list, opts, callbacks, override_title=plex_title)
+    processor.process_uploaded_files(
+        file_list, opts, callbacks, override_title=plex_title)
 
 
 # * Bulk import file I/O functions ---
@@ -378,14 +395,15 @@ def load_bulk_import_file(instance: Instance, filename=None):
     try:
         # Get the current bulk_txt value from the config
         bulk_import_filename = filename if filename is not None else (
-            config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
+            config.bulk_txt if config and config.bulk_txt is not None else DEFAULT_BULK_IMPORT_FILE)
 
         # Check if file exists
         if not globals.bulk_file_service.file_exists(bulk_import_filename):
             if instance.mode == "cli":
                 print(f"File does not exist: {bulk_import_filename}")
             if instance.mode == "web":
-                update_status(instance, f"File does not exist: {bulk_import_filename}")
+                update_status(
+                    instance, f"File does not exist: {bulk_import_filename}")
             return
 
         # Read file using service
@@ -397,16 +415,20 @@ def load_bulk_import_file(instance: Instance, filename=None):
 
     except FileNotFoundError as e:
         debug_me(f"File not found: {str(e)}", "load_bulk_import_file")
-        notify_web(instance, "load_bulk_import", {"loaded": False, "error": f"File not found: {str(e)}"})
+        notify_web(instance, "load_bulk_import", {
+                   "loaded": False, "error": f"File not found: {str(e)}"})
     except Exception as e:
-        debug_me(f"Error loading bulk import: {str(e)}", "load_bulk_import_file")
+        debug_me(
+            f"Error loading bulk import: {str(e)}", "load_bulk_import_file")
         import traceback
         traceback.print_exc()
-        notify_web(instance, "load_bulk_import", {"loaded": False, "error": str(e)})
+        notify_web(instance, "load_bulk_import", {
+                   "loaded": False, "error": str(e)})
 
 
 def rename_bulk_import_file(instance: Instance, old_name, new_name):
-    debug_me(f"Renaming from {old_name} to {new_name}", "rename_bulk_import_file")
+    debug_me(f"Renaming from {old_name} to {new_name}",
+             "rename_bulk_import_file")
 
     if old_name != new_name:
         try:
@@ -415,7 +437,8 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
                        {"renamed": True, "old_filename": old_name, "new_filename": new_name})
             update_status(instance, f"Renamed to {new_name}", "success")
         except Exception:
-            notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
+            notify_web(instance, "rename_bulk_file", {
+                       "renamed": False, "old_filename": old_name})
             update_status(instance, f"Could not rename {old_name}", "warning")
 
 
@@ -423,10 +446,12 @@ def delete_bulk_import_file(instance: Instance, file_name):
     if file_name:
         try:
             globals.bulk_file_service.delete_file(file_name)
-            notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
+            notify_web(instance, "delete_bulk_file", {
+                       "deleted": True, "filename": file_name})
             update_status(instance, f"Deleted {file_name}", "success")
         except Exception:
-            notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
+            notify_web(instance, "delete_bulk_file", {
+                       "deleted": False, "filename": file_name})
             update_status(instance, f"Could not delete {file_name}", "warning")
 
 
@@ -435,33 +460,40 @@ def save_bulk_import_file(instance: Instance, contents=None, filename=None, now_
     if contents:
         try:
             bulk_import_filename = filename if filename is not None else (
-                config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
+                config.bulk_txt if config and config.bulk_txt is not None else DEFAULT_BULK_IMPORT_FILE)
 
             debug_me(f"Saving {bulk_import_filename}", "save_bulk_import_file")
 
-            globals.bulk_file_service.write_file(contents, bulk_import_filename)
+            globals.bulk_file_service.write_file(
+                contents, bulk_import_filename)
 
-            update_status(instance, message=f"Bulk import file {filename} saved", color="success")
-            notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
+            update_status(
+                instance, message=f"Bulk import file {filename} saved", color="success")
+            notify_web(instance, "save_bulk_import", {
+                       "saved": True, "now_load": now_load})
         except Exception:
-            update_status(instance, message="Error saving bulk import file", color="danger")
-            notify_web(instance, "save_bulk_import", {"saved": False, "now_load": now_load})
+            update_status(
+                instance, message="Error saving bulk import file", color="danger")
+            notify_web(instance, "save_bulk_import", {
+                       "saved": False, "now_load": now_load})
 
 
 def check_for_bulk_import_file(instance: Instance):
     """Check if any .txt files exist in the bulk_imports folder before creating bulk_import.txt."""
     try:
-        bulk_import_filename = config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt"
-        globals.bulk_file_service.ensure_default_file_exists(bulk_import_filename)
+        bulk_import_filename = config.bulk_txt if config and config.bulk_txt is not None else DEFAULT_BULK_IMPORT_FILE
+        globals.bulk_file_service.ensure_default_file_exists(
+            bulk_import_filename)
     except Exception:
-        update_status(instance, message="Error creating bulk import file", color="danger")
+        update_status(
+            instance, message="Error creating bulk import file", color="danger")
 
 
 def find_bulk_file(filename: str = None):
     """Find a bulk import file - returns full path if exists, None otherwise."""
     # Get the current bulk_txt value from the config
     bulk_import_filename = filename if filename is not None else (
-        config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
+        config.bulk_txt if config and config.bulk_txt is not None else DEFAULT_BULK_IMPORT_FILE)
 
     # Use the service to check if file exists
     if globals.bulk_file_service.file_exists(bulk_import_filename):
@@ -484,7 +516,8 @@ def setup_web_sockets():
     web_routes.setup_socket_handlers(config, filename_pattern)
 
     # Start the web server
-    web_routes.start_web_server(web_app, DEFAULT_WEB_PORT, globals.debug, config.ip_binding)
+    web_routes.start_web_server(
+        web_app, DEFAULT_WEB_PORT, globals.debug, config.ip_binding)
 
 
 def check_image_orientation(image_path):
@@ -513,7 +546,8 @@ def check_for_updates_periodically():
 
 def add_file_to_schedule_thread(instance: Instance, filename):
     if instance:
-        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
+        threading.Thread(target=process_bulk_file_on_schedule,
+                         args=(instance, filename,)).start()
 
 
 def process_bulk_file_on_schedule(instance: Instance, filename):
@@ -531,9 +565,11 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
             update_log(instance, f"Scheduled file does not exist: {filename}")
             return
     except FileNotFoundError:
-        update_log(instance, f"@ Scheduled import failed due to missing file ({filename})")
+        update_log(
+            instance, f"@ Scheduled import failed due to missing file ({filename})")
     except Exception as e:
-        update_log(instance, f"@ Scheduled import unexpectedly failed ({str(e)})")
+        update_log(
+            instance, f"@ Scheduled import unexpectedly failed ({str(e)})")
 
 
 # Legacy functions - now handled by SchedulerService
@@ -600,7 +636,8 @@ if __name__ == "__main__":
     scheduler_thread = None
 
     # Updated regex: "Movie Title (YYYY).png" OR "Movie Title.png"
-    filename_pattern = re.compile(r'^[^/]+(?:\.jpg|\.jpeg|\.png)$', re.IGNORECASE)
+    filename_pattern = re.compile(
+        r'^[^/]+(?:\.jpg|\.jpeg|\.png)$', re.IGNORECASE)
 
     # Process command line arguments
     args = arguments.parse_arguments()
@@ -627,7 +664,6 @@ if __name__ == "__main__":
     if not config_path:
         config_path = DEFAULT_CONFIG_PATH
 
-
     # Create config as a global object
     config = Config(config_path=config_path)
     globals.config = config  # Also store in globals for cross-module access
@@ -645,12 +681,15 @@ if __name__ == "__main__":
         print(f"[ERROR] ConfigLoadError: {str(e)}")
         print("[ERROR] Stack trace:")
         traceback.print_exc()
-        sys.exit("Can't load config.json file.  Please check that the file exists and is in the correct format.")
+        sys.exit(
+            "Can't load config.json file.  Please check that the file exists and is in the correct format.")
     except Exception as config_load_exception:
-        print(f"[ERROR] Unexpected error when loading config.json file: {str(config_load_exception)}")
+        print(
+            f"[ERROR] Unexpected error when loading config.json file: {str(config_load_exception)}")
         print("[ERROR] Stack trace:")
         traceback.print_exc()
-        sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
+        sys.exit(
+            f"Unexpected error when loading config.json file: {str(config_load_exception)}")
 
     # Create services
     # Initialize bulk file service with optional custom path from environment variable
@@ -659,7 +698,8 @@ if __name__ == "__main__":
         base_dir=get_exe_dir(),
         bulk_imports_dir=bulk_imports_dir
     )
-    globals.scheduler_service = SchedulerService(check_interval=SCHEDULER_CHECK_INTERVAL)
+    globals.scheduler_service = SchedulerService(
+        check_interval=SCHEDULER_CHECK_INTERVAL)
     globals.update_service = UpdateService(
         github_repo=GITHUB_REPO,
         current_version=current_version,
@@ -688,7 +728,8 @@ if __name__ == "__main__":
             print(f"{e}\n")
             print("Please check your config.json settings:")
             print(f"  - base_url: {config.base_url}")
-            print(f"  - token: {config.token[:10]}..." if config.token else "  - token: (not set)")
+            print(
+                f"  - token: {config.token[:10]}..." if config.token else "  - token: (not set)")
             print("\nEnsure your Plex server is running and accessible.")
             print("=" * 70)
             sys.exit(1)
@@ -713,11 +754,13 @@ if __name__ == "__main__":
             cli_options.clear_filters()
 
             # Process using the bulk filename if supplied, else the bulk file set in the config
-            default_bulk_file = globals.bulk_file_service.get_bulk_file_path(config.bulk_txt)
-            parse_bulk_file_from_cli(cli_instance, args.bulk_file if args.bulk_file else default_bulk_file)
+            default_bulk_file = globals.bulk_file_service.get_bulk_file_path(
+                config.bulk_txt)
+            parse_bulk_file_from_cli(
+                cli_instance, args.bulk_file if args.bulk_file else default_bulk_file)
 
         # Now we're looking at URLs - firstly one containing a TPDb user
-        elif "/user/" in cli_command:
+        elif TPBD_USER_BASE_PATH in cli_command:
 
             # Remove some of the command line options which aren't applicable to user scraping
             cli_options.year = None
@@ -749,7 +792,8 @@ if __name__ == "__main__":
                 print("WARNING: Could not connect to Plex TV libraries")
                 print("=" * 70)
                 print(f"{e}\n")
-                print("The web UI will still start, but you won't be able to upload artwork")
+                print(
+                    "The web UI will still start, but you won't be able to upload artwork")
                 print("until you fix the Plex connection in Settings.\n")
                 plex_connected = False
 
@@ -761,7 +805,8 @@ if __name__ == "__main__":
                     print("WARNING: Could not connect to Plex Movie libraries")
                     print("=" * 70)
                     print(f"{e}\n")
-                    print("The web UI will still start, but you won't be able to upload artwork")
+                    print(
+                        "The web UI will still start, but you won't be able to upload artwork")
                     print("until you fix the Plex connection in Settings.\n")
 
             # Create the app and web server
@@ -775,14 +820,16 @@ if __name__ == "__main__":
             web_app.config['SECRET_KEY'] = secrets.token_hex(32)
             web_app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
-            globals.web_socket = SocketIO(web_app, cors_allowed_origins="*", async_mode="eventlet")
-
+            globals.web_socket = SocketIO(
+                web_app, cors_allowed_origins="*", async_mode="eventlet")
 
             # Start update checker using UpdateService
-            def on_update_available(version: str):
-                debug_me(f"Update available. Latest version: {version}", "update_service")
-                notify_web(Instance(broadcast=True), "update_available", {"version": version})
 
+            def on_update_available(version: str):
+                debug_me(
+                    f"Update available. Latest version: {version}", "update_service")
+                notify_web(Instance(broadcast=True),
+                           "update_available", {"version": version})
 
             globals.update_service.start_periodic_check(on_update_available)
 

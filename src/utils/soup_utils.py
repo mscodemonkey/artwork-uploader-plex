@@ -20,12 +20,14 @@ def cook_soup(url):
         try:
             response = requests.get(url, headers=headers, timeout=5)
         except requests.exceptions.ConnectTimeout as e:
-            raise ScraperException(f"Connection timed out: timeout=5 seconds for URL: {url}") from e
+            raise ScraperException(
+                f"Connection timed out: timeout=5 seconds for URL: {url}") from e
         if response.status_code == 200 or (response.status_code == 500 and "mediux.pro" in url):
             soup = BeautifulSoup(response.text, 'html.parser')
             return soup
         else:
-            raise ScraperException(f"Failed to retrieve the page. Status code: {response.status_code}")
+            raise ScraperException(
+                f"Failed to retrieve the page. Status code: {response.status_code}")
     elif ".html" in url:
         with open(url, 'r', encoding='utf-8') as file:
             html_content = file.read()

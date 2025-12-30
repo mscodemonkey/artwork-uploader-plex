@@ -51,7 +51,6 @@ class Scraper:
         self.options = options
 
     def scrape(self) -> None:
-
         """
         Runs the correct scraper based on the source of the URL (as set in the __init__ function)
 
@@ -67,7 +66,8 @@ class Scraper:
             elif self.source == "html":
                 return self.scrape_html()
             else:
-                raise ScraperException(f"Invalid source provided ({self.source if self.source else 'empty source'})")
+                raise ScraperException(
+                    f"Invalid source provided ({self.source if self.source else 'empty source'})")
         except Exception:
             raise
 
@@ -89,7 +89,6 @@ class Scraper:
             raise Exception(f"Unexpected error: {e}")
 
     def scrape_mediux(self) -> None:
-
         """
         Scrape mediux.pro - this could be anything from a backdrop, posters or episode cards
 
@@ -117,7 +116,6 @@ class Scraper:
             raise Exception(f"Unexpected error: {e}")
 
     def scrape_html(self) -> None:
-
         """
         Scrapes a local HTML file.  Not sure what this option is actually used for!
 

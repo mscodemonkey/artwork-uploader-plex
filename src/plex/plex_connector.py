@@ -106,7 +106,8 @@ class PlexConnector:
             except Exception as e:
                 # Handle any other unexpected errors
                 self.plex = None
-                raise PlexConnectorException(f"Unexpected error: {str(e)}", f"Unexpected error: {str(e)}")
+                raise PlexConnectorException(
+                    f"Unexpected error: {str(e)}", f"Unexpected error: {str(e)}")
 
     def set_tv_libraries(self, tv_libraries: Union[str, List[str]]) -> List[ShowSection]:
 
@@ -116,7 +117,8 @@ class PlexConnector:
         if isinstance(tv_libraries, str):
             tv_libraries = [tv_libraries]
         elif not isinstance(tv_libraries, list):
-            raise PlexConnectorException("tv_libraries must be either a string or a list")
+            raise PlexConnectorException(
+                "tv_libraries must be either a string or a list")
 
         self.tv_libraries = []
         for tv_library in tv_libraries:
@@ -139,7 +141,8 @@ class PlexConnector:
         if isinstance(movie_libraries, str):
             movie_libraries = [movie_libraries]
         elif not isinstance(movie_libraries, list):
-            raise PlexConnectorException("movie_libraries must be either a string or a list")
+            raise PlexConnectorException(
+                "movie_libraries must be either a string or a list")
 
         self.movie_libraries = []
         for movie_library in movie_libraries:
@@ -174,7 +177,8 @@ class PlexConnector:
                         libraries.append(movie_library.title)
             except Exception as e:
                 # Continue checking other libraries if one fails
-                debug_me(f"Error searching collection in library: {e}", "PlexConnector/find_collection")
+                debug_me(
+                    f"Error searching collection in library: {e}", "PlexConnector/find_collection")
                 pass
 
         if collections:
@@ -184,7 +188,7 @@ class PlexConnector:
 
     # Find a specific movie or TV show in the given library
     def find_in_library(self, item_type: str, artwork: AnyArtwork) -> Tuple[
-        Optional[List[Union[Movie, Show]]], Optional[List[str]]]:
+            Optional[List[Union[Movie, Show]]], Optional[List[str]]]:
         """
         Finds a specific movie or TV show in the appropriate library based on the provided artwork information.
 
@@ -206,7 +210,8 @@ class PlexConnector:
         libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
         for i, library in enumerate(libraries):
             try:
-                library_item = library.getGuid(f"tmdb://{artwork.get('tmdb_id')}")
+                library_item = library.getGuid(
+                    f"tmdb://{artwork.get('tmdb_id')}")
                 library_name = library.title
                 debug_me(
                     f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'",
@@ -226,7 +231,7 @@ class PlexConnector:
         return None, None
 
     def movie_or_show(self, title: str, year: Optional[int] = None) -> Tuple[
-        Optional[str], Optional[int], Optional[str], Optional[int]]:
+            Optional[str], Optional[int], Optional[str], Optional[int]]:
         """
         Looks up a title in the Plex libraries.
 
@@ -247,8 +252,8 @@ class PlexConnector:
 
         # First check movie libraries
         libraries_with_type = (
-                [(lib, "Movie") for lib in self.movie_libraries] +
-                [(lib, "TV Show") for lib in self.tv_libraries]
+            [(lib, "Movie") for lib in self.movie_libraries] +
+            [(lib, "TV Show") for lib in self.tv_libraries]
         )
         for library, media_type in libraries_with_type:
             try:
@@ -276,8 +281,10 @@ class PlexConnector:
                                  "PlexConnector/movie_or_show")
                     return media_type, tmdb_id, found_title, found_year
             except Exception as e:
-                debug_me(f"Error searching for movie in library '{library.title}': {e}", "PlexConnector/movie_or_show")
+                debug_me(
+                    f"Error searching for movie in library '{library.title}': {e}", "PlexConnector/movie_or_show")
                 pass
 
-        debug_me(f"'{title} ({year})' not found in any library", "PlexConnector/movie_or_show")
+        debug_me(f"'{title} ({year})' not found in any library",
+                 "PlexConnector/movie_or_show")
         return None, None, None, None

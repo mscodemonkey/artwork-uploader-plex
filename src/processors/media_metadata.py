@@ -1,3 +1,4 @@
+import re
 from core.constants import (
     SEASON_COVER, SEASON_BACKDROP, SEASON_SPECIALS,
     MEDIA_TYPE_TV_SHOW, MEDIA_TYPE_COLLECTION,
@@ -41,9 +42,6 @@ def parse_movie(movie_title):
         return None, None
 
 
-import re
-
-
 def parse_title(title: str):
     # Strip any trailing spaces before the extension
     title = re.sub(r"\s+\.", ".", title).strip()
@@ -57,7 +55,8 @@ def parse_title(title: str):
 
     movie_or_show_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)"
     background_pattern = rf"^(?P<title>.+)\s\((?P<year>\d{4})\)\s-\s{SEASON_BACKDROP}"
-    collection_pattern = r"^(?!.*\(\d{4}\))(?P<title>.+)$"  # Some collection poster files don't have the word "Collection" in them
+    # Some collection poster files don't have the word "Collection" in them
+    collection_pattern = r"^(?!.*\(\d{4}\))(?P<title>.+)$"
 
     episode_match = re.match(episode_pattern, title, re.IGNORECASE)
     if episode_match:
@@ -103,7 +102,8 @@ def parse_title(title: str):
             "author": None
         }
         debug_me(
-            f"Matched '{title}' as TV Show {"Title Card" if episode is not None else "Season Cover"} for '{artwork['title']}{f" ({artwork['year']})" if artwork['year'] else ''}', Season {artwork['season']}{f", Episode {artwork['episode']}" if artwork['episode'] is not None else ''}",
+            f"Matched '{title}' as TV Show {"Title Card" if episode is not None else "Season Cover"} for '{artwork['title']}{f" ({artwork['year']})" if artwork['year'] else ''}', Season {
+                artwork['season']}{f", Episode {artwork['episode']}" if artwork['episode'] is not None else ''}",
             "media_metadata/parse_title")
         return artwork
 
@@ -150,7 +150,8 @@ def parse_title(title: str):
             "type": "collection poster",
             "author": None
         }
-        debug_me(f"Matched '{title}' as Collection poster for '{artwork['title']}'", "media_metadata/parse_title")
+        debug_me(
+            f"Matched '{title}' as Collection poster for '{artwork['title']}'", "media_metadata/parse_title")
         return artwork
 
     return {"media": "Unknown", "message": "The title format is unrecognized."}

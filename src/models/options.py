@@ -113,7 +113,8 @@ class Options:
         # Validate year
         if self.year is not None:
             if not isinstance(self.year, int):
-                raise TypeError(f"Year must be an integer, got {type(self.year).__name__}")
+                raise TypeError(
+                    f"Year must be an integer, got {type(self.year).__name__}")
             if not (1900 <= self.year <= 2100):
                 raise ValueError(
                     f"Year must be between 1900-2100, got {self.year}"

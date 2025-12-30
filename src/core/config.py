@@ -69,12 +69,13 @@ class Config:
 
         # If a config file doesn't exist, create one with default values
         if not os.path.isfile(self.path):
-            print(f"[DEBUG Config.load] Config file does not exist, calling create()")
+            print("[DEBUG Config.load] Config file does not exist, calling create()")
             self.create()
-            print(f"[DEBUG Config.load] After create(), file exists: {os.path.isfile(self.path)}")
+            print(
+                f"[DEBUG Config.load] After create(), file exists: {os.path.isfile(self.path)}")
 
         # Load the configuration from the config.json file
-        print(f"[DEBUG Config.load] Attempting to open config file for reading")
+        print(f"[DEBUG Config.load] Attempting to open config file for reading: {self.path}")
         try:
             with open(self.path, "r", encoding="utf-8") as config_file:
                 config = json.load(config_file)
@@ -91,7 +92,8 @@ class Config:
             self.stage_assets = config.get("stage_assets", True)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
-            self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
+            self.auto_manage_bulk_files = config.get(
+                "auto_manage_bulk_files", True)
             self.reset_overlay = config.get("reset_overlay", False)
             self.schedules = config.get("schedules", [])
             self.auth_enabled = config.get("auth_enabled", False)
@@ -100,14 +102,18 @@ class Config:
             self.ip_binding = config.get("ip_binding", DEFAULT_IP_BINDING)
 
         except Exception as e:
-            raise ConfigLoadError(f"Failed to load config from {self.path}: {str(e)}") from e
+            raise ConfigLoadError(
+                f"Failed to load config from {self.path}: {str(e)}") from e
 
     def create(self) -> None:
         """Create a new configuration file with default values."""
         print(f"[DEBUG Config.create] Creating config at: {self.path}")
-        print(f"[DEBUG Config.create] Path is absolute: {os.path.isabs(self.path)}")
-        print(f"[DEBUG Config.create] Parent directory: {os.path.dirname(self.path)}")
-        print(f"[DEBUG Config.create] Parent dir exists: {os.path.isdir(os.path.dirname(self.path)) if os.path.dirname(self.path) else 'N/A (current dir)'}")
+        print(
+            f"[DEBUG Config.create] Path is absolute: {os.path.isabs(self.path)}")
+        print(
+            f"[DEBUG Config.create] Parent directory: {os.path.dirname(self.path)}")
+        print(
+            f"[DEBUG Config.create] Parent dir exists: {os.path.isdir(os.path.dirname(self.path)) if os.path.dirname(self.path) else 'N/A (current dir)'}")
 
         config_json = {
             "base_url": "",
@@ -131,26 +137,31 @@ class Config:
 
         # Create the config.json file if it doesn't exist
         if not os.path.isfile(self.path):
-            print(f"[DEBUG Config.create] File does not exist, attempting to create")
+            print("[DEBUG Config.create] File does not exist, attempting to create")
             try:
                 # Ensure parent directory exists
                 parent_dir = os.path.dirname(self.path)
                 if parent_dir and not os.path.isdir(parent_dir):
-                    print(f"[DEBUG Config.create] Creating parent directory: {parent_dir}")
+                    print(
+                        f"[DEBUG Config.create] Creating parent directory: {parent_dir}")
                     os.makedirs(parent_dir, exist_ok=True)
 
-                print(f"[DEBUG Config.create] Opening file for writing: {self.path}")
+                print(
+                    f"[DEBUG Config.create] Opening file for writing: {self.path}")
                 with open(self.path, "w", encoding="utf-8") as config_file:
                     json.dump(config_json, config_file, indent=4)
-                print(f"[DEBUG Config.create] File written successfully")
-                debug_me(f"Config file '{self.path}' created with default settings.", "Config/create")
+                print("[DEBUG Config.create] File written successfully")
+                debug_me(
+                    f"Config file '{self.path}' created with default settings.", "Config/create")
             except Exception as e:
-                print(f"[ERROR Config.create] Exception: {type(e).__name__}: {str(e)}")
+                print(
+                    f"[ERROR Config.create] Exception: {type(e).__name__}: {str(e)}")
                 import traceback
                 traceback.print_exc()
-                raise ConfigCreationError(f"Failed to create config file at {self.path}: {str(e)}") from e
+                raise ConfigCreationError(
+                    f"Failed to create config file at {self.path}: {str(e)}") from e
         else:
-            print(f"[DEBUG Config.create] File already exists, skipping creation")
+            print("[DEBUG Config.create] File already exists, skipping creation")
 
     def save(self) -> None:
         """Save the current configuration to the file."""
@@ -184,4 +195,5 @@ class Config:
             with open(self.path, "w", encoding="utf-8") as config_file:
                 json.dump(config_json, config_file, indent=4)
         except Exception as e:
-            raise ConfigSaveError(f"Failed to save config to {self.path}: {str(e)}") from e
+            raise ConfigSaveError(
+                f"Failed to save config to {self.path}: {str(e)}") from e

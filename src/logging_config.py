@@ -107,4 +107,5 @@ def log_warning(message: str, module: str = "app") -> None:
 
 def log_error(message: str, module: str = "app", exc_info: bool = False) -> None:
     """Quick error logging without needing a logger instance."""
-    logging.getLogger(f'artwork_uploader.{module}').error(message, exc_info=exc_info)
+    logging.getLogger(f'artwork_uploader.{module}').error(
+        message, exc_info=exc_info)

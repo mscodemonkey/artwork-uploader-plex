@@ -10,7 +10,8 @@ def update_status(instance: Instance, message, color="primary", sticky=False, sp
     """Update the status label with a message and color."""
 
     if (instance.mode == "cli" and cli) or globals.debug:
-        print(f"{bootstrap_colors.get(color, {}).get('ansi', None)}{message}\033[0m")
+        print(
+            f"{bootstrap_colors.get(color, {}).get('ansi', None)}{message}\033[0m")
     if instance.mode == "web":
         notify_web(instance, "status_update",
                    {"message": message, "color": color, "sticky": sticky, "spinner": spinner,
@@ -20,7 +21,8 @@ def update_status(instance: Instance, message, color="primary", sticky=False, sp
 def debug_me(message: str, title: str = None):
     if globals.debug:
         if title:
-            print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{title}] {ANSI_RESET}{message}")
+            print(
+                f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{title}] {ANSI_RESET}{message}")
         else:
             print(f"{ANSI_RESET}{message}")
 
@@ -39,7 +41,8 @@ def update_log(instance: Instance, update_text: str, artwork_title: str = None, 
         if instance.mode == "cli" or force_print or globals.debug:
             print(update_text)
         if instance.mode == "web":
-            notify_web(instance, "log_update", {"message": update_text, "artwork_title": artwork_title})
+            notify_web(instance, "log_update", {
+                       "message": update_text, "artwork_title": artwork_title})
     except Exception as e:
         # Fail silently for logging errors to avoid cascading failures
         if globals.debug:
@@ -48,7 +51,8 @@ def update_log(instance: Instance, update_text: str, artwork_title: str = None, 
 
 def notify_web(instance: Instance, event, data_to_include=None):
     if instance.mode == "web":
-        instance_data = {"instance_id": instance.id, "broadcast": instance.broadcast}
+        instance_data = {"instance_id": instance.id,
+                         "broadcast": instance.broadcast}
         merged_arguments = data_to_include | instance_data
         debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}",
                  "notify_web")

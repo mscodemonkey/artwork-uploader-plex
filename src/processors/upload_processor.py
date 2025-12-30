@@ -30,7 +30,8 @@ class UploadProcessor:
         self.config.load()
         self.docker: bool = os.getenv("RUNNING_IN_DOCKER") == "1"
         self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
-        self.staging: bool = self.kometa and (globals.config.stage_assets or self.options.stage)
+        self.staging: bool = self.kometa and (
+            globals.config.stage_assets or self.options.stage)
 
     def set_options(self, options: Options) -> None:
         self.options = options
@@ -41,16 +42,18 @@ class UploadProcessor:
 
     def process_collection_artwork(self, artwork: CollectionArtwork) -> list[Any]:
 
-        collection_items, libraries = self.plex.find_collection(artwork["title"])
+        collection_items, libraries = self.plex.find_collection(
+            artwork["title"])
 
         if not collection_items:
-            collection_items, libraries = self.plex.find_collection(artwork["title"].replace(" Collection", ""))
+            collection_items, libraries = self.plex.find_collection(
+                artwork["title"].replace(" Collection", ""))
 
         results = []
         artwork_source = artwork["source"]
         description = f"{artwork["title"]} : {artwork["author"]}"
         filter_type = FilterType.COLLECTION_POSTER.value if artwork[
-                                                                "type"] == "collection poster" else FilterType.BACKGROUND.value
+            "type"] == "collection poster" else FilterType.BACKGROUND.value
         artwork_type = "Poster" if artwork["type"] == "collection poster" else "Background"
         artwork_id = artwork_type[0]
 
@@ -68,7 +71,8 @@ class UploadProcessor:
                             saver.set_artwork(artwork)
                             base_dir = ("/temp" if self.options.temp else "/assets") if self.docker else getattr(
                                 globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
-                            saver.dest_dir = os.path.join(base_dir, library, asset_folder)
+                            saver.dest_dir = os.path.join(
+                                base_dir, library, asset_folder)
                             debug_me(f"Destination directory is {saver.dest_dir}",
                                      "UploadProcessor/process_collection_artwork")
                             saver.dest_file_name = artwork_type.lower()
@@ -78,7 +82,8 @@ class UploadProcessor:
                             result = saver.save_to_kometa()
                             results.append(result)
                         else:
-                            uploader = PlexUploader(collection_item, artwork_type, artwork_id)
+                            uploader = PlexUploader(
+                                collection_item, artwork_type, artwork_id)
                             uploader.set_artwork(artwork)
                             uploader.track_artwork_ids = self.config.track_artwork_ids
                             uploader.reset_overlay = self.config.reset_overlay
@@ -93,7 +98,8 @@ class UploadProcessor:
                     raise NotProcessedByFilter(
                         f"{description} | {artwork_type} not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
         else:
-            raise CollectionNotFound(f'{description} | Collection not available on Plex')
+            raise CollectionNotFound(
+                f'{description} | Collection not available on Plex')
         return results
 
     def process_movie_artwork(self, artwork: MovieArtwork) -> list[Any]:
@@ -105,17 +111,21 @@ class UploadProcessor:
                 "id") != "Upload":
             poster_id = artwork.get("id", None)
             poster_page_url = f"{TPDB_BASE_URL}/poster/{poster_id}"
-            debug_me(f"Fetching TMDb ID from '{poster_page_url}'", "UploadProcessor/process_movie_artwork")
+            debug_me(
+                f"Fetching TMDb ID from '{poster_page_url}'", "UploadProcessor/process_movie_artwork")
             poster_page_soup = soup_utils.cook_soup(poster_page_url)
-            artwork["tmdb_id"] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
+            artwork["tmdb_id"] = int(poster_page_soup.find(
+                'div', {"data-media-id": True})['data-media-id'])
 
         movie_items, libraries = self.plex.find_in_library("movie", artwork)
 
         results = []
         artwork_source = artwork["source"]
         description = f"{artwork['title']} ({artwork['year']}) : {artwork['author']}"
-        filter_type = FilterType.MOVIE_POSTER.value if artwork.get("type") == "poster" else FilterType.BACKGROUND.value
-        artwork_type = "Poster" if artwork.get("type") == "poster" else "Background"
+        filter_type = FilterType.MOVIE_POSTER.value if artwork.get(
+            "type") == "poster" else FilterType.BACKGROUND.value
+        artwork_type = "Poster" if artwork.get(
+            "type") == "poster" else "Background"
         artwork_id = artwork_type[0]
 
         if movie_items:
@@ -137,7 +147,8 @@ class UploadProcessor:
                             saver.set_artwork(artwork)
                             base_dir = ("/temp" if self.options.temp else "/assets") if self.docker else getattr(
                                 globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
-                            saver.dest_dir = os.path.join(base_dir, library, asset_folder)
+                            saver.dest_dir = os.path.join(
+                                base_dir, library, asset_folder)
                             debug_me(f"Destination directory is {saver.dest_dir}",
                                      "UploadProcessor/process_movie_artwork")
                             saver.dest_file_name = artwork_type.lower()
@@ -147,7 +158,8 @@ class UploadProcessor:
                             result = saver.save_to_kometa()
                             results.append(result)
                         else:
-                            uploader = PlexUploader(movie_item, artwork_type, artwork_id)
+                            uploader = PlexUploader(
+                                movie_item, artwork_type, artwork_id)
                             uploader.set_artwork(artwork)
                             uploader.track_artwork_ids = self.config.track_artwork_ids
                             uploader.reset_overlay = self.config.reset_overlay
@@ -156,7 +168,8 @@ class UploadProcessor:
                             result = uploader.upload_to_plex()
                             results.append(result)
                     else:
-                        raise NotProcessedByExclusion(f"{desc} | {artwork_type} Poster excluded")
+                        raise NotProcessedByExclusion(
+                            f"{desc} | {artwork_type} Poster excluded")
                 else:
                     raise NotProcessedByFilter(
                         f"{desc} | {artwork_type} filtered by {'request' if not self.options.has_filter(filter_type) else artwork_source}")
@@ -194,9 +207,11 @@ class UploadProcessor:
                 "id") != "Upload":
             poster_id = artwork.get("id", None)
             poster_page_url = f"{TPDB_BASE_URL}/poster/{poster_id}"
-            debug_me(f"Fetching TMDb ID from {poster_page_url}", "UploadProcessor/process_movie_artwork")
+            debug_me(
+                f"Fetching TMDb ID from {poster_page_url}", "UploadProcessor/process_movie_artwork")
             poster_page_soup = soup_utils.cook_soup(poster_page_url)
-            artwork["tmdb_id"] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
+            artwork["tmdb_id"] = int(poster_page_soup.find(
+                'div', {"data-media-id": True})['data-media-id'])
 
         tv_show_items, libraries = self.plex.find_in_library("tv", artwork)
 
@@ -206,9 +221,10 @@ class UploadProcessor:
             for tv_show, library in zip(tv_show_items, libraries):
                 # Use the actual TV show title from Plex in case it differs from the artwork title (if it's a foreign title, etc.)
                 desc = description.replace(artwork["title"], tv_show.title.split(' (')[0]) if tv_show.title.split(' (')[
-                                                                                                  0] != artwork[
-                                                                                                  "title"] else description
-                item_path = tv_show.seasons()[0].episodes()[0].media[0].parts[0].file
+                    0] != artwork[
+                    "title"] else description
+                item_path = tv_show.seasons()[0].episodes()[
+                    0].media[0].parts[0].file
                 path_parts = get_path_parts(item_path)
                 asset_folder = path_parts[-3] if path_parts[-2].lower().startswith("season") or path_parts[
                     -2].lower().startswith("specials") else path_parts[-2]
@@ -232,7 +248,8 @@ class UploadProcessor:
                                 debug_me(f"Staging is {'enabled' if self.staging else 'disabled'}.",
                                          "UploadProcessor/process_tv_artwork")
                                 if not self.kometa:
-                                    upload_target = tv_show.season(artwork["season"])
+                                    upload_target = tv_show.season(
+                                        artwork["season"])
                                 artwork_id = "S"
                                 artwork_type = "Season cover"
                                 file_name = f"Season{artwork["season"]:02}"
@@ -248,7 +265,8 @@ class UploadProcessor:
                                         artwork["episode"] in [E.index for E in tv_show.season(
                                         artwork["season"]).episodes()])) or self.staging:
                                     if not self.kometa:
-                                        upload_target = tv_show.season(artwork["season"]).episode(artwork["episode"])
+                                        upload_target = tv_show.season(
+                                            artwork["season"]).episode(artwork["episode"])
                                     artwork_id = "E"
                                     artwork_type = "Title card"
                                     file_name = f"S{artwork["season"]:02}E{artwork["episode"]:02}"
@@ -263,7 +281,8 @@ class UploadProcessor:
                                 continue
 
                 except (AttributeError, KeyError, NotFound) as e:
-                    raise ShowNotFound(f"{desc} | Not available on Plex in {library}: {e}") from e
+                    raise ShowNotFound(
+                        f"{desc} | Not available on Plex in {library}: {e}") from e
 
                 try:
                     if upload_target or (self.options.kometa or globals.config.save_to_kometa):
@@ -271,8 +290,10 @@ class UploadProcessor:
                                                                                         artwork_source)) or self.options.has_filter(
                                 filter_type):
                             # Pass season/episode info for TV show exclusion checks
-                            season_num = artwork['season'] if isinstance(artwork['season'], int) else None
-                            episode_num = artwork['episode'] if isinstance(artwork['episode'], int) else None
+                            season_num = artwork['season'] if isinstance(
+                                artwork['season'], int) else None
+                            episode_num = artwork['episode'] if isinstance(
+                                artwork['episode'], int) else None
                             if not self.options.is_excluded(artwork["id"], season_num, episode_num):
                                 if self.kometa:
                                     saver = KometaSaver(artwork_type, library)
@@ -280,7 +301,8 @@ class UploadProcessor:
                                     base_dir = (
                                         "/temp" if self.options.temp else "/assets") if self.docker else getattr(
                                         globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
-                                    saver.dest_dir = os.path.join(base_dir, library, asset_folder)
+                                    saver.dest_dir = os.path.join(
+                                        base_dir, library, asset_folder)
                                     debug_me(f"Destination directory is {saver.dest_dir}",
                                              "UploadProcessor/process_tv_artwork")
                                     saver.dest_file_name = file_name
@@ -290,7 +312,8 @@ class UploadProcessor:
                                     result = saver.save_to_kometa()
                                     results.append(result)
                                 else:
-                                    uploader = PlexUploader(upload_target, artwork_type, artwork_id)
+                                    uploader = PlexUploader(
+                                        upload_target, artwork_type, artwork_id)
                                     uploader.set_artwork(artwork)
                                     uploader.track_artwork_ids = self.config.track_artwork_ids
                                     uploader.reset_overlay = self.config.reset_overlay
@@ -299,7 +322,8 @@ class UploadProcessor:
                                     result = uploader.upload_to_plex()
                                     results.append(result)
                             else:
-                                raise NotProcessedByExclusion(f"{desc} | {artwork_type} excluded")
+                                raise NotProcessedByExclusion(
+                                    f"{desc} | {artwork_type} excluded")
                         else:
                             raise NotProcessedByFilter(
                                 f"{desc} | {artwork_type} not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")

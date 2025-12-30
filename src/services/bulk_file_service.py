@@ -26,7 +26,8 @@ class BulkFileService:
 
         # Priority: explicit arg > env var > default constant
         if bulk_imports_dir is None:
-            bulk_imports_dir = os.getenv("BULK_IMPORTS_DIR", DEFAULT_BULK_IMPORTS_DIR)
+            bulk_imports_dir = os.getenv(
+                "BULK_IMPORTS_DIR", DEFAULT_BULK_IMPORTS_DIR)
 
         # If absolute path, don't join with base_dir
         if os.path.isabs(bulk_imports_dir):

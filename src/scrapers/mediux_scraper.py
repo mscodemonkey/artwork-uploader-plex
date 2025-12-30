@@ -40,7 +40,8 @@ class MediuxScraper:
         try:
             self.soup = soup_utils.cook_soup(self.url)
         except Exception as e:
-            raise ScraperException(f"Can't scrape from MediUX: {str(e)}") from e
+            raise ScraperException(
+                f"Can't scrape from MediUX: {str(e)}") from e
 
         scripts = self.soup.find_all('script')
 
@@ -92,7 +93,8 @@ class MediuxScraper:
                             break
 
             if not data_dict:
-                raise ScraperException("No poster data found in MediUX set or boxset.")
+                raise ScraperException(
+                    "No poster data found in MediUX set or boxset.")
 
             if globals.debug:
                 if self.collection_artwork:
@@ -102,7 +104,8 @@ class MediuxScraper:
                     print(
                         f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.collection_artwork)
-                    print(f"*************************************************************{ANSI_RESET}")
+                    print(
+                        f"*************************************************************{ANSI_RESET}")
                 if self.movie_artwork:
                     debug_me(
                         f"Found {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):",
@@ -110,16 +113,19 @@ class MediuxScraper:
                     print(
                         f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.movie_artwork)
-                    print(f"*************************************************************{ANSI_RESET}")
+                    print(
+                        f"*************************************************************{ANSI_RESET}")
                 if self.tv_artwork:
-                    debug_me(f"Skipped {self.exclusions} assets(s) based on exclusions.", "MediuxScraper/scrape")
+                    debug_me(
+                        f"Skipped {self.exclusions} assets(s) based on exclusions.", "MediuxScraper/scrape")
                     debug_me(
                         f"Found {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):",
                         "MediuxScraper/scrape")
                     print(
                         f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.tv_artwork)
-                    print(f"*************************************************************{ANSI_RESET}")
+                    print(
+                        f"*************************************************************{ANSI_RESET}")
 
             # Return the number of excluded assets
             return self.exclusions
@@ -127,7 +133,8 @@ class MediuxScraper:
         except ScraperException:
             raise
         except Exception as e:
-            raise ScraperException(f"Can't scrape from MediUX: {str(e)}") from e
+            raise ScraperException(
+                f"Can't scrape from MediUX: {str(e)}") from e
 
     @staticmethod
     def _fetch_full_set_data(set_id: str) -> Optional[dict]:
@@ -143,7 +150,8 @@ class MediuxScraper:
         """
         try:
             set_url = f"{MEDIUX_BASE_URL}/sets/{set_id}"
-            debug_me(f"Fetching full set data from {set_url}", "MediuxScraper/_fetch_full_set_data")
+            debug_me(
+                f"Fetching full set data from {set_url}", "MediuxScraper/_fetch_full_set_data")
 
             set_soup = soup_utils.cook_soup(set_url)
             scripts = set_soup.find_all('script')
@@ -156,7 +164,8 @@ class MediuxScraper:
 
             return None
         except Exception as e:
-            debug_me(f"Failed to fetch set {set_id}: {str(e)}", "MediuxScraper/_fetch_full_set_data")
+            debug_me(
+                f"Failed to fetch set {set_id}: {str(e)}", "MediuxScraper/_fetch_full_set_data")
             return None
 
     def _process_set(self, set_data: dict, full_set_cache: Optional[dict] = None) -> None:
@@ -207,7 +216,8 @@ class MediuxScraper:
                     if set_id in full_set_cache:
                         full_set = full_set_cache[set_id]
                         try:
-                            year = int(full_set.get("show", {}).get("first_air_date", "")[:4])
+                            year = int(full_set.get("show", {}).get(
+                                "first_air_date", "")[:4])
                         except (KeyError, ValueError, TypeError, IndexError):
                             pass
 
@@ -221,7 +231,8 @@ class MediuxScraper:
                         if set_id in full_set_cache:
                             full_set = full_set_cache[set_id]
                             # Find the matching file by ID in the full set data
-                            matching_file = next((f for f in full_set.get("files", []) if f.get("id") == file_id), None)
+                            matching_file = next((f for f in full_set.get(
+                                "files", []) if f.get("id") == file_id), None)
 
                             if matching_file and "title" in matching_file:
                                 # Use the full metadata from the cached set
@@ -230,7 +241,8 @@ class MediuxScraper:
                                 try:
                                     episode = int(title.rsplit(" E", 1)[1])
                                 except (IndexError, ValueError):
-                                    debug_me(f"Error getting episode number for {title}.", "MediuxScraper/_process_set")
+                                    debug_me(
+                                        f"Error getting episode number for {title}.", "MediuxScraper/_process_set")
                                     episode = None
                                 file_type = FileType.TITLE_CARD.value
                             else:
@@ -250,7 +262,8 @@ class MediuxScraper:
                                 episode = None
                                 file_type = FileType.TITLE_CARD.value
                             else:
-                                debug_me(f"Skipping title card - set not in cache", "MediuxScraper/_process_set")
+                                debug_me(
+                                    f"Skipping title card - set not in cache", "MediuxScraper/_process_set")
                                 continue
 
                     # Regular sets have full episode metadata with title
@@ -261,13 +274,15 @@ class MediuxScraper:
                         try:
                             episode = int(title.rsplit(" E", 1)[1])
                         except (IndexError, ValueError):
-                            debug_me(f"Error getting episode number for {title}.", "MediuxScraper/_process_set")
+                            debug_me(
+                                f"Error getting episode number for {title}.", "MediuxScraper/_process_set")
                             episode = None
                         file_type = FileType.TITLE_CARD.value
 
                     else:
                         # No usable metadata, skip
-                        debug_me(f"Skipping title card - missing episode metadata", "MediuxScraper/_process_set")
+                        debug_me(
+                            f"Skipping title card - missing episode metadata", "MediuxScraper/_process_set")
                         continue
 
                 elif data["fileType"] == FileType.BACKDROP.value:
@@ -281,17 +296,21 @@ class MediuxScraper:
 
                         if set_id in full_set_cache:
                             full_set = full_set_cache[set_id]
-                            matching_file = next((f for f in full_set.get("files", []) if f.get("id") == file_id), None)
+                            matching_file = next((f for f in full_set.get(
+                                "files", []) if f.get("id") == file_id), None)
                             if matching_file:
-                                show_id_backdrop = matching_file.get("show_id_backdrop")
+                                show_id_backdrop = matching_file.get(
+                                    "show_id_backdrop")
 
                     if show_id_backdrop is not None:
-                        debug_me(f"Backdrop: {show_id_backdrop}", "MediuxScraper/_process_set")
+                        debug_me(f"Backdrop: {show_id_backdrop}",
+                                 "MediuxScraper/_process_set")
                         season = SEASON_BACKDROP
                         episode = None
                         file_type = "background"
                     else:
-                        debug_me(f"Skipping backdrop - missing show_id_backdrop", "MediuxScraper/_process_set")
+                        debug_me(
+                            f"Skipping backdrop - missing show_id_backdrop", "MediuxScraper/_process_set")
                         continue
 
                 elif data["fileType"] == FileType.POSTER.value:
@@ -308,29 +327,35 @@ class MediuxScraper:
 
                         if set_id in full_set_cache:
                             full_set = full_set_cache[set_id]
-                            matching_file = next((f for f in full_set.get("files", []) if f.get("id") == file_id), None)
+                            matching_file = next((f for f in full_set.get(
+                                "files", []) if f.get("id") == file_id), None)
                             if matching_file:
                                 if not file_show_id:
                                     file_show_id = matching_file.get("show_id")
                                 if not season_id_data:
-                                    season_id_data = matching_file.get("season_id")
+                                    season_id_data = matching_file.get(
+                                        "season_id")
                                 # Also update seasons array from cached data if needed
                                 if not seasons:
-                                    seasons = full_set.get("show", {}).get("seasons", [])
+                                    seasons = full_set.get(
+                                        "show", {}).get("seasons", [])
 
                     # Determine if this is a show cover or season cover
                     if season_id_data:
                         # This is a season cover
-                        debug_me(f"Season cover: {season_id_data}", "MediuxScraper/_process_set")
+                        debug_me(
+                            f"Season cover: {season_id_data}", "MediuxScraper/_process_set")
                         # Try to get season number from seasons array if available
                         if seasons:
                             season_id = season_id_data.get("id")
                             if season_id:
-                                season_data = [s for s in seasons if s["id"] == season_id]
+                                season_data = [
+                                    s for s in seasons if s["id"] == season_id]
                                 if season_data:
                                     season = season_data[0]["season_number"]
                                 else:
-                                    season = season_id_data.get("season_number", 0)
+                                    season = season_id_data.get(
+                                        "season_number", 0)
                             else:
                                 season = season_id_data.get("season_number", 0)
                         else:
@@ -340,12 +365,14 @@ class MediuxScraper:
                         file_type = "season_cover"
                     elif file_show_id is not None:
                         # This is a show cover
-                        debug_me(f"Show cover detected", "MediuxScraper/_process_set")
+                        debug_me(f"Show cover detected",
+                                 "MediuxScraper/_process_set")
                         season = SEASON_COVER
                         episode = None
                         file_type = "show_cover"
                     else:
-                        debug_me(f"Skipping poster - missing show_id and season_id", "MediuxScraper/_process_set")
+                        debug_me(
+                            f"Skipping poster - missing show_id and season_id", "MediuxScraper/_process_set")
                         continue
 
                 else:
@@ -366,7 +393,8 @@ class MediuxScraper:
                     elif set_data.get("collection"):
                         # This is a movie poster inside a collection set
                         movies = set_data["collection"]["movies"]
-                        movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
+                        movie_data = [
+                            movie for movie in movies if movie["id"] == movie_id][0]
                         title = movie_data["title"]
                         year = int(movie_data["release_date"][:4])
                         file_type = "poster"
@@ -385,7 +413,8 @@ class MediuxScraper:
                             movie_id = data["movie_id_backdrop"]["id"]
                             if set_data.get("collection") is not None:
                                 movies = set_data["collection"]["movies"]
-                                movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
+                                movie_data = [
+                                    movie for movie in movies if movie["id"] == movie_id][0]
                             else:
                                 movie_data = set_data["movie"]
                             title = movie_data["title"]

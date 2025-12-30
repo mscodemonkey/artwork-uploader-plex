@@ -32,12 +32,17 @@ class ProcessingCallbacks:
     All callbacks are optional and called with appropriate arguments
     when processing events occur.
     """
-    on_status_update: Optional[Callable[[str, str, bool, bool], None]] = None  # (message, color, spinner, sticky)
+    on_status_update: Optional[Callable[[
+        # (message, color, spinner, sticky)
+        str, str, bool, bool], None]] = None
     on_log_update: Optional[Callable[[str], None]] = None  # (message)
-    on_progress_update: Optional[Callable[[int, int], None]] = None  # (current, total) - for progress bars
-    on_debug: Optional[Callable[[str, str], None]] = None  # (message, context) - for debug messages
+    # (current, total) - for progress bars
+    on_progress_update: Optional[Callable[[int, int], None]] = None
+    # (message, context) - for debug messages
+    on_debug: Optional[Callable[[str, str], None]] = None
     success_counter: Optional[
-        list] = None  # Mutable list to track successful uploads (contains count as single element)
+        # Mutable list to track successful uploads (contains count as single element)
+        list] = None
 
 
 class ArtworkProcessor:
@@ -205,13 +210,15 @@ class ArtworkProcessor:
         file_source = file_list[0].get('source', 'unknown')
         source = "Mediux" if file_source == "mediux" else "ThePosterDB" if file_source == "theposterdb" else "Unknown"
         author = file_list[0].get('author', 'unknown')
-        title = override_title if override_title else file_list[0].get('title', 'unknown')
+        title = override_title if override_title else file_list[0].get(
+            'title', 'unknown')
         year = file_list[0].get('year', 'unknown')
         success_counter = 0  # Mutable counter to track successful uploads
 
         # Initial progress update
         if callbacks and callbacks.on_debug:
-            callbacks.on_debug("Processing uploaded file...", "process_uploaded_artwork")
+            callbacks.on_debug("Processing uploaded file...",
+                               "process_uploaded_artwork")
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(0, total_files)
 
@@ -241,9 +248,11 @@ class ArtworkProcessor:
                 if callbacks and callbacks.on_log_update:
                     callbacks.on_log_update(
                         f"⚠️ {artwork['title']} {f"({artwork['year']})" if artwork.get('year') else ''} : {artwork['author']} | Not available in Plex.")
-                    os.remove(artwork['path'])  # Remove the temporary file after processing
+                    # Remove the temporary file after processing
+                    os.remove(artwork['path'])
                     try:
-                        os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
+                        # Remove the temporary directory if empty
+                        os.rmdir(os.path.dirname(artwork['path']))
                         callbacks.on_debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}",
                                            "process_uploaded_artwork")
                     except OSError:
@@ -251,12 +260,15 @@ class ArtworkProcessor:
                     continue
             else:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"❌ Unknown media type: {media_type}")
+                    callbacks.on_log_update(
+                        f"❌ Unknown media type: {media_type}")
                 continue
 
             # Build status message
-            season_info = f" - Season {artwork['season']}" if artwork.get('season') else ""
-            episode_info = f", Episode {artwork['episode']}" if artwork.get('episode') else ""
+            season_info = f" - Season {artwork['season']}" if artwork.get(
+                'season') else ""
+            episode_info = f", Episode {artwork['episode']}" if artwork.get(
+                'episode') else ""
             status_msg = f'Processing artwork for {media_type.lower()} "{artwork["title"]}"{season_info}{episode_info}'
 
             # Debug logging
@@ -307,7 +319,8 @@ class ArtworkProcessor:
 
             except Exception as e:
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"❌ Unexpected during process_uploaded_artwork: {str(e)}")
+                    callbacks.on_log_update(
+                        f"❌ Unexpected during process_uploaded_artwork: {str(e)}")
                 if callbacks and callbacks.on_status_update:
                     callbacks.on_status_update(
                         f"Error: {str(e)}",
@@ -315,15 +328,18 @@ class ArtworkProcessor:
                         False,  # no spinner
                         False  # not sticky
                     )
-            os.remove(artwork['path'])  # Remove the temporary file after processing
+            # Remove the temporary file after processing
+            os.remove(artwork['path'])
             try:
-                os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
+                # Remove the temporary directory if empty
+                os.rmdir(os.path.dirname(artwork['path']))
                 callbacks.on_debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}",
                                    "process_uploaded_artwork")
             except OSError:
                 pass
         # Final progress update
         if callbacks and callbacks.on_log_update:
-            callbacks.on_log_update(f"✔️ Finished processing uploaded ZIP file. {success_counter} assets updated.")
+            callbacks.on_log_update(
+                f"✔️ Finished processing uploaded ZIP file. {success_counter} assets updated.")
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(total_files, total_files)
