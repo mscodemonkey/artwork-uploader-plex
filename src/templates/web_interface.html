@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Artwork Uploader for Plex</title>
+    <!-- Link to Bootstrap CSS (CDN) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- Google Font: JetBrains Mono (Nice Monospaced Font) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap"
+          rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+    <link rel="stylesheet" href="/static/web_interface.css">
+
+    <!-- Optional: You can also use a custom stylesheet to override default styles -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.js"></script>
+
+</head>
+<body>
+<!-- Toggle for dark mode -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+    <symbol id="check2" viewBox="0 0 16 16">
+        <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+    </symbol>
+    <symbol id="circle-half" viewBox="0 0 16 16">
+        <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/>
+    </symbol>
+    <symbol id="moon-stars-fill" viewBox="0 0 16 16">
+        <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
+        <path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/>
+    </symbol>
+    <symbol id="sun-fill" viewBox="0 0 16 16">
+        <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+    </symbol>
+</svg>
+
+
+<div class="dropdown position-fixed bottom-0 end-0 mb-3 me-3 bd-mode-toggle z-5 position-absolute">
+    <button class="btn btn-bd-primary py-2 dropdown-toggle d-flex align-items-center"
+            id="bd-theme"
+            type="button"
+            aria-expanded="false"
+            data-bs-toggle="dropdown"
+            aria-label="Toggle theme (auto)">
+        <svg class="bi my-1 theme-icon-active" width="1em" height="1em">
+            <use href="#circle-half"></use>
+        </svg>
+        <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+        <li>
+            <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light"
+                    aria-pressed="false">
+                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em">
+                    <use href="#sun-fill"></use>
+                </svg>
+                Light
+                <svg class="bi ms-auto d-none" width="1em" height="1em">
+                    <use href="#check2"></use>
+                </svg>
+            </button>
+        </li>
+        <li>
+            <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark"
+                    aria-pressed="false">
+                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em">
+                    <use href="#moon-stars-fill"></use>
+                </svg>
+                Dark
+                <svg class="bi ms-auto d-none" width="1em" height="1em">
+                    <use href="#check2"></use>
+                </svg>
+            </button>
+        </li>
+        <li>
+            <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto"
+                    aria-pressed="true">
+                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em">
+                    <use href="#circle-half"></use>
+                </svg>
+                Auto
+                <svg class="bi ms-auto d-none" width="1em" height="1em">
+                    <use href="#check2"></use>
+                </svg>
+            </button>
+        </li>
+    </ul>
+</div>
+
+<div class="container mt-4">
+    <div class="mb-4 row">
+        <div class="col">
+            <h1>
+                <svg class="app-logo" width="50" height="50" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Film strip frame -->
+                    <rect x="10" y="20" width="80" height="60" rx="4" fill="none" stroke="currentColor"
+                          stroke-width="3"/>
+
+                    <!-- Film perforations (left side) -->
+                    <rect x="12" y="25" width="6" height="4" fill="currentColor"/>
+                    <rect x="12" y="38" width="6" height="4" fill="currentColor"/>
+                    <rect x="12" y="51" width="6" height="4" fill="currentColor"/>
+                    <rect x="12" y="64" width="6" height="4" fill="currentColor"/>
+
+                    <!-- Film perforations (right side) -->
+                    <rect x="82" y="25" width="6" height="4" fill="currentColor"/>
+                    <rect x="82" y="38" width="6" height="4" fill="currentColor"/>
+                    <rect x="82" y="51" width="6" height="4" fill="currentColor"/>
+                    <rect x="82" y="64" width="6" height="4" fill="currentColor"/>
+
+                    <!-- Image/poster inside -->
+                    <rect x="24" y="28" width="52" height="44" rx="2" fill="currentColor" opacity="0.15"/>
+
+                    <!-- Upload arrow -->
+                    <g transform="translate(50, 50)">
+                        <path d="M 0,-12 L -8,0 L -3,0 L -3,12 L 3,12 L 3,0 L 8,0 Z" fill="currentColor"/>
+                    </g>
+                </svg>
+                <span class="app-title">Artwork Uploader for Plex</span>
+            </h1>
+        </div>
+    </div>
+
+    <div class="row p-2 mb-4 rounded bg-info" id="version_notifier" style="display: none;">
+        <div class='col align-middle'>
+            <button class="float-end btn btn-primary btn-sm" id="btnUpdate">Update Now</button>
+            A new version is now available: <span class="pe-3" id="latest_version"></span>
+        </div>
+    </div>
+    <div class="row m-3 rounded fade fixed-top" id="status">
+        <div class="col">
+            <div class="p-3">
+                <span id="status_spinner" class="spinner-border spinner-border-sm collapse" aria-hidden="true"></span>
+                <i id="status_icon" class="bi-alarm"></i>
+                <span id="status_message">Welcome to Artwork Scraper for Plex!</span>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Bootstrap Tabs -->
+
+    <nav class="nav nav-tabs" id="myTab">
+        <a class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button"
+           role="tab"
+           aria-controls="config" aria-selected="false">Config</a>
+        <a class="nav-link collapse" id="bulk-import-tab" data-bs-toggle="tab" data-bs-target="#bulk-import"
+           type="button"
+           role="tab" aria-controls="bulk-import" aria-selected="false">Bulk Import</a>
+        <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
+           role="tab" aria-controls="scraper" aria-selected="true">Scraper</a>
+        <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
+           role="tab" aria-controls="uploader" aria-selected="true">Uploader <span
+                style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
+        <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log"
+           type="button"
+           role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block">Scrape&nbsp;</span>Log</a>
+        <a class="nav-link ms-auto" id="logout-link" href="/logout" style="display: none;">
+            <i class="bi bi-box-arrow-right"></i> Logout
+        </a>
+    </nav>
+
+    <div class="progress mt-3 collapse" id="progress_bar_container" role="progressbar" aria-label="Progress"
+         aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+        <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" id="progress_bar"
+             style="width: 0%"></div>
+    </div>
+
+    <div class="tab-content" id="myTabContent">
+
+        <!-- Settings Tab -->
+        <div class="tab-pane fade show active" id="config" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
+
+            <form id="config_form" class="needs-validation" novalidate>
+                <div class="row">
+                    <div class="col-lg-5 mb-3">
+                        <div class="p-3 border">
+                            <h5 class="mb-3">Plex server settings</h5>
+                            <div class="mb-3">
+                                <label for="plex_base_url" class="form-label">Plex base URL:</label>
+                                <input type="url" id="plex_base_url" name="plex_base_url" class="form-control" required
+                                       placeholder="https://plex.example.com"
+                                       pattern="https?://([A-Za-z0-9.-]+)(:[0-9]+)?(/.*)?"
+                                       title="Please enter a valid URL (e.g., https://plex.example.com)">
+                                <div class="invalid-feedback">
+                                    Please provide a valid Plex base URL.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="plex_token" class="form-label">Plex token:</label>
+                                <input type="text" id="plex_token" name="plex_token" class="form-control" required
+                                       pattern="[A-Za-z0-9-]{20}"
+                                       title="Plex token should be a 20-character alphanumeric string.">
+                                <div class="invalid-feedback">
+                                    Please provide a valid Plex token.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="tv_library" class="form-label">TV library:</label>
+                                <input type="text" id="tv_library" name="tv_library" class="form-control" required>
+                                <div class="invalid-feedback">
+                                    Please provide your TV library name. If more than one, separate using commas.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="movie_library" class="form-label">Movie library:</label>
+                                <input type="text" id="movie_library" name="movie_library" class="form-control"
+                                       required>
+                                <div class="invalid-feedback">
+                                    Please provide your Movie library name. If more than one, separate using commas.
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Kometa settings -->
+                        <div class="p-3 border mt-3">
+                            <h5 class="mb-3">Kometa settings</h5>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
+                                <label for="save_to_kometa" class="form-check-label">Save artwork to Kometa asset
+                                    directory</label>
+                            </div>
+                            <div class="form-check mb-3" style="display: none;">
+                                <input class="form-check-input" type="checkbox" value="reset_overlay"
+                                       id="reset_overlay"/>
+                                <label for="reset_overlay" class="form-check-label">Reset the Overlay tag for Kometa if
+                                    artwork updated</label>
+                            </div>
+                            <div id="kometa_settings" style="display: none;">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" value="stage_assets"
+                                           id="stage_assets"/>
+                                    <label for="stage_assets" class="form-check-label">Download assets for seasons and
+                                        episodes not yet in Plex</label>
+                                    <br><small class="form-text text-muted">(Excluding Specials)</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="kometa_base" class="form-label">Kometa Asset Directory:</label>
+                                    <input type="text" id="kometa_base" name="kometa_base" class="form-control"
+                                           placeholder="X:\path\to\kometa\assets">
+                                    <div class="invalid-feedback">
+                                        Please provide your Kometa asset directory.
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="temp_dir" class="form-label">Temp Directory (optional):</label>
+                                    <input type="text" id="temp_dir" name="temp_dir" class="form-control"
+                                           placeholder="X:\path\to\temp\dir">
+                                    <small class="form-text text-muted">(Optional) Specify a temporary directory for
+                                        Kometa operations.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Authentication settings -->
+                        <div class="p-3 border mt-3">
+                            <h5 class="mb-3">Authentication settings</h5>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="auth_enabled"/>
+                                <label for="auth_enabled" class="form-check-label">Enable password protection</label>
+                            </div>
+                            <div id="auth_settings" style="display: none;">
+                                <div class="mb-3">
+                                    <label for="auth_username" class="form-label">Username:</label>
+                                    <input type="text" id="auth_username" name="auth_username" class="form-control"
+                                           placeholder="admin">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="auth_password" class="form-label">Password:</label>
+                                    <input type="password" id="auth_password" name="auth_password" class="form-control"
+                                           placeholder="Enter new password">
+                                    <small class="form-text text-muted">Leave blank to keep existing password</small>
+                                </div>
+                                <div class="alert alert-info" role="alert">
+                                    <i class="bi bi-info-circle"></i> You will need to log in with these credentials
+                                    after saving. Sessions last 7 days with "Remember me" enabled.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="row mb-3">
+                            <div class="col">
+                                <div class="p-3 border">
+                                    <h5 class="mb-3">Artwork <span
+                                            class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB.com
+                                    </h5>
+                                    <div class="row mb-1">
+                                        <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" checked
+                                                       value="show_cover" name="filter" id="p_filter-show_cover"/>
+                                                <label for="p_filter-show_cover" class="form-check-label">Show
+                                                    cover</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" checked
+                                                       value="season_cover" name="filter" id="p_filter-season_cover"/>
+                                                <label for="p_filter-season_cover" class="form-check-label">Season
+                                                    covers</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" checked
+                                                       value="background" name="filter" id="p_filter-background"/>
+                                                <label for="p_filter-background"
+                                                       class="form-check-label">Background</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" checked
+                                                       value="title_card" name="filter" id="p_filter-title_card"/>
+                                                <label for="p_filter-title_card" class="form-check-label">Title
+                                                    cards</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" checked
+                                                       value="movie_poster" id="p_filter-movie_poster"/>
+                                                <label for="p_filter-movie_poster" class="form-check-label">Movie
+                                                    poster</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-4">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" checked
+                                                       value="collection_poster" id="p_filter-collection_poster"/>
+                                                <label for="p_filter-collection_poster" class="form-check-label">Collection
+                                                    poster</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col">
+                                <div class="p-3 border">
+                                    <h5 class="mb-3">Artwork <span
+                                            class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX.pro</h5>
+                                    <div class="row mb-1">
+                                        <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" value="show_cover"
+                                                       id="m_filter-show_cover"/>
+                                                <label for="m_filter-show_cover" class="form-check-label">Show
+                                                    cover</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" value="season_cover"
+                                                       id="m_filter-season_cover"/>
+                                                <label for="m_filter-season_cover" class="form-check-label">Season
+                                                    covers</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" value="background"
+                                                       id="m_filter-background"/>
+                                                <label for="m_filter-background"
+                                                       class="form-check-label">Background</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" value="title_card"
+                                                       id="m_filter-title_card"/>
+                                                <label for="m_filter-title_card" class="form-check-label">Title
+                                                    cards</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                        <div class="col-6 col-md-4 col-xl-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox" value="movie_poster"
+                                                       id="m_filter-movie_poster"/>
+                                                <label for="m_filter-movie_poster" class="form-check-label">Movie
+                                                    poster</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-xl-4 mb-3">
+                                            <div class="form-check mb-2">
+                                                <input class="form-check-input" type="checkbox"
+                                                       value="collection_poster" id="m_filter-collection_poster"/>
+                                                <label for="m_filter-collection_poster" class="form-check-label">Collection
+                                                    poster</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <div class="p-3 border">
+                                    <h5 class="mb-3">Additional settings</h5>
+                                    <div class="form-check mb-3" style="display: none;">
+                                        <input class="form-check-input" type="checkbox" value="--force"
+                                               id="track_artwork_ids"/>
+                                        <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex
+                                            labels (recommend to leave checked)</label>
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" value="auto_manage"
+                                               id="auto_manage_bulk_files"/>
+                                        <label for="auto_manage_bulk_files" class="form-check-label">Sort and label bulk
+                                            files automatically</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-primary mt-3" id="save_config_button">Save Config</button>
+            </form>
+        </div>
+
+
+        <!-- Bulk Import Tab -->
+        <div class="tab-pane fade" id="bulk-import" role="tabpanel" aria-labelledby="bulk-import-tab" tabindex="0">
+            <!--                <form id="bulk_form" class="needs-validation" novalidate> -->
+
+
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="p-3 border d-flex align-items-center">
+                        <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select"
+                                required>
+                            <option selected disabled>Loading file list...</option>
+                        </select>
+                        <div class="invalid-feedback">
+                            Please provide a bulk import file path.
+                        </div>
+                        <!-- Default bulk file checkbox -->
+                        <div class="d-flex align-items-center">
+                            <input type="hidden" id="bulk_import_file" name="bulk_import_file" class="bulk_import_file">
+                            <div class="form-check mb-0 d-flex align-items-center">
+                                <!-- Default bulk file checkbox using Bootstrap icons -->
+                                <input type="checkbox" id="default_bulk_file" class="d-none">
+                                <a title="Default file will be loaded when Artwork Uploader starts"><i
+                                        id="default_bulk_file_icon" class="bi bi-check-circle h4" role="button"></i></a>
+                                <label class="d-none d-sm-block form-check-label mb-0 ms-2" for="default_bulk_file">Default</label>
+                            </div>
+                        </div>
+                        <!-- Icons at the end -->
+                        <a title="Delete this file"><i id="delete_icon" class="bi bi-trash h4 ms-3"
+                                                       role="button"></i></a>
+                        <a title="Rename this file"><i id="rename_icon" class="bi bi-pencil-square h4 ms-3"
+                                                       role="button"></i></a>
+                        <a title="Schedule upload"><i id="schedule_icon" class="bi bi-clock h4 ms-3" role="button"></i></a>
+                        <a title="Create a new bulk file"><i id="create_icon" class="bi bi-file-earmark-plus h4 ms-3"
+                                                             role="button"></i></a>
+                        <a title="Upload a new .txt file"><i id="upload_icon" class="bi bi-upload h4 ms-3"
+                                                             role="button"></i></a>
+                    </div>
+                </div>
+
+                <div class="col d-none"> <!-- Hides the file input -->
+                    <div class="p-3 border">
+                        <div class="input-group">
+                            <input type="file" id="bulk_import_upload" class="form-control" accept=".txt"
+                                   onchange="uploadBulkImportFile(event)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Time Selector for scheduler -->
+            <div id="time_select_box" class="p-3 border">
+                <div id="tooltip_arrow"></div>
+                <div class="row">
+                    <div class="col-auto">
+                        <label class="col-form-label">Every day at</label>
+                    </div>
+                    <div class="col-auto">
+                        <input type="time" id="schedule_time" class="form-control">
+                    </div>
+                    <div class="col-auto collapse" id="set_container">
+                        <button id="set_time" class="btn btn-primary">Set</button>
+                    </div>
+                    <div class="col-auto collapse" id="cancel_container">
+                        <button id="cancel_time" class="btn btn-danger">Delete</button>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="p-3 border">
+                        <textarea id="bulk_import_text" class="form-control w-100 font-monospace" rows="15"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col">
+                    <button class="btn btn-secondary me-3" id="save_bulk_button" onclick="checkBulkImportFileToSave()">
+                        Save Bulk File
+                    </button>
+                    <button class="btn btn-primary" id="bulk_button" onclick="runBulkImport()">Run Bulk Import</button>
+                </div>
+            </div>
+            <!--                </form> -->
+        </div>
+
+
+        <!-- Scraper Tab -->
+        <div class="tab-pane fade" id="scraper" role="tabpanel" aria-labelledby="scraper-tab" tabindex="0">
+            <form id="scraperForm" class="needs-validation" novalidate>
+                <div class="row">
+                    <div class="col mb-3">
+                        <div class="p-3 border">
+                            <label for="scrape_url" class="form-label">URL to scrape:</label>
+                            <input type="text" id="scrape_url" name="scrape_url" class="form-control"
+                                   value="" required
+                                   placeholder="theposterdb.com (poster/set/user) or mediux.pro (sets/boxsets) URL"
+                                   pattern="https://(theposterdb\.com/(poster/\d+|set/\d+|user/[A-Za-z0-9]+)|mediux\.pro/(sets|boxsets)/\d+)"
+                                   title="Please enter a valid URL (e.g., https://theposterdb.com/set/12345 or https://mediux.pro/sets/12345 or https://mediux.pro/boxsets/1153)">
+                            <div class="invalid-feedback">Please provide a valid URL to scrape.</div>
+                        </div>
+                    </div>
+                    <div class="mb-3 col-md-4 col-lg-3">
+                        <div class="p-3 border">
+                            <label for="scrape_url" class="form-label">Plex year:</label>
+                            <input type="text" id="year" name="year" class="form-control"
+                                   value=""
+                                   placeholder="e.g. 1978 or 2023"
+                                   pattern="^(19|20)\d{2}$"
+                                   title="Use this if the year in Plex is different to that on MediUX or TPDb">
+                            <div class="invalid-feedback">Please use a valid year (1900-2099).</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <div class="p-3 border">
+                            <h5 class="mb-3">Options</h5>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" value="--force" id="option-force"/>
+                                <label for="option-force" class="form-check-label">Force upload the artwork, even if it
+                                    already exists</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" value="--stage" id="option-stage"/>
+                                <label for="option-stage" class="form-check-label">Download assets for seasons and
+                                    episodes not yet in Plex (excluding Specials)</label>
+                            </div>
+                            <div class="form-check mb-2" style="display: none;">
+                                <input class="form-check-input" type="checkbox" value="--temp"
+                                       id="option-temp"/>
+                                <label for="option-temp" class="form-check-label">Use temporary directory for downloaded
+                                    assets</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" value="--add-to-bulk"
+                                       id="option-add-to-bulk"/>
+                                <label for="option-add-to-bulk" class="form-check-label">Automatically add this URL to
+                                    the current bulk import list if scraped</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col theposterdb collapse">
+                        <div class="p-3 border">
+                            <h5 class="mb-3">The Poster DB options</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="--add-sets"
+                                       id="option-add-sets"/>
+                                <label for="option-add-sets" class="form-check-label">Add additional sets from the same
+                                    page</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="--add-posters"
+                                       id="option-add-posters"/>
+                                <label for="option-add-posters" class="form-check-label">Add the additional posters
+                                    section from the same page</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col">
+                        <div class="p-3 border">
+                            <h5 class="mb-3">Artwork to include</h5>
+                            <div id="scraper-filters-inherit" class="collapse show row mb-1">
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="inherit"
+                                               name="filter" id="scraper-filters-global"/>
+                                        <label for="scraper-filters-global" class="form-check-label">As set by global
+                                            filters</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="scraper-filters" class="collapse">
+                                <div class="row mb-1">
+                                    <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="show_cover"
+                                                   name="filter" id="filter-show_cover"/>
+                                            <label for="filter-show_cover" class="form-check-label">Show cover</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="season_cover"
+                                                   name="filter" id="filter-season_cover"/>
+                                            <label for="filter-season_cover" class="form-check-label">Season
+                                                covers</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="background"
+                                                   name="filter" id="filter-background"/>
+                                            <label for="filter-background" class="form-check-label">Background</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="title_card"
+                                                   name="filter" id="filter-title_card"/>
+                                            <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="movie_poster"
+                                                   id="filter-movie_poster"/>
+                                            <label for="filter-movie_poster" class="form-check-label">Movie
+                                                poster</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-8 col-lg-3">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" checked
+                                                   value="collection_poster" id="filter-collection_poster"/>
+                                            <label for="filter-collection_poster" class="form-check-label">Collection
+                                                poster</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col">
+                        <button type="button" class="btn btn-primary" id="scrape_button" onclick="startScrape()">Start
+                            Scrape
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+        </div>
+
+        <!-- Uploader Tab -->
+        <div class="tab-pane fade" id="uploader" role="tabpanel" aria-labelledby="uploader-tab" tabindex="0">
+            <div class="row mb-3" id="drop-area">
+                <div class="col">
+                    <p>Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.</p>
+                    <p>It'll try to determine whether the artwork is for a TV show or a movie / collection. This is a
+                        beta feature so please let me know any anomalies you find in Zip files!</p>
+                </div>
+            </div>
+            <div id="progress-container" class="row mt-3 mb-3" style="display:none">
+                <div class="col">
+                    <p>Uploading... <span id="progress-text">0%</span></p>
+                    <div style="width: 100%; background: #ddd; border-radius: 5px;">
+                        <div id="progress-bar"></div>
+                    </div>
+                </div>
+            </div>
+            <form id="upload_form" class="needs-validation" novalidate>
+                <div class="row">
+                    <div class="col mb-3">
+                        <div class="p-3 border mt-3">
+                            <label for="plex_title" class="form-label">Plex title:</label>
+                            <input type="text" id="plex_title" name="plex_title" class="form-control"
+                                   value=""
+                                   placeholder="(if different to file title)"
+                                   title="If your title in Plex is different to the title in the file(s), enter it here to process it correctly">
+                        </div>
+                    </div>
+                    <div class="mb-3 col-md-4 col-lg-3">
+                        <div class="p-3 border mt-3">
+                            <label for="plex_year" class="form-label">Plex year:</label>
+                            <input type="text" id="plex_year" name="plex_year" class="form-control"
+                                   value=""
+                                   placeholder="e.g. 1978 or 2023"
+                                   pattern="^(19|20)\d{2}$"
+                                   title="Use this if the year in Plex is different to that on MediUX or TPDb">
+                            <div class="invalid-feedback">Please use a valid year (1900-2099).</div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="p-3 border">
+                        <h5 class="mb-3">Options</h5>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" value="force" id="upload-option-force"/>
+                            <label for="upload-option-force" class="form-check-label">Force upload the artwork, even if
+                                it
+                                already exists</label>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" value="stage" id="upload-option-stage"/>
+                            <label for="upload-option-stage" class="form-check-label">Apply assets for seasons and
+                                episodes not yet in Plex (excluding Specials)</label>
+                        </div>
+                        <div class="form-check mb-2" style="display: none;">
+                            <input class="form-check-input" type="checkbox" value="temp"
+                                   id="upload-option-temp"/>
+                            <label for="upload-option-temp" class="form-check-label">Use temporary directory for
+                                downloaded
+                                assets</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col">
+                    <div class="p-3 border">
+                        <h5 class="mb-3">Artwork to include</h5>
+                        <div id="upload-filters-inherit" class="collapse show row mb-1">
+                            <div class="col-6 col-md-4 col-lg-3">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" checked value="inherit"
+                                           name="filter" id="upload-filters-global"/>
+                                    <label for="upload-filters-global" class="form-check-label">As set by global
+                                        filters</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="upload-filters" class="collapse">
+                            <div class="row mb-1">
+                                <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="show_cover"
+                                               name="filter" id="upload-filter-show_cover"/>
+                                        <label for="filter-show_cover" class="form-check-label">Show cover</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="season_cover"
+                                               name="filter" id="upload-filter-season_cover"/>
+                                        <label for="filter-season_cover" class="form-check-label">Season covers</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="background"
+                                               name="filter" id="upload-filter-background"/>
+                                        <label for="filter-background" class="form-check-label">Background</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="title_card"
+                                               name="filter" id="upload-filter-title_card"/>
+                                        <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-12 mb-2"><strong>Movies</strong></div>
+                                <div class="col-6 col-md-4 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked value="movie_poster"
+                                               id="upload-filter-movie_poster"/>
+                                        <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-8 col-lg-3">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" checked
+                                               value="collection_poster" id="upload-filter-collection_poster"/>
+                                        <label for="filter-collection_poster" class="form-check-label">Collection
+                                            poster</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Scraping Log Tab -->
+        <div class="tab-pane fade" id="scraping-log" role="tabpanel" aria-labelledby="scraping-log-tab" tabindex="0">
+            <div class="mt-3" id="scraping_log"><!-- --></div>
+        </div>
+
+
+    </div>
+</div>
+
+<!-- Save Confirmation Modal -->
+<div class="modal fade" id="saveBulkImportModal" tabindex="-1" aria-labelledby="saveBulkImportModalLabel"
+     aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="saveBulkImportModalLabel">Save Bulk Import File</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="saveModalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="saveAsCurrent">Save as <span
+                        id="currentFileName"></span></button>
+                <button type="button" class="btn btn-secondary" id="useDefault">Use default (<span
+                        id="defaultFileName"></span>)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Load Yes No Modal -->
+<div class="modal fade" id="loadBulkImportModal" tabindex="-1" aria-labelledby="yesNoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="yesNoModalLabel">Please choose</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="loadModalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="yes_Button">Yes</button>
+                <button type="button" class="btn btn-secondary" id="no_Button" data-bs-dismiss="modal">No</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Yes No Cancel Modal -->
+<div class="modal fade" id="yesNoCancelModal" tabindex="-1" aria-labelledby="yesNoCancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="yesNoCancelModalLabel">Please choose</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="yesNoCancelModalMessage"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="yesButton">Yes</button>
+                <button type="button" class="btn btn-secondary" id="noButton">No</button>
+                <button type="button" class="btn btn-secondary" id="cancelButton" data-bs-dismiss="modal">Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap JS and jQuery (required for tabs) -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
+        integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"
+        integrity="sha384-0pUGZvbkm6XF6gxjEnlmuGrJXVbNuzT9qBBavbLwCsOGabYfZo0T0to5eqruptLy"
+        crossorigin="anonymous"></script>
+<script src="/static/web_interface.js"></script>
+<script src="/static/dark_mode.js"></script>
+</body>
+</html>

@@ -1,4 +1,70 @@
-__pycache__
+# Version control
+.git/
+.gitignore
+.github/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# Development files
+bump_version.py
+pytest.ini
+requirements-dev.txt
+_ArtworkScraper.spec
+*.spec
+
+# Documentation (not needed at runtime)
+CLAUDE.md
+TECHNICAL_INFO.md
+RELEASE.md
+README.md
+LICENSE
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# User data (should be volumes, not baked in)
+bulk_imports/
+logs/
+config.json
+config.json.example
+*.log
+
+# Docker files
 Dockerfile
 docker-compose.yml
-bulk_imports/*
+.dockerignore
+Makefile
+
+# System
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Claude
+.claude/

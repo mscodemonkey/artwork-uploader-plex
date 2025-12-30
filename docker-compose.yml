@@ -5,14 +5,18 @@ services:
     ports:
       - "4567:4567"
     volumes:
-      - ./bulk_imports:/artwork-uploader/bulk_imports:rw
-      - ./config.json:/artwork-uploader/config.json:rw
-      # Optional: mount a custom config file from a different location
-      # - /path/to/your/custom-config.json:/artwork-uploader/custom-config.json:rw
+      # Bulk imports: now at /bulk_imports in container
+      - ./bulk_imports:/bulk_imports:rw
+      # Config: now at /config/config.json in container
+      - ./config.json:/config/config.json:rw
+      # Logs
+      - ./logs:/logs:rw
     environment:
       - TZ=America/Los_Angeles
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
-      # Optional: specify a custom config path (must match the volume mount above)
-      # - CONFIG_PATH=/artwork-uploader/custom-config.json
+
+      # Optional: override default paths
+      # - BULK_IMPORTS_DIR=/custom/bulk_imports
+      # - CONFIG_PATH=/config/config.json
     restart: unless-stopped

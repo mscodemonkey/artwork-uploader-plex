@@ -1,4 +1,4 @@
-APP=artwork-uploader-plex
+APP=media-artwork-uploader
 REGISTRY=jabrown
 TAG ?= $(shell git describe --tags --always --dirty)
 PLATFORMS=linux/amd64,linux/arm64
