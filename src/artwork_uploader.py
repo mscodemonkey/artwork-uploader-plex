@@ -51,8 +51,8 @@ current_version = CURRENT_VERSION
 # ----------------------------------------------
 
 if sys.version_info[0] != MIN_PYTHON_MAJOR or sys.version_info[1] < MIN_PYTHON_MINOR:
-    print(
-        f"Version: {sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]} is not compatible with Artwork Uploader, please upgrade to Python {MIN_PYTHON_MAJOR}.{MIN_PYTHON_MINOR}+")
+    sys.stderr.write(
+        f"Version: {sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]} is not compatible with Artwork Uploader, please upgrade to Python {MIN_PYTHON_MAJOR}.{MIN_PYTHON_MINOR}+\n")
     sys.exit(0)
 
 try:
@@ -60,7 +60,7 @@ try:
     from flask import Flask, render_template
     from flask_socketio import SocketIO
 except ImportError as e:
-    print(f"""{'=' * 70}
+    sys.stderr.write(f"""{'=' * 70}
     ERROR: Required dependencies are missing or incompatible
     {'=' * 70}
     
@@ -81,7 +81,8 @@ except ImportError as e:
       pip install -r requirements.txt
     
     See README.md for more troubleshooting help.
-    {'=' * 70}""")
+    {'=' * 70}
+""")
     sys.exit(1)
 
 # ! Interactive CLI mode flag
