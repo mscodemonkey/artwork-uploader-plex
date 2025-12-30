@@ -74,9 +74,11 @@ class UpdateService:
                          "UpdateService/check_for_update")
                 return latest_version
             else:
-                debug_me(f"No update available.", "UpdateService/check_for_update")
+                debug_me(f"No update available.",
+                         "UpdateService/check_for_update")
         else:
-            debug_me("Could not determine latest version.", "UpdateService/check_for_update")
+            debug_me("Could not determine latest version.",
+                     "UpdateService/check_for_update")
         return None
 
     def start_periodic_check(
@@ -124,5 +126,6 @@ class UpdateService:
             new_version = self.check_for_update()
             if new_version:
                 on_update_available(new_version)
-            debug_me(f"Next update check in {self.check_interval} seconds.", "UpdateService/_check_periodically")
+            debug_me(
+                f"Next update check in {self.check_interval} seconds.", "UpdateService/_check_periodically")
             time.sleep(self.check_interval)

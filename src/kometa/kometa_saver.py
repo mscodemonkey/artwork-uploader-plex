@@ -65,7 +65,8 @@ class KometaSaver:
         # Check if an asset already exists for this item, skip if so (unless force is specified, in which case delete existing asset first)
         try:
             for check_ext in IMAGE_EXTENSIONS:
-                existing_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{check_ext}")
+                existing_file = os.path.join(
+                    self.dest_dir, f"{self.dest_file_name}{check_ext}")
                 if os.path.exists(existing_file) and not self.options.force:
                     return f"⏩ {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
                 elif os.path.exists(existing_file) and self.options.force:
@@ -77,8 +78,10 @@ class KometaSaver:
         if self.type == "file":
             # Save from local file path
             source_file = self.artwork['path']
-            self.dest_file_ext = os.path.splitext(source_file)[1]  # Use the original file extension
-            dest_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
+            self.dest_file_ext = os.path.splitext(
+                source_file)[1]  # Use the original file extension
+            dest_file = os.path.join(
+                self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
             try:
                 os.makedirs(self.dest_dir, exist_ok=True)
                 with open(source_file, 'rb') as src_f:
@@ -94,7 +97,8 @@ class KometaSaver:
                 return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
         try:
             url = self.artwork["url"]
-            debug_me(f"Downloading {self.artwork_type} from URL: {url}", "KometaSaver/save_to_kometa")
+            debug_me(
+                f"Downloading {self.artwork_type} from URL: {url}", "KometaSaver/save_to_kometa")
             r = requests.get(url, headers=headers, stream=True, timeout=5)
             r.raise_for_status()
             content_type = r.headers.get('Content-Type', '')
@@ -103,7 +107,8 @@ class KometaSaver:
         except Exception as e:
             return f"❌ {self.description} | Error saving {self.artwork_type}: Error fetching URL: {e}"
 
-        dest_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
+        dest_file = os.path.join(
+            self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
         try:
             os.makedirs(self.dest_dir, exist_ok=True)
             with open(dest_file, 'wb') as f:

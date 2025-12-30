@@ -26,11 +26,14 @@ from packaging import version
 
 from core import globals
 from core.config import Config
+from core.constants import SOURCE_MEDIUX, SOURCE_THEPOSTERDB
 from models.instance import Instance
 from processors.media_metadata import parse_title
 from services import UtilityService, AuthenticationService
 from utils import utils
 from utils.notifications import update_log, update_status, notify_web, debug_me
+
+SOURCE_TXT = "source.txt"
 
 
 def is_ipv6_available():
@@ -77,7 +80,8 @@ def is_dual_stack_supported():
             # Try to disable IPV6_V6ONLY if possible (enables dual-stack)
             # This might not be available on all platforms
             try:
-                server_socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                server_socket.setsockopt(
+                    socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
             except (OSError, AttributeError):
                 # IPV6_V6ONLY not available or can't be set
                 pass
@@ -99,7 +103,7 @@ def is_dual_stack_supported():
                     ipv6_client.settimeout(1)
                     ipv6_client.connect(('::1', port))
                     ipv6_works = True
-            except (OSError, socket.timeout):
+            except (OSError):
                 pass
 
             # Test IPv4 connection (this is the key test for dual-stack)
@@ -108,13 +112,14 @@ def is_dual_stack_supported():
                     ipv4_client.settimeout(1)
                     ipv4_client.connect(('127.0.0.1', port))
                     ipv4_works = True
-            except (OSError, socket.timeout):
+            except (OSError):
                 pass
 
             # Dual-stack works if both IPv4 and IPv6 connections succeeded
             return ipv4_works and ipv6_works
     except Exception as e:
-        debug_me(f"Error testing dual-stack support: {e}", "is_dual_stack_supported")
+        debug_me(
+            f"Error testing dual-stack support: {e}", "is_dual_stack_supported")
         return False
 
 
@@ -124,7 +129,8 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # Get config from globals
-        config = globals.config if hasattr(globals, 'config') and globals.config else None
+        config = globals.config if hasattr(
+            globals, 'config') and globals.config else None
 
         # If auth not enabled, allow access
         if not config or not config.auth_enabled:
@@ -192,7 +198,8 @@ def setup_routes(web_app, config: Config):
     @login_required
     def download_file(filename):
         """Serve files from the downloads directory."""
-        downloads_path = os.path.join(UtilityService.get_exe_dir(), 'downloads')
+        downloads_path = os.path.join(
+            UtilityService.get_exe_dir(), 'downloads')
         return send_from_directory(downloads_path, filename, as_attachment=True)
 
     @web_app.route('/uploads/<path:filename>')
@@ -243,7 +250,8 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         latest_version = get_latest_version()
         if latest_version and version.parse(latest_version.lstrip('v')) > version.parse(current_version.lstrip('v')):
-            notify_web(instance, "update_available", {"version": latest_version})
+            notify_web(instance, "update_available",
+                       {"version": latest_version})
 
     @globals.web_socket.on("update_app")
     def update_app(data):
@@ -266,7 +274,8 @@ def setup_socket_handlers(
             subprocess.run(["git", "pull"], check=True)
 
             # Install dependencies
-            subprocess.run([python_cmd, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
+            subprocess.run([python_cmd, "-m", "pip", "install",
+                           "-r", "requirements.txt"], check=True)
 
             # Trigger the front-end to restart
             update_status(
@@ -282,7 +291,8 @@ def setup_socket_handlers(
             os.execlp(python_cmd, python_cmd, "artwork_uploader.py")
 
         except Exception as e:
-            update_status(Instance(broadcast=True), "Update failed, restarting the app...", "danger")
+            update_status(Instance(broadcast=True),
+                          "Update failed, restarting the app...", "danger")
             notify_web(instance, "update_failed", {"error": str(e)})
 
     @globals.web_socket.on("start_scrape")
@@ -304,7 +314,8 @@ def setup_socket_handlers(
             notify_web(
                 instance,
                 "element_disable",
-                {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True}
+                {"element": ["scrape_url", "scrape_button",
+                             "bulk_button"], "mode": True}
             )
             process_scrape_url_from_web(instance, url)
 
@@ -343,7 +354,8 @@ def setup_socket_handlers(
             folder_path = globals.bulk_file_service.get_bulk_imports_directory()
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
         except (FileNotFoundError, PermissionError) as e:
-            debug_me(f"Error loading bulk file list: {e}", "load_bulk_filelist")
+            debug_me(
+                f"Error loading bulk file list: {e}", "load_bulk_filelist")
         notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
 
     @globals.web_socket.on("load_bulk_import")
@@ -356,7 +368,8 @@ def setup_socket_handlers(
     def rename_bulk_file(data):
         """Rename a bulk import file."""
         instance = Instance(data.get("instance_id"), "web")
-        rename_bulk_import_file(instance, data.get("old_filename"), data.get("new_filename"))
+        rename_bulk_import_file(instance, data.get(
+            "old_filename"), data.get("new_filename"))
 
     @globals.web_socket.on("delete_bulk_file")
     def delete_bulk_file(data):
@@ -389,14 +402,17 @@ def setup_socket_handlers(
         try:
             globals.bulk_file_service.write_file(content, filename)
             update_log(instance, f"Created new bulk file: {filename}")
-            notify_web(instance, "create_bulk_file", {"created": True, "filename": filename})
+            notify_web(instance, "create_bulk_file", {
+                       "created": True, "filename": filename})
             # Reload the file list
             folder_path = globals.bulk_file_service.get_bulk_imports_directory()
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
-            notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
+            notify_web(instance, "load_bulk_filelist",
+                       {"bulk_files": bulk_files})
         except Exception as e:
             update_status(instance, f"Error creating file: {str(e)}", "danger")
-            notify_web(instance, "create_bulk_file", {"created": False, "error": str(e)})
+            notify_web(instance, "create_bulk_file", {
+                       "created": False, "error": str(e)})
 
     @globals.web_socket.on("display_message")
     def display_message(data):
@@ -413,7 +429,8 @@ def setup_socket_handlers(
             password = data.get("password", "")
 
             if not username or not password:
-                notify_web(instance, "set_password", {"success": False, "error": "Username and password required"})
+                notify_web(instance, "set_password", {
+                           "success": False, "error": "Username and password required"})
                 return
 
             # Hash the password
@@ -429,9 +446,11 @@ def setup_socket_handlers(
             globals.config = config
 
             notify_web(instance, "set_password", {"success": True})
-            update_log(instance, f"Authentication enabled for user '{username}'")
+            update_log(
+                instance, f"Authentication enabled for user '{username}'")
         except Exception as e:
-            notify_web(instance, "set_password", {"success": False, "error": str(e)})
+            notify_web(instance, "set_password", {
+                       "success": False, "error": str(e)})
 
     @globals.web_socket.on("save_config")
     def save_config_web(data):
@@ -451,9 +470,11 @@ def setup_socket_handlers(
             globals.config = config
 
             # Reconnect to Plex because the Plex server or token might have changed
-            update_log(instance, "Saving updated configuration and reconnecting to Plex")
+            update_log(
+                instance, "Saving updated configuration and reconnecting to Plex")
             globals.plex.reconnect(config)
-            notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
+            notify_web(instance, "save_config", {
+                       "saved": True, "config": vars(config)})
         except Exception as config_error:
             update_status(instance, str(config_error), color="danger")
 
@@ -466,7 +487,8 @@ def setup_socket_handlers(
 
             if schedule_file:
                 # Get job ID from scheduler service
-                job_id = globals.scheduler_service.get_job_id_by_file(schedule_file)
+                job_id = globals.scheduler_service.get_job_id_by_file(
+                    schedule_file)
 
                 if job_id:
                     # Remove from scheduler service
@@ -485,10 +507,12 @@ def setup_socket_handlers(
                     notify_web(
                         instance,
                         "delete_schedule",
-                        {"file": schedule_file, "job_reference": job_id, "deleted": True}
+                        {"file": schedule_file,
+                            "job_reference": job_id, "deleted": True}
                     )
                 else:
-                    notify_web(instance, "delete_schedule", {"deleted": False, "job_id": job_id})
+                    notify_web(instance, "delete_schedule", {
+                               "deleted": False, "job_id": job_id})
 
     @globals.web_socket.on("add_schedule")
     def add_tasks_to_scheduler(data):
@@ -528,7 +552,8 @@ def setup_socket_handlers(
                         }
                     )
                 except Exception as e:
-                    debug_me(f"Error adding schedule: {e}", "add_tasks_to_scheduler")
+                    debug_me(
+                        f"Error adding schedule: {e}", "add_tasks_to_scheduler")
                     raise
 
                 # Start the scheduler if it's not already started
@@ -536,7 +561,8 @@ def setup_socket_handlers(
 
         except Exception as e:
             if globals.debug:
-                debug_me(f"Error in scheduler setup: {e}", "add_tasks_to_scheduler")
+                debug_me(
+                    f"Error in scheduler setup: {e}", "add_tasks_to_scheduler")
                 raise
 
     def update_or_add_schedule(file_name, new_time):
@@ -582,14 +608,16 @@ def setup_socket_handlers(
         plex_year = data.get("plex_year")
         plex_title = data.get("plex_title")
         options = data.get("options")
-        debug_me(f"Obtained options from web form: {options}", "handle_upload_complete")
+        debug_me(
+            f"Obtained options from web form: {options}", "handle_upload_complete")
 
         instance = Instance(data.get("instance_id"), "web")
 
         if file_name in upload_chunks and len(upload_chunks[file_name]["chunks"]) == int(
                 upload_chunks[file_name]["total_chunks"]
         ):
-            debug_me(f"Upload complete for {file_name}, saving file...", "handle_upload_complete")
+            debug_me(
+                f"Upload complete for {file_name}, saving file...", "handle_upload_complete")
             save_uploaded_file(
                 instance,
                 file_name,
@@ -652,7 +680,8 @@ def save_uploaded_file(
     # temp_zip_path = tempfile.mktemp(suffix=".zip")
     temp_zip_folder = tempfile.mkdtemp()
     temp_zip_path = os.path.join(temp_zip_folder, file_name)
-    debug_me(f"Saving uploaded file {file_name} to temporary path: {temp_zip_folder}", "save_uploaded_file")
+    debug_me(
+        f"Saving uploaded file {file_name} to temporary path: {temp_zip_folder}", "save_uploaded_file")
 
     with open(temp_zip_path, "wb") as f:
         for chunk in upload_chunks[file_name]["chunks"]:
@@ -676,14 +705,18 @@ def save_uploaded_file(
     try:
         os.remove(temp_zip_path)
         os.rmdir(temp_zip_folder)
-        debug_me(f"Deleted temporary ZIP file: {temp_zip_path}", "save_uploaded_file")
+        debug_me(
+            f"Deleted temporary ZIP file: {temp_zip_path}", "save_uploaded_file")
     except Exception as e:
-        debug_me(f"Error deleting temporary ZIP file: {e}", "save_uploaded_file")
+        debug_me(
+            f"Error deleting temporary ZIP file: {e}", "save_uploaded_file")
 
-    process_uploaded_artwork(instance, extracted_files, options, filters, plex_title, plex_year)
+    process_uploaded_artwork(instance, extracted_files,
+                             options, filters, plex_title, plex_year)
 
     notify_web(instance, "upload_complete", {"files": extracted_files})
-    update_status(instance, "Finished processing uploaded file.", color="success")
+    update_status(instance, "Finished processing uploaded file.",
+                  color="success")
 
 
 def extract_and_list_zip(
@@ -708,32 +741,37 @@ def extract_and_list_zip(
     """
     extract_dir = tempfile.mkdtemp()
     valid_files = []
-    zip_source = "theposterdb"
+    zip_source = SOURCE_THEPOSTERDB
 
-    debug_me(f"Extracting ZIP file: {zip_path} to {extract_dir}", "extract_and_list_zip")
+    debug_me(
+        f"Extracting ZIP file: {zip_path} to {extract_dir}", "extract_and_list_zip")
 
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         # Pre-process the file list to determine source and extract valid files
         for zip_info in zip_ref.infolist():
-            debug_me(f"Processing ZIP entry: {zip_info.filename}", "extract_and_list_zip")
-            filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
+            debug_me(
+                f"Processing ZIP entry: {zip_info.filename}", "extract_and_list_zip")
+            # Get filename only (ignore paths)
+            filename = os.path.basename(zip_info.filename)
 
             # Skip directories and unwanted metadata files
             if not filename or filename.startswith('.') or filename.lower() in {"ds_store", "__macosx"}:
                 continue
 
-            if filename == "source.txt":
-                zip_source = "mediux"
-                with zip_ref.open(zip_info.filename) as source, open(os.path.join(extract_dir, "source.txt"),
+            if filename == SOURCE_TXT:
+                zip_source = SOURCE_MEDIUX
+                with zip_ref.open(zip_info.filename) as source, open(os.path.join(extract_dir, SOURCE_TXT),
                                                                      "wb") as target:
                     target.write(source.read())
-                with open(os.path.join(extract_dir, "source.txt"), "r", encoding="utf-8") as source_file:
+                with open(os.path.join(extract_dir, SOURCE_TXT), "r", encoding="utf-8") as source_file:
                     for line in source_file:
                         if line.startswith("Author:"):
                             author = line.split("Author:")[1].strip()
-                            debug_me(f"Detected MediUX source, author: {author}", "extract_and_list_zip")
+                            debug_me(
+                                f"Detected MediUX source, author: {author}", "extract_and_list_zip")
                             break
-                os.remove(os.path.join(extract_dir, "source.txt"))  # Clean up source.txt after obtaining author info
+                # Clean up source.txt after obtaining author info
+                os.remove(os.path.join(extract_dir, SOURCE_TXT))
 
             elif filename_pattern.match(filename):
                 extracted_path = os.path.join(extract_dir, filename)
@@ -746,9 +784,10 @@ def extract_and_list_zip(
     file_list = []
 
     if zip_source == "theposterdb":
-        match = re.search(f"set by (.+?) -", os.path.basename(zip_path))
+        match = re.search("set by (.+?) -", os.path.basename(zip_path))
         author = match.group(1).strip() if match else None
-        debug_me(f"Detected ThePosterDB source, author: {author}", "extract_and_list_zip")
+        debug_me(
+            f"Detected ThePosterDB source, author: {author}", "extract_and_list_zip")
 
     for file in os.listdir(extract_dir):
         full_path = os.path.join(extract_dir, file)
@@ -767,13 +806,17 @@ def extract_and_list_zip(
         artwork["author"] = author
         # Determine media type via Plex lookup if not a collection
         if artwork["media"] != "Collection":
-            media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
+            media_type, tmdb_id, title, year = globals.plex.movie_or_show(
+                artwork.get('title'), artwork.get('year'))
             if media_type is None:
                 # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
-                artwork["title"] = re.sub(r'-', '', artwork.get('title')).replace('...', '').strip()
-                media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
+                artwork["title"] = artwork.get('title').replace(
+                    "-", "").replace('...', '').strip()
+                media_type, tmdb_id, title, year = globals.plex.movie_or_show(
+                    artwork.get('title'), artwork.get('year'))
             artwork["media"] = media_type if media_type else "unavailable"
-            artwork["title"] = title if title and title != artwork.get('title') else artwork.get('title')
+            artwork["title"] = title if title and title != artwork.get(
+                'title') else artwork.get('title')
             artwork["tmdb_id"] = tmdb_id
             if artwork.get('year') is None and year is not None:
                 artwork['year'] = year
@@ -793,7 +836,8 @@ def extract_and_list_zip(
 
     sorted_data = sorted(file_list, key=sort_key_func)
 
-    debug_me(f"Obtained {len(sorted_data)} artwork items:", "extract_and_list_zip")
+    debug_me(f"Obtained {len(sorted_data)} artwork items:",
+             "extract_and_list_zip")
     pprint.pprint(sorted_data)
 
     return sorted_data
@@ -817,17 +861,18 @@ def start_web_server(web_app, web_port: int, debug: bool = False, ip_binding: st
         if ipv6_available:
             print("Checking dual-stack support...")
             dual_stack_supported = is_dual_stack_supported()
-
             if dual_stack_supported:
                 # "::" enables both IPv4 and IPv6
                 binding_host = "::"
-                print(f"✓ Starting web server on dual-stack (IPv4 and IPv6) at port {web_port}")
+                print(
+                    f"✓ Starting web server on dual-stack (IPv4 and IPv6) at port {web_port}")
                 print(f"  - IPv4: http://127.0.0.1:{web_port}")
                 print(f"  - IPv6: http://[::1]:{web_port}")
             else:
                 # Dual-stack not supported, fall back to IPv4 only
                 binding_host = "0.0.0.0"
-                print(f"! Dual-stack not supported on this system, using IPv4 only at port {web_port}")
+                print(
+                    f"! Dual-stack not supported on this system, using IPv4 only at port {web_port}")
                 print(f"  - IPv4: http://127.0.0.1:{web_port}")
         else:
             # IPv6 not available, fall back to IPv4 only
@@ -844,7 +889,8 @@ def start_web_server(web_app, web_port: int, debug: bool = False, ip_binding: st
         else:
             # IPv6 requested but not available, fall back to IPv4
             binding_host = "0.0.0.0"
-            print(f"! IPv6 requested but not available, falling back to IPv4 at port {web_port}")
+            print(
+                f"! IPv6 requested but not available, falling back to IPv4 at port {web_port}")
             print(f"  - IPv4: http://127.0.0.1:{web_port}")
     else:
         # IPv4 only (default fallback)
@@ -852,4 +898,5 @@ def start_web_server(web_app, web_port: int, debug: bool = False, ip_binding: st
         print(f"Starting web server on IPv4 only at port {web_port}")
         print(f"  - IPv4: http://127.0.0.1:{web_port}")
 
-    globals.web_socket.run(web_app, host=binding_host, port=web_port, debug=debug)
+    globals.web_socket.run(web_app, host=binding_host,
+                           port=web_port, debug=debug)

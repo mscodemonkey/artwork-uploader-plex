@@ -19,9 +19,11 @@ class PlexUploader:
             artwork_type: str,
             artwork_id: str
     ) -> None:
-        self.upload_target: Union[Movie, Show, Season, Episode, Collection] = upload_target
+        self.upload_target: Union[Movie, Show,
+                                  Season, Episode, Collection] = upload_target
         self.artwork_type: str = artwork_type
-        self.artwork_id: str = artwork_id.upper() + "ID:"  # This will be BID, CID, PID, SID or EID - for [B]ackgrounds, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
+        # This will be BID, CID, PID, SID or EID - for [B]ackgrounds, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
+        self.artwork_id: str = artwork_id.upper() + "ID:"
         self.description: str = "item"
         self.label: Optional[str] = None
         self.artwork: Optional[AnyArtwork] = None
@@ -38,7 +40,8 @@ class PlexUploader:
         else:
             self.type = "url"
             self.label = self.artwork_id + utils.calculate_md5(
-                self.artwork["url"].split('&_cb=')[0])  # Remove any cache buster before calculating the MD5
+                # Remove any cache buster before calculating the MD5
+                self.artwork["url"].split('&_cb=')[0])
 
     def set_description(self, description: str) -> None:
         self.description = description
@@ -51,7 +54,8 @@ class PlexUploader:
         if self.reset_overlay:
             for label in self.upload_target.labels:
                 if str(label) == KOMETA_OVERLAY_LABEL:
-                    self.upload_target.removeLabel(label, False)  # Remove the Overlay label
+                    self.upload_target.removeLabel(
+                        label, False)  # Remove the Overlay label
                     self.upload_target.reload()
 
     def upload_to_plex(self) -> str:
@@ -62,16 +66,19 @@ class PlexUploader:
 
                 if self.artwork_id == "BID:":
                     if self.type == "file":
-                        self.upload_target.uploadArt(filepath=self.artwork['path'])
+                        self.upload_target.uploadArt(
+                            filepath=self.artwork['path'])
                     else:
                         self.upload_target.uploadArt(url=self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
                 else:
                     if self.type == "file":
-                        self.upload_target.uploadPoster(filepath=self.artwork['path'])
+                        self.upload_target.uploadPoster(
+                            filepath=self.artwork['path'])
                     else:
-                        self.upload_target.uploadPoster(url=self.artwork["url"])
+                        self.upload_target.uploadPoster(
+                            url=self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
                 if self.artwork["source"] == ScraperSource.THEPOSTERDB.value and self.type == "url":
@@ -86,9 +93,11 @@ class PlexUploader:
         existing_artwork = False
 
         for label in self.upload_target.labels:
-            existing_label = str(label)  # Convert the label object to a string if it's not already
+            # Convert the label object to a string if it's not already
+            existing_label = str(label)
             if existing_label.startswith(
-                    self.artwork_id):  # Only check this type of ID, could be multiple IDs per item (e.g. background + cover)
+                    # Only check this type of ID, could be multiple IDs per item (e.g. background + cover)
+                    self.artwork_id):
                 if existing_label == self.label:
                     existing_artwork = True
                     if not self.track_artwork_ids:

@@ -57,7 +57,8 @@ class UtilityService:
             return source if source else ''
 
         # Now safely get the values, even if they are missing
-        season_value = parse_season(item.get('season'))  # Using .get() to avoid KeyError
+        # Using .get() to avoid KeyError
+        season_value = parse_season(item.get('season'))
         episode_value = parse_episode(item.get('episode'))  # Same for episode
         source_value = parse_source(item.get('source'))  # Same for source
 

@@ -72,7 +72,8 @@ TPDB_BASE_URL = "https://theposterdb.com"
 TPDB_API_ASSETS_URL = "https://theposterdb.com/api/assets"
 TPDB_RATE_LIMIT_DELAY = 6  # seconds between requests
 TPDB_USER_UPLOADS_PER_PAGE = 24
-
+TPBD_USER_BASE_PATH = "/user/"
+TPBD_SET_BASE_PATH = "/set/"
 # MediUX configuration
 MEDIUX_BASE_URL = "https://mediux.pro"
 MEDIUX_API_BASE_URL = "https://api.mediux.pro/assets/"
