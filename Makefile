@@ -1,6 +1,6 @@
 APP=media-artwork-uploader
 REGISTRY=jabrown
-TAG ?= $(shell git describe --tags --always --dirty)
+TAG?=$(shell git describe --tags --always --dirty)
 PLATFORMS=linux/amd64,linux/arm64
 
 .PHONY: docker-build docker-release
