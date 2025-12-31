@@ -3,7 +3,7 @@
   "extends": [
     "local>jabrown93/.github:renovate-config"
   ],
-  "automerge": "false",
+  "automerge": false,
   "platformAutomerge": false,
   "ignoreTests": true,
   "lockFileMaintenance": {
