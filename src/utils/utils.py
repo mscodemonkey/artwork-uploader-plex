@@ -61,6 +61,46 @@ def title_cleaner(string):
     return title
 
 
+def normalize_title_for_matching(title: str) -> str:
+    """
+    Normalize a title for fuzzy matching by removing punctuation and standardizing format.
+
+    This allows matching titles like:
+    - "The Emperors New Groove" and "The Emperor's New Groove"
+    - "Star Wars: Episode IV" and "Star Wars Episode IV"
+
+    Args:
+        title: The title to normalize
+
+    Returns:
+        Normalized title string
+
+    Example:
+        >>> normalize_title_for_matching("The Emperor's New Groove")
+        'emperors new groove'
+        >>> normalize_title_for_matching("Star Wars: Episode IV")
+        'star wars episode iv'
+    """
+    if not title:
+        return ""
+
+    # Convert to lowercase
+    normalized = title.lower()
+
+    # Remove apostrophes and other common punctuation
+    # Keep spaces and alphanumeric characters
+    normalized = re.sub(r"[''`']", "", normalized)  # Remove apostrophes (various types)
+    normalized = re.sub(r"[^\w\s]", " ", normalized)  # Replace other punctuation with spaces
+
+    # Remove "the" prefix if present
+    normalized = re.sub(r"^the\s+", "", normalized)
+
+    # Collapse multiple spaces into one and strip
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+
+    return normalized
+
+
 def parse_string_to_dict(input_string):
     # Remove unnecessary replacements
     input_string = input_string.replace('\\\\\\\"', "")

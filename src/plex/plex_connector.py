@@ -13,6 +13,7 @@ from plexapi.library import MovieSection, ShowSection
 from plexapi.server import PlexServer
 from plexapi.video import Movie, Show
 from utils.notifications import debug_me
+from utils.utils import normalize_title_for_matching
 
 
 class PlexConnector:
@@ -166,12 +167,22 @@ class PlexConnector:
         collections = []
         libraries = []
 
+        # Normalize the search title for fuzzy matching
+        normalized_search_title = normalize_title_for_matching(collection_title)
+
         for movie_library in self.movie_libraries:
             try:
                 plex_collections = movie_library.collections()
                 for collection in plex_collections:
+                    # Try exact match first
                     if collection.title == collection_title:
-                        debug_me(f"Found '{collection_title}' in '{movie_library.title}'",
+                        debug_me(f"Found '{collection_title}' in '{movie_library.title}' (exact match)",
+                                 "PlexConnector/find_collection")
+                        collections.append(collection)
+                        libraries.append(movie_library.title)
+                    # Fall back to normalized fuzzy match
+                    elif normalize_title_for_matching(collection.title) == normalized_search_title:
+                        debug_me(f"Found '{collection_title}' as '{collection.title}' in '{movie_library.title}' (fuzzy match)",
                                  "PlexConnector/find_collection")
                         collections.append(collection)
                         libraries.append(movie_library.title)
@@ -255,6 +266,8 @@ class PlexConnector:
             [(lib, "Movie") for lib in self.movie_libraries] +
             [(lib, "TV Show") for lib in self.tv_libraries]
         )
+
+        # Try exact search first
         for library, media_type in libraries_with_type:
             try:
                 search_kwargs = {'title': title}
@@ -274,10 +287,10 @@ class PlexConnector:
                                 pass
                             break
                     if tmdb_id is not None:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} with TMDb ID: {tmdb_id}",
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} with TMDb ID: {tmdb_id} (exact match)",
                                  "PlexConnector/movie_or_show")
                     else:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} but TMDb ID not found",
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} but TMDb ID not found (exact match)",
                                  "PlexConnector/movie_or_show")
                     return media_type, tmdb_id, found_title, found_year
             except Exception as e:
@@ -285,6 +298,43 @@ class PlexConnector:
                     f"Error searching for movie in library '{library.title}': {e}", "PlexConnector/movie_or_show")
                 pass
 
-        debug_me(f"'{title} ({year})' not found in any library",
+        # If exact search failed, try fuzzy matching
+        normalized_search_title = normalize_title_for_matching(title)
+        debug_me(f"Exact search failed for '{title}', trying fuzzy match with normalized title: '{normalized_search_title}'",
+                 "PlexConnector/movie_or_show")
+
+        for library, media_type in libraries_with_type:
+            try:
+                # Get all items and check normalized titles
+                search_kwargs = {}
+                if year is not None:
+                    search_kwargs['year'] = year
+                all_items = library.search(**search_kwargs) if search_kwargs else library.all()
+
+                for item in all_items:
+                    if normalize_title_for_matching(item.title) == normalized_search_title:
+                        # Check year match if provided
+                        if year is None or item.year == year:
+                            tmdb_id: Optional[int] = None
+                            for guid in item.guids:
+                                if "tmdb://" in guid.id:
+                                    try:
+                                        tmdb_id = int(guid.id.split("tmdb://", 1)[-1])
+                                    except ValueError:
+                                        pass
+                                    break
+                            if tmdb_id is not None:
+                                debug_me(f"Item '{title} ({year})' found as '{item.title}' with TMDb ID: {tmdb_id} (fuzzy match)",
+                                         "PlexConnector/movie_or_show")
+                            else:
+                                debug_me(f"Item '{title} ({year})' found as '{item.title}' but TMDb ID not found (fuzzy match)",
+                                         "PlexConnector/movie_or_show")
+                            return media_type, tmdb_id, item.title, item.year
+            except Exception as e:
+                debug_me(
+                    f"Error in fuzzy search for '{title}' in library '{library.title}': {e}", "PlexConnector/movie_or_show")
+                pass
+
+        debug_me(f"'{title} ({year})' not found in any library (tried exact and fuzzy matching)",
                  "PlexConnector/movie_or_show")
         return None, None, None, None
