@@ -9,6 +9,7 @@ The routes are organized into:
 - Socket.IO event handlers (@socket.on)
 - Helper functions for file uploads and processing
 """
+import shutil
 
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from utils import utils
@@ -245,6 +246,7 @@ def setup_socket_handlers(
     )
 
     # Temporary storage for chunked uploads
+    # Changed from in-memory list to file handles for better memory efficiency with large uploads
     upload_chunks = {}
 
     @globals.web_socket.on("check_for_update")
@@ -581,7 +583,7 @@ def setup_socket_handlers(
 
     @globals.web_socket.on("upload_artwork_chunk")
     def handle_upload_chunk(data):
-        """Handle chunked file upload."""
+        """Handle chunked file upload - writes directly to temp file for memory efficiency."""
         instance = Instance(data.get("instance_id"), "web")
 
         file_name = data["fileName"]
@@ -590,19 +592,52 @@ def setup_socket_handlers(
         total_chunks = data["totalChunks"]
 
         if file_name not in upload_chunks:
+            # Create a temporary file to stream chunks to disk instead of memory
+            temp_file = tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.upload')
             upload_chunks[file_name] = {
-                "chunks": [],
+                "temp_file": temp_file,
+                "temp_path": temp_file.name,
+                "chunks_received": 0,
                 "total_chunks": total_chunks,
                 "instance": instance
             }
 
-        # Ensure decoding to bytes
+        # Decode and write chunk directly to disk
         try:
             decoded_chunk = base64.b64decode(chunk_data)
-            upload_chunks[file_name]["chunks"].append(decoded_chunk)
+            upload_chunks[file_name]["temp_file"].write(decoded_chunk)
+            upload_chunks[file_name]["chunks_received"] += 1
         except Exception as e:
             logger.error(
-                f"Error decoding chunk {chunk_index}: {e}", exc_info=True)
+                f"Error decoding/writing chunk {chunk_index}: {e}", exc_info=True)
+            # Cleanup temp file and state to avoid resource leaks and partial uploads
+            try:
+                if file_name in upload_chunks:
+                    temp_file_obj = upload_chunks[file_name].get("temp_file")
+                    temp_path = upload_chunks[file_name].get("temp_path")
+                    if temp_file_obj is not None:
+                        try:
+                            temp_file_obj.close()
+                        except Exception as close_err:
+                            logger.warning(
+                                f"Error closing temp file for {file_name}: {close_err}",
+                                exc_info=True,
+                            )
+                    if temp_path and os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except OSError as remove_err:
+                            logger.warning(
+                                f"Error removing temp file {temp_path} for {file_name}: {remove_err}",
+                                exc_info=True,
+                            )
+                    # Remove the upload entry so it does not appear partially complete
+                    del upload_chunks[file_name]
+            except Exception as cleanup_err:
+                logger.error(
+                    f"Error during cleanup after failed chunk {chunk_index} for {file_name}: {cleanup_err}",
+                    exc_info=True,
+                )
 
     @globals.web_socket.on("upload_complete")
     def handle_upload_complete(data):
@@ -617,11 +652,15 @@ def setup_socket_handlers(
 
         instance = Instance(data.get("instance_id"), "web")
 
-        if file_name in upload_chunks and len(upload_chunks[file_name]["chunks"]) == int(
+        if file_name in upload_chunks and upload_chunks[file_name]["chunks_received"] == int(
                 upload_chunks[file_name]["total_chunks"]
         ):
             debug_me(
-                f"Upload complete for {file_name}, saving file...", "handle_upload_complete")
+                f"Upload complete for {file_name}, processing file...", "handle_upload_complete")
+
+            # Close the temp file before processing
+            upload_chunks[file_name]["temp_file"].close()
+
             save_uploaded_file(
                 instance,
                 file_name,
@@ -637,20 +676,39 @@ def setup_socket_handlers(
 
             # Cleanup after saving the file
             try:
+                temp_path = upload_chunks[file_name]["temp_path"]
+                # Delete temp file if it still exists
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except OSError as remove_err:
+                        logger.error(
+                            f"Error removing temp file {temp_path}: {remove_err}")
                 del upload_chunks[file_name]
-            except KeyError:
-                pass
+            except (KeyError, OSError) as e:
+                debug_me(f"Error during cleanup: {e}", "handle_upload_complete")
         else:
+            chunks_received = upload_chunks[file_name]["chunks_received"] if file_name in upload_chunks else 0
+            expected_chunks = upload_chunks[file_name]["total_chunks"] if file_name in upload_chunks else 0
             debug_me(
                 f'Upload complete event received for {file_name}, but with '
-                f'{len(upload_chunks[file_name]["chunks"])} of '
-                f'{int(upload_chunks[file_name]["total_chunks"])}, some chunks are missing.',
+                f'{chunks_received} of {expected_chunks}, some chunks are missing.',
                 "handle_upload_complete"
             )
             try:
+                # Clean up temp file
+                if file_name in upload_chunks:
+                    upload_chunks[file_name]["temp_file"].close()
+                    temp_path = upload_chunks[file_name]["temp_path"]
+                    if os.path.exists(temp_path):
+                        try:
+                            os.remove(temp_path)
+                        except OSError as remove_err:
+                            logger.error(
+                                f"Error removing temp file {temp_path}: {remove_err}")
                 del upload_chunks[file_name]
-            except KeyError:
-                pass
+            except (KeyError, OSError) as e:
+                debug_me(f"Error during cleanup: {e}", "handle_upload_complete")
 
 
 def save_uploaded_file(
@@ -666,7 +724,7 @@ def save_uploaded_file(
         sort_key_func
 ):
     """
-    Assemble chunks and save the uploaded file.
+    Process the uploaded file from temp storage.
 
     Args:
         instance: Instance object for web notifications
@@ -674,27 +732,40 @@ def save_uploaded_file(
         filters: List of filters to apply
         plex_title: Optional title override
         plex_year: Optional year override
-        upload_chunks: Dictionary of upload chunks
+        upload_chunks: Dictionary with temp file info
         filename_pattern: Regex pattern for validating filenames
         check_image_orientation_func: Function to check image orientation
         sort_key_func: Function to generate sort keys
     """
     from artwork_uploader import process_uploaded_artwork
 
-    # temp_zip_path = tempfile.mktemp(suffix=".zip")
+    # Get the temp file path that was written during chunk upload
+    temp_upload_path = upload_chunks[file_name]["temp_path"]
+    debug_me(
+        f"Processing uploaded file {file_name} from temp path: {temp_upload_path}", "save_uploaded_file")
+
+    # Move to a proper temp location with correct filename for processing
     temp_zip_folder = tempfile.mkdtemp()
     temp_zip_path = os.path.join(temp_zip_folder, file_name)
-    debug_me(
-        f"Saving uploaded file {file_name} to temporary path: {temp_zip_folder}", "save_uploaded_file")
 
-    with open(temp_zip_path, "wb") as f:
-        for chunk in upload_chunks[file_name]["chunks"]:
-            if isinstance(chunk, str):  # Convert strings to bytes if needed
-                chunk = chunk.encode('utf-8')
-            f.write(chunk)
+    # Move/rename the upload temp file to processing location
+    try:
+        shutil.move(temp_upload_path, temp_zip_path)
+    except OSError as e:
+        debug_me(
+            f"Failed to move uploaded file from {temp_upload_path} to {temp_zip_path}: {e}",
+            "save_uploaded_file",
+        )
+        # Best-effort cleanup of the temporary zip folder created for processing
+        try:
+            os.rmdir(temp_zip_folder)
+        except Exception:
+            # Ignore cleanup errors here to avoid masking the original exception
+            pass
+        # Re-raise so callers can handle the failure as before
+        raise
 
-    del upload_chunks[file_name]  # Free memory
-    debug_me(f"Saved ZIP file: {temp_zip_path}", "save_uploaded_file")
+    debug_me(f"Moved uploaded file to: {temp_zip_path}", "save_uploaded_file")
 
     extracted_files = extract_and_list_zip(
         temp_zip_path,

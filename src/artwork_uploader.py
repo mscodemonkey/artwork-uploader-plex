@@ -852,8 +852,20 @@ if __name__ == "__main__":
             web_app.config['SECRET_KEY'] = secrets.token_hex(32)
             web_app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
+            # Configure SocketIO with increased timeouts for large file uploads
+            # ping_timeout: How long to wait for a pong response before disconnecting (default: 60s)
+            # ping_interval: How often to send pings to keep connection alive (default: 25s)
+            # http_compression: Enable compression for better performance with large uploads
+            # max_http_buffer_size: Maximum size of HTTP long-polling messages (default: 1MB)
             globals.web_socket = SocketIO(
-                web_app, cors_allowed_origins="*", async_mode="eventlet")
+                web_app,
+                cors_allowed_origins="*",
+                async_mode="eventlet",
+                ping_timeout=300,  # 5 minutes - allows time for large file processing
+                ping_interval=25,  # Keep default 25s to maintain connection health
+                http_compression=True,  # Enable compression for better performance
+                max_http_buffer_size=10000000  # 10MB - allow larger individual messages
+            )
 
             # Start update checker using UpdateService
 

@@ -234,6 +234,36 @@ All web routes and Socket.IO handlers are in `web_routes.py`:
 
 The web UI uses Socket.IO for real-time updates. Services emit events like `status_update`, `log_update`, `progress_update` via callbacks.
 
+## Performance and Memory Optimizations
+
+The application includes several optimizations for handling large file uploads and maintaining stable WebSocket connections:
+
+### SocketIO Configuration
+
+The SocketIO instance is configured with increased timeouts and enhanced compression (src/artwork_uploader.py:852):
+- `ping_timeout`: 300 seconds (5 minutes) - allows time for large file processing without disconnection
+- `ping_interval`: 25 seconds (default) - maintains connection health with regular pings
+- `http_compression`: Enabled for better performance with large uploads
+- `max_http_buffer_size`: 10MB (increased from 1MB default) - allows larger individual messages
+
+These settings ensure stable connections during long-running operations like bulk imports or large artwork uploads.
+
+### Memory-Efficient Chunked Uploads
+
+File uploads use a streaming approach to minimize memory usage (src/web_routes.py:582):
+- Incoming chunks are written directly to a temporary file on disk instead of accumulating in memory
+- Each uploaded file gets a `NamedTemporaryFile` that persists until upload completion
+- After all chunks are received, the temp file is moved to the final processing location
+- Proper cleanup ensures temp files are removed even if errors occur
+
+This approach prevents memory exhaustion when uploading large ZIP files (artwork collections) through the web interface.
+
+**Implementation Details**:
+- `upload_chunks` dictionary stores file handles and temp paths, not data chunks
+- Base64-decoded chunks are immediately written to disk via `temp_file.write()`
+- On upload completion, the temp file is closed and moved (not copied) to the processing location
+- Error handling includes cleanup of temp files to prevent disk space leaks
+
 ## Testing Strategy
 
 **pytest.ini** configures test discovery and markers:
