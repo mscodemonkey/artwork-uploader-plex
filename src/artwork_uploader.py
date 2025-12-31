@@ -7,6 +7,7 @@ import uuid
 
 import eventlet
 eventlet.monkey_patch()
+from flask_cors import CORS
 
 from core import globals
 from core.config import Config
@@ -844,6 +845,9 @@ if __name__ == "__main__":
             # Create the app and web server
 
             web_app = Flask(__name__, template_folder="templates")
+
+            # Enable CORS for all routes to allow Socket.IO connections from any origin
+            CORS(web_app, resources={r"/*": {"origins": "*", "supports_credentials": True}})
 
             # Configure session for authentication
             import secrets

@@ -9,6 +9,7 @@ customtkinter==5.2.2
 darkdetect==0.8.0
 eventlet==0.40.4
 Flask==3.1.2
+Flask-CORS==5.0.0
 Flask-SocketIO==5.6.0
 h11==0.16.0
 idna==3.11

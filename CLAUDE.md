@@ -234,6 +234,16 @@ All web routes and Socket.IO handlers are in `web_routes.py`:
 
 The web UI uses Socket.IO for real-time updates. Services emit events like `status_update`, `log_update`, `progress_update` via callbacks.
 
+### CORS Configuration
+
+The application uses Flask-CORS to enable cross-origin requests (src/artwork_uploader.py:848):
+- Configured immediately after Flask app creation
+- Allows all origins (`origins: "*"`) for all routes
+- Required for Socket.IO connections from different domains/ports
+- Works in conjunction with SocketIO's `cors_allowed_origins="*"` setting
+
+**Why CORS is needed**: While SocketIO has its own CORS configuration, the initial HTTP handshake and Flask routes require Flask-CORS to properly send CORS headers. Without this, browsers will block Socket.IO connections due to CORS policy violations, especially in production deployments or when accessing from different origins.
+
 ## Performance and Memory Optimizations
 
 The application includes several optimizations for handling large file uploads and maintaining stable WebSocket connections:
