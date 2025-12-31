@@ -6,6 +6,7 @@ import traceback
 import uuid
 
 import eventlet
+eventlet.monkey_patch()
 
 from core import globals
 from core.config import Config
@@ -41,7 +42,6 @@ from services import (
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from utils.utils import is_not_comment, parse_url_and_options
 
-eventlet.monkey_patch()
 
 module_logger = get_logger(__name__)
 
