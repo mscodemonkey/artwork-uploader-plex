@@ -14,6 +14,7 @@ from core.constants import (
     GITHUB_REPO,
     DEFAULT_BULK_IMPORT_FILE,
     DEFAULT_CONFIG_PATH,
+    DEFAULT_LOGS_DIR,
     DEFAULT_WEB_PORT,
     SCHEDULER_CHECK_INTERVAL,
     UPDATE_CHECK_INTERVAL,
@@ -702,11 +703,16 @@ if __name__ == "__main__":
         sys.exit(
             f"Unexpected error when loading config.json file: {str(config_load_exception)}")
 
+    # Determine log directory: environment variable (for Docker) takes precedence over CLI argument
+    logs_dir = os.environ.get("LOGS_DIR", args.logs)
+    if not logs_dir:
+        logs_dir = DEFAULT_LOGS_DIR
+
     # Initialize logging with debug flag from config or CLI args
     debug_mode = args.debug or config.debug
-    logger = setup_logging(debug=debug_mode)
+    logger = setup_logging(debug=debug_mode, log_dir=logs_dir)
     logger.info(
-        f"Logging initialized (debug={'enabled' if debug_mode else 'disabled'})")
+        f"Logging initialized (debug={'enabled' if debug_mode else 'disabled'}, log_dir={logs_dir})")
 
     # Create services
     # Initialize bulk file service with optional custom path from environment variable

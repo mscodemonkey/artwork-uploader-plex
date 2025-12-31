@@ -19,4 +19,5 @@ services:
       # Optional: override default paths
       # - BULK_IMPORTS_DIR=/custom/bulk_imports
       # - CONFIG_PATH=/config/config.json
+      # - LOGS_DIR=/custom/logs
     restart: unless-stopped

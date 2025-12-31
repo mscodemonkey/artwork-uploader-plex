@@ -28,6 +28,7 @@ RUNNING_IN_DOCKER = os.getenv("RUNNING_IN_DOCKER") == "1"
 DEFAULT_CONFIG_PATH = "/config/config.json" if RUNNING_IN_DOCKER else "config.json"
 DEFAULT_BULK_IMPORTS_DIR = "/bulk_imports" if RUNNING_IN_DOCKER else "bulk_imports"
 DEFAULT_BULK_IMPORT_FILE = "bulk_import.txt"
+DEFAULT_LOGS_DIR = "/logs" if RUNNING_IN_DOCKER else "logs"
 
 # Plex library defaults
 DEFAULT_TV_LIBRARY = ["TV Shows"]

@@ -10,13 +10,14 @@ from pathlib import Path
 from typing import Optional
 
 
-def setup_logging(debug: bool = False, log_file: Optional[str] = None) -> logging.Logger:
+def setup_logging(debug: bool = False, log_file: Optional[str] = None, log_dir: Optional[str] = None) -> logging.Logger:
     """
     Configure application logging with file and console handlers.
 
     Args:
         debug: If True, set logging level to DEBUG, otherwise INFO
-        log_file: Path to log file. If None, uses default 'logs/artwork_uploader.log'
+        log_file: Path to log file. If None, uses default '<log_dir>/artwork_uploader.log'
+        log_dir: Directory for log files. If None, uses default 'logs'
 
     Returns:
         Configured logger instance for the application
@@ -33,13 +34,18 @@ def setup_logging(debug: bool = False, log_file: Optional[str] = None) -> loggin
     # Remove existing handlers to avoid duplicates
     logger.handlers.clear()
 
+    # Determine log directory
+    if log_dir is None:
+        log_dir_path = Path('logs')
+    else:
+        log_dir_path = Path(log_dir)
+
     # Create logs directory if it doesn't exist
-    log_dir = Path('logs')
-    log_dir.mkdir(exist_ok=True)
+    log_dir_path.mkdir(exist_ok=True, parents=True)
 
     # Determine log file path
     if log_file is None:
-        log_file = log_dir / 'artwork_uploader.log'
+        log_file = log_dir_path / 'artwork_uploader.log'
     else:
         log_file = Path(log_file)
 
