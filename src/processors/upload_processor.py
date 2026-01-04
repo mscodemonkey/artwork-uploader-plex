@@ -32,6 +32,8 @@ class UploadProcessor:
         self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
         self.staging: bool = self.kometa and (
             globals.config.stage_assets or self.options.stage)
+        self.stage_specials: bool = globals.config.stage_specials
+        self.stage_collections: bool = globals.config.stage_collections
 
     def set_options(self, options: Options) -> None:
         self.options = options
@@ -91,6 +93,36 @@ class UploadProcessor:
                             uploader.set_options(self.options)
                             result = uploader.upload_to_plex()
                             results.append(result)
+                    else:
+                        raise NotProcessedByExclusion(
+                            f"{description} | Poster excluded")
+                else:
+                    raise NotProcessedByFilter(
+                        f"{description} | {artwork_type} not processed due to {'requested' if not self.options.has_filter(filter_type) else artwork_source} filtering")
+        elif self.kometa and self.stage_collections:
+            # Stage collection artwork to Kometa even though collection doesn't exist in Plex
+            # Save to all configured movie libraries
+            movie_libraries = self.config.movie_library if isinstance(self.config.movie_library, list) else [self.config.movie_library]
+            for library in movie_libraries:
+                if (self.options.has_no_filters() and self.check_master_filters(filter_type,
+                                                                                artwork_source)) or self.options.has_filter(
+                        filter_type):
+                    if not self.options.is_excluded(artwork["id"]):
+                        asset_folder = artwork["title"]
+                        saver = KometaSaver(artwork_type, library)
+                        saver.set_artwork(artwork)
+                        base_dir = ("/temp" if self.options.temp else "/assets") if self.docker else getattr(
+                            globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
+                        saver.dest_dir = os.path.join(
+                            base_dir, library, asset_folder)
+                        debug_me(f"Staging collection to {saver.dest_dir}",
+                                 "UploadProcessor/process_collection_artwork")
+                        saver.dest_file_name = artwork_type.lower()
+                        saver.dest_file_ext = ".jpg"
+                        saver.set_description(description)
+                        saver.set_options(self.options)
+                        result = saver.save_to_kometa()
+                        results.append(result)
                     else:
                         raise NotProcessedByExclusion(
                             f"{description} | Poster excluded")
@@ -244,7 +276,8 @@ class UploadProcessor:
                     elif artwork["season"] >= 0:
                         if artwork["episode"] == EPISODE_COVER or artwork["episode"] is None:
                             if artwork["season"] in [S.index for S in tv_show.seasons()] or (
-                                    self.staging and season != SEASON_SPECIALS):
+                                    self.staging and season != SEASON_SPECIALS) or (
+                                    self.kometa and self.stage_specials and season == SEASON_SPECIALS):
                                 debug_me(f"Staging is {'enabled' if self.staging else 'disabled'}.",
                                          "UploadProcessor/process_tv_artwork")
                                 if not self.kometa:
@@ -260,7 +293,8 @@ class UploadProcessor:
                                 continue
                         elif artwork["episode"] >= 0:
                             if (artwork["season"] in [S.index for S in tv_show.seasons()]) or (
-                                    self.staging and season != SEASON_SPECIALS):
+                                    self.staging and season != SEASON_SPECIALS) or (
+                                    self.kometa and self.stage_specials and season == SEASON_SPECIALS):
                                 if ((artwork["season"] in [S.index for S in tv_show.seasons()]) and (
                                         artwork["episode"] in [E.index for E in tv_show.season(
                                         artwork["season"]).episodes()])) or self.staging:

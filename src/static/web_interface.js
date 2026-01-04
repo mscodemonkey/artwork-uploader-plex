@@ -403,6 +403,12 @@ function saveConfig() {
     save_config.stage_assets = document.getElementById("stage_assets").checked;
     toggleScraperStageCheckbox();
 
+    // Checkbox for staging specials
+    save_config.stage_specials = document.getElementById("stage_specials").checked;
+
+    // Checkbox for staging collections
+    save_config.stage_collections = document.getElementById("stage_collections").checked;
+
     // Checkbox for managing bulk files
     save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
 
@@ -476,6 +482,8 @@ function loadConfig() {
             document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids;
             document.getElementById("save_to_kometa").checked = data.config.save_to_kometa;
             document.getElementById("stage_assets").checked = data.config.stage_assets;
+            document.getElementById("stage_specials").checked = data.config.stage_specials;
+            document.getElementById("stage_collections").checked = data.config.stage_collections;
             document.getElementById("kometa_base").value = data.config.kometa_base;
             document.getElementById("temp_dir").value = data.config.temp_dir || "";
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;

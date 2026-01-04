@@ -30,6 +30,8 @@ class Config:
         temp_dir: (Optional) Temporary directory for testing purposes
         save_to_kometa: Whether to save artwork to Kometa
         stage_assets: Whether to download assets for seasons and episodes that are not in Plex yet (except Specials)
+        stage_specials: Whether to save specials (season 0) artwork to Kometa even when the season doesn't exist in Plex
+        stage_collections: Whether to save collection artwork to Kometa even when the collection doesn't exist in Plex
         track_artwork_ids: Whether to track artwork IDs using Plex labels
         auto_manage_bulk_files: Whether to auto-organize bulk files
         reset_overlay: Whether to reset Kometa overlay labels on upload
@@ -56,6 +58,8 @@ class Config:
         self.temp_dir: str = "C:\\Temp\\assets\\temp"
         self.save_to_kometa: bool = False
         self.stage_assets: bool = True
+        self.stage_specials: bool = False
+        self.stage_collections: bool = False
         self.track_artwork_ids: bool = True
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
@@ -95,6 +99,8 @@ class Config:
             self.temp_dir = config.get("temp_dir", "")
             self.save_to_kometa = config.get("save_to_kometa", False)
             self.stage_assets = config.get("stage_assets", True)
+            self.stage_specials = config.get("stage_specials", False)
+            self.stage_collections = config.get("stage_collections", False)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.auto_manage_bulk_files = config.get(
@@ -134,6 +140,8 @@ class Config:
             "temp_dir": "",
             "save_to_kometa": False,
             "stage_assets": False,
+            "stage_specials": False,
+            "stage_collections": False,
             "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
             "reset_overlay": False,
@@ -182,6 +190,8 @@ class Config:
             "temp_dir": self.temp_dir,
             "save_to_kometa": self.save_to_kometa,
             "stage_assets": self.stage_assets,
+            "stage_specials": self.stage_specials,
+            "stage_collections": self.stage_collections,
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
