@@ -41,6 +41,7 @@ class Config:
         auth_password_hash: Hashed password for web server authentication
         ip_binding: IP binding mode - "auto" (default), "ipv4", or "ipv6"
         debug: Enable debug logging
+        kometa_library_paths: Dictionary mapping Plex library names to Kometa directory names
     """
 
     def __init__(self, config_path: str = DEFAULT_CONFIG_PATH) -> None:
@@ -69,6 +70,7 @@ class Config:
         self.auth_password_hash: str = ""
         self.ip_binding: str = DEFAULT_IP_BINDING
         self.debug: bool = False
+        self.kometa_library_paths: Dict[str, str] = {}
 
     def load(self) -> None:
         """Load the configuration from the JSON file."""
@@ -112,6 +114,7 @@ class Config:
             self.auth_password_hash = config.get("auth_password_hash", "")
             self.ip_binding = config.get("ip_binding", DEFAULT_IP_BINDING)
             self.debug = config.get("debug", False)
+            self.kometa_library_paths = config.get("kometa_library_paths", {})
 
         except Exception as e:
             raise ConfigLoadError(
@@ -146,7 +149,8 @@ class Config:
             "auto_manage_bulk_files": True,
             "reset_overlay": False,
             "schedules": [],
-            "debug": False
+            "debug": False,
+            "kometa_library_paths": {}
         }
 
         # Create the config.json file if it doesn't exist
@@ -201,7 +205,8 @@ class Config:
             "auth_username": self.auth_username,
             "auth_password_hash": self.auth_password_hash,
             "ip_binding": self.ip_binding,
-            "debug": self.debug
+            "debug": self.debug,
+            "kometa_library_paths": self.kometa_library_paths
         }
 
         try:
@@ -210,3 +215,18 @@ class Config:
         except Exception as e:
             raise ConfigSaveError(
                 f"Failed to save config to {self.path}: {str(e)}") from e
+
+    def resolve_library_directory(self, library_name: str) -> str:
+        """
+        Resolve the directory name for a given Plex library.
+
+        If the library is mapped in kometa_library_paths, return the mapped name.
+        Otherwise, return the library name as-is (backward compatible).
+
+        Args:
+            library_name: The name of the Plex library
+
+        Returns:
+            The directory name to use in the Kometa asset structure
+        """
+        return self.kometa_library_paths.get(library_name, library_name)

@@ -257,6 +257,26 @@
                                     </div>
                                 </div>
                                 <div class="mb-3">
+                                    <label for="kometa_library_paths" class="form-label">
+                                        Kometa Library Path Mappings (Optional):
+                                        <i class="bi bi-info-circle"
+                                           data-bs-toggle="tooltip"
+                                           title="Map Plex library names to custom Kometa directory names. Format: {&quot;Library Name&quot;: &quot;directory-name&quot;}. Leave blank to use library names."></i>
+                                    </label>
+                                    <textarea
+                                        id="kometa_library_paths"
+                                        name="kometa_library_paths"
+                                        class="form-control font-monospace"
+                                        rows="3"
+                                        placeholder='{"TV Shows": "tv", "Anime": "anime", "Movies": "movies"}'></textarea>
+                                    <div class="form-text">
+                                        Optional: JSON object mapping Plex library names to custom directory names
+                                    </div>
+                                    <div class="invalid-feedback">
+                                        Invalid JSON format. Please use valid JSON syntax.
+                                    </div>
+                                </div>
+                                <div class="mb-3">
                                     <label for="temp_dir" class="form-label">Temp Directory (optional):</label>
                                     <input type="text" id="temp_dir" name="temp_dir" class="form-control"
                                            placeholder="X:\path\to\temp\dir">

@@ -156,6 +156,10 @@ Avoid creating new global variables; use dependency injection or extend existing
 - `mediux_filters`, `tpdb_filters`: Global artwork type filters (array of filter strings)
 - `save_to_kometa`: Save to Kometa asset directory instead of direct Plex upload
 - `kometa_base`: Base path to Kometa asset directory
+- `kometa_library_paths`: Optional dictionary mapping Plex library names to custom Kometa directory names
+  - Example: `{"TV Shows": "tv", "Movies": "movies", "4K Movies": "movies-4k"}`
+  - Unmapped libraries use their Plex name (default behavior)
+  - Useful for standardizing directory names or avoiding spaces in paths
 - `reset_overlay`: Remove Kometa overlay label when uploading new artwork
 
 **Custom Config Path**:
