@@ -1,6 +1,7 @@
 services:
   artwork_uploader:
-    build: .
+    build:
+      context: .
     container_name: artwork-uploader
     ports:
       - "4567:4567"
@@ -15,6 +16,9 @@ services:
       - TZ=America/Los_Angeles
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
+      # User/Group IDs: Change to match your host user (run 'id -u' and 'id -g' to find yours)
+      - PUID=65536
+      - PGID=65536
 
       # Optional: override default paths
       # - BULK_IMPORTS_DIR=/custom/bulk_imports

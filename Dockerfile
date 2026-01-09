@@ -1,28 +1,31 @@
-FROM dhi.io/python:3.14.2-dev AS builder
+FROM python:3.14.2-slim
 
 ENV PATH="/app/venv/bin:$PATH"
 
 WORKDIR /app
 
-RUN python -m venv /app/venv
+ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/venv/bin:${PATH}"
+ENV PYTHONPATH="/app/src:${PYTHONPATH}"
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir -r requirements.txt
-
-FROM dhi.io/python:3.14.2
-
-# Copy only runtime code from src/
 COPY src/ /app/src/
-COPY --from=builder /app/venv /app/venv
 
-ENV PYTHONUNBUFFERED=1
-ENV PATH="/app/venv/bin:$PATH"
-ENV PYTHONPATH=/app/src:$PYTHONPATH
+COPY entrypoint.sh /entrypoint.sh
+
+# Install gosu for dropping privileges and create necessary directories
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gosu && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    python -m venv /app/venv && \
+    pip install --no-cache-dir -r requirements.txt && \
+    chmod +x /entrypoint.sh
 
 EXPOSE 4567
 
-# Entry point now in src/
-ENTRYPOINT ["python", "/app/src/artwork_uploader.py"]
+# Use entrypoint script to handle PUID/PGID at runtime
+ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["--debug"]
+CMD ["python", "/app/src/artwork_uploader.py", "--debug"]

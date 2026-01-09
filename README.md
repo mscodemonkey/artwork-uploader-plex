@@ -140,7 +140,9 @@ services:
       - TZ=Etc/UTC
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
-    restart: unless-stopped      
+      - PUID=1000  # Optional: Change to your user ID (run 'id -u')
+      - PGID=1000  # Optional: Change to your group ID (run 'id -g')
+    restart: unless-stopped
 ```
 
 ### Year matching
@@ -257,32 +259,49 @@ Both mediux_filters and tpdb_filters specify which artwork types to upload by in
 ---
 # Usage
 
-## Docker 
+## Docker
 
-If you want to use Docker, there is a Dockerfile in the repo to allow it to be deployed in a container alongside a plex container. 
+If you want to use Docker, there is a Dockerfile in the repo to allow it to be deployed in a container alongside a plex container.
 
-Clone the repository and use the `docker-compose.yml` file to deploy it with docker compose. Or copy this block in a `docker-compose.yml` file pointing to the location of the repository to build the image instead of the `.` 
+Clone the repository and use the `docker-compose.yml` file to deploy it with docker compose. Or copy this block in a `docker-compose.yml` file pointing to the location of the repository to build the image instead of the `.`
+
+### PUID/PGID Support
+
+Like LinuxServer.io images, this container supports setting the user and group IDs at runtime to match your host system. This ensures files created by the container have proper permissions on mounted volumes.
+
+To find your user and group IDs on Linux/macOS:
+```bash
+id -u  # Shows your user ID (PUID)
+id -g  # Shows your group ID (PGID)
+```
+
+Set PUID and PGID as environment variables in your docker-compose.yml:
 
 ```yaml
 services:
   artwork_uploader:
-    build: .
+    build:
+      context: .
     container_name: artwork-uploader
     ports:
       - "4567:4567"
     volumes:
-      - ./bulk_imports:/artwork-uploader/bulk_imports:rw
-      - ./config.json:/artwork-uploader/config.json:rw
+      - ./bulk_imports:/bulk_imports:rw
+      - ./config.json:/config/config.json:rw
       - C:\Users\<USERNAME>\Kometa\config\assets:/assets:rw # Optional, only if you want to save the assets locally to your Kometa asset directory
       - C:\Temp\assets:/temp:rw # Optional, only if you're saving assets locally and want to have a temp dir for testing purposes
     environment:
       - TZ=Etc/UTC
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
-    restart: unless-stopped    
+      - PUID=1000  # Change to your user ID (run 'id -u')
+      - PGID=1000  # Change to your group ID (run 'id -g')
+    restart: unless-stopped
 ```
 
-And run 
+**Note:** PUID and PGID are now runtime environment variables, which means you can change them without rebuilding the container. This is more flexible than the previous build-time approach.
+
+And run
 ```bash
 docker compose up -d
 ```
