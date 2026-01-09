@@ -14,7 +14,7 @@ COPY src/ /app/src/
 
 COPY entrypoint.sh /entrypoint.sh
 
-# Install gosu for dropping privileges and create necessary directories
+# Install gosu for dropping privileges and set up Python environment
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gosu && \
     apt-get clean && \
