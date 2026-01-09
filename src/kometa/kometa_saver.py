@@ -91,8 +91,8 @@ class KometaSaver:
                     return f"♻️ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
                 else:
                     return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
-            except OSError:
-                return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
+            except OSError as e:
+                return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'. {e}"
             except Exception as e:
                 return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
         try:
@@ -118,7 +118,7 @@ class KometaSaver:
                 return f"♻️ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
             else:
                 return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
-        except OSError:
-            return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
+        except OSError as e:
+            return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'. {e}"
         except Exception as e:
             return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
