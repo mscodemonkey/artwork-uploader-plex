@@ -37,7 +37,6 @@ from services import (
     ArtworkProcessor,
     ProcessingCallbacks,
     SchedulerService,
-    UpdateService,
     UtilityService
 )
 from utils.notifications import update_log, update_status, notify_web, debug_me
@@ -541,21 +540,6 @@ def sort_key(item):
     """Sort key for artwork items - uses UtilityService."""
     return UtilityService.sort_key(item)
 
-
-# Autoupdate functions
-
-def get_latest_version():
-    """Fetch the latest release version from GitHub."""
-    return globals.update_service.get_latest_version() if globals.update_service else None
-
-
-def check_for_updates_periodically():
-    """Background task to check for updates periodically - now handled by UpdateService."""
-    # This function is kept for backwards compatibility but is no longer used
-    # The UpdateService handles periodic checks automatically
-    pass
-
-
 def add_file_to_schedule_thread(instance: Instance, filename):
     if instance:
         threading.Thread(target=process_bulk_file_on_schedule,
@@ -724,11 +708,6 @@ if __name__ == "__main__":
     )
     globals.scheduler_service = SchedulerService(
         check_interval=SCHEDULER_CHECK_INTERVAL)
-    globals.update_service = UpdateService(
-        github_repo=GITHUB_REPO,
-        current_version=current_version,
-        check_interval=UPDATE_CHECK_INTERVAL
-    )
 
     # Make sure there's at least one bulk_import file
     check_for_bulk_import_file(cli_instance)
@@ -870,15 +849,5 @@ if __name__ == "__main__":
                 http_compression=True,  # Enable compression for better performance
                 max_http_buffer_size=10000000  # 10MB - allow larger individual messages
             )
-
-            # Start update checker using UpdateService
-
-            def on_update_available(version: str):
-                debug_me(
-                    f"Update available. Latest version: {version}", "update_service")
-                notify_web(Instance(broadcast=True),
-                           "update_available", {"version": version})
-
-            globals.update_service.start_periodic_check(on_update_available)
 
             setup_web_sockets()

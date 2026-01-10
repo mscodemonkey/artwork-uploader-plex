@@ -1,4 +1,4 @@
-FROM python:3.14.2-slim
+FROM python:3.14.2
 
 ENV PATH="/app/venv/bin:$PATH"
 
@@ -14,18 +14,22 @@ COPY src/ /app/src/
 
 COPY entrypoint.sh /entrypoint.sh
 
-# Install gosu for dropping privileges and set up Python environment
+# Install gosu for dropping privileges and create necessary directories
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gosu && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     python -m venv /app/venv && \
     pip install --no-cache-dir -r requirements.txt && \
-    chmod +x /entrypoint.sh
+    chmod +x /entrypoint.sh && \
+    groupadd -g 1027 artwork && \
+    useradd -u 1027 -g artwork -m artwork
 
 EXPOSE 4567
 
-# Use entrypoint script to handle PUID/PGID at runtime
-ENTRYPOINT ["/entrypoint.sh"]
+USER artwork
 
-CMD ["python", "/app/src/artwork_uploader.py", "--debug"]
+ENTRYPOINT ["python", "/app/src/artwork_uploader.py"]
+
+CMD ["--debug"]
+

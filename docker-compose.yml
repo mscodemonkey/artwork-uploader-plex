@@ -17,8 +17,8 @@ services:
       - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
       # User/Group IDs: Change to match your host user (run 'id -u' and 'id -g' to find yours)
-      - PUID=65536
-      - PGID=65536
+      - PUID=1027
+      - PGID=1027
 
       # Optional: override default paths
       # - BULK_IMPORTS_DIR=/custom/bulk_imports

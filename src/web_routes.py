@@ -239,7 +239,6 @@ def setup_socket_handlers(
         delete_bulk_import_file,
         add_file_to_schedule_thread,
         update_scheduled_jobs,
-        get_latest_version,
         current_version,
         check_image_orientation,
         sort_key
@@ -248,15 +247,6 @@ def setup_socket_handlers(
     # Temporary storage for chunked uploads
     # Changed from in-memory list to file handles for better memory efficiency with large uploads
     upload_chunks = {}
-
-    @globals.web_socket.on("check_for_update")
-    def check_for_update(data):
-        """Check for updates when requested by the frontend."""
-        instance = Instance(data.get("instance_id"), "web")
-        latest_version = get_latest_version()
-        if latest_version and version.parse(latest_version.lstrip('v')) > version.parse(current_version.lstrip('v')):
-            notify_web(instance, "update_available",
-                       {"version": latest_version})
 
     @globals.web_socket.on("update_app")
     def update_app(data):

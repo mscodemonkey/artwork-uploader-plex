@@ -10,7 +10,6 @@ from .authentication_service import AuthenticationService
 from .bulk_file_service import BulkFileService
 from .image_service import ImageService
 from .scheduler_service import SchedulerService
-from .update_service import UpdateService
 from .utility_service import UtilityService
 
 __all__ = [
@@ -19,7 +18,6 @@ __all__ = [
     'ArtworkProcessor',
     'ProcessingCallbacks',
     'SchedulerService',
-    'UpdateService',
     'UtilityService',
     'AuthenticationService'
 ]
