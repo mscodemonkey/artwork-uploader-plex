@@ -279,7 +279,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # Log the completion of the bulk import process
         poster_count = success_counter[0]
-        update_log(instance, f"🏁 Bulk process completed - {display_filename} - {poster_count} assets updated")
+        update_log(instance, f"🏁 Bulk process completed - {display_filename} - {poster_count} asset(s) updated")
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", {"percent": 100})
@@ -342,7 +342,7 @@ def scrape_and_upload(instance: Instance, url, options, success_counter=None):
         raise
 
 
-def process_uploaded_artwork(instance: Instance, file_list, options, filters, plex_title = None, plex_year = None):
+def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, zip_author, zip_source, options, filters, plex_title = None, plex_year = None):
     """
     Process uploaded artwork files and upload to Plex or save to Kometa asset directory.
 
@@ -378,7 +378,7 @@ def process_uploaded_artwork(instance: Instance, file_list, options, filters, pl
     else:
         opts = Options(filters=filters, temp=True if "temp" in options else False, stage=True if "stage" in options else False, force=True if "force" in options else False)
     processor = ArtworkProcessor(globals.plex)
-    processor.process_uploaded_files(file_list, opts, callbacks, override_title=plex_title)
+    processor.process_uploaded_files(file_list, skipped, zip_title, zip_author, zip_source, opts, callbacks, override_title=plex_title)
 
 
 # * Bulk import file I/O functions ---

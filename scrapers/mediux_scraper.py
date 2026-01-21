@@ -1,6 +1,7 @@
 from typing import Optional, Any
 from core import globals
 from pprint import pprint
+from core.config import Config
 from utils import soup_utils
 from utils import utils
 from utils.notifications import debug_me
@@ -19,7 +20,11 @@ class MediuxScraper:
         self.title: Optional[str] = None
         self.author: Optional[str] = None
         self.options: Options = Options()
+        self.config: Config = Config()
         self.exclusions: int = 0
+        self.filtered: int = 0
+        self.skipped: int = 0
+        self.total: int = 0
 
         self.movie_artwork: MovieArtworkList = []
         self.tv_artwork: TVArtworkList = []
@@ -30,8 +35,7 @@ class MediuxScraper:
     def set_options(self, options: Options) -> None:
         self.options = options
 
-
-    def scrape(self) -> None:
+    def scrape(self) -> int:
 
         try:
             self.soup = soup_utils.cook_soup(self.url)
@@ -90,26 +94,29 @@ class MediuxScraper:
             if not data_dict:
                 raise ScraperException("No poster data found in MediUX set or boxset.")
 
+            self.skipped = self.exclusions + self.filtered
+
             if globals.debug:
+                if self.skipped > 0:
+                    debug_me(f"⏩ Skipped {self.skipped} assets(s) out of {self.total} based on exclusions ({self.exclusions}) or filters ({self.filtered}).", "MediuxScraper/scrape")
                 if self.collection_artwork:
-                    debug_me(f"Found {len(self.collection_artwork)} collection asset(s) for {len({item['title'] for item in self.collection_artwork})} collection(s):", "MediuxScraper/scrape")
+                    debug_me(f"✅ Included {len(self.collection_artwork)} collection asset(s) for {len({item['title'] for item in self.collection_artwork})} collection(s):", "MediuxScraper/scrape")
                     print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.collection_artwork)
                     print(f"*************************************************************{ANSI_RESET}")
                 if self.movie_artwork:
-                    debug_me(f"Found {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):","MediuxScraper/scrape")
+                    debug_me(f"✅ Included {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):","MediuxScraper/scrape")
                     print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.movie_artwork)
                     print(f"*************************************************************{ANSI_RESET}")
                 if self.tv_artwork:
-                    debug_me(f"Skipped {self.exclusions} assets(s) based on exclusions.", "MediuxScraper/scrape")
-                    debug_me(f"Found {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):", "MediuxScraper/scrape")
+                    debug_me(f"✅ Included {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):", "MediuxScraper/scrape")
                     print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
                     pprint(self.tv_artwork)
                     print(f"*************************************************************{ANSI_RESET}")
 
-            # Return the number of excluded assets
-            return self.exclusions
+            # Return the number of skipped assets
+            return self.skipped
 
         except ScraperException:
             raise
@@ -175,7 +182,9 @@ class MediuxScraper:
             media_type = MediaType.MOVIE.value
 
         # Process each file in the set
-        for data in poster_data:
+        self.total=len(poster_data)
+
+        for i, data in enumerate(poster_data):
             #debug_me(str(data["id"]),"MediuxScraper/_process_set")
 
             if media_type == MediaType.TV_SHOW.value:
@@ -349,22 +358,22 @@ class MediuxScraper:
                         # This is a movie poster
                         title = set_data["movie"]["title"]
                         year = int(set_data["movie"]["release_date"][:4])
-                        file_type = "poster"
+                        file_type = "movie_poster"
                     elif set_data.get("collection"):
                         # This is a movie poster inside a collection set
                         movies = set_data["collection"]["movies"]
                         movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
                         title = movie_data["title"]
                         year = int(movie_data["release_date"][:4])
-                        file_type = "poster"
+                        file_type = "movie_poster"
                 elif data["collection_id"]:
                     # This is a collection poster
                     title = set_data["collection"]["collection_name"]
-                    file_type = "collection poster"
+                    file_type = "collection_poster"
                 else:
-                    if data["fileType"] == "poster":
+                    if data["fileType"] == "movie_poster":
                         # This is a collection poster
-                        file_type = "collection poster"
+                        file_type = "collection_poster"
                         title = set_data["collection"]["collection_name"]
                     elif data["fileType"] == "backdrop":
                         # This is a movie background
@@ -387,48 +396,81 @@ class MediuxScraper:
             poster_url = f"{base_url}{image_stub}{quality_suffix}{cache_buster}"
 
             if media_type == MediaType.TV_SHOW.value:
-                if not self.options.is_excluded(image_stub, season if isinstance(season, int) else None, episode if isinstance(episode, int) else None):
-                    tv_artwork = {}
-                    tv_artwork["title"] = show_name
-                    tv_artwork["season"] = season
-                    tv_artwork["episode"] = episode
-                    tv_artwork["url"] = poster_url
-                    tv_artwork["source"] = ScraperSource.MEDIUX.value
-                    tv_artwork["year"] = year
-                    tv_artwork["id"] = image_stub
-                    tv_artwork['type'] = file_type
-                    tv_artwork["author"] = self.author
-                    tv_artwork["tmdb_id"] = show_id
-                    # debug_me(f"TV Artwork: {tv_artwork}", "MediuxScraper/_process_set")
-                    self.tv_artwork.append(tv_artwork)
-                else:
-                    self.exclusions += 1
-                    if episode == "Cover":
-                        debug_me(f"Skipping season cover for '{show_name} ({year})', Season {season} based on exclusions.", "MediuxScraper/_process_set")
+                # Apply filters and exclusions
+                if (self.options.has_no_filters() and file_type in self.config.mediux_filters) or self.options.has_filter(file_type):
+                    if not self.options.is_excluded(image_stub, season if isinstance(season, int) else None, episode if isinstance(episode, int) else None):
+                        debug_me(
+                            f"{i+1}. ✅ Including {file_type.replace('_', ' ')} for '{show_name} ({year})'"
+                            + (f", Season {season}" if isinstance(season, int) else "")
+                            + (f", Episode {episode}" if isinstance(episode, int) else "")
+                            + ".", "MediuxScraper/_process_set"
+                        )
+                        tv_artwork = {}
+                        tv_artwork["title"] = show_name
+                        tv_artwork["season"] = season
+                        tv_artwork["episode"] = episode
+                        tv_artwork["url"] = poster_url
+                        tv_artwork["source"] = ScraperSource.MEDIUX.value
+                        tv_artwork["year"] = year
+                        tv_artwork["id"] = image_stub
+                        tv_artwork['type'] = file_type
+                        tv_artwork["author"] = self.author
+                        tv_artwork["tmdb_id"] = show_id
+                        self.tv_artwork.append(tv_artwork)
                     else:
-                        debug_me(f"Skipping title card for '{show_name} ({year})', Season {season}, Episode {episode} based on exclusions.", "MediuxScraper/_process_set")
+                        self.exclusions += 1
+                        debug_me(
+                            f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{show_name} ({year})'"
+                            + (f", Season {season}" if isinstance(season, int) else "")
+                            + (f", Episode {episode}" if isinstance(episode, int) else "")
+                            + " based on exclusions.", "MediuxScraper/_process_set"
+                        )
+                else:
+                    self.filtered += 1
+                    debug_me(
+                        f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{show_name} ({year})'"
+                        + (f", Season {season}" if isinstance(season, int) else "")
+                        + (f", Episode {episode}" if isinstance(episode, int) else "")
+                        + " based on filters.", "MediuxScraper/_process_set"
+                    )
 
             elif media_type == MediaType.MOVIE.value:
                 if "Collection" in title:
-                    collection_artwork = {}
-                    collection_artwork["title"] = title
-                    collection_artwork["url"] = poster_url
-                    collection_artwork["id"] = image_stub
-                    collection_artwork["source"] = ScraperSource.MEDIUX.value
-                    collection_artwork["type"] = file_type
-                    collection_artwork["year"] = None
-                    collection_artwork["author"] = self.author
-                    # debug_me(f"Collection Artwork: {collection_artwork}", "MediuxScraper/_process_set")
-                    self.collection_artwork.append(collection_artwork)
+                    if (self.options.has_no_filters() and file_type in self.config.mediux_filters) or self.options.has_filter(file_type):
+                        if not self.options.is_excluded(image_stub):
+                            debug_me(f"{i+1}. ✅ Including {file_type.replace('_', ' ')} for '{title}'.", "MediuxScraper/_process_set")
+                            collection_artwork = {}
+                            collection_artwork["title"] = title
+                            collection_artwork["url"] = poster_url
+                            collection_artwork["id"] = image_stub
+                            collection_artwork["source"] = ScraperSource.MEDIUX.value
+                            collection_artwork["type"] = file_type
+                            collection_artwork["year"] = None
+                            collection_artwork["author"] = self.author
+                            self.collection_artwork.append(collection_artwork)
+                        else:
+                            self.exclusions += 1
+                            debug_me(f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title}' based on exclusions.", "MediuxScraper/_process_set")
+                    else:
+                        self.filtered += 1
+                        debug_me(f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title}' based on filters.", "MediuxScraper/_process_set")
                 else:
-                    movie_artwork = {}
-                    movie_artwork["title"] = title
-                    movie_artwork["year"] = int(year)
-                    movie_artwork["url"] = poster_url
-                    movie_artwork["source"] = ScraperSource.MEDIUX.value
-                    movie_artwork["id"] = image_stub
-                    movie_artwork["type"] = file_type
-                    movie_artwork["author"] = self.author
-                    movie_artwork["tmdb_id"] = movie_id
-                    # debug_me(f"Movie Artwork: {movie_artwork}", "MediuxScraper/_process_set")
-                    self.movie_artwork.append(movie_artwork)
+                    if (self.options.has_no_filters() and file_type in self.config.mediux_filters) or self.options.has_filter(file_type):
+                        if not self.options.is_excluded(image_stub):
+                            debug_me(f"{i+1}. ✅ Including {file_type.replace('_', ' ')} for '{title} ({year})'.", "MediuxScraper/_process_set")
+                            movie_artwork = {}
+                            movie_artwork["title"] = title
+                            movie_artwork["year"] = int(year)
+                            movie_artwork["url"] = poster_url
+                            movie_artwork["source"] = ScraperSource.MEDIUX.value
+                            movie_artwork["id"] = image_stub
+                            movie_artwork["type"] = file_type
+                            movie_artwork["author"] = self.author
+                            movie_artwork["tmdb_id"] = movie_id
+                            self.movie_artwork.append(movie_artwork)
+                        else:
+                            self.exclusions += 1
+                            debug_me(f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title} ({year})' based on exclusions.", "MediuxScraper/_process_set")
+                    else:
+                        self.filtered += 1
+                        debug_me(f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title} ({year})' based on filters.", "MediuxScraper/_process_set")
