@@ -1,37 +1,23 @@
 import eventlet
-eventlet.monkey_patch()
 
-import base64
-from pathlib import Path
+eventlet.monkey_patch()
 
 import uuid
 import os
 import re
-import zipfile
-import tempfile
-
-import requests
-import subprocess
-import schedule, time
 from core import globals
 import threading
 import sys
 
-from utils import utils
 from models import arguments
 from models.instance import Instance
-from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from core.config import Config
 from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException
 from scrapers.theposterdb_scraper import ThePosterDBScraper
-from processors.upload_processor import UploadProcessor
-from scrapers.scraper import Scraper
 from utils.utils import is_not_comment, parse_url_and_options
 from models.options import Options
 from plex.plex_connector import PlexConnector
-from core.exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
-    NotProcessedByExclusion
 from core.constants import (
     CURRENT_VERSION,
     GITHUB_REPO,
@@ -42,7 +28,7 @@ from core.constants import (
     MIN_PYTHON_MAJOR,
     MIN_PYTHON_MINOR
 )
-from core.enums import InstanceMode, ScraperSource
+from core.enums import InstanceMode
 from services import (
     BulkFileService,
     ImageService,
@@ -52,6 +38,8 @@ from services import (
     UpdateService,
     UtilityService
 )
+from services.notify_service import NotifyService
+
 
 # ----------------------------------------------
 # Important for autoupdater
@@ -280,6 +268,15 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         # Log the completion of the bulk import process
         poster_count = success_counter[0]
         update_log(instance, f"🏁 Bulk process completed - {display_filename} - {poster_count} asset(s) updated")
+
+        if len(globals.config.apprise_urls) > 0 and not globals.manual_run:
+            notification_title = "Artwork Uploader"
+            notification_body = f"Scheduled import of {len(parsed_urls)} entries from bulk file '{display_filename}' completed. {poster_count} asset(s) updated."
+            debug_me(f"Sending notification. Title: {notification_title}, Message: {notification_body}", "NotifyService/send_notification")
+            globals.notify_service.send_notification(
+                title=notification_title,
+                message=notification_body
+            )
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", {"percent": 100})
@@ -529,15 +526,15 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
             with open(bulk_import_file, "r", encoding="utf-8") as file:
                 content = file.read()
             if content:
-                update_log(instance, "@ *** Scheduled import started ***")
+                update_log(instance, "🕘 *** Scheduled import started ***")
                 run_bulk_import_scrape_in_thread(instance, content, filename)
         else:
-            update_log(instance, f"Scheduled file does not exist: {filename}")
+            update_log(instance, f"🕘 Scheduled file does not exist: {filename}")
             return
     except FileNotFoundError:
-        update_log(instance, f"@ Scheduled import failed due to missing file ({filename})")
+        update_log(instance, f"🔴 Scheduled import failed due to missing file ({filename})")
     except Exception as e:
-        update_log(instance, f"@ Scheduled import unexpectedly failed ({str(e)})")
+        update_log(instance, f"🔴 Scheduled import unexpectedly failed ({str(e)})")
 
 
 # Legacy functions - now handled by SchedulerService
@@ -647,6 +644,9 @@ if __name__ == "__main__":
         check_interval=UPDATE_CHECK_INTERVAL
     )
 
+    # Initialize the notification service with the list of Apprise URLs from the config file
+    globals.notify_service = NotifyService(config.apprise_urls)
+
     # Make sure there's at least one bulk_import file
     check_for_bulk_import_file(cli_instance)
 
@@ -654,6 +654,7 @@ if __name__ == "__main__":
     globals.plex = PlexConnector(config.base_url, config.token)
 
     # Setup scheduler
+    globals.manual_run = False  # Reset manual run flag
     setup_scheduler_on_first_load(cli_instance)
 
     # Check for CLI arguments regardless of interactive_cli flag

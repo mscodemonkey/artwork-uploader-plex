@@ -230,7 +230,9 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         bulk_list = data.get("bulk_list").lower()
         filename = data.get("filename", "bulk_import.txt")
+        globals.manual_run = True # Set manual run flag
         run_bulk_import_scrape_in_thread(instance, bulk_list, filename)
+        globals.manual_run = False # Reset manual run flag after starting thread
 
     @globals.web_socket.on("save_bulk_import")
     def handle_bulk_import(data):
