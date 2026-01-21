@@ -34,6 +34,7 @@ class Config:
         auth_enabled: Whether authentication is enabled for the web server
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
+        apprise_urls: List of Apprise notification URLs
     """
 
     def __init__(self, config_path: str = "config.json") -> None:

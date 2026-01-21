@@ -32,6 +32,7 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
     loadConfig()
+    updateLog("🔄 Configuration loaded, ready for action!")
     toggleThePosterDBElements();
 });
 
@@ -379,6 +380,12 @@ function saveConfig() {
     save_config.temp_dir = document.getElementById("temp_dir").value.trim();
     toggleTempCheckbox();
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
+    
+    // Convert comma-separated Apprise URLs to array
+    save_config.apprise_urls = document.getElementById("apprise_urls").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values
 
     // Convert comma-separated library inputs to arrays
     save_config.tv_library = document.getElementById("tv_library").value
@@ -479,6 +486,7 @@ function loadConfig() {
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
+            document.getElementById("apprise_urls").value = data.config.apprise_urls.join(", ");
 
             // Load authentication settings
             document.getElementById("auth_enabled").checked = data.config.auth_enabled || false;

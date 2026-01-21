@@ -369,7 +369,7 @@ def setup_socket_handlers(
             globals.config = config
 
             # Reconnect to Plex because the Plex server or token might have changed
-            update_log(instance, "Saving updated configuration and reconnecting to Plex")
+            update_log(instance, "💾 Saving updated configuration and reconnecting to Plex")
             globals.plex.reconnect(config)
             notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
         except Exception as config_error:
