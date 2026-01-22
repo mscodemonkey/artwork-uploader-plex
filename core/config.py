@@ -34,6 +34,7 @@ class Config:
         auth_enabled: Whether authentication is enabled for the web server
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
+        apprise_urls: List of Apprise notification URLs
     """
 
     def __init__(self, config_path: str = "config.json") -> None:
@@ -56,6 +57,7 @@ class Config:
         self.auth_enabled: bool = False
         self.auth_username: str = ""
         self.auth_password_hash: str = ""
+        self.apprise_urls: List[str] = []
 
 
     def load(self) -> None:
@@ -88,6 +90,7 @@ class Config:
             self.auth_enabled = config.get("auth_enabled", False)
             self.auth_username = config.get("auth_username", "")
             self.auth_password_hash = config.get("auth_password_hash", "")
+            self.apprise_urls = config.get("apprise_urls", [])
 
         except Exception as e:
             raise ConfigLoadError from e
@@ -109,7 +112,8 @@ class Config:
             "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
             "reset_overlay": False,
-            "schedules": []
+            "schedules": [],
+            "apprise_urls": []
         }
 
         # Create the config.json file if it doesn't exist
@@ -145,7 +149,8 @@ class Config:
             "schedules": self.schedules,
             "auth_enabled": self.auth_enabled,
             "auth_username": self.auth_username,
-            "auth_password_hash": self.auth_password_hash
+            "auth_password_hash": self.auth_password_hash,
+            "apprise_urls": self.apprise_urls
         }
 
         try:

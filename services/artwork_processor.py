@@ -81,9 +81,9 @@ class ArtworkProcessor:
 
         if callbacks and callbacks.on_log_update:
             #callbacks.on_log_update(f"🔍 Scraping artwork{f" for '{title}'" if title else ""} by '{scraper.author}'")
-            callbacks.on_log_update(f"🔍 {title} : {scraper.author} | Scraping from {f"ThePosterDB" if scraper.source == "theposterdb" else "Mediux"}")
-            if scraper.exclusions > 0:
-                callbacks.on_log_update(f"⏩ {title} : {scraper.author} | Skipped {scraper.exclusions} asset(s) based on exclusions.")
+            callbacks.on_log_update(f"🔍 {title} : {scraper.author} | Obtained {scraper.total} asset(s) from {f"ThePosterDB" if scraper.source == "theposterdb" else "Mediux"}")
+            if scraper.skipped > 0:
+                callbacks.on_log_update(f"⏩ {title} : {scraper.author} | Skipping {scraper.skipped} asset(s) based on exclusions ({scraper.exclusions}) or filters ({scraper.filtered}). Processing {scraper.total - scraper.skipped} asset(s).")
 
         # Process collections
         for artwork in scraper.collection_artwork:
@@ -181,6 +181,10 @@ class ArtworkProcessor:
     def process_uploaded_files(
         self,
         file_list: list[dict],
+        skipped: int,
+        zip_title: Optional[str],
+        zip_author: Optional[str],
+        zip_source: Optional[str],
         options: Options,
         callbacks: Optional[ProcessingCallbacks] = None,
         override_title: Optional[str] = None
@@ -198,11 +202,23 @@ class ArtworkProcessor:
         processor.set_options(options)
 
         total_files = len(file_list)
-        file_source = file_list[0].get('source', 'unknown')
-        source = "Mediux" if file_source == "mediux" else "ThePosterDB" if file_source == "theposterdb" else "Unknown"
-        author = file_list[0].get('author', 'unknown')
-        title = override_title if override_title else file_list[0].get('title', 'unknown')
-        year = file_list[0].get('year', 'unknown')
+        title = override_title if override_title else zip_title if zip_title else "Unknown"
+        author = zip_author if zip_author else "Unknown"
+        source = zip_source if zip_source else "Unknown"
+
+        if total_files > 0:
+            # ZIP file titles don't contain year info, even for ZIPs of single movies or TV shows
+            # In that case, we try to infer the year from the first file's metadata
+            # We determine if it's a single movie/TV ZIP by checking if the title of the ZIP file is part of the title of the first file
+            # Otherwise we assume it's a ZIP file containing artwork for multiple shows/movies/collections and leave year as None
+            year = file_list[0].get('year', 'unknown') if title in file_list[0].get('title', 'unknown') else None
+            if callbacks and callbacks.on_debug:
+                callbacks.on_debug(f"Processing {total_files} files from {source} ZIP file for {title}{f' ({year})' if year else ''}", "process_uploaded_artwork")
+        else:
+            year = None
+            if callbacks and callbacks.on_debug:
+                callbacks.on_debug("No files to process in uploaded ZIP file", "process_uploaded_artwork")
+        
         success_counter = 0  # Mutable counter to track successful uploads
 
         # Initial progress update
@@ -212,8 +228,9 @@ class ArtworkProcessor:
             callbacks.on_progress_update(0, total_files)
 
         if callbacks and callbacks.on_log_update:
-            #callbacks.on_log_update(f"⚙️ Processing {source} ZIP file by {author} for {title} ({year}).")
-            callbacks.on_log_update(f"⚙️ {title}{f" ({year})" if year else ''} : {author} | Processing uploaded {source} ZIP file.")
+            callbacks.on_log_update(f"⚙️ {title}{f' ({year})' if year else ''} : {author} | Obtained {total_files + skipped} asset(s) from uploaded {source} ZIP file.")
+            if skipped > 0:
+                callbacks.on_log_update(f"⏩ {title}{f' ({year})' if year else ''} : {author} | Skipping {skipped} asset(s) based on filters. Processing {total_files} asset(s).")
 
         for index, artwork in enumerate(file_list, start=1):
             # Update progress
@@ -316,6 +333,6 @@ class ArtworkProcessor:
                 pass
         # Final progress update
         if callbacks and callbacks.on_log_update:
-            callbacks.on_log_update(f"✔️ Finished processing uploaded ZIP file. {success_counter} assets updated.")
+            callbacks.on_log_update(f"✔️ Finished processing uploaded ZIP file. {success_counter} asset(s) updated.")
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(total_files, total_files)

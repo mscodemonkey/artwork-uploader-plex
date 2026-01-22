@@ -33,7 +33,10 @@ class Scraper:
         self.source: Optional[str] = None
         self.title: Optional[str] = None
         self.author: Optional[str] = None
+        self.skipped: int = 0
         self.exclusions: int = 0
+        self.filtered: int = 0
+        self.total: int = 0
 
         # Set source based on the contents of the URL
         parsed_url = urlparse(url)
@@ -76,13 +79,16 @@ class Scraper:
         try:
             theposterdb_scraper = ThePosterDBScraper(self.url)
             theposterdb_scraper.set_options(self.options)
-            self.exclusions = theposterdb_scraper.scrape()
+            self.skipped = theposterdb_scraper.scrape()
 
             self.title = theposterdb_scraper.title
             self.author = theposterdb_scraper.author
             self.movie_artwork = theposterdb_scraper.movie_artwork
             self.tv_artwork = theposterdb_scraper.tv_artwork
             self.collection_artwork = theposterdb_scraper.collection_artwork
+            self.exclusions = theposterdb_scraper.exclusions
+            self.filtered = theposterdb_scraper.filtered
+            self.total = theposterdb_scraper.total
 
         except ScraperException as scraper_exception:
             raise
@@ -105,13 +111,16 @@ class Scraper:
 
             mediux_scraper = MediuxScraper(self.url)
             mediux_scraper.set_options(self.options)
-            self.exclusions = mediux_scraper.scrape()
+            self.skipped = mediux_scraper.scrape()
 
             self.title = mediux_scraper.title
             self.author = mediux_scraper.author
             self.movie_artwork = mediux_scraper.movie_artwork
             self.tv_artwork = mediux_scraper.tv_artwork
             self.collection_artwork = mediux_scraper.collection_artwork
+            self.exclusions = mediux_scraper.exclusions
+            self.filtered = mediux_scraper.filtered
+            self.total = mediux_scraper.total
 
         except ScraperException:
             raise

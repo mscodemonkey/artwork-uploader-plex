@@ -25,7 +25,6 @@ from pathlib import Path
 from packaging import version
 
 from flask import render_template, send_from_directory, request, redirect, url_for, session
-import schedule
 from functools import wraps
 
 from core import globals
@@ -231,7 +230,9 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         bulk_list = data.get("bulk_list").lower()
         filename = data.get("filename", "bulk_import.txt")
+        globals.manual_run = True # Set manual run flag
         run_bulk_import_scrape_in_thread(instance, bulk_list, filename)
+        globals.manual_run = False # Reset manual run flag after starting thread
 
     @globals.web_socket.on("save_bulk_import")
     def handle_bulk_import(data):
@@ -368,7 +369,7 @@ def setup_socket_handlers(
             globals.config = config
 
             # Reconnect to Plex because the Plex server or token might have changed
-            update_log(instance, "Saving updated configuration and reconnecting to Plex")
+            update_log(instance, "💾 Saving updated configuration and reconnecting to Plex")
             globals.plex.reconnect(config)
             notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
         except Exception as config_error:
@@ -499,6 +500,7 @@ def setup_socket_handlers(
         plex_year = data.get("plex_year")
         plex_title = data.get("plex_title")
         options = data.get("options")
+        debug_me(f"Obtained filters from web form: {filters}", "handle_upload_complete")
         debug_me(f"Obtained options from web form: {options}", "handle_upload_complete")
 
         instance = Instance(data.get("instance_id"), "web")
@@ -580,9 +582,10 @@ def save_uploaded_file(
     del upload_chunks[file_name]  # Free memory
     debug_me(f"Saved ZIP file: {temp_zip_path}", "save_uploaded_file")
 
-    extracted_files = extract_and_list_zip(
+    extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
         temp_zip_path,
         filename_pattern,
+        filters,
         plex_title,
         plex_year,
         check_image_orientation_func,
@@ -597,7 +600,7 @@ def save_uploaded_file(
     except Exception as e:
         debug_me(f"Error deleting temporary ZIP file: {e}", "save_uploaded_file")
 
-    process_uploaded_artwork(instance, extracted_files, options, filters, plex_title, plex_year)
+    process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
 
     notify_web(instance, "upload_complete", {"files": extracted_files})
     update_status(instance, "Finished processing uploaded file.", color="success")
@@ -606,11 +609,12 @@ def save_uploaded_file(
 def extract_and_list_zip(
     zip_path: str,
     filename_pattern: re.Pattern,
+    filters: list,
     plex_title: str,
     plex_year: int,
     check_image_orientation_func,
     sort_key_func
-) -> list:
+) -> tuple[list, int, str, str, str]:
     """
     Extract a ZIP file, flatten directories, and return a list of valid image files.
 
@@ -639,15 +643,20 @@ def extract_and_list_zip(
             if not filename or filename.startswith('.') or filename.lower() in {"ds_store", "__macosx"}:
                 continue
 
+            # Mediux ZIP files contain a source.txt file with metadata, we obtain title and author from there
             if filename == "source.txt":
+                debug_me("Detected Mediux source", "extract_and_list_zip")
                 zip_source = "mediux"
                 with zip_ref.open(zip_info.filename) as source, open(os.path.join(extract_dir, "source.txt"), "wb") as target:
                     target.write(source.read())
                 with open(os.path.join(extract_dir, "source.txt"), "r", encoding="utf-8") as source_file:
                     for line in source_file:
+                        if line.startswith("Title:"):
+                            zip_title = line.split("Title:")[1].strip()
+                            debug_me(f"Detected ZIP title: {zip_title}", "extract_and_list_zip")
                         if line.startswith("Author:"):
-                            author = line.split("Author:")[1].strip()
-                            debug_me(f"Detected MediUX source, author: {author}", "extract_and_list_zip")
+                            zip_author = line.split("Author:")[1].strip()
+                            debug_me(f"Detected ZIP author: {zip_author}", "extract_and_list_zip")
                             break
                 os.remove(os.path.join(extract_dir, "source.txt"))  # Clean up source.txt after obtaining author info
                 
@@ -662,15 +671,24 @@ def extract_and_list_zip(
     file_list = []
 
     if zip_source == "theposterdb":
-        match = re.search(f"set by (.+?) -", os.path.basename(zip_path))
-        author = match.group(1).strip() if match else None
-        debug_me(f"Detected ThePosterDB source, author: {author}", "extract_and_list_zip")
+        # For ThePosterDB, extract title and author from filename
+        pattern = r"^(?P<title>.+?)\s+set by\s+(?P<author>.+?)\s*-"
+        match = re.search(pattern, os.path.basename(zip_path), re.IGNORECASE)
+        zip_title = match.group("title").strip() if match else None
+        zip_author = match.group("author").strip() if match else None
+        debug_me(f"Detected ThePosterDB source", "extract_and_list_zip")
+        debug_me(f"Detected ZIP title: {zip_title}", "extract_and_list_zip")
+        debug_me(f"Detected ZIP author: {zip_author}", "extract_and_list_zip")
 
-    for file in os.listdir(extract_dir):
+    total_files = len(os.listdir(extract_dir))
+    filtered_files = 0
+
+    for i, file in enumerate(os.listdir(extract_dir)):
         full_path = os.path.join(extract_dir, file)
         md5 = utils.calculate_file_md5(full_path)
 
         # Obtain artwork title, year, media type, season, episode and artwork type by parsing the filename
+        debug_me(f"{i+1}. Parsing artwork metadata from filename: {file}", "extract_and_list_zip")
         artwork = parse_title(os.path.splitext(file)[0])
         # Override title and year if provided
         artwork["title"] = plex_title if plex_title else artwork["title"]
@@ -680,7 +698,7 @@ def extract_and_list_zip(
         artwork["path"] = full_path
         artwork["checksum"] = md5
         artwork["id"] = "Upload"
-        artwork["author"] = author
+        artwork["author"] = zip_author
         # Determine media type via Plex lookup if not a collection
         if artwork["media"] != "Collection":
             media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
@@ -696,23 +714,59 @@ def extract_and_list_zip(
         if artwork['media'] == "TV Show":
             if artwork['season'] is None:
                 artwork['season'] = "Cover"
+                artwork['type'] = "show_cover"
             if artwork['season'] == "Cover" and check_image_orientation_func(artwork["path"]) == "landscape":
                 artwork['season'] = "Backdrop"
+                artwork['type'] = "background"
         if artwork['media'] == "Movie":
             if check_image_orientation_func(artwork["path"]) == "landscape":
                 artwork['type'] = "background"
+            else:
+                artwork['type'] = "movie_poster"
         if artwork['media'] == "Collection":
             if check_image_orientation_func(artwork["path"]) == "landscape":
-                artwork['type'] = "backdrop"
+                artwork['type'] = "background"
+        if artwork['media'] == "unavailable":
+            if check_image_orientation_func(artwork["path"]) == "landscape":
+                artwork['type'] = "background"
+            if artwork['type'] == "season_cover":
+                artwork['media'] = "TV Show"
+            else:
+                # If we get to this point, there is no way to determine if it's a TV show or Movie, so default to poster
+                # However this won't pass any filters (becuase it's either "movie_poster" or "show_cover"), so this artwork won't be processed further
+                artwork['type'] = "poster"  
 
-        file_list.append(artwork)
+        # Check for filters and exclusions
+        if not filters or artwork["type"] in filters:
+            debug_me(
+                f"{i+1}. ✅ Including {artwork["type"].replace('_', ' ')} "
+                f"for '{artwork['title']}"
+                + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
+                + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
+                + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
+                + f". Type is {artwork['type']}.", "extract_and_list_zip"
+            )
+
+            file_list.append(artwork)
+        else:
+            debug_me(
+                f"{i+1}. ⏩ Skipping {artwork["type"].replace('_', ' ')} "
+                f"for '{artwork['title']}"
+                + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
+                + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
+                + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
+                + f" based on filters. Type is {artwork['type']} and filters are {filters}.", "extract_and_list_zip"
+            )
+            filtered_files += 1
 
     sorted_data = sorted(file_list, key=sort_key_func)
 
-    debug_me(f"Obtained {len(sorted_data)} artwork items:", "extract_and_list_zip")
-    pprint.pprint(sorted_data)
+    debug_me(f"⏩ Skipped {filtered_files} assets(s) out of {total_files} based on filters).", "extract_and_list_zip")
+    debug_me(f"✅ Included {len(sorted_data)} assets:", "extract_and_list_zip")
+    if globals.debug:
+        pprint.pprint(sorted_data)
 
-    return sorted_data
+    return sorted_data, filtered_files, zip_title, zip_author, zip_source
 
 
 def start_web_server(web_app, web_host: str, web_port: int, debug: bool = False):
