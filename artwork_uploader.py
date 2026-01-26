@@ -1,37 +1,24 @@
+from email import errors
 import eventlet
-eventlet.monkey_patch()
 
-import base64
-from pathlib import Path
+eventlet.monkey_patch()
 
 import uuid
 import os
 import re
-import zipfile
-import tempfile
-
-import requests
-import subprocess
-import schedule, time
 from core import globals
 import threading
 import sys
 
-from utils import utils
 from models import arguments
 from models.instance import Instance
-from processors.media_metadata import parse_title
-from utils.notifications import update_log, update_status, notify_web, debug_me
+from utils.notifications import update_log, update_status, notify_web, debug_me, send_notification
 from core.config import Config
-from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException
+from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException, InvalidUrl, InvalidFlag
 from scrapers.theposterdb_scraper import ThePosterDBScraper
-from processors.upload_processor import UploadProcessor
-from scrapers.scraper import Scraper
 from utils.utils import is_not_comment, parse_url_and_options
 from models.options import Options
 from plex.plex_connector import PlexConnector
-from core.exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, NotProcessedByFilter, \
-    NotProcessedByExclusion
 from core.constants import (
     CURRENT_VERSION,
     GITHUB_REPO,
@@ -42,16 +29,17 @@ from core.constants import (
     MIN_PYTHON_MAJOR,
     MIN_PYTHON_MINOR
 )
-from core.enums import InstanceMode, ScraperSource
+from core.enums import InstanceMode
 from services import (
     BulkFileService,
     ImageService,
-    ArtworkProcessor,
-    ProcessingCallbacks,
     SchedulerService,
-    UpdateService,
     UtilityService
 )
+from services.artwork_processor import ArtworkProcessor, ProcessingCallbacks
+from services.update_service import UpdateService
+from services.notify_service import NotifyService
+
 
 # ----------------------------------------------
 # Important for autoupdater
@@ -114,29 +102,41 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
     except FileNotFoundError:
         print("File not found. Please enter a valid file path.")
 
+    update_log(instance, f"🎬 Bulk process started for '{os.path.basename(file_path)}'")
+
     # Loop through the file, process the URL and options, then scrape according to the URL
-    for line in urls:
+    for n, line in enumerate(urls, 1):
 
         # Skip comments
         if is_not_comment(line):
 
             # Parse the line to extract the URL and options
-            parsed_url = parse_url_and_options(line)
+            try:
+                parsed_url = parse_url_and_options(line)
+            except InvalidUrl as e:
+                update_log(instance, f"❌ Invalid URL found in bulk file '{os.path.basename(file_path)}', line {n}: '{str(e)}'")
+                continue
+            except InvalidFlag as e:
+                update_log(instance, f"❌ One or more invalid flags found in bulk file '{os.path.basename(file_path)}', line {n}: {str(e)}")
+                continue
 
             # Parse according to whether it's a user portfolio or poster / set URL
             if "/user/" in parsed_url.url:
                 try:
                     scrape_tpdb_user(instance, parsed_url.url, parsed_url.options)
                 except ScraperException as scraper_error:
-                    print(str(scraper_error))
+                    debug_me(f"ScraperException: {str(scraper_error)}", "parse_bulk_file_from_cli")
                 except Exception as unknown_error:
-                    print(str(unknown_error))
+                    debug_me(f"Unknown exception: {str(unknown_error)}", "parse_bulk_file_from_cli")
             else:
                 try:
                     scrape_and_upload(instance, parsed_url.url, parsed_url.options)
+                except ScraperException as e:
+                    debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
                 except Exception as e:
-                    print(f"Error processing {parsed_url.url}: {str(e)}")
+                    debug_me(f"Unknown Exception: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
 
+    update_log(instance, f"🏁 Bulk process completed for '{os.path.basename(file_path)}'")
 
 # ---------------------- GUI FUNCTIONS ----------------------
 
@@ -193,7 +193,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
 
 
-def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None):
+def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, scheduled: bool = False) -> None:
 
     """Run the bulk import scrape in a separate thread."""
 
@@ -204,26 +204,34 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
 
     # Loop through the import file and build a list of URLs and options
     # Ignoring any lines containing comments using # or //
-    for line in bulk_import_list:
-        if is_not_comment(line):
-            parsed_url = parse_url_and_options(line)
-            parsed_urls.append(parsed_url)
+    update_log(instance, f"🎬 Bulk process started for '{filename}'")
 
-    if not parsed_urls:
-        update_status(instance, "No bulk import entries found.", color="danger")
+    for n, line in enumerate(bulk_import_list, 1):
+        if is_not_comment(line):
+            try:
+                parsed_url = parse_url_and_options(line)
+                parsed_urls.append(parsed_url)
+            except InvalidUrl as e:
+                update_log(instance, f"❌ Invalid URL found in bulk file '{filename}', line {n}: '{str(e)}'")
+                continue
+            except InvalidFlag as e:
+                update_log(instance, f"❌ One or more invalid flags found in bulk file '{filename}', line {n}: {str(e)}")
+                continue                
+    if len(parsed_urls) == 0:
+        update_status(instance, "No valid bulk import entries found.", color="danger")
+        return
 
     if instance.mode == "web":
         notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
 
     # Pass the processing of the parsed URLs off to a thread
-    if instance.mode == "web":
-        try:
-            process_bulk_import_from_ui(instance, parsed_urls, filename)
-        except Exception:
-            raise
+    try:
+        process_bulk_import_from_ui(instance, parsed_urls, filename, scheduled)
+    except Exception:
+        raise
 
 
-def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None) -> None:
+def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None, scheduled: bool = False) -> None:
 
     """
     Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
@@ -238,6 +246,9 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
     # Track successful poster uploads (those with ✅ or ♻️)
     success_counter = [0]
+    assets_processed = [0]
+    errors = 0
+    libraries = [0]
 
     try:
 
@@ -248,7 +259,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # Log the start of the bulk import process
         display_filename = filename if filename else "bulk_import.txt"
-        update_log(instance, f"🎬 Bulk process started - {display_filename}")
+#        update_log(instance, f"🎬 Bulk process started for '{display_filename}'")
 
         # Show the progress bar on the web UI
         notify_web(instance, "progress_bar", {"percent" : 0})
@@ -261,13 +272,17 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             # Parse according to whether it's a user portfolio or poster / set URL
             if "/user/" in parsed_line.url:
                 try:
-                    scrape_tpdb_user(instance, parsed_line.url, parsed_line.options, success_counter)
+                    scrape_tpdb_user(instance, parsed_line.url, parsed_line.options, success_counter, assets_processed)
                 except Exception:
+                    debug_me(f"Failed to scrape TPDb user URL: {parsed_line.url}", "process_bulk_import_from_ui")
                     pass
             else:
                 try:
-                    scrape_and_upload(instance, parsed_line.url, parsed_line.options, success_counter)
-                except Exception:
+                    scrape_and_upload(instance, parsed_line.url, parsed_line.options, success_counter, assets_processed)
+                except ScraperException as e:
+                    update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
+                    debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}", "process_bulk_import_from_ui")
+                    errors += 1 
                     pass
 
             percent = ((i + 1) / len(parsed_urls)) * 100
@@ -275,11 +290,25 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # All done, update the UI
         notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)} (100%)", "percent" : 100})
-        update_status(instance, "Bulk import scraping completed.", color="success")
 
         # Log the completion of the bulk import process
         poster_count = success_counter[0]
-        update_log(instance, f"🏁 Bulk process completed - {display_filename} - {poster_count} asset(s) updated")
+
+        message = (
+            ("🏁 " if errors == 0 else "⚠️ ")
+            + ("Scheduled b" if scheduled else "B")
+            + f"ulk import of '{display_filename}' completed "
+            + ("successfully • " if errors == 0 else f"with {errors} error(s), check logs for details • ")
+            + f"{assets_processed[0]} asset(s) processed • "
+            + f"{poster_count} asset(s) updated"
+            + (f" • {errors} error(s)" if errors > 0 else "")
+        )
+        
+        update_status(instance, message[2:], color="success" if errors == 0 else "warning")
+        update_log(instance, message)
+        if scheduled:
+            debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).", "process_bulk_import_from_ui")
+            send_notification(instance, message)
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", {"percent": 100})
@@ -290,7 +319,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
 
 # Scrape all pages of a TPDb user's uploaded artwork
-def scrape_tpdb_user(instance: Instance, url, options, success_counter=None):
+def scrape_tpdb_user(instance: Instance, url, options, success_counter=None, assets_processed=None):
 
     if "?" in url:
         cleaned_url = url.split("?")[0]
@@ -307,13 +336,13 @@ def scrape_tpdb_user(instance: Instance, url, options, success_counter=None):
     try:
         for page in range(pages):
             page_url = f"{url}?section=uploads&page={page + 1}"
-            scrape_and_upload(instance, page_url, options, success_counter)
+            scrape_and_upload(instance, page_url, options, success_counter, assets_processed)
     except Exception:
         raise ScraperException(f"Failed to process and upload from URL: {url}")
 
 
 # Scraped the URL then uploads what it's scraped to Plex
-def scrape_and_upload(instance: Instance, url, options, success_counter=None):
+def scrape_and_upload(instance: Instance, url, options, success_counter=None, assets_processed=None):
     """
     Scrape artwork from a URL and upload to Plex.
 
@@ -330,7 +359,8 @@ def scrape_and_upload(instance: Instance, url, options, success_counter=None):
     callbacks = ProcessingCallbacks(
         on_status_update=status_callback,
         on_log_update=log_callback,
-        success_counter=success_counter
+        success_counter=success_counter,
+        assets_processed=assets_processed
     )
 
     # Use the service to do the actual work
@@ -338,7 +368,11 @@ def scrape_and_upload(instance: Instance, url, options, success_counter=None):
         processor = ArtworkProcessor(globals.plex)
         return processor.scrape_and_process(url, options, callbacks)
     except PlexConnectorException as not_connected:
+        debug_me(f"PlexConnectorException: {str(not_connected)}", "scrape_and_upload")
         update_status(instance, str(not_connected), "danger")
+        raise
+    except ScraperException as scraper_error:
+        debug_me(f"ScraperException: {str(scraper_error)}", "scrape_and_upload")
         raise
 
 
@@ -372,11 +406,13 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
     )
 
     # Use the service to do the actual work
-    if plex_year:
-        plex_year = int(plex_year)
-        opts = Options(filters=filters, year=plex_year, temp=True if "temp" in options else False, stage=True if "stage" in options else False, force=True if "force" in options else False)
-    else:
-        opts = Options(filters=filters, temp=True if "temp" in options else False, stage=True if "stage" in options else False, force=True if "force" in options else False)
+    opts = Options(
+        filters=filters, 
+        year=int(plex_year) if plex_year else None, 
+        temp=True if "temp" in options else False, 
+        stage=True if "stage" in options else False, 
+        force=True if "force" in options else False
+    )
     processor = ArtworkProcessor(globals.plex)
     processor.process_uploaded_files(file_list, skipped, zip_title, zip_author, zip_source, opts, callbacks, override_title=plex_title)
 
@@ -529,15 +565,17 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
             with open(bulk_import_file, "r", encoding="utf-8") as file:
                 content = file.read()
             if content:
-                update_log(instance, "@ *** Scheduled import started ***")
-                run_bulk_import_scrape_in_thread(instance, content, filename)
+                update_log(instance, f"🕘 Scheduled bulk import started for '{filename}'")
+                debug_me(f"Scheduled import started for instance {instance.id} mode {instance.mode}", "process_bulk_file_on_schedule")
+                send_notification(instance, f"🕘 Scheduled bulk import started for '{filename}'")
+                run_bulk_import_scrape_in_thread(instance, content, filename, scheduled=True)
         else:
-            update_log(instance, f"Scheduled file does not exist: {filename}")
+            update_log(instance, f"🔴 Bulk file does not exist: {filename}")
             return
     except FileNotFoundError:
-        update_log(instance, f"@ Scheduled import failed due to missing file ({filename})")
+        update_log(instance, f"🔴 Scheduled bulk import failed due to missing file ({filename})")
     except Exception as e:
-        update_log(instance, f"@ Scheduled import unexpectedly failed ({str(e)})")
+        update_log(instance, f"🔴 Scheduled bulk import unexpectedly failed ({str(e)})")
 
 
 # Legacy functions - now handled by SchedulerService
@@ -647,6 +685,7 @@ if __name__ == "__main__":
         check_interval=UPDATE_CHECK_INTERVAL
     )
 
+
     # Make sure there's at least one bulk_import file
     check_for_bulk_import_file(cli_instance)
 
@@ -654,6 +693,7 @@ if __name__ == "__main__":
     globals.plex = PlexConnector(config.base_url, config.token)
 
     # Setup scheduler
+    globals.manual_run = False  # Reset manual run flag
     setup_scheduler_on_first_load(cli_instance)
 
     # Check for CLI arguments regardless of interactive_cli flag
