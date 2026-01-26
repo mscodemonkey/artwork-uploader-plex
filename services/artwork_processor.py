@@ -37,6 +37,7 @@ class ProcessingCallbacks:
     on_progress_update: Optional[Callable[[int, int], None]] = None  # (current, total) - for progress bars
     on_debug: Optional[Callable[[str, str], None]] = None  # (message, context) - for debug messages
     success_counter: Optional[list] = None  # Mutable list to track successful uploads (contains count as single element)
+    assets_processed: Optional[list] = None  # Mutable list to track total assets processed (contains count as single element)
 
 
 class ArtworkProcessor:
@@ -67,13 +68,24 @@ class ArtworkProcessor:
             ScraperException: If scraping fails
         """
         # Check Plex connection
-        self.plex.connect()
+        try:
+            self.plex.connect()
+        except PlexConnectorException as e:
+            if callbacks and callbacks.on_log_update:
+                callbacks.on_log_update(f"❌ Plex connection error: {str(e)}")
+            raise PlexConnectorException(f"Plex connection error: {str(e)}") from e
 
         # Scrape the artwork
         scraper = Scraper(url)
         scraper.set_options(options)
-        scraper.scrape()
-        title = scraper.title
+
+        try:
+            scraper.scrape()
+            title = scraper.title
+        except ScraperException as e:
+            if callbacks and callbacks.on_log_update:
+                callbacks.on_log_update(f"❌ Scraper error: {str(e)}")
+            raise ScraperException(f"Scraper error: {str(e)}") from e
 
         # Process the scraped artwork
         processor = UploadProcessor(self.plex)
@@ -81,9 +93,13 @@ class ArtworkProcessor:
 
         if callbacks and callbacks.on_log_update:
             #callbacks.on_log_update(f"🔍 Scraping artwork{f" for '{title}'" if title else ""} by '{scraper.author}'")
-            callbacks.on_log_update(f"🔍 {title} : {scraper.author} | Obtained {scraper.total} asset(s) from {f"ThePosterDB" if scraper.source == "theposterdb" else "Mediux"}")
+            callbacks.on_log_update(f"🔍 {title} • {scraper.author} | Obtained {scraper.total} asset(s) from {f"ThePosterDB" if scraper.source == "theposterdb" else "Mediux"}")
             if scraper.skipped > 0:
-                callbacks.on_log_update(f"⏩ {title} : {scraper.author} | Skipping {scraper.skipped} asset(s) based on exclusions ({scraper.exclusions}) or filters ({scraper.filtered}). Processing {scraper.total - scraper.skipped} asset(s).")
+                callbacks.on_log_update(f"⏩ {title} • {scraper.author} | Skipping {scraper.skipped} asset(s) based on exclusions ({scraper.exclusions}) or filters ({scraper.filtered}). Processing {scraper.total - scraper.skipped} asset(s).")
+
+        # Update total assets processed
+        if callbacks and callbacks.assets_processed is not None:
+            callbacks.assets_processed[0] += scraper.total
 
         # Process collections
         for artwork in scraper.collection_artwork:
@@ -108,7 +124,7 @@ class ArtworkProcessor:
                 processor.process_tv_artwork,
                 callbacks
             )
-        callbacks.on_log_update("✔️ Scraping completed")
+        callbacks.on_log_update(f"✔️ {title} • {scraper.author} | Processing completed")
         return title
 
     def _process_single_artwork(
@@ -158,14 +174,6 @@ class ArtworkProcessor:
         except ShowNotFound as e:
             if callbacks and callbacks.on_log_update:
                 callbacks.on_log_update(f"⚠️ {str(e)}")
-
-        except NotProcessedByExclusion as e:
-            if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"⏩ {str(e)}")
-
-        except NotProcessedByFilter as e:
-            if callbacks and callbacks.on_log_update:
-                callbacks.on_log_update(f"⏩ {str(e)}")
 
         except Exception as e:
             if callbacks and callbacks.on_log_update:
@@ -228,9 +236,9 @@ class ArtworkProcessor:
             callbacks.on_progress_update(0, total_files)
 
         if callbacks and callbacks.on_log_update:
-            callbacks.on_log_update(f"⚙️ {title}{f' ({year})' if year else ''} : {author} | Obtained {total_files + skipped} asset(s) from uploaded {source} ZIP file.")
+            callbacks.on_log_update(f"⚙️ {title}{f' ({year})' if year else ''} • {author} | Obtained {total_files + skipped} asset(s) from uploaded {source} ZIP file.")
             if skipped > 0:
-                callbacks.on_log_update(f"⏩ {title}{f' ({year})' if year else ''} : {author} | Skipping {skipped} asset(s) based on filters. Processing {total_files} asset(s).")
+                callbacks.on_log_update(f"⏩ {title}{f' ({year})' if year else ''} • {author} | Skipping {skipped} asset(s) based on filters. Processing {total_files} asset(s).")
 
         for index, artwork in enumerate(file_list, start=1):
             # Update progress
@@ -251,12 +259,13 @@ class ArtworkProcessor:
                 process_func = processor.process_tv_artwork
             elif media_type == "unavailable":
                 if callbacks and callbacks.on_log_update:
-                    callbacks.on_log_update(f"⚠️ {artwork['title']} {f"({artwork['year']})" if artwork.get('year') else ''} : {artwork['author']} | Not available in Plex.")
+                    callbacks.on_log_update(f"⚠️ {artwork['title']} {f"({artwork['year']})" if artwork.get('year') else ''} : {artwork['author']} | Not available on Plex.")
                     os.remove(artwork['path'])  # Remove the temporary file after processing
                     try:
                         os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
                         callbacks.on_debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}", "process_uploaded_artwork")
                     except OSError as e:
+                        callbacks.on_debug(f"Error deleting temporary directory: {os.path.dirname(artwork['path'])} - {str(e)}", "process_uploaded_artwork")
                         pass
                     continue
             else:
@@ -333,6 +342,6 @@ class ArtworkProcessor:
                 pass
         # Final progress update
         if callbacks and callbacks.on_log_update:
-            callbacks.on_log_update(f"✔️ Finished processing uploaded ZIP file. {success_counter} asset(s) updated.")
+            callbacks.on_log_update(f"✔️ {title}{f' ({year})' if year else ''} • {author} | {total_files} file(s) processed • {success_counter} asset(s) updated.")
         if callbacks and callbacks.on_progress_update:
             callbacks.on_progress_update(total_files, total_files)

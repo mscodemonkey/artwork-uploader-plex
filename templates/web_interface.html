@@ -209,7 +209,7 @@
                                     </div>
                                     <div class="mb-3">
                                         <label for="kometa_base" class="form-label">Kometa Asset Directory:</label>
-                                        <input type="text" id="kometa_base" name="kometa_base" class="form-control" placeholder="X:\path\to\kometa\assets">
+                                        <input type="text" id="kometa_base" name="kometa_base" class="form-control" placeholder="X:\path\to\kometa\assets" title="Full path to Kometa asset directory">
                                         <div class="invalid-feedback">
                                             Please provide your Kometa asset directory.
                                         </div>
@@ -372,10 +372,15 @@
                                                 <label for="apprise_urls" class="form-label">Apprise URLs to notify:</label>
                                                 <input type="text" id="apprise_urls" name="apprise_urls" class="form-control" placeholder="discord://{botname}@​{WebhookID}/{WebhookToken},ntfy://{user}:{password}@​{host}/{topics}"
                                                     title="Enter one or more Apprise URLs separated by commas.">
-                                                <small class="form-text text-muted">(Optional) Enter one or more Apprise URLs separated by commas.</small><br>
-                                                <small class="form-text text-muted">See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.</small>
+                                                <small class="form-text text-muted">(Optional) Enter one or more Apprise URLs separated by commas. See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.</small><br>
+                                                <!-- <small class="form-text text-muted">See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.</small> -->
                                                 <div class="invalid-feedback">
                                                     Enter one or more Apprise URLs separated by commas.
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col">
+                                                        <button class="btn btn-primary mt-3" type="button" id="test_notif_btn">Test Notifications</button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>  

@@ -1,6 +1,8 @@
+from datetime import datetime
 from core import globals
 from models.instance import Instance
 from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
+from services.notify_service import NotifyService
 
 # For backwards compatibility
 bootstrap_colors = BOOTSTRAP_COLORS
@@ -9,6 +11,8 @@ def update_status(instance: Instance, message, color="primary", sticky=False, sp
     """Update the status label with a message and color."""
 
     if (instance.mode == "cli" and cli) or globals.debug:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        message = f"[{timestamp}] {message}"
         print(f"{bootstrap_colors.get(color, {}).get('ansi', None)}{message}\033[0m")
     if instance.mode == "web":
         notify_web(instance, "status_update",
@@ -16,10 +20,11 @@ def update_status(instance: Instance, message, color="primary", sticky=False, sp
 
 def debug_me(message: str, title:str = None):
     if globals.debug:
+        timestamp = datetime.now().strftime("%H:%M:%S")
         if title:
-            print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{title}] {ANSI_RESET}{message}")
+            print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{timestamp}] [{title}] {ANSI_RESET}{message}")
         else:
-            print(f"{ANSI_RESET}{message}")
+            print(f"[{timestamp}] {ANSI_RESET}{message}")
 
 def update_log(instance: Instance, update_text: str, artwork_title: str = None, force_print: bool = False) -> None:
 
@@ -33,6 +38,8 @@ def update_log(instance: Instance, update_text: str, artwork_title: str = None, 
         force_print (bool)
     """
     try:
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        update_text = f"[{timestamp}] {update_text}"
         if instance.mode == "cli" or force_print or globals.debug:
             print(update_text)
         if instance.mode == "web":
@@ -40,7 +47,7 @@ def update_log(instance: Instance, update_text: str, artwork_title: str = None, 
     except Exception as e:
         # Fail silently for logging errors to avoid cascading failures
         if globals.debug:
-            print(f"Error in update_log: {e}")
+            print(f"[{timestamp}] Error in update_log: {e}")
 
 def notify_web(instance: Instance, event, data_to_include = None):
 
@@ -49,3 +56,41 @@ def notify_web(instance: Instance, event, data_to_include = None):
         merged_arguments = data_to_include | instance_data
         debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}", "notify_web")
         globals.web_socket.emit(event, merged_arguments)
+
+def send_notification(instance: Instance, message: str) -> None:
+
+    """
+    Sends a notification using the NotifyService class.
+
+    Args:
+        instance (Instance):
+        message (str):
+
+    Returns:
+        None
+    """
+    try:
+        if len(globals.config.apprise_urls) > 0:
+            notifier = NotifyService()
+            notify_success = True
+            for url in globals.config.apprise_urls:
+                notifier.add_url(url)
+                url_success = notifier.send_notification("Artwork Uploader", message)
+                if url_success:
+                    debug_me(f"📢 Notification sent successfully for URL: {url}", "send_notification")
+                    update_log(instance, f"📢 Notification sent successfully for URL: {url}")
+                else:
+                    debug_me(f"⚠️ Notification failed to send for URL: {url}", "send_notification")
+                    update_log(instance, f"⚠️ Notification failed to send for URL: {url}")
+                notify_success = notify_success and url_success
+                notifier.clear_urls()
+            if len(globals.config.apprise_urls) > 1:
+                if notify_success:
+                    debug_me(f"✅ {len(globals.config.apprise_urls)} notifications sent successfully.", "send_notification")
+                    update_log(instance, f"✅ {len(globals.config.apprise_urls)} notifications sent successfully.")
+                elif not notify_success:
+                    debug_me("⚠️ Some notifications failed to send. Check logs for details.", "send_notification")
+                    update_log(instance, "⚠️ Some notifications failed to send. Check logs for details.")
+    except Exception as e:
+        debug_me(f"🚨 Error sending notification: {str(e)}", "send_notification")
+        update_log(instance, f"🚨 Error sending notification: {str(e)}")

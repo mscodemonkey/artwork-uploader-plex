@@ -42,10 +42,32 @@ document.getElementById("bulk_import_text").addEventListener("input", updateBulk
 document.getElementById("scraper-filters-global").addEventListener("change", inheritGlobalFiltersForScraper);
 document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
 document.getElementById("btnUpdate").addEventListener("click", updateApp);
+document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
+
 
 // ==================================================
 // General helper functions
 // ==================================================
+
+// Send test notification
+function testNotifications() {
+    urls = document.getElementById("apprise_urls").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values    
+    socket.emit("test_notifications", { instance_id: instanceId, urls: urls });
+}
+
+socket.on("test_notifications", (data) => {
+    // updateStatus("Sending test notification...", "info", false, true);
+    if (validResponse(data)) {
+        if (data.success) {
+            updateLog("📢 Test notification sent successfully to '" + data.url + "'");
+        } else {
+            updateLog("❌ Error sending test notification to '" + data.url + "'");
+        }
+    }
+});
 
 // Check incoming socket message is for this instance
 function validResponse(data, broadcast = false) {
@@ -109,6 +131,14 @@ function updateStatus(message, color = "info", sticky = false, spinner = false, 
 
     if (!statusEl) return;
 
+    // Check if message has timestamp
+    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\]/.test(message);
+
+    // Remove timestamp if present
+    if (hasTimestamp) {
+        message = message.replace(/^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\]\s*/, '');
+    }
+    
     // Update the message and color
     messageEl.innerHTML = message;
 
@@ -180,11 +210,17 @@ socket.on("status_update", (data) => {
 function updateLog(message, color = null, artwork_title = null) {
     let statusElement = document.getElementById("scraping_log");
 
-    // Get current timestamp
-    let timestamp = new Date().toLocaleTimeString("en-GB", { hour12: false });
+    // Match [00:00:00] to [23:59:59] at the start
+    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\]/.test(message);
+
+    // Add timestamp if message doesn't already have one
+    if (!hasTimestamp) {
+        let timestamp = new Date().toLocaleTimeString("en-GB", { hour12: false });
+        message = '[' + timestamp + '] ' + message;
+    }
 
     // Prepend the new message with timestamp
-    statusElement.innerHTML = '<div class="log_message">[' + timestamp +'] ' + message + '</div>' + statusElement.innerHTML;
+    statusElement.innerHTML = '<div class="log_message">' + message + '</div>' + statusElement.innerHTML;
 }
 socket.on("log_update", (data) => {
     if (validResponse(data,true)) {

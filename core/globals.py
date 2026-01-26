@@ -9,6 +9,3 @@ plex = None  # Plex connector
 bulk_file_service = None
 scheduler_service = None
 update_service = None
-notify_service = None
-
-manual_run = False  # Indicates if the current run is manual or scheduled
