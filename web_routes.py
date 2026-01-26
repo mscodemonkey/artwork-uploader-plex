@@ -28,6 +28,7 @@ from flask import render_template, send_from_directory, request, redirect, url_f
 from functools import wraps
 
 from core import globals
+from services.notify_service import NotifyService
 from utils import utils
 from models.instance import Instance
 from core.config import Config
@@ -230,9 +231,7 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         bulk_list = data.get("bulk_list").lower()
         filename = data.get("filename", "bulk_import.txt")
-        globals.manual_run = True # Set manual run flag
         run_bulk_import_scrape_in_thread(instance, bulk_list, filename)
-        globals.manual_run = False # Reset manual run flag after starting thread
 
     @globals.web_socket.on("save_bulk_import")
     def handle_bulk_import(data):
@@ -320,6 +319,38 @@ def setup_socket_handlers(
     def display_message(data):
         """Log a debug message from the frontend."""
         debug_me(data.get("message"), data.get("title", "web_message"))
+
+    @globals.web_socket.on("test_notifications")
+    def test_notifications(data):
+        """Send a test notification."""
+        instance = Instance(data.get("instance_id"), "web")
+        instance.broadcast = True
+        # Disable the test button to prevent multiple clicks
+        notify_web(instance, "element_disable", {"element": ["test_notif_btn"], "mode": True})
+        urls = data.get("urls", [])
+        notification_title = "Test Notification from Artwork Uploader"
+        notification_message = "This is a test notification to verify your notification settings are working correctly."
+        test_notification = NotifyService()
+        success = True
+        for url in urls:
+            test_notification.add_url(url)
+            debug_me(f"Sending test notification to '{url}'", "test_notifications")
+            url_success = test_notification.send_notification(notification_title, notification_message)
+            success = success and url_success
+            if url_success:
+                debug_me(f"📢 Test notification sent successfully to '{url}'", "test_notifications")
+                notify_web(instance, "test_notifications", {"success": True, "url": url})
+            else:
+                debug_me(f"❌ Test notification failed to send to '{url}'.", "test_notifications")
+                notify_web(instance, "test_notifications", {"success": False, "url": url})
+            test_notification.clear_urls()
+        if success:
+            debug_me("✅ All test notifications sent successfully.", "test_notifications")
+            notify_web(instance, "status_update", {"message": "All test notifications sent successfully.", "color": "success", "icon": "check-circle"})
+        else:
+            debug_me("⚠️ Some test notifications failed to send. Check logs for details.", "test_notifications")
+            notify_web(instance, "status_update", {"message": "Some test notifications failed to send. Check logs for details.", "color": "danger", "icon": "x-circle"})
+        notify_web(instance, "element_disable", {"element": ["test_notif_btn"], "mode": False})
 
     @globals.web_socket.on("set_password")
     def set_password_web(data):

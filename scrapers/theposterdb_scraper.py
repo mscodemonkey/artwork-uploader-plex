@@ -63,6 +63,7 @@ class ThePosterDBScraper:
             if self.url and ("/set/" in self.url or "/user/" in self.url):
                 self.soup = soup_utils.cook_soup(self.url)
                 debug_me(f"★ Got a valid URL {self.url}", "ThePosterDBScraper/scrape")
+                debug_me(f"★ Processing URL with options {self.options}", "ThePosterDBScraper/scrape")
 
                 self.get_set_title(self.soup)
                 self.get_set_author(self.soup)
@@ -125,8 +126,8 @@ class ThePosterDBScraper:
         try:
             self.title = soup.find('p', id = "set-title").a.string
         except (AttributeError, TypeError) as e:
-            debug_me(f"title lookup failed!", "ThePosterDBScraper/get_set_title")
-        debug_me(f"set title: {self.title}", "ThePosterDBScraper/get_set_title")
+            debug_me(f"Set title lookup failed!", "ThePosterDBScraper/get_set_title")
+        debug_me(f"Found set title: {self.title}", "ThePosterDBScraper/get_set_title")
 
     def get_set_author(self, soup: Any) -> None:
         """ 
@@ -136,15 +137,15 @@ class ThePosterDBScraper:
             try:
                 #self.author = soup.select_one('p#set-title span.font-italic a').string.strip()
                 self.author = soup.find('p', class_='uploaded-by text-white d-inline-block text-truncate w-100').a.string
-                debug_me(f"set author: {self.author}", "ThePosterDBScraper/get_set_author")
+                debug_me(f"Found set author: {self.author}", "ThePosterDBScraper/get_set_author")
             except:
-                debug_me(f"author lookup failed {soup}", "ThePosterDBScraper/get_set_author")
+                debug_me(f"Set author lookup failed {soup}", "ThePosterDBScraper/get_set_author")
         elif "/user/" in self.url:
             try:
                 self.author = soup.find('p', class_='h1 mb-0 mr-md-1').a.string
-                debug_me(f"author: {self.author}", "ThePosterDBScraper/get_set_author")
+                debug_me(f"Found author: {self.author}", "ThePosterDBScraper/get_set_author")
             except:
-                debug_me(f"author lookup failed {soup}", "ThePosterDBScraper/get_set_author")
+                debug_me(f"Author lookup failed {soup}", "ThePosterDBScraper/get_set_author")
 
     def get_posters(self, poster_div: Any) -> None:
 

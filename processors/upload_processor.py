@@ -39,7 +39,7 @@ class UploadProcessor:
 
         result = None
         results = []
-        description = f"{artwork["title"]} : {artwork["author"]}"
+        description = f"{artwork["title"]} • {artwork["author"]}"
         artwork_type = "Poster" if artwork["type"] == "collection_poster" else "Background"
         artwork_id = artwork_type[0]
 
@@ -92,7 +92,7 @@ class UploadProcessor:
         
         result = None
         results = []
-        description = f"{artwork['title']} ({artwork['year']}) : {artwork['author']}"
+        description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']}"
         artwork_type = "Poster" if artwork.get("type") == "movie_poster" else "Background"
         artwork_id = artwork_type[0]
 
@@ -148,11 +148,11 @@ class UploadProcessor:
             season = f"Season {artwork['season']:02}"
 #
         if is_numeric(artwork['season']) and is_numeric(artwork['episode']):
-            description = f"{artwork['title']} ({artwork['year']}) : {artwork['author']} : {season}, Episode {artwork['episode']:02}"
+            description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']} • {season} • Episode {artwork['episode']:02}"
         elif (artwork['episode'] is None or artwork['episode'] == "Cover") and is_numeric(artwork['season']):
-            description = f"{artwork['title']} ({artwork['year']}) : {artwork['author']} : {season}"
+            description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']} • {season}"
         elif artwork['season'] is None or artwork["season"] == "Cover" or artwork["season"] == "Backdrop":
-            description = f"{artwork['title']} ({artwork['year']}) : {artwork['author']}"
+            description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']}"
 
         artwork["year"] = self.options.year if self.options.year else artwork["year"]
         

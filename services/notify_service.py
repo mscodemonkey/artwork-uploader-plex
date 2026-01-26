@@ -1,17 +1,19 @@
 import apprise
-
-from utils.notifications import debug_me
+from typing import Optional
 
 class NotifyService:
 
-    def __init__(self, urls):
-        debug_me(f"Initializing NotifyService with URLs: {urls}", "NotifyService/__init__")
+    def __init__(self):
         self.apobj = apprise.Apprise()
-        for url in urls:
-            self.apobj.add(url)
 
-    def send_notification(self, title, message):
-        self.apobj.notify(
+    def add_url(self, url: str):
+        self.apobj.add(url)
+
+    def clear_urls(self):
+        self.apobj.clear()
+
+    def send_notification(self, title, message) -> Optional[bool]:
+        return self.apobj.notify(
             body=message,
             title=title
         )
