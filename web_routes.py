@@ -23,6 +23,7 @@ import subprocess
 import pprint
 from pathlib import Path
 from packaging import version
+from plexapi.server import PlexServer
 
 from flask import render_template, send_from_directory, request, redirect, url_for, session
 from functools import wraps
@@ -320,6 +321,74 @@ def setup_socket_handlers(
         """Log a debug message from the frontend."""
         debug_me(data.get("message"), data.get("title", "web_message"))
 
+    @globals.web_socket.on("test_plex_connect")
+    def test_plex_connect(data):
+        """Test connectivity to Plex server"""
+
+        def fail(status, log):
+            notify_web(instance, "test_plex_connect", { "success": False, "status": status, "log": log })
+            notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
+
+        instance = Instance(data.get("instance_id"), "web")
+        instance.broadcast = True
+        
+        # Disable the test button to prevent multiple clicks
+        notify_web(instance, "element_disable", {"element": ["test_plex_btn"], "mode": True})
+        
+        # Capture Plex settings form parameters
+        url = data.get("url", "")
+        debug_me(f"Obtained Plex URL: {url}")
+        token = data.get("token", "")
+        debug_me(f"Obtained Plex token: {token}")
+        tv_libs = data.get("tv_libs", "")
+        debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}")
+        movie_libs = data.get("movie_libs", "")
+        debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}")
+        
+        # Check for a valid Plex server URL and token
+        url_pattern = r"^https?:\/\/((([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?$"
+        token_pattern = r"^[A-Za-z0-9_-]{20,}$"
+        if not re.fullmatch(url_pattern, url):
+            fail("Invalid Plex URL", f"❌ Invalid Plex URL • {url}")
+            return
+        if not re.fullmatch(token_pattern, token):
+            fail("Invalid Plex token", f"❌ Invalid Plex token • {token}")
+            return
+        
+        # Check connectivity to server
+        try:
+            plex_server = PlexServer(url, token, timeout=5)
+        except Exception as e:
+            if "NewConnectionError" in str(e):
+                log = f"❌ Error connecting to Plex • Connection refused"
+            elif "ConnectTimeoutError" in str(e):
+                log = f"❌ Error connecting to Plex • Timed out"
+            elif "unauthorized" in str(e):
+                log = f"❌ Error connecting to Plex • Invalid token"
+            elif "NameResolutionError" in str(e):
+                log = f"❌ Error connecting to Plex • Cannot resolve server name"
+            elif "SSLError" in str(e):
+                log = f"❌ Error connecting to Plex • SSL certificate validation failed"
+            else:
+                log = f"❌ Unknown error connecting to Plex: {str(e)}"
+            fail ("Error connecting to Plex, check log for details", log)
+            return
+
+        # Check that the provided libraries exist in the server        
+        all_libs = list(tv_libs) + list(movie_libs)
+        invalid_libs = []
+        for lib in all_libs:
+            try:
+                plex_server.library.section(lib)
+            except Exception:
+                invalid_libs.append(lib)
+        if invalid_libs:
+            fail("Some libraries not found, check log for details.", f"❌ The following libraries could not be found: {", ".join (invalid_libs)}")
+            return
+        
+        notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
+        notify_web(instance, "test_plex_connect", { "success": True })
+
     @globals.web_socket.on("test_notifications")
     def test_notifications(data):
         """Send a test notification."""
@@ -339,17 +408,17 @@ def setup_socket_handlers(
             success = success and url_success
             if url_success:
                 debug_me(f"📢 Test notification sent successfully to '{url}'", "test_notifications")
-                notify_web(instance, "test_notifications", {"success": True, "url": url})
+                notify_web(instance, "test_notifications", {"success": "url_pass", "url": url})
             else:
                 debug_me(f"❌ Test notification failed to send to '{url}'.", "test_notifications")
-                notify_web(instance, "test_notifications", {"success": False, "url": url})
+                notify_web(instance, "test_notifications", {"success": "url_fail", "url": url})
             test_notification.clear_urls()
         if success:
             debug_me("✅ All test notifications sent successfully.", "test_notifications")
-            notify_web(instance, "status_update", {"message": "All test notifications sent successfully.", "color": "success", "icon": "check-circle"})
+            notify_web(instance, "test_notifications", { "success": "all", "status": "All test notifications sent successfully."})
         else:
             debug_me("⚠️ Some test notifications failed to send. Check logs for details.", "test_notifications")
-            notify_web(instance, "status_update", {"message": "Some test notifications failed to send. Check logs for details.", "color": "danger", "icon": "x-circle"})
+            notify_web(instance, "test_notifications", { "success": "partial", "status": "Some test notifications failed to send. Check logs for details."})
         notify_web(instance, "element_disable", {"element": ["test_notif_btn"], "mode": False})
 
     @globals.web_socket.on("set_password")
@@ -404,7 +473,7 @@ def setup_socket_handlers(
             globals.plex.reconnect(config)
             notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
         except Exception as config_error:
-            update_status(instance, str(config_error), color="danger")
+            update_status(instance, str(config_error), color="warning")
 
     @globals.web_socket.on("delete_schedule")
     def delete_task_from_scheduler(data):

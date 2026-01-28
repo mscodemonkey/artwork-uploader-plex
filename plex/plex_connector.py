@@ -47,29 +47,6 @@ class PlexConnector:
             if not self.base_url or not self.token:
                 raise PlexConnectorException("Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.")
 
-            # Quick connectivity check before attempting full connection
-            try:
-                parsed = urlparse(self.base_url)
-                host = parsed.hostname or 'localhost'
-                port = parsed.port or 32400
-
-                # Try to connect with a short timeout using connect_ex (non-blocking check)
-                test_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                test_socket.settimeout(3)
-                result = test_socket.connect_ex((host, port))
-                test_socket.close()
-
-                if result != 0:
-                    raise PlexConnectorException(
-                        f'Cannot reach Plex server at {self.base_url}. Please check that the server is running and the address is correct.',
-                        f"Connection refused (error code: {result})")
-            except PlexConnectorException:
-                raise
-            except (socket.timeout, socket.error, OSError) as e:
-                raise PlexConnectorException(
-                    f'Cannot reach Plex server at {self.base_url}. Connection timed out after 3 seconds.',
-                    f"Connection failed: {str(e)}")
-
             try:
                 self.plex = PlexServer(self.base_url, self.token, timeout=10)  # Initialize the Plex server connection with 10 second timeout
 

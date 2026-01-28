@@ -43,11 +43,39 @@ document.getElementById("scraper-filters-global").addEventListener("change", inh
 document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
 document.getElementById("btnUpdate").addEventListener("click", updateApp);
 document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
+document.getElementById("test_plex_btn").addEventListener("click", testPlexConnect);
 
 
 // ==================================================
 // General helper functions
 // ==================================================
+
+// Test connection to Plex server
+function testPlexConnect() {
+    updateStatus("Testing connection to Plex server", "info", false, true)
+    baseUrl = document.getElementById("plex_base_url").value
+    token = document.getElementById("plex_token").value
+    tvLibraries = document.getElementById("tv_library").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values    
+    movieLibraries = document.getElementById("movie_library").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values    
+    socket.emit("test_plex_connect", { instance_id: instanceId, url: baseUrl, token: token, tv_libs: tvLibraries, movie_libs: movieLibraries });
+}
+socket.on("test_plex_connect", (data) => {
+    if (validResponse(data)) {
+        if (data.success) {
+            updateStatus("Successfully connected to Plex server", "success", false, false, "server")
+            updateLog("✅ Successfully connected to Plex server");
+        } else {
+            updateStatus(data.status, "danger", false, false, "x-circle")
+            updateLog(data.log);
+        }
+    }
+});
 
 // Send test notification
 function testNotifications() {
@@ -59,12 +87,15 @@ function testNotifications() {
 }
 
 socket.on("test_notifications", (data) => {
-    // updateStatus("Sending test notification...", "info", false, true);
     if (validResponse(data)) {
-        if (data.success) {
+        if (data.success == "url_pass") {
             updateLog("📢 Test notification sent successfully to '" + data.url + "'");
-        } else {
+        } else if (data.success == "url_fail") {
             updateLog("❌ Error sending test notification to '" + data.url + "'");
+        } else if (data.success == "all") {
+            updateStatus(data.status, "success", false, false, "send")
+        } else if (data.success == "partial") {
+            updateStatus(data.status, "warning", false, false, "exclamation-octagon")
         }
     }
 });
@@ -494,7 +525,7 @@ function saveConfig() {
                 updateStatus("Configuration saved", "success", false, false, "check-circle");
                 configureTabs(true);
             } else {
-                updateStatus("Configuration could not be saved", "danger", false, false, "cross-circle");
+                updateStatus("Configuration could not be saved", "danger", false, false, "x-circle");
                 configureTabs(true);
             }
         }
@@ -741,7 +772,7 @@ function loadBulkFile(bulkImport = null) {
                     updateSchedulerIcon();
                     //                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
                 } else {
-                    updateStatus("Bulk import file could not be loaded","danger", false, false, "cross-circle")
+                    updateStatus("Bulk import file could not be loaded","danger", false, false, "x-circle")
                 }
 
 

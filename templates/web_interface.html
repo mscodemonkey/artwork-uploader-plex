@@ -118,7 +118,7 @@
                 <div class="p-3">
                     <span id="status_spinner" class="spinner-border spinner-border-sm collapse" aria-hidden="true"></span>
                     <i id="status_icon" class="bi-alarm"></i>
-                    <span id="status_message">Welcome to Artwork Scraper for Plex!</span>
+                    <span id="status_message">Welcome to Artwork Uploader for Plex!</span>
                 </div>
             </div>
         </div>
@@ -129,15 +129,15 @@
 
         <nav class="nav nav-tabs" id="myTab">
             <a class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab"
-            aria-controls="config" aria-selected="false">Config</a>
+            aria-controls="config" aria-selected="false"><i class="bi bi-toggles"></i>&nbsp;Config</a>
             <a class="nav-link collapse" id="bulk-import-tab" data-bs-toggle="tab" data-bs-target="#bulk-import" type="button"
-            role="tab" aria-controls="bulk-import" aria-selected="false">Bulk Import</a>
+            role="tab" aria-controls="bulk-import" aria-selected="false"><i class="bi bi-text-left"></i>&nbsp;Bulk Import</a>
             <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
-            role="tab" aria-controls="scraper" aria-selected="true">Scraper</a>
+            role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&nbsp;Scraper</a>
             <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
-            role="tab" aria-controls="uploader" aria-selected="true">Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
+            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&nbsp;Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
-            role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block">Scrape&nbsp;</span>Log</a>
+            role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&nbsp;Log</a>
             <a class="nav-link ms-auto" id="logout-link" href="/logout" style="display: none;">
                 <i class="bi bi-box-arrow-right"></i> Logout
             </a>
@@ -169,8 +169,8 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="plex_token" class="form-label">Plex token:</label>
-                                    <input type="text" id="plex_token" name="plex_token" class="form-control" required pattern="[A-Za-z0-9-]{20}"
-                                        title="Plex token should be a 20-character alphanumeric string.">
+                                    <input type="text" id="plex_token" name="plex_token" class="form-control" required pattern="^[A-Za-z0-9_-]{20,40}$"
+                                        title="Plex token should be a 20+ character string with letters, digits, dashes or underscores.">
                                     <div class="invalid-feedback">
                                         Please provide a valid Plex token.
                                     </div>
@@ -189,6 +189,11 @@
                                         Please provide your Movie library name. If more than one, separate using commas.
                                     </div>
                                 </div>
+                                <div class="row">
+                                    <div class="col">
+                                        <button class="btn btn-primary mt-3" type="button" id="test_plex_btn"><i class="bi bi-server"></i>&ensp;Test Connection to Plex</button>
+                                    </div>
+                                </div>                                
                             </div>
                             <!-- Kometa settings -->                           
                             <div class="p-3 border mt-3">
@@ -379,17 +384,17 @@
                                                 </div>
                                                 <div class="row">
                                                     <div class="col">
-                                                        <button class="btn btn-primary mt-3" type="button" id="test_notif_btn">Test Notifications</button>
+                                                        <button class="btn btn-primary mt-3" type="button" id="test_notif_btn"><i class="bi bi-send"></i>&ensp;Test Notifications</button>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>  
                                     </div>
+                                    <button class="btn btn-primary mt-3" id="save_config_button"><i class="bi bi-floppy2"></i>&ensp;Save Config</button>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <button class="btn btn-primary mt-3" id="save_config_button">Save Config</button>
                 </form>
             </div>
 
@@ -467,8 +472,8 @@
                 </div>
                 <div class="row mb-3">
                     <div class="col">
-                        <button class="btn btn-secondary me-3" id="save_bulk_button" onclick="checkBulkImportFileToSave()">Save Bulk File</button>
-                        <button class="btn btn-primary" id="bulk_button" onclick="runBulkImport()">Run Bulk Import</button>
+                        <button class="btn btn-secondary me-3" id="save_bulk_button" onclick="checkBulkImportFileToSave()"><i class="bi bi-floppy2"></i>&ensp;Save Bulk File</button>
+                        <button class="btn btn-primary" id="bulk_button" onclick="runBulkImport()"><i class="bi bi-play-circle"></i>&ensp;Run Bulk Import</button>
                     </div>
                 </div>
                 <!--                </form> -->
@@ -612,7 +617,7 @@
                     </div>
                     <div class="row">
                         <div class="col">
-                            <button type="button" class="btn btn-primary" id="scrape_button" onclick="startScrape()">Start
+                            <button type="button" class="btn btn-primary" id="scrape_button" onclick="startScrape()"><i class="bi bi-play-circle"></i>&ensp;Start
                                 Scrape
                             </button>
                         </div>
@@ -625,7 +630,7 @@
             <div class="tab-pane fade" id="uploader" role="tabpanel" aria-labelledby="uploader-tab" tabindex="0">
                 <div class="row mb-3" id="drop-area">
                     <div class="col">
-                        <p>Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.</p><p>It'll try to determine whether the artwork is for a TV show or a movie / collection.  This is a beta feature so please let me know any anomalies you find in Zip files!</p>
+                        <p>1. Check any options or customize filters.</p><p>2. Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.</p><p>3. The app will try to determine whether the artwork is for a TV show or a movie / collection or if it contains a mix of assets.</p><p>This is a beta feature so please let me know any anomalies you find in ZIP files!</p>
                     </div>
                 </div>
                 <div id="progress-container" class="row mt-3 mb-3" style="display:none">

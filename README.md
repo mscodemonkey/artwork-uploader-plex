@@ -564,11 +564,12 @@ until you fix the Plex connection in Settings.
 ## Web UI
 It's still work in progress, as is this entire app!  I wouldn't consider it "production" ready but it's fully functional!
 
-![Settings](assets/settings.png)
-![Bulk Import](assets/web_bulk_import.png)
+![Settings](assets/config-tab.png)
+![Bulk Import](assets/bulk-tab.png)
 ![Processing](assets/processing.png)
-![Scraper](assets/url_scraper.png)
-![Session Log](assets/session_log.png)
+![Scraper](assets/scraper-tab.png)
+![Upload ZIP](assets/upload-tab.png)
+![Log](assets/log-tab.png)
 
 
 ## Multiple Libraries
