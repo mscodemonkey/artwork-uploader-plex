@@ -224,6 +224,11 @@
                                         <input type="text" id="temp_dir" name="temp_dir" class="form-control" placeholder="X:\path\to\temp\dir">
                                         <small class="form-text text-muted">(Optional) Specify a temporary directory for Kometa operations.</small>
                                     </div>
+                                    <div id="docker_warning" class="alert alert-info" role="alert" style="display: none;">
+                                        <i class="bi bi-info-circle"></i>&ensp; When running as a docker container the Kometa asset and temp directories are hardcoded to <code>/assets</code> and <code>/temp</code>
+                                        respectively. These paths must be mapped to the chosen host paths via bind mounts in the <code>docker-compose.yml</code> file. Changing these settings will 
+                                        only have any effect if running the script from outside the container.
+                                    </div>
                                 </div>
                             </div>
                             <!-- Authentication settings -->

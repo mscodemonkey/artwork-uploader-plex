@@ -414,12 +414,16 @@ def setup_socket_handlers(
                 notify_web(instance, "test_notifications", {"success": "url_fail", "url": url})
             test_notification.clear_urls()
         if success:
-            debug_me("✅ All test notifications sent successfully.", "test_notifications")
-            notify_web(instance, "test_notifications", { "success": "all", "status": "All test notifications sent successfully."})
+            message = "✅ Test notification sent successfully." if len(urls) == 1 else "✅ All test notifications sent successfully."
+            debug_me(message, "test_notifications")
+            notify_web(instance, "test_notifications", { "success": "all", "status": message[2:]  })
         else:
-            debug_me("⚠️ Some test notifications failed to send. Check logs for details.", "test_notifications")
-            notify_web(instance, "test_notifications", { "success": "partial", "status": "Some test notifications failed to send. Check logs for details."})
-        notify_web(instance, "element_disable", {"element": ["test_notif_btn"], "mode": False})
+            message = "❌ Test notification failed to send. " if len(urls) == 1 else "⚠️ Some test notifications failed to send. Check logs for details."
+            severity = "danger" if len(urls) == 1 else "warning"
+            icon = "x-circle" if len(urls) == 1 else "exclamation-triangle"
+            debug_me(message, "test_notifications")
+            notify_web(instance, "test_notifications", { "success": "partial", "status": message[2:], "severity": severity, "icon": icon })
+        notify_web(instance, "element_disable", { "element": ["test_notif_btn"], "mode": False })
 
     @globals.web_socket.on("set_password")
     def set_password_web(data):
@@ -567,6 +571,16 @@ def setup_socket_handlers(
 
         # Add new schedule if not found
         config.schedules.append({"file": file_name, "time": new_time})
+
+    @globals.web_socket.on("detect_docker")
+    def docker_detection(data):
+        """Detects whether app is running in docker and informs frontend"""
+        instance = Instance(data.get("instance_id"), "web")
+        if os.getenv("RUNNING_IN_DOCKER") == "1":
+            docker = "true"
+        else:
+            docker = "false"
+        notify_web(instance, "docker_detected", { "docker": docker })
 
     @globals.web_socket.on("upload_artwork_chunk")
     def handle_upload_chunk(data):
