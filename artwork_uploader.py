@@ -169,9 +169,6 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         # Process the URL and options passed from the GUI or website
         parsed_line = parse_url_and_options(url)
 
-        # Update the UI before we start
-        update_status(instance, f"Scraping: {parsed_line.url}", color="info", sticky=True, spinner=True)
-
         # Scrape the URL indicated, with the required options
         if "/user/" in parsed_line.url:
             scrape_tpdb_user(instance, parsed_line.url, parsed_line.options)

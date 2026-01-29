@@ -21,6 +21,7 @@ class MediuxScraper:
         self.author: Optional[str] = None
         self.options: Options = Options()
         self.config: Config = Config()
+        self.config.load()
         self.exclusions: int = 0
         self.filtered: int = 0
         self.skipped: int = 0
@@ -35,7 +36,7 @@ class MediuxScraper:
     def set_options(self, options: Options) -> None:
         self.options = options
 
-    def scrape(self) -> int:
+    def scrape(self) -> None:
 
         try:
             self.soup = soup_utils.cook_soup(self.url)
@@ -64,17 +65,18 @@ class MediuxScraper:
                                 if file.get("set_id") and file["set_id"].get("id"):
                                     set_ids.add(file["set_id"]["id"])
 
-                        # Fetch full set data for each unique set_id
-                        full_set_cache = {}
-                        for set_id in set_ids:
-                            full_data = self._fetch_full_set_data(set_id)
-                            if full_data:
-                                full_set_cache[set_id] = full_data
+                        debug_me(f"Obtained {len(set_ids)} set IDs from Boxset '{self.title}' by '{self.author}'", "MedixScraper/scrape")
 
-                        # Process each set in the boxset with the cache
-                        for set_data in data_dict["boxset"]["sets"]:
-                            self._process_set(set_data, full_set_cache)
-                        break
+                        # Spawn and scrape a child MediuxScraper for each set in the boxset
+                        for n, set_id in enumerate(set_ids,1):
+                            self._scrape_set_in_boxset(set_id)
+                            movies =len(self.movie_artwork)
+                            collections = len(self.collection_artwork)
+                            shows = len(self.tv_artwork)
+                            debug_me(f"Processed {n} out of {len(set_ids)} sets. Collected {movies} movie, {collections} collection and {shows} TV show assets so far, skipped {self.skipped}", "MedixScraper/scrape")
+
+                        return
+
                     elif "set" in data_dict:
                         if 'Set Link\\' not in script.text:
                             # This is a regular set
@@ -115,8 +117,7 @@ class MediuxScraper:
                     pprint(self.tv_artwork)
                     print(f"*************************************************************{ANSI_RESET}")
 
-            # Return the number of skipped assets
-            return self.skipped
+            return
 
         except ScraperException:
             raise
@@ -124,7 +125,7 @@ class MediuxScraper:
             raise ScraperException(f"Can't scrape from MediUX: {str(e)}") from e
 
 
-    def _fetch_full_set_data(self, set_id: str) -> Optional[dict]:
+    def _scrape_set_in_boxset(self, set_id: str) -> None:
         """
         Fetch full set data from MediUX for a given set ID.
         This is used to get complete metadata for boxset files.
@@ -137,21 +138,26 @@ class MediuxScraper:
         """
         try:
             set_url = f"https://mediux.pro/sets/{set_id}"
-            debug_me(f"Fetching full set data from {set_url}", "MediuxScraper/_fetch_full_set_data")
+            debug_me(f"Fetching full set data from {set_url}", "MediuxScraper/_scrape_set_in_boxset")
 
-            set_soup = soup_utils.cook_soup(set_url)
-            scripts = set_soup.find_all('script')
+            child_scraper = MediuxScraper(set_url)
+            child_scraper.set_options(self.options)
+            child_scraper.scrape()
 
-            for script in scripts:
-                if 'set' in script.text and 'files' in script.text and 'Set Link\\' not in script.text:
-                    data_dict = utils.parse_string_to_dict(script.text)
-                    if 'set' in data_dict:
-                        return data_dict['set']
+            for artwork in child_scraper.collection_artwork:
+                self.collection_artwork.append(artwork)
+            for artwork in child_scraper.tv_artwork:
+                self.tv_artwork.append(artwork)
+            for artwork in child_scraper.movie_artwork:
+                self.movie_artwork.append(artwork)
 
-            return None
+            self.skipped += child_scraper.skipped
+            self.exclusions += child_scraper.exclusions
+            self.filtered += child_scraper.filtered
+            self.total += child_scraper.total
+
         except Exception as e:
-            debug_me(f"Failed to fetch set {set_id}: {str(e)}", "MediuxScraper/_fetch_full_set_data")
-            return None
+            debug_me(f"Failed to scrape set {set_id}: {str(e)}", "MediuxScraper/_scrape_set_in_boxset")
 
 
     def _process_set(self, set_data: dict, full_set_cache: Optional[dict] = None) -> None:
