@@ -704,6 +704,7 @@ function toggleThePosterDBElements() {
 
         const url = urlInput.value;
         const elements = document.querySelectorAll(".theposterdb");
+        const filts = document.querySelectorAll('[id^="tpdb-');
 
         // Define the regex pattern from the input
         const pattern = /^https:\/\/theposterdb\.com\/set\/\d+$/;
@@ -711,6 +712,7 @@ function toggleThePosterDBElements() {
         // Validate the URL before showing elements
         if (pattern.test(url)) {
             elements.forEach(el => el.style.display = "block");
+            filts.forEach(filt => filt.style.display = "none");
         } else {
             elements.forEach(el => {
                 el.style.display = "none";
@@ -719,6 +721,7 @@ function toggleThePosterDBElements() {
                     checkbox.checked = false;
                 });
             });
+            filts.forEach(filt => filt.style.display = "block");
         }
 
     }
