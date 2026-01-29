@@ -34,6 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
     loadConfig()
     updateLog("🔄 Configuration loaded, ready for action!")
     toggleThePosterDBElements();
+    toggleDockerWarning();
 });
 
 // Specific event listeners
@@ -83,8 +84,11 @@ function testNotifications() {
         .split(",")
         .map(item => item.trim())
         .filter(item => item !== ""); // Remove empty values    
-    socket.emit("test_notifications", { instance_id: instanceId, urls: urls });
-}
+    if (urls.length == 0) {
+        updateStatus("Set at least one notification URL", "warning", false, false, "exclamation-triangle")
+    } else {
+        socket.emit("test_notifications", { instance_id: instanceId, urls: urls });
+    }}
 
 socket.on("test_notifications", (data) => {
     if (validResponse(data)) {
@@ -95,7 +99,7 @@ socket.on("test_notifications", (data) => {
         } else if (data.success == "all") {
             updateStatus(data.status, "success", false, false, "send")
         } else if (data.success == "partial") {
-            updateStatus(data.status, "warning", false, false, "exclamation-octagon")
+            updateStatus(data.status, data.severity, false, false, data.icon)
         }
     }
 });
@@ -700,6 +704,7 @@ function toggleThePosterDBElements() {
 
         const url = urlInput.value;
         const elements = document.querySelectorAll(".theposterdb");
+        const filts = document.querySelectorAll('[id^="tpdb-');
 
         // Define the regex pattern from the input
         const pattern = /^https:\/\/theposterdb\.com\/set\/\d+$/;
@@ -707,6 +712,7 @@ function toggleThePosterDBElements() {
         // Validate the URL before showing elements
         if (pattern.test(url)) {
             elements.forEach(el => el.style.display = "block");
+            filts.forEach(filt => filt.style.display = "none");
         } else {
             elements.forEach(el => {
                 el.style.display = "none";
@@ -715,6 +721,7 @@ function toggleThePosterDBElements() {
                     checkbox.checked = false;
                 });
             });
+            filts.forEach(filt => filt.style.display = "block");
         }
 
     }
@@ -1666,6 +1673,22 @@ function togglePlexOptions() {
     //    document.getElementById("reset_overlay").checked = false;
     }
 }
+
+function toggleDockerWarning() {
+    socket.emit("detect_docker", { instance_id: instanceId });
+}
+socket.on("docker_detected", (data) => {
+    const dockerWarning = document.getElementById("docker_warning");
+    if (validResponse(data)) {
+        if (data.docker == "true") {
+            updateLog("🐳 Docker detected")
+            dockerWarning.style.display = "block";
+        } else {
+            dockerWarning.style.display = "none";
+        }
+    }
+})
+
 
 // Add event listener for save_to_kometa checkbox
 document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);
