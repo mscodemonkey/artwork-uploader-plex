@@ -80,6 +80,11 @@ class ArtworkProcessor:
         scraper.set_options(options)
 
         try:
+            if callbacks and callbacks.on_status_update:
+                if "/boxsets/" in url:
+                    callbacks.on_status_update(f"Scraping Mediux Boxset from {url}, this may take a while...", "info", True, True)
+                else:
+                    callbacks.on_status_update(f"Scraping {url}", "info", True, True)
             scraper.scrape()
             title = scraper.title
         except ScraperException as e:
@@ -92,7 +97,6 @@ class ArtworkProcessor:
         processor.set_options(options)
 
         if callbacks and callbacks.on_log_update:
-            #callbacks.on_log_update(f"🔍 Scraping artwork{f" for '{title}'" if title else ""} by '{scraper.author}'")
             callbacks.on_log_update(f"🔍 {title} • {scraper.author} | Obtained {scraper.total} asset(s) from {f"ThePosterDB" if scraper.source == "theposterdb" else "Mediux"}")
             if scraper.skipped > 0:
                 callbacks.on_log_update(f"⏩ {title} • {scraper.author} | Skipping {scraper.skipped} asset(s) based on exclusions ({scraper.exclusions}) or filters ({scraper.filtered}). Processing {scraper.total - scraper.skipped} asset(s).")

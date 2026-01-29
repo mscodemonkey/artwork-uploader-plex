@@ -23,6 +23,7 @@ class ThePosterDBScraper:
         self.title: Optional[str] = None
         self.options: Options = Options()
         self.config: Config = Config()
+        self.config.load()
         self.author: Optional[str] = None
         self.tmdb_id: Optional[int] = None
         self.skipped: int = 0
@@ -44,7 +45,7 @@ class ThePosterDBScraper:
 
 
     # Scrape The Poster DB
-    def scrape(self) -> int:
+    def scrape(self) -> None:
 
         """
         If we were passed a poster link, it should have a link to its corresponding poster set.
@@ -102,8 +103,7 @@ class ThePosterDBScraper:
                 if self.options.add_sets:
                     self.scrape_additional_sets()
 
-                # Return the number of excluded assets
-                return self.skipped
+                return
 
             else:
                 raise ScraperException(f"Invalid or unsupported URL for ThePosterDB: {self.url}")

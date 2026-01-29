@@ -79,13 +79,14 @@ class Scraper:
         try:
             theposterdb_scraper = ThePosterDBScraper(self.url)
             theposterdb_scraper.set_options(self.options)
-            self.skipped = theposterdb_scraper.scrape()
+            theposterdb_scraper.scrape()
 
             self.title = theposterdb_scraper.title
             self.author = theposterdb_scraper.author
             self.movie_artwork = theposterdb_scraper.movie_artwork
             self.tv_artwork = theposterdb_scraper.tv_artwork
             self.collection_artwork = theposterdb_scraper.collection_artwork
+            self.skipped = theposterdb_scraper.skipped
             self.exclusions = theposterdb_scraper.exclusions
             self.filtered = theposterdb_scraper.filtered
             self.total = theposterdb_scraper.total
@@ -111,13 +112,14 @@ class Scraper:
 
             mediux_scraper = MediuxScraper(self.url)
             mediux_scraper.set_options(self.options)
-            self.skipped = mediux_scraper.scrape()
+            mediux_scraper.scrape()
 
             self.title = mediux_scraper.title
             self.author = mediux_scraper.author
             self.movie_artwork = mediux_scraper.movie_artwork
             self.tv_artwork = mediux_scraper.tv_artwork
             self.collection_artwork = mediux_scraper.collection_artwork
+            self.skipped = mediux_scraper.skipped
             self.exclusions = mediux_scraper.exclusions
             self.filtered = mediux_scraper.filtered
             self.total = mediux_scraper.total
