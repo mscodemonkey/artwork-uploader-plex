@@ -35,6 +35,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateLog("🔄 Configuration loaded, ready for action!")
     toggleThePosterDBElements();
     toggleDockerWarning();
+    getVersion();
 });
 
 // Specific event listeners
@@ -50,6 +51,17 @@ document.getElementById("test_plex_btn").addEventListener("click", testPlexConne
 // ==================================================
 // General helper functions
 // ==================================================
+
+// Get version info from backend
+function getVersion() {
+    socket.emit("get_version", { instance_id: instanceId });
+
+    socket.once("get_version", (data) => {
+        if (validResponse(data)) {
+            document.getElementById("app_version").innerText = data.version;
+        }
+    });
+}
 
 // Test connection to Plex server
 function testPlexConnect() {
@@ -69,7 +81,7 @@ function testPlexConnect() {
 socket.on("test_plex_connect", (data) => {
     if (validResponse(data)) {
         if (data.success) {
-            updateStatus("Successfully connected to Plex server", "success", false, false, "server")
+            updateStatus("Successfully connected to Plex server", "success", false, false, "check2-circle")
             updateLog("✅ Successfully connected to Plex server");
         } else {
             updateStatus(data.status, "danger", false, false, "x-circle")
@@ -737,6 +749,7 @@ function configureTabs(afterSave = false) {
             document.getElementById('scraper-tab').classList.add("show");
             document.getElementById('scraping-log-tab').classList.add("show");
             document.getElementById('uploader-tab').classList.add("show");
+            document.getElementById('about-tab').classList.add("show");
             if (!afterSave) {
                 document.getElementById('config').classList.remove("show","active");
                 document.getElementById('config-tab').classList.remove("active");
