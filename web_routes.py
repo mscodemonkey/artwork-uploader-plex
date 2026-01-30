@@ -321,6 +321,12 @@ def setup_socket_handlers(
         """Log a debug message from the frontend."""
         debug_me(data.get("message"), data.get("title", "web_message"))
 
+    @globals.web_socket.on("get_version")
+    def get_version(data):
+        """Get the current application version."""
+        instance = Instance(data.get("instance_id"), "web")
+        notify_web(instance, "get_version", {"version": current_version})
+
     @globals.web_socket.on("test_plex_connect")
     def test_plex_connect(data):
         """Test connectivity to Plex server"""
