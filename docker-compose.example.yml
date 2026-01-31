@@ -7,9 +7,9 @@ services:
     volumes:
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
       - ./config:/artwork-uploader/config:rw
-      - C:/Users/jtarr/Kometa/config/assets:/assets:rw
-      - C:/Temp/assets:/temp:rw
+      - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw
+      - <HOST_TEMP_PATH>:/Temp/assets:/temp:rw
     environment:
-      - TZ=Europe/Madrid
+      - TZ=Europe/London
       - RUNNING_IN_DOCKER=1
     restart: unless-stopped

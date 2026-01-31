@@ -5,6 +5,7 @@ Extracted from artwork_uploader.py to reduce file size and improve
 maintainability.
 """
 
+import os
 from typing import Optional, Callable
 from packaging import version
 import threading
@@ -44,9 +45,19 @@ class UpdateService:
         Returns:
             Latest version tag if found, None otherwise
         """
+        # The use of a token is only needed for development purposes, for testing
+        # the app update feature and make sure you don't hit rate limits
+        token = os.getenv("GITHUB_TOKEN")
+        headers = {}
+        if token:
+            headers = {"Authorization": f"token {token}"}
+            debug_me("Using GitHub token for authenticated requests.", "UpdateService/get_latest_version")
+        else:
+            debug_me("No GitHub token found. Using unauthenticated requests.", "UpdateService/get_latest_version")
+
         url = f"https://api.github.com/repos/{self.github_repo}/releases/latest"
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200:
                 return response.json()["tag_name"]
             else:
