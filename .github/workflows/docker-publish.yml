@@ -26,4 +26,4 @@ jobs:
           context: .
           push: true
           # Replace 'your-username' with your actual GitHub username
-          tags: ghcr.io/NakedRoboticCore/artwork-uploader:latest
+          tags: ghcr.io/nakedroboticcore/artwork-uploader:latest
