@@ -109,9 +109,10 @@
 
         <div class="alert alert-info d-flex align-items-center d-none" id="version_notifier">
             <div class="flex-grow-1 flex-shrink-1 pe-3">
-                A new version is now available: <span id="latest_version"></span>
+                <i class="bi bi-exclamation-circle"></i>&ensp;A new version is now available: <span id="latest_version"></span>.
+                <br><span id="docker_update_message"></span>
             </div>
-            <button class="btn btn-info btn-sm text-nowrap" id="btnUpdate">
+            <button class="btn btn-info btn-sm text-nowrap d-none" id="btnUpdate">
                 <i class="bi bi-shift"></i>&nbsp;Update Now
             </button>
         </div>
@@ -137,7 +138,7 @@
             <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
             role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&ensp;Scraper</a>
             <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
-            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
+            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader <span class="badge rounded-pill text-bg-danger">BETA</span></a>
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
             role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&ensp;Log</a>
             <a class="nav-link collapse" id="about-tab" data-bs-toggle="tab" data-bs-target="#about" type="button"
@@ -263,7 +264,8 @@
                                 <div class="col">
                                     <div class="p-3 border rounded-3 shadow-sm">
                                         <!-- ThePosterDB filters -->
-                                        <h5 class="mb-3"><i id="status_icon" class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB.com</h5>
+                                        <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB&thinsp;
+                                            <a href="https://theposterdb.com" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a></h5>
                                         <div class="row mb-1">
                                             <div class="col-12 mb-2"><strong>TV shows</strong></div>
                                             <div class="col-6 col-md-4 col-xl-3">
@@ -302,7 +304,8 @@
                                 <div class="col">
                                     <div class="p-3 border rounded-3 shadow-sm">
                                         <!-- MediUX filters -->
-                                        <h5 class="mb-3"><i id="status_icon" class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX.pro</h5>
+                                        <h5 class="mb-3"><i id="status_icon" class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX&thinsp;
+                                            <a href="https://mediux.pro" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a></h5>
                                         <div class="row mb-1">
                                             <div class="col-12 mb-2"><strong>TV shows</strong></div>
                                             <div class="col-6 col-md-4 col-xl-3">

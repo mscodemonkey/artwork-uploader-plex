@@ -114,3 +114,4 @@ DEVELOPER_GUIDE.md
 # Keep technical documentation for contributors
 !TECHNICAL_INFO.md
 .gitignore
+docker-compose.yml

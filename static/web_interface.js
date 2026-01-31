@@ -744,12 +744,12 @@ if (scrapeUrlInput) {
 }
 
 function configureTabs(afterSave = false) {
+        document.getElementById('scraping-log-tab').classList.add("show");
+        document.getElementById('about-tab').classList.add("show");
         if (config.base_url && config.token) {
             document.getElementById('bulk-import-tab').classList.add("show");
             document.getElementById('scraper-tab').classList.add("show");
-            document.getElementById('scraping-log-tab').classList.add("show");
             document.getElementById('uploader-tab').classList.add("show");
-            document.getElementById('about-tab').classList.add("show");
             if (!afterSave) {
                 document.getElementById('config').classList.remove("show","active");
                 document.getElementById('config-tab').classList.remove("active");
@@ -1535,9 +1535,15 @@ socket.emit("check_for_update", { instance_id: instanceId});
 
 socket.on("update_available", function(data) {
     if(validResponse(data)){
-        updateLog("Update available: " + data.version, "info");
+        updateLog("🚨 Update available: " + data.version, "info");
         document.getElementById("latest_version").innerText = data.version;
         document.getElementById("version_notifier").classList.remove("d-none");
+        if (data.docker == "true") {
+            document.getElementById("docker_update_message").innerText = "Self-update is disabled in Docker. Please pull the lastet image manually.";
+        } else {
+            document.getElementById("docker_update_message").innerText = "";
+            document.getElementById("btnUpdate").classList.remove("d-none");
+        }
     }
 });
 
