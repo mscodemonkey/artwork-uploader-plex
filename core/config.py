@@ -37,7 +37,7 @@ class Config:
         apprise_urls: List of Apprise notification URLs
     """
 
-    def __init__(self, config_path: str = "config.json") -> None:
+    def __init__(self, config_path: str = "config/config.json") -> None:
         self.path: str = config_path
         self.base_url: str = ""
         self.token: str = ""
@@ -45,11 +45,11 @@ class Config:
         self.tv_library: List[str] = ["TV Shows"]
         self.movie_library: List[str] = ["Movies"]
         self.mediux_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"]
-        self.tpdb_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"]
-        self.kometa_base: str = "C:\\Temp\\assets"
-        self.temp_dir: str = "C:\\Temp\\assets\\temp"
+        self.tpdb_filters: List[str] = ["season_cover", "show_cover", "movie_poster", "collection_poster"]
+        self.kometa_base: str = ""
+        self.temp_dir: str = ""
         self.save_to_kometa: bool = False
-        self.stage_assets: bool = True
+        self.stage_assets: bool = False
         self.track_artwork_ids: bool = True
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
@@ -104,14 +104,14 @@ class Config:
             "tv_library": ["TV Shows"],
             "movie_library": ["Movies"],
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
-            "tpdb_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
+            "tpdb_filters": ["season_cover", "show_cover", "movie_poster", "collection_poster"],
             "kometa_base": "",
             "temp_dir": "",
             "save_to_kometa": False,
             "stage_assets": False,
             "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
-            "reset_overlay": False,
+            "reset_overlay": True,
             "schedules": [],
             "apprise_urls": []
         }

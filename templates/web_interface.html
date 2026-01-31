@@ -107,11 +107,13 @@
             </div>
         </div>
 
-        <div class="row p-2 mb-4 rounded bg-info" id="version_notifier" style="display: none;">
-            <div class='col align-middle' >
-                <button class="float-end btn btn-primary btn-sm" id="btnUpdate">Update Now</button>
-                A new version is now available: <span class="pe-3" id="latest_version"></span>
+        <div class="alert alert-info d-flex align-items-center d-none" id="version_notifier">
+            <div class="flex-grow-1 flex-shrink-1 pe-3">
+                A new version is now available: <span id="latest_version"></span>
             </div>
+            <button class="btn btn-info btn-sm text-nowrap" id="btnUpdate">
+                <i class="bi bi-shift"></i>&nbsp;Update Now
+            </button>
         </div>
         <div class="row m-3 rounded fade fixed-top" id="status">
             <div class="col">
@@ -129,17 +131,17 @@
 
         <nav class="nav nav-tabs" id="myTab">
             <a class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab"
-            aria-controls="config" aria-selected="false"><i class="bi bi-toggles"></i>&nbsp;Config</a>
+            aria-controls="config" aria-selected="false"><i class="bi bi-toggles"></i>&ensp;Config</a>
             <a class="nav-link collapse" id="bulk-import-tab" data-bs-toggle="tab" data-bs-target="#bulk-import" type="button"
-            role="tab" aria-controls="bulk-import" aria-selected="false"><i class="bi bi-text-left"></i>&nbsp;Bulk Import</a>
+            role="tab" aria-controls="bulk-import" aria-selected="false"><i class="bi bi-text-left"></i>&ensp;Bulk Import</a>
             <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
-            role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&nbsp;Scraper</a>
+            role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&ensp;Scraper</a>
             <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
-            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&nbsp;Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
+            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader <span style="background:red; color: white !important; padding: 2px 5px; font-size: 80%">BETA</span></a>
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
-            role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&nbsp;Log</a>
+            role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&ensp;Log</a>
             <a class="nav-link collapse" id="about-tab" data-bs-toggle="tab" data-bs-target="#about" type="button"
-            role="tab" aria-controls="about" aria-selected="false"><i class="bi bi-code-slash"></i>&nbsp;About</a>
+            role="tab" aria-controls="about" aria-selected="false"><i class="bi bi-code-slash"></i>&ensp;About</a>
             <a class="nav-link ms-auto" id="logout-link" href="/logout" style="display: none;">
                 <i class="bi bi-box-arrow-right"></i> Logout
             </a>
@@ -419,7 +421,7 @@
                                 </div>
                             </div>
                             <!-- Icons at the end -->
-                            <a title="Delete this file"><i id="delete_icon" class="bi bi-trash h4 ms-3" role="button"></i></a>
+                            <a title="Delete this file"><i id="delete_icon" class="bi bi-trash3 h4 ms-3" role="button"></i></a>
                             <a title="Rename this file"><i id="rename_icon" class="bi bi-pencil-square h4 ms-3" role="button"></i></a>
                             <a title="Schedule upload"><i id="schedule_icon" class="bi bi-clock h4 ms-3" role="button"></i></a>
                             <a title="Create a new bulk file"><i id="create_icon" class="bi bi-file-earmark-plus h4 ms-3" role="button"></i></a>
@@ -441,7 +443,7 @@
                     <div id="tooltip_arrow"></div>
                     <div class="row">
                         <div class="col-auto">
-                            <label class="col-form-label">Every day at</label>
+                            <label class="col-form-label text-dark">Every day at</label>
                         </div>
                         <div class="col-auto">
                             <input type="time" id="schedule_time" class="form-control">

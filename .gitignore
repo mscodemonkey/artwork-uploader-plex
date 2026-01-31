@@ -54,6 +54,7 @@ htmlcov/
 nosetests.xml
 coverage.xml
 docker-compose.override.yml
+docker-compose.yml
 *.cover
 
 # Type checking

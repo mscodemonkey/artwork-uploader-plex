@@ -1537,12 +1537,12 @@ socket.on("update_available", function(data) {
     if(validResponse(data)){
         updateLog("Update available: " + data.version, "info");
         document.getElementById("latest_version").innerText = data.version;
-        document.getElementById("version_notifier").style.display = "block";
+        document.getElementById("version_notifier").classList.remove("d-none");
     }
 });
 
 function updateApp() {
-    document.getElementById("version_notifier").style.display = "none";
+    document.getElementById("version_notifier").classList.add("d-none");
     socket.emit("update_app", { instance_id: instanceId});
 }
 
