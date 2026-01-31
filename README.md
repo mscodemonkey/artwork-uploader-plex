@@ -262,14 +262,14 @@ Both mediux_filters and tpdb_filters specify which artwork types to upload by in
 
 ## Docker 
 
-If you want to use Docker, there is a Dockerfile in the repo to allow it to be deployed in a container alongside a plex container. 
+**NEW!!** If you want to use Docker, there is an artwork-uploader image in the Github repository ready for deploymnet! 
 
-Clone the repository and rename the `docker-compose.example.yml` file as `docker-compose.yml` and customize the Kometa asset and temp paths (or comment them out if you don't use Kometa) to deploy it with docker compose. Or copy this block in a `docker-compose.yml` file pointing to the location of the repository to build the image instead of the `.`
+Choose a location in your system, create an `artwork-uploader` folder (or name it however you like) and create a `docker-compose.yml` file inside. You can downlad and rename the provided `docker-compose.example.yml` file as a template, just customize your [Time Zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) and the Kometa asset and temp paths (or comment them out if you don't use Kometa) to deploy it with docker compose. Or just copy and customize the contents from here:
 
 ```yaml
 services:
   artwork_uploader:
-    build: .
+    image: ghcr.io/mscodemonkey/artwork-uploader:latest
     container_name: artwork-uploader
     ports:
       - "4567:4567"
@@ -279,15 +279,17 @@ services:
       - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw # Optional, only if you want to save the assets locally to your Kometa asset directory
       - <HOST_TEMP_PATH>:/temp:rw # Optional, only if you're saving assets locally and want to have a temp dir for testing purposes
     environment:
-      - TZ=Etc/UTC
+      - TZ=Europe/London
       - RUNNING_IN_DOCKER=1
     restart: unless-stopped    
 ```
 
-And run 
+And then just run 
 ```bash
 docker compose up -d
 ```
+
+Open a web browser and point it to `http://your_ip_address:4567` and you're ready to rock and roll! 
 
 ## Directly as a python script
 
