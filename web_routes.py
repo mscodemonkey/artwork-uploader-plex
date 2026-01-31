@@ -154,6 +154,7 @@ def setup_socket_handlers(
 
     # Temporary storage for chunked uploads
     upload_chunks = {}
+    docker = "true" if os.getenv("RUNNING_IN_DOCKER") == "1" else "false"
 
     @globals.web_socket.on("check_for_update")
     def check_for_update(data):
@@ -161,7 +162,7 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         latest_version = get_latest_version()
         if latest_version and version.parse(latest_version.lstrip('v')) > version.parse(current_version.lstrip('v')):
-            notify_web(instance, "update_available", {"version": latest_version})
+            notify_web(instance, "update_available", { "version": latest_version, "docker": docker })
 
     @globals.web_socket.on("update_app")
     def update_app(data):
@@ -177,11 +178,21 @@ def setup_socket_handlers(
                 spinner=True
             )
 
-            # Detect platform
-            python_cmd = "python3" if sys.platform == "darwin" else "python"
+            # Use the exact same python that is currently running this code:
+            python_cmd = sys.executable
 
-            # Pull latest changes
-            subprocess.run(["git", "pull"], check=True)
+            # Fetch the latest metadata
+            subprocess.run(["git", "fetch", "--all"], check=True)
+
+            # Force move the HEAD to the latest commit on origin/main
+            subprocess.run(["git", "reset", "--hard", "origin/main"], check=True)
+
+            # Re-attach to the local 'main' branch and update its pointer
+            # This is the step that fixes the "HEAD detached" status
+            subprocess.run(["git", "checkout", "-B", "main", "origin/main"], check=True)
+
+            # Clean up any leftover files
+            subprocess.run(["git", "clean", "-fd"], check=True)
 
             # Install dependencies
             subprocess.run([python_cmd, "-m", "pip", "install", "-r", "requirements.txt"], check=True)
@@ -582,10 +593,6 @@ def setup_socket_handlers(
     def docker_detection(data):
         """Detects whether app is running in docker and informs frontend"""
         instance = Instance(data.get("instance_id"), "web")
-        if os.getenv("RUNNING_IN_DOCKER") == "1":
-            docker = "true"
-        else:
-            docker = "false"
         notify_web(instance, "docker_detected", { "docker": docker })
 
     @globals.web_socket.on("upload_artwork_chunk")
