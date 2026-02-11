@@ -17,7 +17,7 @@ itsdangerous==2.2.0
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 packaging==26.0
-pillow==12.1.0
+pillow==12.1.1
 PlexAPI==4.18.0
 python-engineio==4.13.1
 python-socketio==5.16.1
