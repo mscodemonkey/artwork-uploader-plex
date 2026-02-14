@@ -157,7 +157,7 @@ def parse_title(title: str):
     if collection_match:
         artwork = {
             "media": "Collection",
-            "title": title.strip(" - Backdrop").strip(),  # Remove trailing " - Backdrop" if present
+            "title": title.removesuffix(" - Backdrop").strip(),  # Remove trailing " - Backdrop" if present
             "year": None,
             "season": None,
             "episode": None,

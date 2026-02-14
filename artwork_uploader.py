@@ -1,7 +1,9 @@
 from email import errors
-import eventlet
+#import eventlet
 
-eventlet.monkey_patch()
+#eventlet.monkey_patch()
+#from gevent import monkey
+#monkey.patch_all()
 
 import uuid
 import os
@@ -44,6 +46,7 @@ from services.notify_service import NotifyService
 # ----------------------------------------------
 # Important for autoupdater
 current_version = CURRENT_VERSION
+github_repo = GITHUB_REPO  
 # ----------------------------------------------
 
 if sys.version_info[0] != MIN_PYTHON_MAJOR or sys.version_info[1] < MIN_PYTHON_MINOR:
@@ -74,6 +77,7 @@ except (ModuleNotFoundError, ImportError) as e:
     print("=" * 70)
     sys.exit(1)
 
+globals.docker = os.getenv("RUNNING_IN_DOCKER") == "1"
 
 
 # ! Interactive CLI mode flag
@@ -85,14 +89,13 @@ scheduled_jobs_by_file = {}  # Legacy - kept for backwards compatibility
 config = None  # Initialized in main
 
 
-github_repo = GITHUB_REPO  # For autoupdater
 
 # ---------------------- CORE FUNCTIONS ----------------------
 
 def parse_bulk_file_from_cli(instance: Instance, file_path):
 
     """
-    Load and parse the URLs from a bulk file, then scrape them with any options set for that URL.
+    Load and parse the URLs from a bulk import file, then scrape them with any options set for that URL.
     """
 
     # Open the file and read the contents
@@ -114,10 +117,10 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
             try:
                 parsed_url = parse_url_and_options(line)
             except InvalidUrl as e:
-                update_log(instance, f"❌ Invalid URL found in bulk file '{os.path.basename(file_path)}', line {n}: '{str(e)}'")
+                update_log(instance, f"❌ Invalid URL found in bulk import file '{os.path.basename(file_path)}', line {n}: '{str(e)}'")
                 continue
             except InvalidFlag as e:
-                update_log(instance, f"❌ One or more invalid flags found in bulk file '{os.path.basename(file_path)}', line {n}: {str(e)}")
+                update_log(instance, f"❌ One or more invalid flags found in bulk import file '{os.path.basename(file_path)}', line {n}: {str(e)}")
                 continue
 
             # Parse according to whether it's a user portfolio or poster / set URL
@@ -130,7 +133,8 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                     debug_me(f"Unknown exception: {str(unknown_error)}", "parse_bulk_file_from_cli")
             else:
                 try:
-                    scrape_and_upload(instance, parsed_url.url, parsed_url.options)
+                    success_counter = [0]
+                    scrape_and_upload(instance, parsed_url.url, parsed_url.options, success_counter)
                 except ScraperException as e:
                     debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
                 except Exception as e:
@@ -173,7 +177,8 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         if "/user/" in parsed_line.url:
             scrape_tpdb_user(instance, parsed_line.url, parsed_line.options)
         else:
-            title = scrape_and_upload(instance, parsed_line.url, parsed_line.options)
+            success_counter = [0]
+            title = scrape_and_upload(instance, parsed_line.url, parsed_line.options, success_counter)
 
         # And update the UI when we're done
         update_status(instance, f"Processed all artwork at {parsed_line.url}", color="success")
@@ -209,10 +214,10 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
                 parsed_url = parse_url_and_options(line)
                 parsed_urls.append(parsed_url)
             except InvalidUrl as e:
-                update_log(instance, f"❌ Invalid URL found in bulk file '{filename}', line {n}: '{str(e)}'")
+                update_log(instance, f"❌ Invalid URL found in bulk import file '{filename}', line {n}: '{str(e)}'")
                 continue
             except InvalidFlag as e:
-                update_log(instance, f"❌ One or more invalid flags found in bulk file '{filename}', line {n}: {str(e)}")
+                update_log(instance, f"❌ One or more invalid flags found in bulk import file '{filename}', line {n}: {str(e)}")
                 continue                
     if len(parsed_urls) == 0:
         update_status(instance, "No valid bulk import entries found.", color="danger")
@@ -453,9 +458,11 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
             globals.bulk_file_service.rename_file(old_name, new_name)
             notify_web(instance, "rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
             update_status(instance, f"Renamed to {new_name}", "success")
+            update_log(instance, f"✏️ Renamed bulk import file from '{old_name}' to '{new_name}'")
         except Exception as e:
             notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
             update_status(instance, f"Could not rename {old_name}", "warning")
+            update_log(instance, f"🔴 Could not rename bulk import file '{old_name}'")
 
 
 def delete_bulk_import_file(instance: Instance, file_name):
@@ -464,9 +471,11 @@ def delete_bulk_import_file(instance: Instance, file_name):
             globals.bulk_file_service.delete_file(file_name)
             notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
             update_status(instance, f"Deleted {file_name}", "success")
+            update_log(instance, f"🗑️ Deleted bulk import file '{file_name}'")
         except Exception as e:
             notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
             update_status(instance, f"Could not delete {file_name}", "warning")
+            update_log(instance, f"🔴 Could not delete bulk import file '{file_name}'")
 
 
 def save_bulk_import_file(instance: Instance, contents = None, filename = None, now_load = None):
@@ -481,9 +490,11 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
 
             update_status(instance, message=f"Bulk import file {filename} saved", color="success")
             notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
+            update_log(instance, f"💾 Saved bulk import file '{bulk_import_filename}'")
         except Exception as e:
             update_status(instance, message="Error saving bulk import file", color="danger")
             notify_web(instance, "save_bulk_import", {"saved": False, "now_load": now_load})
+            update_log(instance, f"🔴 Error saving bulk import file '{bulk_import_filename}'")
 
 
 def check_for_bulk_import_file(instance: Instance):
@@ -689,10 +700,6 @@ if __name__ == "__main__":
     # Create a connector for Plex
     globals.plex = PlexConnector(config.base_url, config.token)
 
-    # Setup scheduler
-    globals.manual_run = False  # Reset manual run flag
-    setup_scheduler_on_first_load(cli_instance)
-
     # Check for CLI arguments regardless of interactive_cli flag
     if cli_command:
 
@@ -749,13 +756,25 @@ if __name__ == "__main__":
         # User passed in a poster or set URL, so let's process that
         else:
             try:
-                scrape_and_upload(cli_instance, cli_command, cli_options)
+                success_counter = [0]
+                scrape_and_upload(cli_instance, cli_command, cli_options, success_counter)
             except Exception as e:
                 update_status(cli_instance, str(e),color="danger")
     else:
 
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
         if not interactive_cli:
+            update_log(cli_instance, f"🚀 Starting Artwork Uploader {CURRENT_VERSION} in web mode")
+            if globals.docker:
+                update_log(cli_instance, "🐳 Running in Docker environment", force_print=True)
+            # Setup scheduler only in the main process to avoid duplication
+            if os.getenv("WERKZEUG_RUN_MAIN") == "true" or not globals.debug:
+                update_log(cli_instance, "🗓️ Setting up scheduler for scheduled tasks")
+                debug_me("This is the main process - setting up scheduler", "__main__")
+                setup_scheduler_on_first_load(cli_instance)
+            else:
+                debug_me("Not the main process - skipping scheduler setup", "__main__")
+                update_log(cli_instance, "⚠️ Skipping scheduler setup in debug mode")            
 
             # Connect to the TV and Movie libraries
             plex_connected = True
@@ -791,12 +810,13 @@ if __name__ == "__main__":
             web_app.config['SECRET_KEY'] = secrets.token_hex(32)
             web_app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
-            globals.web_socket = SocketIO(web_app, cors_allowed_origins="*", async_mode="eventlet")
+            globals.web_socket = SocketIO(web_app, cors_allowed_origins="*", async_mode="threading")
 
             # Start update checker using UpdateService
             def on_update_available(version: str):
-                debug_me(f"Update available. Latest version: {version}", "update_service")
-                notify_web(Instance(broadcast=True), "update_available", {"version": version})
+                instance = Instance(broadcast=True)
+                update_log(instance, f"🚨 Update available: {version} (current: {current_version})")
+                notify_web(instance, "version_check", { "current_version": current_version, "new_version": version, "docker": "true" if globals.docker else "false" })
 
             globals.update_service.start_periodic_check(on_update_available)
 

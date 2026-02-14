@@ -109,7 +109,7 @@
 
         <div class="alert alert-info d-flex align-items-center d-none" id="version_notifier">
             <div class="flex-grow-1 flex-shrink-1 pe-3">
-                <i class="bi bi-exclamation-circle"></i>&ensp;A new version is now available: <span id="latest_version"></span>.
+                <i class="bi bi-megaphone-fill"></i>&ensp;A new version is now available: <span id="latest_version"></span>.
                 <br><span id="docker_update_message"></span>
             </div>
             <button class="btn btn-info btn-sm text-nowrap d-none" id="btnUpdate">
@@ -138,13 +138,13 @@
             <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
             role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&ensp;Scraper</a>
             <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
-            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader <span class="badge rounded-pill text-bg-danger">BETA</span></a>
+            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader</a>
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
             role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&ensp;Log</a>
             <a class="nav-link collapse" id="about-tab" data-bs-toggle="tab" data-bs-target="#about" type="button"
             role="tab" aria-controls="about" aria-selected="false"><i class="bi bi-code-slash"></i>&ensp;About</a>
             <a class="nav-link ms-auto" id="logout-link" href="/logout" style="display: none;">
-                <i class="bi bi-box-arrow-right"></i> Logout
+                <i class="bi bi-box-arrow-right"></i>&ensp;Logout
             </a>
         </nav>
 
@@ -161,34 +161,35 @@
                     <div class="row">
                         <div class="col-lg-5 mb-3">
                             <div class="p-3 border rounded-3 shadow-sm">
-                                <h5 class="mb-3"><i id="status_icon" class="bi bi-film"></i>&ensp;Plex server settings</h5>
+                                <h5 class="mb-3"><i class="bi bi-film"></i>&ensp;Plex server settings</h5>
                                 <div class="mb-3">
-                                    <label for="plex_base_url" class="form-label"><i id="status_icon" class="bi bi-link-45deg"></i>&ensp;Base URL:</label>
+                                    <label for="plex_base_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Base URL</label>
                                     <input type="url" id="plex_base_url" name="plex_base_url" class="form-control" required
                                         placeholder="https://plex.example.com"
-                                        pattern="https?://([A-Za-z0-9.-]+)(:[0-9]+)?(/.*)?"
+                                        pattern="https?:\/\/((([a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,})|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?"
                                         title="Please enter a valid URL (e.g., https://plex.example.com)">
                                     <div class="invalid-feedback">
                                         Please provide a valid Plex base URL.
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="plex_token" class="form-label"><i id="status_icon" class="bi bi-key"></i>&ensp;Token:</label>
-                                    <input type="text" id="plex_token" name="plex_token" class="form-control" required pattern="^[A-Za-z0-9_-]{20,40}$"
+                                    <label for="plex_token" class="form-label"><i class="bi bi-key"></i>&ensp;Authentication Token</label>
+                                    &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-delay='{"hide": 500}' data-bs-html="true" data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i>
+                                    <input type="text" id="plex_token" name="plex_token" class="form-control" required pattern="[A-Za-z0-9_\-]{20,40}"
                                         title="Plex token should be a 20+ character string with letters, digits, dashes or underscores.">
                                     <div class="invalid-feedback">
                                         Please provide a valid Plex token.
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="tv_library" class="form-label"><i id="status_icon" class="bi bi-tv"></i>&ensp;TV libraries:</label>
+                                    <label for="tv_library" class="form-label"><i class="bi bi-tv"></i>&ensp;TV libraries</label>
                                     <input type="text" id="tv_library" name="tv_library" class="form-control" required>
                                     <div class="invalid-feedback">
                                         Please provide your TV library name. If more than one, separate using commas.
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="movie_library" class="form-label"><i id="status_icon" class="bi bi-camera-reels"></i>&ensp;Movie libraries:</label>
+                                    <label for="movie_library" class="form-label"><i class="bi bi-camera-reels"></i>&ensp;Movie libraries</label>
                                     <input type="text" id="movie_library" name="movie_library" class="form-control" required>
                                     <div class="invalid-feedback">
                                         Please provide your Movie library name. If more than one, separate using commas.
@@ -202,54 +203,58 @@
                             </div>
                             <!-- Kometa settings -->                           
                             <div class="p-3 border mt-3 rounded-3 shadow-sm">
-                                <h5 class="mb-3"><i id="status_icon" class="bi bi-download"></i>&ensp;Kometa settings</h5>
+                                <h5 class="mb-3"><i class="bi bi-download"></i>&ensp;Kometa settings</h5>
                                 <div class="form-check form-switch mb-3">
                                     <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
                                     <label for="save_to_kometa" class="form-check-label">Save artwork to Kometa asset directory</label>
                                 </div>
-                                <div class="form-check form-switch mb3" style="display: none;">
+                                <div class="form-check form-switch mb-3" style="display: none;">
                                     <input class="form-check-input" type="checkbox" value="reset_overlay" id="reset_overlay"/>
                                     <label for="reset_overlay" class="form-check-label">Reset the Overlay tag for Kometa if artwork updated</label>
                                 </div>                                
                                 <div id="kometa_settings" style="display: none;">
-                                    <div class="form-check form-switch mb3">
+                                    <div class="form-check form-switch mb-3">
                                         <input class="form-check-input" type="checkbox" value="stage_assets" id="stage_assets"/>
-                                        <label for="stage_assets" class="form-check-label">Download assets for seasons and episodes not yet in Plex</label>
-                                        <br><small class="form-text text-muted">(Excluding Specials)</small>
+                                        <label for="stage_assets" class="form-check-label">Stage assets</label>&nbsp;
+                                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Saves assets for seasons and episodes not yet in Plex (excluding specials)"></i>
+                                        <!-- <br><small class="form-text text-muted">(Excluding Specials)</small> -->
                                     </div>
                                     <div class="mb-3">
-                                        <label for="kometa_base" class="form-label"><i id="status_icon" class="bi bi-folder"></i>&ensp;Kometa Asset Directory:</label>
+                                        <label for="kometa_base" class="form-label"><i class="bi bi-folder"></i>&ensp;Kometa Asset Directory</label>
                                         <input type="text" id="kometa_base" name="kometa_base" class="form-control" placeholder="X:\path\to\kometa\assets" title="Full path to Kometa asset directory">
                                         <div class="invalid-feedback">
-                                            Please provide your Kometa asset directory.
+                                            Please provide your Kometa asset directory
                                         </div>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="temp_dir" class="form-label"><i id="status_icon" class="bi bi-clock-history"></i>&ensp;Temp Directory (optional):</label>
+                                        <label for="temp_dir" class="form-label"><i class="bi bi-clock-history"></i>&ensp;Temp Directory</label>&nbsp;
+                                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Temp directory for Kometa operations (optional)"></i>
                                         <input type="text" id="temp_dir" name="temp_dir" class="form-control" placeholder="X:\path\to\temp\dir">
-                                        <small class="form-text text-muted">(Optional) Specify a temporary directory for Kometa operations.</small>
+                                        <!-- <small class="form-text text-muted">Specify a temporary directory for Kometa operations (optional)</small> -->
                                     </div>
-                                    <div id="docker_warning" class="alert alert-info" role="alert" style="display: block;">
-                                        <i class="bi bi-info-circle"></i>&ensp; When running as a docker container the Kometa asset and temp directories are hardcoded to <code>/assets</code> and <code>/temp</code>
-                                        respectively. These container paths must be mapped to the chosen host paths via bind mounts in the <code>docker-compose.yml</code> file. Changing these settings will 
-                                        only have effect when running the script from outside the container.
-                                    </div>
+                                </div>
+                                <div id="docker_warning" class="alert alert-info mt-3 mb-0 alert-dismissible fade show" role="alert" style="display: block;">
+                                    <i class="bi bi-info-circle"></i>&ensp; When running in Docker the Kometa asset and temp directories are hardcoded 
+                                    inside the container to <code>/assets</code> and <code>/temp</code> respectively. The host paths displayed here are the ones 
+                                    mapped to these container paths via bind mounts in the <span class="text-nowrap"><code>docker-compose.yml</code></span> file.
+                                    To change them you must edit your compose file and restart the container.
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
                             </div>
                             <!-- Authentication settings -->
                             <div class="p-3 border mt-3 rounded-3 shadow-sm">
-                                <h5 class="mb-3"><i id="status_icon" class="bi bi-shield-check"></i>&ensp;Authentication settings</h5>
+                                <h5 class="mb-3"><i class="bi bi-shield-check"></i>&ensp;Authentication settings</h5>
                                 <div class="form-check form-switch mb-3">
                                     <input class="form-check-input" type="checkbox" id="auth_enabled"/>
                                     <label for="auth_enabled" class="form-check-label">Enable password protection</label>
                                 </div>
                                 <div id="auth_settings" style="display: none;">
                                     <div class="mb-3">
-                                        <label for="auth_username" class="form-label"><i id="status_icon" class="bi bi-person"></i>&ensp;Username:</label>
-                                        <input type="text" id="auth_username" name="auth_username" class="form-control" placeholder="admin">
+                                        <label for="auth_username" class="form-label"><i class="bi bi-person"></i>&ensp;Username</label>
+                                        <input type="text" id="auth_username" name="auth_username" class="form-control" placeholder="username">
                                     </div>
                                     <div class="mb-3">
-                                        <label for="auth_password" class="form-label"><i id="status_icon" class="bi bi-lock"></i>&ensp;Password:</label>
+                                        <label for="auth_password" class="form-label"><i class="bi bi-lock"></i>&ensp;Password</label>
                                         <input type="password" id="auth_password" name="auth_password" class="form-control" placeholder="Enter new password">
                                         <small class="form-text text-muted">Leave blank to keep existing password</small>
                                     </div>
@@ -267,7 +272,7 @@
                                         <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB&thinsp;
                                             <a href="https://theposterdb.com" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a></h5>
                                         <div class="row mb-1">
-                                            <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                            <div class="col-12 mb-2"><strong>TV Shows</strong></div>
                                             <div class="col-6 col-md-4 col-xl-3">
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="p_filter-show_cover"/>
@@ -304,10 +309,10 @@
                                 <div class="col">
                                     <div class="p-3 border rounded-3 shadow-sm">
                                         <!-- MediUX filters -->
-                                        <h5 class="mb-3"><i id="status_icon" class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX&thinsp;
+                                        <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX&thinsp;
                                             <a href="https://mediux.pro" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a></h5>
                                         <div class="row mb-1">
-                                            <div class="col-12 mb-2"><strong>TV shows</strong></div>
+                                            <div class="col-12 mb-2"><strong>TV Shows</strong></div>
                                             <div class="col-6 col-md-4 col-xl-3">
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input" type="checkbox" value="show_cover" id="m_filter-show_cover"/>
@@ -355,7 +360,7 @@
                             <div class="row mb-3">
                                 <div class="col">
                                     <div class="p-3 border rounded-3 shadow-sm">
-                                        <h5 class="mb-3"><i id="status_icon" class="bi bi-sliders"></i>&ensp;Additional settings</h5>
+                                        <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Additional settings</h5>
                                         <div class="form-check form-switch mb-3" style="display: none;">
                                             <input class="form-check-input" type="checkbox" value="--force" id="track_artwork_ids"/>
                                             <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex labels (recommend to leave checked)</label>
@@ -371,14 +376,13 @@
                             <div class="row mb-3">
                                 <div class="col">
                                     <div class="p-3 border rounded-3 shadow-sm">
-                                        <h5 class="mb-3"><i id="status_icon" class="bi bi-app-indicator"></i>&ensp;Notifications settings</h5>
+                                        <h5 class="mb-3"><i class="bi bi-app-indicator"></i>&ensp;Notifications settings</h5>
                                         <div id="notifications_settings" style="display: block;">
                                             <div class="mb-3">
-                                                <label for="apprise_urls" class="form-label"><i id="status_icon" class="bi bi-link-45deg"></i>&ensp;Apprise URLs to notify:</label>
-                                                <input type="text" id="apprise_urls" name="apprise_urls" class="form-control" placeholder="discord://{botname}@​{WebhookID}/{WebhookToken},ntfy://{user}:{password}@​{host}/{topics}"
+                                                <label for="apprise_urls" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Apprise URLs to notify</label>
+                                                &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-delay='{"hide": 500}' data-bs-html="true" data-bs-title='Enter one or more Apprise URLs separated by commas. See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.'></i>
+                                                <input type="text" id="apprise_urls" name="apprise_urls" class="form-control" placeholder="discord://{botname}@​{WebhookID}/{WebhookToken}"
                                                     title="Enter one or more Apprise URLs separated by commas.">
-                                                <small class="form-text text-muted">(Optional) Enter one or more Apprise URLs separated by commas. See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.</small><br>
-                                                <!-- <small class="form-text text-muted">See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.</small> -->
                                                 <div class="invalid-feedback">
                                                     Enter one or more Apprise URLs separated by commas.
                                                 </div>
@@ -428,7 +432,8 @@
                             <a title="Rename this file"><i id="rename_icon" class="bi bi-pencil-square h4 ms-3" role="button"></i></a>
                             <a title="Schedule upload"><i id="schedule_icon" class="bi bi-clock h4 ms-3" role="button"></i></a>
                             <a title="Create a new bulk file"><i id="create_icon" class="bi bi-file-earmark-plus h4 ms-3" role="button"></i></a>
-                            <a title="Upload a new .txt file"><i id="upload_icon" class="bi bi-upload h4 ms-3" role="button"></i></a>
+                            <a title="Upload a new bulk file"><i id="upload_icon" class="bi bi-upload h4 ms-3" role="button"></i></a>
+                            <a title="Download current bulk file"><i id="download_icon" class="bi bi-download h4 ms-3" role="button"></i></a>
                         </div>
                     </div>
 
@@ -486,7 +491,7 @@
                     <div class="row">
                         <div class="col mb-3">
                             <div class="p-3 border rounded-3 shadow-sm">
-                                <label for="scrape_url" class="form-label"><i id="status_icon" class="bi bi-link-45deg"></i>&ensp;URL to scrape:</label>
+                                <label for="scrape_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;URL to scrape</label>
                                 <input type="text" id="scrape_url" name="scrape_url" class="form-control"
                                     value="" required
                                     placeholder="theposterdb.com (poster/set/user) or mediux.pro (sets/boxsets) URL"
@@ -497,7 +502,8 @@
                         </div>
                         <div class="mb-3 col-md-4 col-lg-3">
                             <div class="p-3 border rounded-3 shadow-sm">
-                                <label for="scrape_url" class="form-label"><i id="status_icon" class="bi bi-calendar3"></i>&ensp;Plex year:</label>
+                                <label for="scrape_url" class="form-label"><i class="bi bi-calendar3"></i>&ensp;Plex year</label>
+                                &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Use this if the year in Plex is different to that on MediUX or TPDb"></i>
                                 <input type="text" id="year" name="year" class="form-control"
                                     value=""
                                     placeholder="e.g. 1978 or 2023"
@@ -510,7 +516,7 @@
                     <div class="row mb-3">
                         <div class="col">
                             <div class="p-3 border rounded-3 shadow-sm">
-                                <h5 class="mb-3"><i id="status_icon" class="bi bi-sliders"></i>&ensp;Options</h5>
+                                <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Options</h5>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input" type="checkbox" value="--force" id="option-force"/>
                                     <label for="option-force" class="form-check-label">Force upload the artwork, even if it
@@ -537,7 +543,7 @@
                         </div>
                         <div class="col theposterdb collapse">
                             <div class="p-3 border rounded-3 shadow-sm">
-                                <h5 class="mb-3"><i id="status_icon" class="bi bi-sliders"></i>&ensp;The Poster DB options</h5>
+                                <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;The Poster DB options</h5>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" value="--add-sets"
                                         id="option-add-sets"/>
@@ -556,7 +562,7 @@
                     <div class="row mb-3">
                         <div class="col">
                             <div class="p-3 border rounded-3 shadow-sm">
-                                <h5 class="mb-3"><i id="status_icon" class="bi bi-card-image"></i>&ensp;Artwork to include</h5>
+                                <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork to include</h5>
                                 <div id="scraper-filters-inherit" class="collapse show row mb-1">
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check form-switch mb-2">
@@ -633,7 +639,6 @@
                         <p><i class="bi bi-1-square"></i>&ensp;Check any options or customize filters.</p>
                         <p><i class="bi bi-2-square"></i>&ensp;Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.</p>
                         <p><i class="bi bi-3-square"></i>&ensp;The app will try to determine whether the artwork is for a TV show or a movie / collection or if it contains a mix of assets.</p>
-                        <p><i class="bi bi-exclamation-triangle"></i>&ensp;This is a beta feature so please report any anomalies you find in ZIP files!</p>
                     </div>
                 </div>
                 <div id="progress-container" class="row mt-3 mb-3" style="display:none">
@@ -648,7 +653,7 @@
                     <div class="row">
                         <div class="col mb-3">
                             <div class="p-3 border mt-3 rounded-3 shadow-sm">
-                                <label for="plex_title" class="form-label"><i id="status_icon" class="bi bi-textarea-t"></i>&ensp;Plex title:</label>
+                                <label for="plex_title" class="form-label"><i class="bi bi-textarea-t"></i>&ensp;Plex title</label>
                                 <input type="text" id="plex_title" name="plex_title" class="form-control"
                                     value=""
                                     placeholder="(if different to file title)"
@@ -657,7 +662,8 @@
                         </div>
                         <div class="mb-3 col-md-4 col-lg-3">
                             <div class="p-3 border mt-3 rounded-3 shadow-sm">
-                                    <label for="plex_year" class="form-label"><i id="status_icon" class="bi bi-calendar3"></i>&ensp;Plex year:</label>
+                                    <label for="plex_year" class="form-label"><i class="bi bi-calendar3"></i>&ensp;Plex year</label>
+                                    &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Use this if the year in Plex is different to that on MediUX or TPDb"></i>
                                     <input type="text" id="plex_year" name="plex_year" class="form-control"
                                         value=""
                                         placeholder="e.g. 1978 or 2023"
@@ -671,7 +677,7 @@
                 <div class="row mb-3">
                     <div class="col">
                         <div class="p-3 border rounded-3 shadow-sm">
-                            <h5 class="mb-3"><i id="status_icon" class="bi bi-sliders"></i>&ensp;Options</h5>
+                            <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Options</h5>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" value="force" id="upload-option-force"/>
                                 <label for="upload-option-force" class="form-check-label">Force upload the artwork, even if it
@@ -694,7 +700,7 @@
                 <div class="row mb-3">
                     <div class="col">
                         <div class="p-3 border rounded-3 shadow-sm">
-                            <h5 class="mb-3"><i id="status_icon" class="bi bi-card-image"></i>&ensp;Artwork to include</h5>
+                            <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork to include</h5>
                             <div id="upload-filters-inherit" class="collapse show row mb-1">
                                 <div class="col-6 col-md-4 col-lg-3">
                                     <div class="form-check form-switch mb-2">
@@ -765,12 +771,17 @@
                         <div class="p-3 border rounded-3 shadow-sm">
                             <h5 class="mb-3"><i class="bi bi-code-slash"></i>&ensp;About Artwork Uploader for Plex</h5>
                             <div class="col">
-                                <p>Version: <span id="app_version"></span></p>
+                                <p>Version: <span id="app_version"></span></p> <!-- &ensp;<span class="badge rounded-pill text-bg-primary" id="check-update-btn" role="button">CHECK FOR UPDATES</span></p> -->
                                 <p>Artwork Uploader for Plex is an open-source application written in Python and designed to simplify the process of managing artwork for your Plex media server. 
                                     Whether you're looking to enhance your movie posters, TV show covers, episode title cards or collection artwork, 
                                     this tool provides an easy-to-use interface to streamline the process.</p>
                                 <p><i class="bi bi-github"></i>&ensp;Find the source code and report any issues on <a href="https://github.com/mscodemonkey/artwork-uploader-plex" target="_blank">GitHub</a></p>
                                 <p><i class="bi bi-arrow-through-heart"></i>&ensp;Like what you see? Give us a star on our GitHub page!</p>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="debug-mode"/>
+                                    <label for="debug-mode" class="form-check-label">Enable debug mode</label>&nbsp;
+                                    <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="If you need to report an issue, enable debug mode, reproduce the issue and check the logs."></i>
+                                </div>
                             </div>
                         </div>
                     </div>

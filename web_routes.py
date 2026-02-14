@@ -11,16 +11,15 @@ The routes are organized into:
 """
 
 import os
+import logging
+import flask.cli
 import pprint
 import sys
 import re
-import uuid
 import base64
 import tempfile
 import zipfile
-import threading
 import subprocess
-import pprint
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
@@ -87,15 +86,18 @@ def setup_routes(web_app, config: Config):
             if AuthenticationService.authenticate(username, password, config.auth_username, config.auth_password_hash):
                 session['authenticated'] = True
                 session.permanent = remember  # Set to 7 days if remember is checked
+                update_log(Instance(broadcast=True), f"👤 User {username} logged in successfully")
                 return redirect(url_for('home'))
             else:
                 error = "Invalid username or password"
+                update_log(Instance(broadcast=True), f"⛔ Invalid username or password provided")
 
         return render_template("login.html", error=error)
 
     @web_app.route("/logout")
     def logout():
         """Handle user logout."""
+        update_log(Instance(broadcast=True), f"👋🏻 Logout successful")
         session.clear()
         return redirect(url_for('login'))
 
@@ -143,7 +145,6 @@ def setup_socket_handlers(
         load_bulk_import_file,
         rename_bulk_import_file,
         delete_bulk_import_file,
-        process_uploaded_artwork,
         add_file_to_schedule_thread,
         update_scheduled_jobs,
         get_latest_version,
@@ -154,15 +155,36 @@ def setup_socket_handlers(
 
     # Temporary storage for chunked uploads
     upload_chunks = {}
-    docker = "true" if os.getenv("RUNNING_IN_DOCKER") == "1" else "false"
+
+    @globals.web_socket.on("debug_mode")
+    def debug_mode(data):
+        """Report on debug mode status and toggle debug mode."""
+        instance = Instance(data.get("instance_id"), "web")
+        if data.get("action") == "get":
+            update_log(instance, f"🐞 Debug mode is {'On' if globals.debug else 'Off'}")
+            debug_me(f"Reporting current debug mode: {'On' if globals.debug else 'Off'}", "debug_mode")
+            notify_web(instance, "debug_mode", { "debug": globals.debug })
+        elif data.get("action") == "toggle":
+            update_log(instance, f"🐞 Debug mode is {'Off' if globals.debug else 'On'}")
+            debug_me(f"Turning debug mode {'Off' if globals.debug else 'On'}", "debug_mode")
+            notify_web(instance, "debug_mode", { "debug": not globals.debug })
+            if globals.debug:
+                globals.debug = False
+            else:
+                globals.debug = True
 
     @globals.web_socket.on("check_for_update")
     def check_for_update(data):
         """Check for updates when requested by the frontend."""
-        instance = Instance(data.get("instance_id"), "web")
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
+        debug_me(f"Checking for update by request from the frontend", "check_for_update")
         latest_version = get_latest_version()
         if latest_version and version.parse(latest_version.lstrip('v')) > version.parse(current_version.lstrip('v')):
-            notify_web(instance, "update_available", { "version": latest_version, "docker": docker })
+            update_log(instance, f"🚨 Update available: {latest_version} (current: {current_version})")
+            notify_web(instance, "version_check", { "new_version": latest_version, "current_version": current_version, "docker": "true" if globals.docker else "false" })
+        else:
+            update_log(instance, f"✅ You are running the latest version: {current_version}")
+            notify_web(instance, "version_check", { "new_version": None, "current_version": current_version, "docker": "true" if globals.docker else "false" })
 
     @globals.web_socket.on("update_app")
     def update_app(data):
@@ -177,6 +199,7 @@ def setup_socket_handlers(
                 sticky=True,
                 spinner=True
             )
+            update_log(instance, "🔄 Starting update process...")
 
             # Use the exact same python that is currently running this code:
             python_cmd = sys.executable
@@ -212,6 +235,7 @@ def setup_socket_handlers(
 
         except Exception as e:
             update_status(Instance(broadcast=True), "Update failed, restarting the app...", "danger")
+            update_log(instance, f"❌ Update failed: {str(e)}")
             notify_web(instance, "update_failed", {"error": str(e)})
 
     @globals.web_socket.on("start_scrape")
@@ -235,6 +259,7 @@ def setup_socket_handlers(
                 "element_disable",
                 {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True}
             )
+            update_log(instance, f"🔄 Starting scrape for URL: {url}")
             process_scrape_url_from_web(instance, url)
 
     @globals.web_socket.on("start_bulk_import")
@@ -261,6 +286,7 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         config.load()
         update_scheduled_jobs()
+        update_log(instance, "🔄 Configuration loaded")
         notify_web(instance, "load_config", {"config": vars(config)})
 
     @globals.web_socket.on("load_bulk_filelist")
@@ -272,7 +298,7 @@ def setup_socket_handlers(
             folder_path = Path("bulk_imports")
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
         except (FileNotFoundError, PermissionError) as e:
-            debug_me(f"Error loading bulk file list: {e}", "load_bulk_filelist")
+            debug_me(f"Error loading bulk import file list: {e}", "load_bulk_filelist")
         notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
 
     @globals.web_socket.on("load_bulk_import")
@@ -285,7 +311,13 @@ def setup_socket_handlers(
     def rename_bulk_file(data):
         """Rename a bulk import file."""
         instance = Instance(data.get("instance_id"), "web")
-        rename_bulk_import_file(instance, data.get("old_filename"), data.get("new_filename"))
+        old_name = data.get("old_filename")
+        new_name = data.get("new_filename")
+        time = globals.scheduler_service.run_times_by_file.get(old_name)
+        rename_bulk_import_file(instance, old_name, new_name)
+        if time:
+            delete_task_from_scheduler({"instance_id": instance.id, "file": old_name})
+            add_tasks_to_scheduler({"instance_id": instance.id, "file": new_name, "time": time})
 
     @globals.web_socket.on("delete_bulk_file")
     def delete_bulk_file(data):
@@ -317,50 +349,53 @@ def setup_socket_handlers(
 
         try:
             globals.bulk_file_service.write_file(content, filename)
-            update_log(instance, f"Created new bulk file: {filename}")
+            update_log(instance, f"📝 Created new bulk import file: {filename}")
             notify_web(instance, "create_bulk_file", {"created": True, "filename": filename})
             # Reload the file list
             folder_path = Path("bulk_imports")
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
             notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
         except Exception as e:
+            update_log(instance, f"🔴 Failed to create new bulk import file")
             update_status(instance, f"Error creating file: {str(e)}", "danger")
             notify_web(instance, "create_bulk_file", {"created": False, "error": str(e)})
 
     @globals.web_socket.on("display_message")
     def display_message(data):
         """Log a debug message from the frontend."""
-        debug_me(data.get("message"), data.get("title", "web_message"))
-
-    @globals.web_socket.on("get_version")
-    def get_version(data):
-        """Get the current application version."""
         instance = Instance(data.get("instance_id"), "web")
-        notify_web(instance, "get_version", {"version": current_version})
+        debug_me(f"Received message from fronted: '{data.get('message')}' • Log level: '{data.get('level')}'", "display_message")
+        if data.get("level") == "debug":
+            debug_me(data.get("message"), data.get("title", "web_message"))
+        elif data.get("level") == "log":
+            update_log(instance, data.get("message"))
 
     @globals.web_socket.on("test_plex_connect")
     def test_plex_connect(data):
         """Test connectivity to Plex server"""
 
         def fail(status, log):
+            update_log(instance, log)
+            update_status(instance, status, "danger", False, False, "x-circle")
             notify_web(instance, "test_plex_connect", { "success": False, "status": status, "log": log })
             notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
 
         instance = Instance(data.get("instance_id"), "web")
         instance.broadcast = True
-        
+        update_status(instance, "Testing connection to Plex server", "info", False, True)
+
         # Disable the test button to prevent multiple clicks
         notify_web(instance, "element_disable", {"element": ["test_plex_btn"], "mode": True})
         
         # Capture Plex settings form parameters
         url = data.get("url", "")
-        debug_me(f"Obtained Plex URL: {url}")
+        debug_me(f"Obtained Plex URL: {url}", "test_plex_connect")
         token = data.get("token", "")
-        debug_me(f"Obtained Plex token: {token}")
+        debug_me(f"Obtained Plex token: {token}", "test_plex_connect")
         tv_libs = data.get("tv_libs", "")
-        debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}")
+        debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}", "test_plex_connect")
         movie_libs = data.get("movie_libs", "")
-        debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}")
+        debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}", "test_plex_connect")
         
         # Check for a valid Plex server URL and token
         url_pattern = r"^https?:\/\/((([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?$"
@@ -378,7 +413,7 @@ def setup_socket_handlers(
         except Exception as e:
             if "NewConnectionError" in str(e):
                 log = f"❌ Error connecting to Plex • Connection refused"
-            elif "ConnectTimeoutError" in str(e):
+            elif "ConnectTimeoutError" in str(e) or "timed out" in str(e):
                 log = f"❌ Error connecting to Plex • Timed out"
             elif "unauthorized" in str(e):
                 log = f"❌ Error connecting to Plex • Invalid token"
@@ -403,6 +438,8 @@ def setup_socket_handlers(
             fail("Some libraries not found, check log for details.", f"❌ The following libraries could not be found: {", ".join (invalid_libs)}")
             return
         
+        update_log(instance, "✅ Successfully connected to Plex server")
+        update_status(instance, "Successfully connected to Plex server", "success", False, False, "check2-circle")
         notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
         notify_web(instance, "test_plex_connect", { "success": True })
 
@@ -418,6 +455,7 @@ def setup_socket_handlers(
         notification_message = "This is a test notification to verify your notification settings are working correctly."
         test_notification = NotifyService()
         success = True
+        failed = 0
         for url in urls:
             test_notification.add_url(url)
             debug_me(f"Sending test notification to '{url}'", "test_notifications")
@@ -425,52 +463,30 @@ def setup_socket_handlers(
             success = success and url_success
             if url_success:
                 debug_me(f"📢 Test notification sent successfully to '{url}'", "test_notifications")
-                notify_web(instance, "test_notifications", {"success": "url_pass", "url": url})
+                update_log(instance, f"📢 Test notification sent successfully to '{url}'")
+                if len(urls) == 1:
+                    update_status(instance, f"Test notification sent successfully", "success", False, False, "check2-circle")
             else:
+                failed += 1
                 debug_me(f"❌ Test notification failed to send to '{url}'.", "test_notifications")
-                notify_web(instance, "test_notifications", {"success": "url_fail", "url": url})
+                update_log(instance, f"❌ Test notification failed to send to '{url}'")
+                if len(urls) == 1:
+                    update_status(instance, f"Test notification failed to send", "danger", False, False, "x-circle")
             test_notification.clear_urls()
-        if success:
-            message = "✅ Test notification sent successfully." if len(urls) == 1 else "✅ All test notifications sent successfully."
-            debug_me(message, "test_notifications")
-            notify_web(instance, "test_notifications", { "success": "all", "status": message[2:]  })
-        else:
-            message = "❌ Test notification failed to send. " if len(urls) == 1 else "⚠️ Some test notifications failed to send. Check logs for details."
-            severity = "danger" if len(urls) == 1 else "warning"
-            icon = "x-circle" if len(urls) == 1 else "exclamation-triangle"
-            debug_me(message, "test_notifications")
-            notify_web(instance, "test_notifications", { "success": "partial", "status": message[2:], "severity": severity, "icon": icon })
+        if len(urls) > 1:
+            if success and len(urls) > 1:
+                debug_me("All test notifications sent successfully", "test_notifications")
+                update_log(instance, "✅ All test notifications sent successfully")
+                update_status(instance, "All test notifications sent successfully", "success", False, False, "check2-circle")
+            elif failed < len(urls):
+                debug_me("Some test notifications failed to send", "test_notifications")
+                update_log(instance, "⚠️ Some test notifications failed to send")
+                update_status(instance, "Some test notifications failed to send. Check logs for details.", "warning", False, False, "exclamation-triangle")
+            else:
+                debug_me("All test notifications failed to send", "test_notifications")
+                update_log(instance, "❌ All test notifications failed to send")
+                update_status(instance, "All test notifications failed to send", "danger", False, False, "x-circle")
         notify_web(instance, "element_disable", { "element": ["test_notif_btn"], "mode": False })
-
-    @globals.web_socket.on("set_password")
-    def set_password_web(data):
-        """Set a new password for authentication."""
-        instance = Instance(data.get("instance_id"), "web")
-
-        try:
-            username = data.get("username", "")
-            password = data.get("password", "")
-
-            if not username or not password:
-                notify_web(instance, "set_password", {"success": False, "error": "Username and password required"})
-                return
-
-            # Hash the password
-            password_hash = AuthenticationService.hash_password(password)
-
-            # Update config
-            config.auth_username = username
-            config.auth_password_hash = password_hash
-            config.auth_enabled = True
-            config.save()
-
-            # Also update globals
-            globals.config = config
-
-            notify_web(instance, "set_password", {"success": True})
-            update_log(instance, f"Authentication enabled for user '{username}'")
-        except Exception as e:
-            notify_web(instance, "set_password", {"success": False, "error": str(e)})
 
     @globals.web_socket.on("save_config")
     def save_config_web(data):
@@ -478,11 +494,49 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
 
         try:
+            # Create new config object and load existing config from config.json
+            new_config = Config()
+            new_config.load()
+            new_config_dict = vars(new_config)
+            #global_config = globals.config
+            current_config_dict = vars(globals.config).copy()
+            password_change = False
+            # Capture the provided password and see if it's different 
+            password = data.get("config").get("auth_password")
+            if password:
+                debug_me(f"Captured password as: {password}", "save_config")
+                password_change = not AuthenticationService.verify_password(password, globals.config.auth_password_hash)
+
             # Unpack the config dictionary into the local config
             for key, value in data.get("config").items():
-                # Skip password_hash - it should only be set via set_password
-                if key == "auth_password_hash":
-                    continue
+                new_config_dict[key] = value
+
+            # Prepare configurations to be compared
+            new_config_dict.pop("auth_password")
+            new_config_dict.pop("auth_password_hash")
+            current_config_dict.pop("auth_password_hash")
+
+            # If the new configuration is the same, return
+            if new_config_dict == current_config_dict and not password_change:
+                update_status(instance, "No configuration change detected", "info", False, False, "info-circle")
+                return
+            
+            if new_config_dict["auth_enabled"] and password:
+                if new_config_dict["auth_username"] == current_config_dict["auth_username"] and password_change:
+                    update_log(instance, f"🔐 Password changed for user {new_config_dict["auth_username"]}")
+                elif new_config_dict["auth_username"] != current_config_dict["auth_username"]:
+                    update_log(instance, f"🔐 Authentication enabled for user {new_config_dict["auth_username"]}")
+                password_hash = AuthenticationService.hash_password(password)
+                new_config_dict["auth_password_hash"] = password_hash
+
+            if not new_config_dict["auth_enabled"]:
+                if current_config_dict["auth_enabled"]:
+                    update_log(instance, f"🔓 Authentication disabled for user {globals.config.auth_username}")
+                new_config_dict["auth_username"] = ""
+                new_config_dict["auth_password_hash"] = ""
+
+            # Populate the attributes of the config object with the values provided through the frontend
+            for key, value in new_config_dict.items():
                 setattr(config, key, value)
             config.save()
 
@@ -521,12 +575,11 @@ def setup_socket_handlers(
                     config.save()
 
                     # And update the front-end
-                    notify_web(
-                        instance,
-                        "delete_schedule",
-                        {"file": schedule_file, "job_reference": job_id, "deleted": True}
-                    )
+                    notify_web(instance, "delete_schedule", { "file": schedule_file, "job_reference": job_id, "deleted": True })
+                    update_log(instance, f"🗑️ Deleted scheduled task for '{schedule_file}'")
+                    debug_me(f"Deleted scheduled task for '{schedule_file}' with job ID '{job_id}'", "delete_task_from_scheduler")
                 else:
+                    debug_me(f"Couldn't find a scheduled job for '{schedule_file}'")
                     notify_web(instance, "delete_schedule", {"deleted": False, "job_id": job_id})
 
     @globals.web_socket.on("add_schedule")
@@ -556,17 +609,11 @@ def setup_socket_handlers(
                         schedule_callback
                     )
 
-                    notify_web(
-                        instance,
-                        "add_schedule",
-                        {
-                            "added": True,
-                            "file": schedule_file,
-                            "time": schedule_time,
-                            "jobReference": job_id
-                        }
-                    )
+                    notify_web(instance, "add_schedule", { "added": True, "file": schedule_file, "time": schedule_time, "jobReference": job_id })
+                    update_log(instance, f"⏰ Added scheduled task '{schedule_file}' every day at {schedule_time}")
+                    debug_me(f"Added scheduled task '{schedule_file}' every day at {schedule_time} with job ID '{job_id}'", "add_tasks_to_scheduler")
                 except Exception as e:
+                    update_log(instance, f"🔴 Failed to add scheduled task '{schedule_file}'")
                     debug_me(f"Error adding schedule: {e}", "add_tasks_to_scheduler")
                     raise
 
@@ -574,9 +621,8 @@ def setup_socket_handlers(
                 globals.scheduler_service.start()
 
         except Exception as e:
-            if globals.debug:
-                debug_me(f"Error in scheduler setup: {e}", "add_tasks_to_scheduler")
-                raise
+            debug_me(f"Error in scheduler setup: {e}", "add_tasks_to_scheduler")
+            raise
 
     def update_or_add_schedule(file_name, new_time):
         """Helper function to update or add a schedule in config."""
@@ -593,7 +639,16 @@ def setup_socket_handlers(
     def docker_detection(data):
         """Detects whether app is running in docker and informs frontend"""
         instance = Instance(data.get("instance_id"), "web")
-        notify_web(instance, "docker_detected", { "docker": docker })
+        if globals.docker:
+            kometa_base = utils.get_host_path("/assets")
+            temp_dir = utils.get_host_path("/temp")
+            update_log(instance, f"🐳 Docker environment detected")
+            debug_me(f"Docker detected, Kometa asset path mapped to '{kometa_base}', temp dir mapped to '{temp_dir}'", "docker_detection")
+            if kometa_base == "(not defined)":
+                update_log(instance, "⚠️ Kometa base path is not defined in docker-compose.yml file. Saving assets to Kometa asset directory is not available.")
+            notify_web(instance, "docker_detected", { "docker": "true", "kometa_base": kometa_base, "temp_dir": temp_dir })
+        else:
+            notify_web(instance, "docker_detected", { "docker": "false" })
 
     @globals.web_socket.on("upload_artwork_chunk")
     def handle_upload_chunk(data):
@@ -636,6 +691,7 @@ def setup_socket_handlers(
             upload_chunks[file_name]["total_chunks"]
         ):
             debug_me(f"Upload complete for {file_name}, saving file...", "handle_upload_complete")
+            update_log(instance, f"✅ {file_name} • Upload completed successfully")
             save_uploaded_file(
                 instance,
                 file_name,
@@ -709,7 +765,9 @@ def save_uploaded_file(
     del upload_chunks[file_name]  # Free memory
     debug_me(f"Saved ZIP file: {temp_zip_path}", "save_uploaded_file")
 
+    update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file...")
     extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
+        instance,
         temp_zip_path,
         filename_pattern,
         filters,
@@ -729,11 +787,11 @@ def save_uploaded_file(
 
     process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
 
-    notify_web(instance, "upload_complete", {"files": extracted_files})
     update_status(instance, "Finished processing uploaded file.", color="success")
 
 
 def extract_and_list_zip(
+    instance: Instance,
     zip_path: str,
     filename_pattern: re.Pattern,
     filters: list,
@@ -755,26 +813,44 @@ def extract_and_list_zip(
         List of artwork dictionaries sorted by media type, season, episode
     """
     extract_dir = tempfile.mkdtemp()
-    valid_files = []
+    #valid_files = []
+    file_list = []
     zip_source = "theposterdb"
+    filtered_files = 0
 
     debug_me(f"Extracting ZIP file: {zip_path} to {extract_dir}", "extract_and_list_zip")
 
+    # For ThePosterDB, extract title and author from filename
+    pattern = r"^(?P<title>.+?)\s+set by\s+(?P<author>.+?)\s*-"
+    match = re.search(pattern, os.path.basename(zip_path), re.IGNORECASE)
+    if match:
+        zip_title = match.group("title").strip()
+        zip_author = match.group("author").strip()
+        debug_me(f"Detected ThePosterDB source", "extract_and_list_zip")
+        debug_me(f"Detected ZIP title: {zip_title}", "extract_and_list_zip")
+        debug_me(f"Detected ZIP author: {zip_author}", "extract_and_list_zip")
+    else:
+        zip_source = "mediux"
+
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         # Pre-process the file list to determine source and extract valid files
-        for zip_info in zip_ref.infolist():
-            debug_me(f"Processing ZIP entry: {zip_info.filename}", "extract_and_list_zip")
+        zip_infos = [zip_info for zip_info in zip_ref.infolist() if os.path.basename(zip_info.filename) and not os.path.basename(zip_info.filename).startswith(".") and os.path.basename(zip_info.filename) not in {"ds_store", "__macosx"}]
+        total_files_in_zip = len(zip_infos)
+        
+        update_status(instance, "Extracting ZIP file...", "info", sticky=True, spinner=True)
+        for n, zip_info in enumerate(zip_infos, 1):
             filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
-
-            # Skip directories and unwanted metadata files
-            if not filename or filename.startswith('.') or filename.lower() in {"ds_store", "__macosx"}:
-                continue
+            debug_me(f"{n} / {total_files_in_zip} • Processing '{filename}'", "extract_and_list_zip")
+            percent = (n/total_files_in_zip)*100 if total_files_in_zip > 0 else 0
+            message = f"{n} / {total_files_in_zip} ({percent.__round__()}%)"
+            notify_web(instance, "progress_bar", { "percent": percent, "message": message })
+            #time.sleep(0.01)
 
             # Mediux ZIP files contain a source.txt file with metadata, we obtain title and author from there
             if filename == "source.txt":
                 debug_me("Detected Mediux source", "extract_and_list_zip")
                 zip_source = "mediux"
-                with zip_ref.open(zip_info.filename) as source, open(os.path.join(extract_dir, "source.txt"), "wb") as target:
+                with zip_ref.open(zip_info) as source, open(os.path.join(extract_dir, "source.txt"), "wb") as target:
                     target.write(source.read())
                 with open(os.path.join(extract_dir, "source.txt"), "r", encoding="utf-8") as source_file:
                     for line in source_file:
@@ -788,103 +864,87 @@ def extract_and_list_zip(
                 os.remove(os.path.join(extract_dir, "source.txt"))  # Clean up source.txt after obtaining author info
                 
             elif filename_pattern.match(filename):
-                extracted_path = os.path.join(extract_dir, filename)
+                full_path = os.path.join(extract_dir, filename)
 
-                with zip_ref.open(zip_info.filename) as source, open(extracted_path, "wb") as target:
+                with zip_ref.open(zip_info) as source, open(full_path, "wb") as target:
                     target.write(source.read())
 
-                valid_files.append(extracted_path)
+                #full_path = os.path.join(extract_dir, filename)
+                md5 = utils.calculate_file_md5(full_path)
 
-    file_list = []
+                # Obtain artwork title, year, media type, season, episode and artwork type by parsing the filename
+                debug_me(f"Parsing artwork metadata from filename: {filename}", "extract_and_list_zip")
+                artwork = parse_title(os.path.splitext(filename)[0])
+                # Override title and year if provided
+                artwork["title"] = plex_title if plex_title else artwork["title"]
+                artwork["year"] = plex_year if plex_year else artwork.get("year")
+                # Add additional metadata
+                artwork["source"] = zip_source
+                artwork["path"] = full_path
+                artwork["checksum"] = md5
+                artwork["id"] = "Upload"
+                artwork["author"] = zip_author
+                # Determine media type via Plex lookup if not a collection
+                if artwork["media"] != "Collection":
+                    media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
+                    if media_type is None:
+                        # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
+                        artwork["title"] = re.sub(r'-', '', artwork.get('title')).replace('...', '').strip()
+                        media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
+                    artwork["media"] = media_type if media_type else "unavailable"
+                    artwork["title"] = title if title and title != artwork.get('title') else artwork.get('title')
+                    artwork["tmdb_id"] = tmdb_id
+                    if artwork.get('year') is None and year is not None:
+                        artwork['year'] = year
+                if artwork['media'] == "TV Show":
+                    if artwork['season'] is None:
+                        artwork['season'] = "Cover"
+                        artwork['type'] = "show_cover"
+                    if artwork['season'] == "Cover" and check_image_orientation_func(artwork["path"]) == "landscape":
+                        artwork['season'] = "Backdrop"
+                        artwork['type'] = "background"
+                if artwork['media'] == "Movie":
+                    if check_image_orientation_func(artwork["path"]) == "landscape":
+                        artwork['type'] = "background"
+                    else:
+                        artwork['type'] = "movie_poster"
+                if artwork['media'] == "Collection":
+                    if check_image_orientation_func(artwork["path"]) == "landscape":
+                        artwork['type'] = "background"
+                if artwork['media'] == "unavailable":
+                    if check_image_orientation_func(artwork["path"]) == "landscape":
+                        artwork['type'] = "background"
+                    if artwork['type'] == "season_cover":
+                        artwork['media'] = "TV Show"
+                    else:
+                        # If we get to this point, there is no way to determine if it's a TV show or Movie, so default to poster
+                        # However this won't pass any filters (becuase it's either "movie_poster" or "show_cover"), so this artwork won't be processed further
+                        artwork['type'] = "poster"  
 
-    if zip_source == "theposterdb":
-        # For ThePosterDB, extract title and author from filename
-        pattern = r"^(?P<title>.+?)\s+set by\s+(?P<author>.+?)\s*-"
-        match = re.search(pattern, os.path.basename(zip_path), re.IGNORECASE)
-        zip_title = match.group("title").strip() if match else None
-        zip_author = match.group("author").strip() if match else None
-        debug_me(f"Detected ThePosterDB source", "extract_and_list_zip")
-        debug_me(f"Detected ZIP title: {zip_title}", "extract_and_list_zip")
-        debug_me(f"Detected ZIP author: {zip_author}", "extract_and_list_zip")
+                # Check for filters and exclusions
+                if not filters or artwork["type"] in filters:
+                    debug_me(
+                        f"✅ Including {artwork["type"].replace('_', ' ')} "
+                        f"for '{artwork['title']}"
+                        + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
+                        + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
+                        + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
+                        + f". Type is {artwork['type']}.", "extract_and_list_zip"
+                    )
+
+                    file_list.append(artwork)
+                else:
+                    debug_me(
+                        f"⏩ Skipping {artwork["type"].replace('_', ' ')} "
+                        f"for '{artwork['title']}"
+                        + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
+                        + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
+                        + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
+                        + f" based on filters. Type is {artwork['type']} and filters are {filters}.", "extract_and_list_zip"
+                    )
+                    filtered_files += 1
 
     total_files = len(os.listdir(extract_dir))
-    filtered_files = 0
-
-    for i, file in enumerate(os.listdir(extract_dir)):
-        full_path = os.path.join(extract_dir, file)
-        md5 = utils.calculate_file_md5(full_path)
-
-        # Obtain artwork title, year, media type, season, episode and artwork type by parsing the filename
-        debug_me(f"{i+1}. Parsing artwork metadata from filename: {file}", "extract_and_list_zip")
-        artwork = parse_title(os.path.splitext(file)[0])
-        # Override title and year if provided
-        artwork["title"] = plex_title if plex_title else artwork["title"]
-        artwork["year"] = plex_year if plex_year else artwork.get("year")
-        # Add additional metadata
-        artwork["source"] = zip_source
-        artwork["path"] = full_path
-        artwork["checksum"] = md5
-        artwork["id"] = "Upload"
-        artwork["author"] = zip_author
-        # Determine media type via Plex lookup if not a collection
-        if artwork["media"] != "Collection":
-            media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-            if media_type is None:
-                # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
-                artwork["title"] = re.sub(r'-', '', artwork.get('title')).replace('...', '').strip()
-                media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-            artwork["media"] = media_type if media_type else "unavailable"
-            artwork["title"] = title if title and title != artwork.get('title') else artwork.get('title')
-            artwork["tmdb_id"] = tmdb_id
-            if artwork.get('year') is None and year is not None:
-                artwork['year'] = year
-        if artwork['media'] == "TV Show":
-            if artwork['season'] is None:
-                artwork['season'] = "Cover"
-                artwork['type'] = "show_cover"
-            if artwork['season'] == "Cover" and check_image_orientation_func(artwork["path"]) == "landscape":
-                artwork['season'] = "Backdrop"
-                artwork['type'] = "background"
-        if artwork['media'] == "Movie":
-            if check_image_orientation_func(artwork["path"]) == "landscape":
-                artwork['type'] = "background"
-            else:
-                artwork['type'] = "movie_poster"
-        if artwork['media'] == "Collection":
-            if check_image_orientation_func(artwork["path"]) == "landscape":
-                artwork['type'] = "background"
-        if artwork['media'] == "unavailable":
-            if check_image_orientation_func(artwork["path"]) == "landscape":
-                artwork['type'] = "background"
-            if artwork['type'] == "season_cover":
-                artwork['media'] = "TV Show"
-            else:
-                # If we get to this point, there is no way to determine if it's a TV show or Movie, so default to poster
-                # However this won't pass any filters (becuase it's either "movie_poster" or "show_cover"), so this artwork won't be processed further
-                artwork['type'] = "poster"  
-
-        # Check for filters and exclusions
-        if not filters or artwork["type"] in filters:
-            debug_me(
-                f"{i+1}. ✅ Including {artwork["type"].replace('_', ' ')} "
-                f"for '{artwork['title']}"
-                + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
-                + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
-                + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
-                + f". Type is {artwork['type']}.", "extract_and_list_zip"
-            )
-
-            file_list.append(artwork)
-        else:
-            debug_me(
-                f"{i+1}. ⏩ Skipping {artwork["type"].replace('_', ' ')} "
-                f"for '{artwork['title']}"
-                + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
-                + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
-                + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
-                + f" based on filters. Type is {artwork['type']} and filters are {filters}.", "extract_and_list_zip"
-            )
-            filtered_files += 1
 
     sorted_data = sorted(file_list, key=sort_key_func)
 
@@ -906,4 +966,13 @@ def start_web_server(web_app, web_host: str, web_port: int, debug: bool = False)
         web_port: Port to bind to
         debug: Whether to run in debug mode
     """
-    globals.web_socket.run(web_app, host=web_host, port=web_port, debug=debug)
+    flask.cli.show_server_banner = lambda *args: None
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
+    globals.web_socket.run(
+        web_app, 
+        host=web_host, 
+        port=web_port, 
+        debug=debug, 
+        allow_unsafe_werkzeug=True
+    )

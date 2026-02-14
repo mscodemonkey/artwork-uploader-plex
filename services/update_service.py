@@ -7,11 +7,13 @@ maintainability.
 
 import os
 from typing import Optional, Callable
+import uuid
 from packaging import version
 import threading
 import time
 import requests
 
+from models.instance import Instance
 from utils.notifications import debug_me
 
 
@@ -32,11 +34,13 @@ class UpdateService:
             current_version: Current version of the application
             check_interval: Seconds between update checks (default: 3600 = 1 hour)
         """
-        self.github_repo = github_repo
-        self.current_version = current_version
-        self.check_interval = check_interval
+        self.github_repo:str = github_repo
+        self.current_version:str = current_version
+        self.check_interval: int = check_interval
         self.update_thread: Optional[threading.Thread] = None
-        self.is_running = False
+        self.is_running:bool = False
+        self.instance: Instance = Instance(uuid.uuid4(), mode="cli")  # Create a CLI instance for logging purposes
+        self.update_found: str = None
 
     def get_latest_version(self) -> Optional[str]:
         """
@@ -45,6 +49,10 @@ class UpdateService:
         Returns:
             Latest version tag if found, None otherwise
         """
+        if self.update_found:
+            debug_me(f"Returning cached latest version: {self.update_found}", "UpdateService/get_latest_version")
+            return self.update_found
+                    
         # The use of a token is only needed for development purposes, for testing
         # the app update feature and make sure you don't hit rate limits
         token = os.getenv("GITHUB_TOKEN")
@@ -81,6 +89,7 @@ class UpdateService:
 
             if version.parse(latest_normalized) > version.parse(current_normalized):
                 debug_me(f"Update available! Current version: {self.current_version}. Latest version: {latest_version}", "UpdateService/check_for_update")
+                self.update_found = latest_version
                 return latest_version
             else:
                 debug_me(f"No update available.", "UpdateService/check_for_update")
@@ -129,9 +138,11 @@ class UpdateService:
         Args:
             on_update_available: Callback function for update notifications
         """
-        while self.is_running:
+        while self.is_running and not self.update_found:
             new_version = self.check_for_update()
             if new_version:
                 on_update_available(new_version)
-            debug_me(f"Next update check in {self.check_interval} seconds.", "UpdateService/_check_periodically")
+                debug_me(f"An update has been found, exiting periodic check thread", "UpdateService/_check_periodically")
+                break
+            debug_me(f"No update found, next check in {self.check_interval} seconds.", "UpdateService/_check_periodically")
             time.sleep(self.check_interval)

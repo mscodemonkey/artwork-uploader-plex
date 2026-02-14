@@ -15,6 +15,8 @@ const instanceId = getInstanceId();
 const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
 const CHUNK_SIZE = 1024 * 64; // 64 KB per chunk for uploads
 
+const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
 
 // UI References
 const scrapeUrlInput = document.getElementById("scrape_url");
@@ -32,10 +34,8 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
     loadConfig()
-    updateLog("🔄 Configuration loaded, ready for action!")
     toggleThePosterDBElements();
-    toggleDockerWarning();
-    getVersion();
+    detectEnvironment();
 });
 
 // Specific event listeners
@@ -46,26 +46,89 @@ document.getElementById("upload-filters-global").addEventListener("change", inhe
 document.getElementById("btnUpdate").addEventListener("click", updateApp);
 document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
 document.getElementById("test_plex_btn").addEventListener("click", testPlexConnect);
-
+document.getElementById("debug-mode").addEventListener("change", function() {
+    socket.emit("debug_mode", { instance_id: instanceId, action: "toggle" });
+});
 
 // ==================================================
 // General helper functions
 // ==================================================
 
-// Get version info from backend
-function getVersion() {
-    socket.emit("get_version", { instance_id: instanceId });
-
-    socket.once("get_version", (data) => {
-        if (validResponse(data)) {
-            document.getElementById("app_version").innerText = data.version;
-        }
-    });
+function detectEnvironment() {
+    socket.emit("detect_docker", { instance_id: instanceId });
+    socket.emit("debug_mode", { instance_id: instanceId, action: "get" });
+    socket.emit("check_for_update", { instance_id: instanceId });
 }
+
+socket.on("version_check", function(data) {
+    if(validResponse(data, true)){
+        if (data.new_version) {
+            // Show update notifier
+            document.getElementById("latest_version").innerText = data.new_version;
+            document.getElementById("version_notifier").classList.remove("d-none");
+            //document.getElementById("check-update-btn").classList.add("d-none");
+        }
+        // Display current version in the About tab
+        document.getElementById("app_version").innerText = data.current_version;
+        // If running in Docker, show message about self-update being disabled and hide update button
+        if (data.docker == "true") {
+            document.getElementById("docker_update_message").innerText = "Self-update is disabled in Docker. Please pull the lastet image manually.";
+        } else {
+            document.getElementById("docker_update_message").innerText = "";
+            document.getElementById("btnUpdate").classList.remove("d-none");
+        }
+    }
+});
+
+socket.on("debug_mode", function(data) {
+    if (validResponse(data)) {
+        // Set the correct state of the debug mode toggle based on the backend value
+        document.getElementById("debug-mode").checked = data.debug;
+    }
+});
+
+function toggleDockerWarning() {
+    socket.emit("detect_docker", { instance_id: instanceId });
+}
+socket.on("docker_detected", (data) => {
+    const dockerWarning = document.getElementById("docker_warning");
+    const kometaBase = document.getElementById("kometa_base");
+    const tempDir = document.getElementById("temp_dir");
+    const saveToKometaCheckbox = document.getElementById("save_to_kometa");
+    const optionTemp = document.getElementById("option-temp");
+    const uploadOptionTemp = document.getElementById("upload-option-temp");
+
+    if (validResponse(data)) {
+        if (data.docker == "true") {
+            // If not Kometa asset directory has been bind mounted to the container /asset path, disable the
+            // ability to turn on saving to Kometa asset directory
+            if (data.kometa_base == "(not defined)") {
+                saveToKometaCheckbox.disabled = true;
+                saveToKometaCheckbox.checked = false;
+                toggleKometaSettings();
+                dockerWarning.innerHTML = '<i class="bi bi-exclamation-triangle"></i>&ensp;Kometa base path not defined in <span class="text-nowrap"><code>docker-compose.yml</code></span>. Saving assets to Kometa asset directory is not available.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+                dockerWarning.classList.add("alert-danger");
+            }
+            dockerWarning.style.display = "block";
+            kometaBase.disabled = true;
+            kometaBase.value = data.kometa_base; // Set to host path detected by backend
+            tempDir.disabled = true;
+            tempDir.value = data.temp_dir; // Set to host path detected by backend
+            // If no host path ha been bound to the container /temp path, disable the ability to use a temp dir
+            if (data.temp_dir == "(not defined)") {
+                optionTemp.checked = false;
+                optionTemp.parentElement.classList.add("d-none");
+                uploadOptionTemp.checked = false;
+                uploadOptionTemp.parentElement.classList.add("d-none");
+            }
+        } else {
+            dockerWarning.style.display = "none";
+        }
+    }
+})
 
 // Test connection to Plex server
 function testPlexConnect() {
-    updateStatus("Testing connection to Plex server", "info", false, true)
     baseUrl = document.getElementById("plex_base_url").value
     token = document.getElementById("plex_token").value
     tvLibraries = document.getElementById("tv_library").value
@@ -78,17 +141,6 @@ function testPlexConnect() {
         .filter(item => item !== ""); // Remove empty values    
     socket.emit("test_plex_connect", { instance_id: instanceId, url: baseUrl, token: token, tv_libs: tvLibraries, movie_libs: movieLibraries });
 }
-socket.on("test_plex_connect", (data) => {
-    if (validResponse(data)) {
-        if (data.success) {
-            updateStatus("Successfully connected to Plex server", "success", false, false, "check2-circle")
-            updateLog("✅ Successfully connected to Plex server");
-        } else {
-            updateStatus(data.status, "danger", false, false, "x-circle")
-            updateLog(data.log);
-        }
-    }
-});
 
 // Send test notification
 function testNotifications() {
@@ -101,20 +153,6 @@ function testNotifications() {
     } else {
         socket.emit("test_notifications", { instance_id: instanceId, urls: urls });
     }}
-
-socket.on("test_notifications", (data) => {
-    if (validResponse(data)) {
-        if (data.success == "url_pass") {
-            updateLog("📢 Test notification sent successfully to '" + data.url + "'");
-        } else if (data.success == "url_fail") {
-            updateLog("❌ Error sending test notification to '" + data.url + "'");
-        } else if (data.success == "all") {
-            updateStatus(data.status, "success", false, false, "send")
-        } else if (data.success == "partial") {
-            updateStatus(data.status, data.severity, false, false, data.icon)
-        }
-    }
-});
 
 // Check incoming socket message is for this instance
 function validResponse(data, broadcast = false) {
@@ -178,12 +216,12 @@ function updateStatus(message, color = "info", sticky = false, spinner = false, 
 
     if (!statusEl) return;
 
-    // Check if message has timestamp
-    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\]/.test(message);
+    // Check if message has timestamp with milliseconds [00:00:00.000] to [23:59:59.999]
+    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}\]/.test(message);
 
     // Remove timestamp if present
     if (hasTimestamp) {
-        message = message.replace(/^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\]\s*/, '');
+        message = message.replace(/^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}\]\s*/, '');
     }
     
     // Update the message and color
@@ -257,13 +295,16 @@ socket.on("status_update", (data) => {
 function updateLog(message, color = null, artwork_title = null) {
     let statusElement = document.getElementById("scraping_log");
 
-    // Match [00:00:00] to [23:59:59] at the start
-    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\]/.test(message);
+    // Match [00:00:00.000] to [23:59:59] at the start
+    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}\]/.test(message);
 
     // Add timestamp if message doesn't already have one
     if (!hasTimestamp) {
         let timestamp = new Date().toLocaleTimeString("en-GB", { hour12: false });
         message = '[' + timestamp + '] ' + message;
+    } else {
+        // Remove timestamp milliseconds for consistency
+        message = message.replace(/^\[(\d{2}:\d{2}:\d{2})\.\d{3}\]/, '[$1]');
     }
 
     // Prepend the new message with timestamp
@@ -511,25 +552,30 @@ function saveConfig() {
     // Authentication settings
     save_config.auth_enabled = document.getElementById("auth_enabled").checked;
     save_config.auth_username = document.getElementById("auth_username").value.trim();
-    // Don't send password in save_config - it's handled separately
+    save_config.auth_password = document.getElementById("auth_password").value;
 
-    // Check if we need to set a new password
-    const newPassword = document.getElementById("auth_password").value;
-    if (save_config.auth_enabled && newPassword) {
-        // First set the password
-        socket.emit("set_password", {
-            instance_id: instanceId,
-            username: save_config.auth_username,
-            password: newPassword
-        });
-        // Clear the password field
-        document.getElementById("auth_password").value = "";
-
-        // Wait a moment then save config
-        setTimeout(() => {
+    // Process every possible condition of auth enable/disable and same/different username and password/no password provided
+    // If auth is enabled and a password is NOT provided
+    if (save_config.auth_enabled && !save_config.auth_password) {
+        // If the username provided is the same, proceed saving the configuration
+        if (save_config.auth_username === config.auth_username) {
             socket.emit("save_config", { instance_id: instanceId, config: save_config });
-        }, 500);
+        // If the username has changed and a password is not provided, don't proceed
+        } else if (save_config.auth_enabled != config.auth_username) {
+            socket.emit("display_message", { "instance_id": instanceId, "message": "🔴 Password must be provided", "level": "log" });
+            updateStatus("Password must be provided", "danger", false, false, "x-circle");
+        // Proceed saving the configuration with a new username/password combination
+        } else {
+            socket.emit("display_message", { "instance_id": instanceId, "message": "Changing username and providing password", "level": "log"});
+            socket.emit("save_config", { instance_id: instanceId, config: save_config });
+        }
+    } else if (save_config.auth_enabled && save_config.auth_password) {
+        // Clear the password fill and save the config
+        document.getElementById("auth_password").value = ""
+        socket.emit("save_config", { instance_id: instanceId, config: save_config })
     } else {
+        // If the auth cehckbox is off, proceed to disable authentication
+        document.getElementById("auth_username").value = ""
         socket.emit("save_config", { instance_id: instanceId, config: save_config });
     }
 
@@ -538,7 +584,7 @@ function saveConfig() {
         if (validResponse(data)) {
             if (data.saved) {
                 config = data.config;
-                updateStatus("Configuration saved", "success", false, false, "check-circle");
+                updateStatus("Configuration saved", "success", false, false, "check2-circle");
                 configureTabs(true);
             } else {
                 updateStatus("Configuration could not be saved", "danger", false, false, "x-circle");
@@ -790,7 +836,6 @@ function loadBulkFile(bulkImport = null) {
                     updateBulkSaveButtonState();
                     handleDefaultCheckbox();
                     updateSchedulerIcon();
-                    //                    updateStatus("Bulk import file '" + data.filename + "' was loaded","success", false, false, "check-circle")
                 } else {
                     updateStatus("Bulk import file could not be loaded","danger", false, false, "x-circle")
                 }
@@ -1117,7 +1162,7 @@ document.getElementById("delete_icon").addEventListener("click", function () {
 
     // Prevent deleting if the selected file is the default file
     if (filename === defaultBulkFile) {
-        alert("You cannot delete the default bulk file.");
+        updateStatus("You cannot delete the default bulk import file", "danger", false, false, "x-circle");
         return; // Exit the function if it's the default file
     }
 
@@ -1138,7 +1183,8 @@ document.getElementById("delete_icon").addEventListener("click", function () {
                         bulkTextAsLoaded = null
                         loadBulkFileList(); // Reload the file list if deleted
                         loadBulkFile(defaultBulkFile);
-                        updateBulkSaveButtonState()
+                        updateBulkSaveButtonState();
+                        socket.emit("delete_schedule", { instance_id: instanceId, "file": data.filename });
                     }
                 }
             });
@@ -1146,14 +1192,14 @@ document.getElementById("delete_icon").addEventListener("click", function () {
     }
 });
 
-// Function to handle uploading a bulk file
+// Function to handle creating a new bulk file
 document.getElementById("create_icon").addEventListener("click", function () {
     // Create a new bulk import file
     socket.emit("create_bulk_file", { instance_id: instanceId });
 
     socket.once("create_bulk_file", (data) => {
         if (data.created) {
-            updateStatus("New bulk file created: " + data.filename, "success", false, false, "check-circle");
+            updateStatus("Created " + data.filename, "success", false, false, "check2-circle");
             // Store the filename to load after refresh
             const newFilename = data.filename;
             // The backend will emit load_bulk_filelist, so we just need to handle it
@@ -1186,6 +1232,28 @@ document.getElementById("create_icon").addEventListener("click", function () {
     });
 });
 
+// Function to handle downloading the current bulk file
+document.getElementById("download_icon").addEventListener("click", function () {
+    const filename = currentBulkImport || document.getElementById("switch_bulk_file").value;
+    if (filename) {
+        downloadBulkImportFile(filename)
+    socket.emit("display_message", { "instance_id": instanceId, "message": `📥 ${filename} • File successfully downloaded`, "level": "log" });
+    updateStatus(filename + " successfully downloaded", "success", false, false, "check2-circle");
+    }
+});
+
+function downloadBulkImportFile(filename) {
+    const file = new Blob([document.getElementById("bulk_import_text").value], { type: 'text/plain' });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+
+// Function to handle uploading a bulk file
 document.getElementById("upload_icon").addEventListener("click", function () {
     document.getElementById("bulk_import_upload").value = "";
     document.getElementById("bulk_import_upload").click(); // Trigger file input click
@@ -1199,6 +1267,8 @@ function uploadBulkImportFile(event) {
 
         if (!file.name.endsWith('.txt')) {
             console.error("Invalid file type. Only .txt files are allowed.");
+            socket.emit("display_message", { "instance_id": instanceId, "message": "🚫 " + file.name + " • Invalid file type. Only .txt files are allowed.", "level": "log" });
+            updateStatus("Invalid file type. Only .txt files are allowed.", "danger", false, false, "x-circle");
             return;
         }
 
@@ -1277,6 +1347,7 @@ document.getElementById("default_bulk_file_icon").addEventListener("click", func
         // Disable the icon to prevent further changes
         this.classList.add("disabled");
 
+        socket.emit("display_message", { "instance_id": instanceId, "message": `✅ Default bulk import file set to '${selectedFile}'`, "level": "log" });
         // Save the configuration change
         saveConfig();
     }
@@ -1335,7 +1406,8 @@ function uploadFile(file) {
     const logTab = document.querySelector('#scraping-log-tab');
     bootstrap.Tab.getOrCreateInstance(logTab).show();
 
-    socket.emit("display_message", {"message": `Uploading '${file.name}'...`, "title": "uploadFile"});
+    socket.emit("display_message", { "instance_id": instanceId, "message": `Uploading '${file.name}'...`, "title": "uploadFile", "level": "debug" });
+    socket.emit("display_message", { "instance_id": instanceId, "message": `📤 ${file.name} • Upload initiated`, "level": "log" });
 
     const reader = new FileReader();
 
@@ -1378,7 +1450,8 @@ function uploadFile(file) {
                 const plex_year = document.getElementById("plex_year").value;
                 const plex_title = document.getElementById("plex_title").value;
 
-                socket.emit("display_message", {"message": `Successfully uploaded '${file.name}'`, "title": "uploadFile"});
+                //socket.emit("display_message", { "instance_id": instanceId, "message": `Successfully uploaded '${file.name}'`, "title": "uploadFile", "level": "debug" });
+                //socket.emit("display_message", { "instance_id": instanceId, "message": `✅️ ${file.name} • Upload completed successfully`, "level": "log" });
                 socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, options: options, filters: filters, plex_title: plex_title, plex_year: plex_year });
                 progress_bar(100, "Upload complete!");
 
@@ -1418,7 +1491,7 @@ function uploadFile(file) {
 
 socket.on("upload_progress", function (data) {
     if(validResponse(data)) {
-        progress_bar(data.progress);
+        progress_bar(data.progress, `${progress}%`);
     }
 });
 
@@ -1432,13 +1505,19 @@ socket.on("upload_complete", function (data) {
 // Scheduler
 // =====================
 
-    function updateOrAddSchedule(fileName, newTime, jobReference = null) {
-        const schedule = schedules.find(s => s.file === fileName);
-        if (schedule) {
-            schedule.time = newTime;
-            schedule.jobReference = jobReference;
+    function updateOrAddSchedule(fileName, newTime) {
+        if (newTime == null) {
+            // Remove this schedule form the list of schedules
+            schedules = schedules.filter(s => s.file !== fileName);
         } else {
-            schedules.push({ file: fileName, time: newTime });
+            const schedule = schedules.find(s => s.file === fileName);
+            if (schedule) {
+                // Update the existing schedule
+                schedule.time = newTime;
+            } else {
+                // Add the new schedule
+                schedules.push({ file: fileName, time: newTime });
+            }
         }
     }
 
@@ -1472,7 +1551,7 @@ socket.on("upload_complete", function (data) {
             socket.once("add_schedule", (data) => {
                 if (validResponse(data)) {
                     if (data.added) {
-                        updateOrAddSchedule(data.file, data.time, data.jobReference);
+                        updateOrAddSchedule(data.file, data.time);
                         updateSchedulerIcon();
                         timeSelectBox.classList.remove("show-tooltip");
                     }
@@ -1530,22 +1609,7 @@ socket.on("upload_complete", function (data) {
         return schedules.find(s => s.file === fileName);
     }
 
-// Check for update on page load
-socket.emit("check_for_update", { instance_id: instanceId});
 
-socket.on("update_available", function(data) {
-    if(validResponse(data)){
-        updateLog("🚨 Update available: " + data.version, "info");
-        document.getElementById("latest_version").innerText = data.version;
-        document.getElementById("version_notifier").classList.remove("d-none");
-        if (data.docker == "true") {
-            document.getElementById("docker_update_message").innerText = "Self-update is disabled in Docker. Please pull the lastet image manually.";
-        } else {
-            document.getElementById("docker_update_message").innerText = "";
-            document.getElementById("btnUpdate").classList.remove("d-none");
-        }
-    }
-});
 
 function updateApp() {
     document.getElementById("version_notifier").classList.add("d-none");
@@ -1598,6 +1662,7 @@ function toggleKometaSettings() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const kometaSettings = document.getElementById("kometa_settings");
     const kometaBase = document.getElementById("kometa_base");
+
     if (saveToKometa) {
         kometaSettings.style.display = "block";
         if (kometaBase) {
@@ -1689,25 +1754,8 @@ function togglePlexOptions() {
         trackArtworkIDs.style.display = "none";
         resetOverlay.style.display = "none";
         document.getElementById("track_artwork_ids").checked = true;
-    //    document.getElementById("reset_overlay").checked = false;
     }
 }
-
-function toggleDockerWarning() {
-    socket.emit("detect_docker", { instance_id: instanceId });
-}
-socket.on("docker_detected", (data) => {
-    const dockerWarning = document.getElementById("docker_warning");
-    if (validResponse(data)) {
-        if (data.docker == "true") {
-            updateLog("🐳 Docker detected")
-            dockerWarning.style.display = "block";
-        } else {
-            dockerWarning.style.display = "none";
-        }
-    }
-})
-
 
 // Add event listener for save_to_kometa checkbox
 document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);

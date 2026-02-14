@@ -128,7 +128,7 @@ class ArtworkProcessor:
                 processor.process_tv_artwork,
                 callbacks
             )
-        callbacks.on_log_update(f"✔️ {title} • {scraper.author} | Processing completed")
+        callbacks.on_log_update(f"✔️ {title} • {scraper.author} | {scraper.total - scraper.skipped} asset(s) processed • {callbacks.success_counter[0]} asset(s) updated")
         return title
 
     def _process_single_artwork(
@@ -240,7 +240,7 @@ class ArtworkProcessor:
             callbacks.on_progress_update(0, total_files)
 
         if callbacks and callbacks.on_log_update:
-            callbacks.on_log_update(f"⚙️ {title}{f' ({year})' if year else ''} • {author} | Obtained {total_files + skipped} asset(s) from uploaded {source} ZIP file.")
+            callbacks.on_log_update(f"⚙️ {title}{f' ({year})' if year else ''} • {author} | Obtained {total_files + skipped} asset(s) from uploaded {'MediUX' if source=="mediux" else 'TPDb'} ZIP file.")
             if skipped > 0:
                 callbacks.on_log_update(f"⏩ {title}{f' ({year})' if year else ''} • {author} | Skipping {skipped} asset(s) based on filters. Processing {total_files} asset(s).")
 
@@ -338,10 +338,18 @@ class ArtworkProcessor:
                         False,  # no spinner
                         False   # not sticky
                     )
-            os.remove(artwork['path'])  # Remove the temporary file after processing
+            try:
+                os.remove(artwork['path'])  # Remove the temporary file after processing
+                if callbacks and callbacks.on_debug:
+                    callbacks.on_debug(f"Deleted temporary file: {artwork['path']}", "process_uploaded_artwork")
+            except OSError as e:
+                if callbacks and callbacks.on_debug:
+                    callbacks.on_debug(f"Failed to delete temporary file: {artwork['path']} - {str(e)}", "process_uploaded_artwork")
+                pass
             try:
                 os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
-                callbacks.on_debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}", "process_uploaded_artwork")
+                if callbacks and callbacks.on_debug:
+                    callbacks.on_debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}", "process_uploaded_artwork")
             except OSError:
                 pass
         # Final progress update
