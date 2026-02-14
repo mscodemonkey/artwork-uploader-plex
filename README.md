@@ -127,7 +127,7 @@ Finally, if you're using the Kometa asset directory and you're running the scrip
 ```yaml
 services:
   artwork_uploader:
-    build: .
+    image: ghcr.io/mscodemonkey/artwork-uploader:latest
     container_name: artwork-uploader
     ports:
       - "4567:4567"

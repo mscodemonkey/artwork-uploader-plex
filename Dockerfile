@@ -25,4 +25,3 @@ VOLUME ["/artwork-uploader/bulk_imports"]
 
 # Run application
 ENTRYPOINT ["python", "artwork_uploader.py"]
-CMD ["--debug"]

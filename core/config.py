@@ -4,10 +4,12 @@ Application configuration management.
 
 import json
 import os
+from core import globals
 from typing import List, Dict, Any
 
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 from utils.notifications import debug_me
+from utils.utils import get_host_path
 
 
 class Config:
@@ -78,8 +80,12 @@ class Config:
             self.movie_library = config.get("movie_library", [])
             self.mediux_filters = config.get("mediux_filters", [])
             self.tpdb_filters = config.get("tpdb_filters", [])
-            self.kometa_base = config.get("kometa_base", "")
-            self.temp_dir = config.get("temp_dir", "")
+            if globals.docker:
+                self.kometa_base = get_host_path("/assets")
+                self.temp_dir = get_host_path("/temp")
+            else:
+                self.kometa_base = config.get("kometa_base", "")
+                self.temp_dir = config.get("temp_dir", "")
             self.save_to_kometa = config.get("save_to_kometa", False)
             self.stage_assets = config.get("stage_assets", True)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
@@ -115,6 +121,12 @@ class Config:
             "schedules": [],
             "apprise_urls": []
         }
+
+        if globals.docker:
+            host_kometa_base = get_host_path("/assets")
+            config_json["kometa_base"] = host_kometa_base if host_kometa_base != "(not defined)" else ""
+            host_temp_dir = get_host_path("/temp")
+            config_json["temp_dir"] = host_temp_dir if host_temp_dir != "(not defined)" else ""
 
         # Create the config.json file if it doesn't exist
         if not os.path.isfile(self.path):

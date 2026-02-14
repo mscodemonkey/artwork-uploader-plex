@@ -276,5 +276,26 @@ def get_path_parts(path: str) -> list:
     else:
         return PurePosixPath(path).parts
 
-
+def get_host_path(container_path: str) -> str:
+    """
+    Parses /proc/self/mountinfo to find the host path
+    corresponding to the given container path.
+    """
+    try:
+        with open("/proc/self/mountinfo", "r") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 5:
+                    continue
+                target = parts[4].strip()
+                if container_path == target:
+                    host_path = parts[3]
+                    if "path=" in line:
+                        drive=line.split("path=")[1].split(";")[0].rstrip('\\')
+                        full_path = f"{drive}{host_path}".replace("/", "\\")
+                        return full_path
+                    return host_path
+    except Exception as e:
+        debug_me(f"Error reading /proc/self/mountinfo: {e}", "get_host_path")
+    return "(not defined)"
 

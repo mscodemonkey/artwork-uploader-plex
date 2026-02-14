@@ -1,6 +1,4 @@
 from typing import Optional, Any
-from core import globals
-from pprint import pprint
 from core.config import Config
 from utils import soup_utils
 from utils import utils
@@ -98,24 +96,23 @@ class MediuxScraper:
 
             self.skipped = self.exclusions + self.filtered
 
-            if globals.debug:
-                if self.skipped > 0:
-                    debug_me(f"⏩ Skipped {self.skipped} assets(s) out of {self.total} based on exclusions ({self.exclusions}) or filters ({self.filtered}).", "MediuxScraper/scrape")
-                if self.collection_artwork:
-                    debug_me(f"✅ Included {len(self.collection_artwork)} collection asset(s) for {len({item['title'] for item in self.collection_artwork})} collection(s):", "MediuxScraper/scrape")
-                    print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                    pprint(self.collection_artwork)
-                    print(f"*************************************************************{ANSI_RESET}")
-                if self.movie_artwork:
-                    debug_me(f"✅ Included {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):","MediuxScraper/scrape")
-                    print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                    pprint(self.movie_artwork)
-                    print(f"*************************************************************{ANSI_RESET}")
-                if self.tv_artwork:
-                    debug_me(f"✅ Included {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):", "MediuxScraper/scrape")
-                    print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                    pprint(self.tv_artwork)
-                    print(f"*************************************************************{ANSI_RESET}")
+            if self.skipped > 0:
+                debug_me(f"⏩ Skipped {self.skipped} assets(s) out of {self.total} based on exclusions ({self.exclusions}) or filters ({self.filtered}).", "ThePosterDBScraper/scrape")
+            if self.collection_artwork:
+                debug_me(f"✅ Included {len(self.collection_artwork)} collection asset(s) for {len({item['title'] for item in self.collection_artwork})} collection(s):", "ThePosterDBScraper/scrape")
+                debug_me(f"*************************************************************")
+                debug_me(self.collection_artwork)
+                debug_me(f"*************************************************************")  
+            if self.movie_artwork:
+                debug_me(f"✅ Included {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):","ThePosterDBScraper/scrape")
+                debug_me(f"*************************************************************")
+                debug_me(self.movie_artwork)
+                debug_me(f"*************************************************************")
+            if self.tv_artwork:
+                debug_me(f"✅ Included {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):", "ThePosterDBScraper/scrape")
+                debug_me(f"*************************************************************")
+                debug_me(self.tv_artwork)
+                debug_me(f"*************************************************************")
 
             return
 

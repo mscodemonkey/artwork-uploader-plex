@@ -1,7 +1,5 @@
 import math
 from typing import Optional, Any
-from pprint import pprint
-from core import globals
 
 from processors import media_metadata
 from utils import soup_utils
@@ -72,29 +70,6 @@ class ThePosterDBScraper:
                 # Get the standard set of posters on the TPDb page
                 self.scrape_posters(self.soup)
 
-                self.skipped = self.exclusions + self.filtered
-
-                self.total = len(self.movie_artwork) + len(self.tv_artwork) + len(self.collection_artwork) + self.skipped
-
-                if globals.debug:
-                    if self.skipped > 0:
-                        debug_me(f"⏩ Skipped {self.skipped} assets(s) out of {self.total} based on exclusions ({self.exclusions}) or filters ({self.filtered}).", "ThePosterDBScraper/scrape")
-                    if self.collection_artwork:
-                        debug_me(f"✅ Included {len(self.collection_artwork)} collection asset(s) for {len({item["title"] for item in self.collection_artwork})} collection(s):", "ThePosterDBScraper/scrape")
-                        print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                        pprint(self.collection_artwork)
-                        print(f"*************************************************************{ANSI_RESET}")  
-                    if self.movie_artwork:
-                        debug_me(f"✅ Included {len(self.movie_artwork)} movie asset(s) for {len({item["title"] for item in self.movie_artwork})} movie(s):","ThePosterDBScraper/scrape")
-                        print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                        pprint(self.movie_artwork)
-                        print(f"*************************************************************{ANSI_RESET}")
-                    if self.tv_artwork:
-                        debug_me(f"✅ Included {len(self.tv_artwork)} TV show asset(s) for {len({item["title"] for item in self.tv_artwork})} TV show(s):", "ThePosterDBScraper/scrape")
-                        print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('success').get('ansi')}*************************************************************")
-                        pprint(self.tv_artwork)
-                        print(f"*************************************************************{ANSI_RESET}")
-
                 # Get the additional posters if required
                 if self.options.add_posters:
                     self.scrape_additional_posters()
@@ -102,6 +77,28 @@ class ThePosterDBScraper:
                 # Get the additional sets if required
                 if self.options.add_sets:
                     self.scrape_additional_sets()
+
+                self.skipped = self.exclusions + self.filtered
+
+                self.total = len(self.movie_artwork) + len(self.tv_artwork) + len(self.collection_artwork) + self.skipped
+
+                if self.skipped > 0:
+                    debug_me(f"⏩ Skipped {self.skipped} assets(s) out of {self.total} based on exclusions ({self.exclusions}) or filters ({self.filtered}).", "ThePosterDBScraper/scrape")
+                if self.collection_artwork:
+                    debug_me(f"✅ Included {len(self.collection_artwork)} collection asset(s) for {len({item['title'] for item in self.collection_artwork})} collection(s):", "ThePosterDBScraper/scrape")
+                    debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
+                    debug_me(self.collection_artwork)
+                    debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")  
+                if self.movie_artwork:
+                    debug_me(f"✅ Included {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):","ThePosterDBScraper/scrape")
+                    debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
+                    debug_me(self.movie_artwork)
+                    debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
+                if self.tv_artwork:
+                    debug_me(f"✅ Included {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):", "ThePosterDBScraper/scrape")
+                    debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
+                    debug_me(self.tv_artwork)
+                    debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
 
                 return
 
@@ -263,7 +260,7 @@ class ThePosterDBScraper:
         Returns:
 
         """
-        debug_me("⚲ Looking for additional posters...")
+        debug_me("Looking for additional posters...", "ThePosterDBScraper/scrape_additional_posters")
         poster_div = self.soup.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')[-1]
         mt4s = self.soup.find('main').find_all('div', class_='mt-4')
 
@@ -275,7 +272,7 @@ class ThePosterDBScraper:
 
     def scrape_additional_sets(self) -> None:
 
-        debug_me("⚲ Looking for additional sets...")
+        debug_me("Looking for additional sets...", "ThePosterDBScraper/scrape_additional_sets")
         mt4s = self.soup.find('main').find_all('div', class_='mt-4')
 
         for mt4 in mt4s:
