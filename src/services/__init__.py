@@ -11,13 +11,15 @@ from .bulk_file_service import BulkFileService
 from .image_service import ImageService
 from .scheduler_service import SchedulerService
 from .utility_service import UtilityService
+from .notify_service import NotifyService
 
 __all__ = [
+    'ArtworkProcessor',
     'BulkFileService',
     'ImageService',
-    'ArtworkProcessor',
     'ProcessingCallbacks',
     'SchedulerService',
     'UtilityService',
-    'AuthenticationService'
+    'AuthenticationService',
+    'NotifyService'
 ]

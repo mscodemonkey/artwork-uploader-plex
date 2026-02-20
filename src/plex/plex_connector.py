@@ -261,6 +261,13 @@ class PlexConnector:
                 if year is not None:
                     search_kwargs['year'] = year
                 search_results = library.search(**search_kwargs)
+                if not search_results and year is not None:
+                    # Retry with +1/-1 year if no results found
+                    for adjusted_year in (int(year) - 1, int(year) + 1):
+                        search_kwargs['year'] = adjusted_year
+                        search_results = library.search(**search_kwargs)
+                        if search_results:
+                            break
                 if search_results:
                     tmdb_id: Optional[int] = None
                     result = search_results[0]

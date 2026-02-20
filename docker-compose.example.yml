@@ -1,0 +1,27 @@
+services:
+  artwork_uploader:
+    build:
+      context: .
+    container_name: artwork-uploader
+    ports:
+      - "4567:4567"
+    volumes:
+      # Bulk imports: now at /bulk_imports in container
+      - ./bulk_imports:/bulk_imports:rw
+      # Config: now at /config/config.json in container
+      - ./config.json:/config/config.json:rw
+      # Logs
+      - ./logs:/logs:rw
+    environment:
+      - TZ=America/Los_Angeles
+      - PYTHONUNBUFFERED=1
+      - RUNNING_IN_DOCKER=1
+      # User/Group IDs: Change to match your host user (run 'id -u' and 'id -g' to find yours)
+      - PUID=1027
+      - PGID=1027
+
+      # Optional: override default paths
+      # - BULK_IMPORTS_DIR=/custom/bulk_imports
+      # - CONFIG_PATH=/config/config.json
+      # - LOGS_DIR=/custom/logs
+    restart: unless-stopped

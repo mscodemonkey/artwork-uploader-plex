@@ -27,6 +27,7 @@ class SchedulerService:
         self.scheduler_thread: Optional[threading.Thread] = None
         self.scheduled_jobs: Dict[str, schedule.Job] = {}
         self.scheduled_jobs_by_file: Dict[str, str] = {}
+        self.run_times_by_file: Dict [str, str] = {}
         self.is_running = False
 
     def add_schedule(
@@ -57,6 +58,7 @@ class SchedulerService:
         # Store job references
         self.scheduled_jobs[job_id] = job
         self.scheduled_jobs_by_file[filename] = job_id
+        self.run_times_by_file[filename] = schedule_time
 
         return job_id
 

@@ -2,11 +2,11 @@
 # Artwork Uploader for Plex 
 Adapted from a fork of plex-poster-set-helper by Brian Brown
 
-Artwork Uploader is a tool to help upload sets of posters from ThePosterDB or MediUX (including sets and boxsets) or scrape posters from MediUX and upload them to your Plex server in seconds!
+Artwork Uploader is a tool to help process sets of posters from ThePosterDB or MediUX (including sets and boxsets) and upload them to your Plex server or download them to your Kometa aset directory in seconds!
 
 # What's different from Brian's original app?
 ### Upload Zip files
-You can upload the Zip file you download from theposterdb.com or mediux.pro.  It should handle all types of Zip, including the odd misnamed file from MediUX.  This feature is still in Beta so help me out with some feedback here!
+You can upload the Zip file you download from theposterdb.com or mediux.pro.  It should handle all types of Zip, including the odd misnamed file from MediUX.  This feature is still in Beta so help out with some feedback here!
 This is also to keep theposterdb happy that we're not breaking their terms of service by scraping.
 
 ### Artwork tracking for speedy updates
@@ -19,10 +19,10 @@ If you really want to upload artwork again, use the ```--force``` option at the 
 There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.  This is against the terms of service of theposterdb.com so we encourage you to login, download the files you want, and upload them using this tool, rather than scraping.  Once an API is available we'll switch over ASAP.
 
 ### Per-URL filtering and artwork excludes 
-And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it.
+And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it. You can also exclude entire seasons or individual espisode, that way the app doesn't have to provess all the previous seasons for whic you already have artwork applied.
 
 ### Kometa support
-Kometa can be supported in two different ways. The simplest way is for the script to reset Kometa's overlay label so the next time Kometa runs the overlay gets added to the new artwork (`reset_overlay` set to `true` in config.json). Alternatively, if you're using Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) to manage all your Plex custom art, you can check the option to save the artwork to the Kometa asset directory instead of applying it direectly to Plex (either in the GUI or by setting `save_to_kometa` to `true` in the config.json file). In that case, whenever Kometa runs again it will apply all new or updated artwork with its corresponding overlays. If this option is enabled, you will have to set the Kometa base directory (`kometa_base` in the config file, or with the appropriate text field in the GUI) to the base asset directory.
+Kometa support is offered in two different ways. The simple way is for the script to reset Kometa's overlay label so the next time Kometa runs the overlay gets added to the new artwork (`reset_overlay` set to `true` in config.json). Alternatively, if you're using Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) to manage all your Plex custom art, you can check the option to save the artwork to the Kometa asset directory instead of applying it direectly to Plex (either in the GUI or by setting `save_to_kometa` to `true` in the config.json file). In that case, whenever Kometa runs again it will apply all new or updated artwork with its corresponding overlays. If this option is enabled, you will have to set the Kometa base directory (`kometa_base` in the config file, or with the appropriate text field in the GUI) to the base asset directory.
 
 Kometa asset directory support works on the following assumptions:
 
@@ -127,18 +127,17 @@ Finally, if you're using the Kometa asset directory and you're running the scrip
 ```yaml
 services:
   artwork_uploader:
-    build: .
+    image: ghcr.io/mscodemonkey/artwork-uploader:latest
     container_name: artwork-uploader
     ports:
       - "4567:4567"
     volumes:
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
-      - ./config.json:/artwork-uploader/config.json:rw
-      - C:\Users\<USERNAME>\Kometa\config\assets:/assets:rw
-      - C:\Temp\assets:/temp:rw
+      - ./config:/artwork-uploader/config:rw
+      - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw
+      - <HOST_TEMP_PATH>:/temp:rw
     environment:
       - TZ=Etc/UTC
-      - PYTHONUNBUFFERED=1
       - RUNNING_IN_DOCKER=1
       - PUID=1000  # Optional: Change to your user ID (run 'id -u')
       - PGID=1000  # Optional: Change to your group ID (run 'id -g')
@@ -154,13 +153,14 @@ Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you
 ### Web UI
 Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
 
-
-### Scheduler
+### Scheduler with Apprise notifications
 Basic scheduler, so that you can leave this running and update all your artwork every day. 
 
 The basic version is available now on the bulk imports page, click on the clock to enable or disable per file.  
 
 It's there for when we have API access (and works for scrapers in the meantime) but is limited to running once a day which should be fine.
+
+Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the ```apprise_urls``` variable in the ```config.json```file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
 
 ## Coming soon
 - API integration with MediUX so we don't need to scrape any more.  I've been in contact with them to get access to the API as soon as it's launched.
@@ -169,7 +169,7 @@ It's there for when we have API access (and works for scrapers in the meantime) 
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!  I really hope you don't mind me taking your work and running with it, please get in touch if you'd like to merge the two projects!
 
 ## Disclaimer
-This is a first project for me, i'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that scraping breaks the terms of service of TPDb so please consider using the upload Zip feature from there.  Wish these sites had APIs!
+This is a first project for me, I'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that scraping breaks the terms of service of TPDb so please consider using the upload Zip feature from there.  Wish these sites had APIs!
 
 ## For Developers
 If you're interested in contributing to this project or want to understand how it works under the hood, check out the [Technical Information for Contributors](TECHNICAL_INFO.md) which includes:
@@ -199,13 +199,13 @@ Then CD to the folder where you extracted Artwork Uploader
 
 You may need to use ```python3 -m pip install -r requirements.txt```
 
-### 5. Rename ```example_config.json``` to ```config.json```.  
+### 5. Rename ```example_config.json``` to ```config.json``` inside the ```/config``` directory.  
 This is optional - if you don't do this, a new config.json will be created when you first run the utility and you'll be prompted to edit the config.
 
 ### 6. Edit your config.json to provide the following information:  
 
 ```"base_url"```  
-- The IP address (and port) of your Plex server. e.g. "http://12.34.56.78:32400/".
+- The IP address (and port) of your Plex server. e.g. "http://12.34.56.78:32400/" or https://myplex.example.com if behind a reverse proxy like Nginx or Caddy.
 
 ```"token"```  
 - Your Plex token (can be found [here](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)).
@@ -247,8 +247,11 @@ This is optional - if you don't do this, a new config.json will be created when 
 ```"stage_assets"```
 - Set to ```true``` to download assets for TV show seasons and episodes not yet available in Plex. This can be useful if the scheduled run happens before a particular season or episode is downloaded by your automation. This feature does not apply to the Specials season (Seaon 0).
 
+```"apprise_urls"```
+- Provide a comma-separated list of Apprise service URLs to send notifications upong completion of scheduled bulk imports. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
+
 ### Filter options
-Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]
+Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]. TPDb does not provide title cards or backgrounds so these filters are not available in the web UI.
       - show_cover
       - background
       - season_cover
@@ -288,11 +291,10 @@ services:
     volumes:
       - ./bulk_imports:/bulk_imports:rw
       - ./config.json:/config/config.json:rw
-      - C:\Users\<USERNAME>\Kometa\config\assets:/assets:rw # Optional, only if you want to save the assets locally to your Kometa asset directory
-      - C:\Temp\assets:/temp:rw # Optional, only if you're saving assets locally and want to have a temp dir for testing purposes
+      - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw # Optional, only if you want to save the assets locally to your Kometa asset directory
+      - <HOST_TEMP_PATH>:/temp:rw # Optional, only if you're saving assets locally and want to have a temp dir for testing purposes
     environment:
-      - TZ=Etc/UTC
-      - PYTHONUNBUFFERED=1
+      - TZ=Europe/London
       - RUNNING_IN_DOCKER=1
       - PUID=1000  # Change to your user ID (run 'id -u')
       - PGID=1000  # Change to your group ID (run 'id -g')
@@ -305,6 +307,8 @@ And run
 ```bash
 docker compose up -d
 ```
+
+Open a web browser and point it to `http://your_ip_address:4567` and you're ready to rock and roll! 
 
 ## Directly as a python script
 
@@ -365,9 +369,9 @@ The script supports various command-line arguments for flexible use.
 - ThePosterDB is a number
 - MediUX is a UUID
 - For TV shows, you can also exclude specific episodes or entire seasons:
-  - ```--exclude s01e05``` - Excludes season 1 episode 5
+  - ```--exclude s01e05``` - Excludes the title card for season 1 episode 5
   - ```--exclude s1e5``` - Same as above (both formats work)
-  - ```--exclude s02``` - Excludes all episodes in season 2
+  - ```--exclude s02``` - Excludes season cover and all episode title cards for season 2
   - ```--exclude s00e01 s02``` - Excludes specials episode 1 and all of season 2
   - You can mix artwork IDs and episode/season patterns in the same command
     
@@ -498,6 +502,8 @@ If you see errors like this in your logs:
 
 Flask correctly rejects these with a 400 error since it doesn't support HTTPS by default. You can safely ignore these messages - they don't affect functionality.
 
+If you want to access the app over HTTPS you can use a reverse proxy like Nginx or Caddy.
+
 ### "eventlet monkey_patch" errors
 
 If you see errors related to eventlet on Python 3.13, consider using Python 3.11 or 3.12 instead, as eventlet has known compatibility issues with Python 3.13.
@@ -579,11 +585,13 @@ until you fix the Plex connection in Settings.
 ## Web UI
 It's still work in progress, as is this entire app!  I wouldn't consider it "production" ready but it's fully functional!
 
-![Settings](assets/settings.png)
-![Bulk Import](assets/web_bulk_import.png)
+![Settings](assets/config-tab.png)
+![Bulk Import](assets/bulk-tab.png)
 ![Processing](assets/processing.png)
-![Scraper](assets/url_scraper.png)
-![Session Log](assets/session_log.png)
+![Scraper](assets/scraper-tab.png)
+![Upload ZIP](assets/upload-tab.png)
+![Log](assets/log-tab.png)
+![About](assets/about-tab.png)
 
 
 ## Multiple Libraries

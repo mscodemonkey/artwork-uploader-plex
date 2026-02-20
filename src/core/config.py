@@ -4,11 +4,13 @@ Application configuration management.
 
 import json
 import os
+from core import globals
 from typing import List, Dict, Any
 
 from core.constants import DEFAULT_CONFIG_PATH, DEFAULT_BULK_IMPORT_FILE, DEFAULT_TV_LIBRARY, DEFAULT_MOVIE_LIBRARY, DEFAULT_IP_BINDING
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 from logging_config import get_logger
+from utils.utils import get_host_path
 
 logger = get_logger(__name__)
 
@@ -42,6 +44,7 @@ class Config:
         ip_binding: IP binding mode - "auto" (default), "ipv4", or "ipv6"
         debug: Enable debug logging
         kometa_library_paths: Dictionary mapping Plex library names to Kometa directory names
+        apprise_urls: List of Apprise notification URLs
     """
 
     def __init__(self, config_path: str = DEFAULT_CONFIG_PATH) -> None:
@@ -53,10 +56,10 @@ class Config:
         self.movie_library: List[str] = DEFAULT_MOVIE_LIBRARY
         self.mediux_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster",
                                           "collection_poster"]
-        self.tpdb_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster",
+        self.tpdb_filters: List[str] = ["season_cover", "show_cover", "movie_poster",
                                         "collection_poster"]
-        self.kometa_base: str = "C:\\Temp\\assets"
-        self.temp_dir: str = "C:\\Temp\\assets\\temp"
+        self.kometa_base: str = ""
+        self.temp_dir: str = ""
         self.save_to_kometa: bool = False
         self.stage_assets: bool = True
         self.stage_specials: bool = False
@@ -71,6 +74,7 @@ class Config:
         self.ip_binding: str = DEFAULT_IP_BINDING
         self.debug: bool = False
         self.kometa_library_paths: Dict[str, str] = {}
+        self.apprise_urls: List[str] = []
 
     def load(self) -> None:
         """Load the configuration from the JSON file."""
@@ -97,8 +101,12 @@ class Config:
             self.movie_library = config.get("movie_library", [])
             self.mediux_filters = config.get("mediux_filters", [])
             self.tpdb_filters = config.get("tpdb_filters", [])
-            self.kometa_base = config.get("kometa_base", "")
-            self.temp_dir = config.get("temp_dir", "")
+            if globals.docker:
+                self.kometa_base = get_host_path("/assets")
+                self.temp_dir = get_host_path("/temp")
+            else:
+                self.kometa_base = config.get("kometa_base", "")
+                self.temp_dir = config.get("temp_dir", "")
             self.save_to_kometa = config.get("save_to_kometa", False)
             self.stage_assets = config.get("stage_assets", True)
             self.stage_specials = config.get("stage_specials", False)
@@ -115,6 +123,7 @@ class Config:
             self.ip_binding = config.get("ip_binding", DEFAULT_IP_BINDING)
             self.debug = config.get("debug", False)
             self.kometa_library_paths = config.get("kometa_library_paths", {})
+            self.apprise_urls = config.get("apprise_urls", [])
 
         except Exception as e:
             raise ConfigLoadError(
@@ -137,7 +146,7 @@ class Config:
             "movie_library": ["Movies"],
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster",
                                "collection_poster"],
-            "tpdb_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster",
+            "tpdb_filters": ["season_cover", "show_cover", "movie_poster",
                              "collection_poster"],
             "kometa_base": "",
             "temp_dir": "",
@@ -150,8 +159,15 @@ class Config:
             "reset_overlay": False,
             "schedules": [],
             "debug": False,
-            "kometa_library_paths": {}
+            "kometa_library_paths": {},
+            "apprise_urls": []
         }
+
+        if globals.docker:
+            host_kometa_base = get_host_path("/assets")
+            config_json["kometa_base"] = host_kometa_base if host_kometa_base != "(not defined)" else ""
+            host_temp_dir = get_host_path("/temp")
+            config_json["temp_dir"] = host_temp_dir if host_temp_dir != "(not defined)" else ""
 
         # Create the config.json file if it doesn't exist
         if not os.path.isfile(self.path):
@@ -206,7 +222,8 @@ class Config:
             "auth_password_hash": self.auth_password_hash,
             "ip_binding": self.ip_binding,
             "debug": self.debug,
-            "kometa_library_paths": self.kometa_library_paths
+            "kometa_library_paths": self.kometa_library_paths,
+            "apprise_urls": self.apprise_urls
         }
 
         try:

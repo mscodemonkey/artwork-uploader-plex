@@ -11,9 +11,11 @@ let barTimer = null;            // Timer for progress bar
 
 const socket = io();
 const instanceId = getInstanceId();
-
+const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
 const CHUNK_SIZE = 1024 * 64; // 64 KB per chunk for uploads
 
+const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
 
 // UI References
 const scrapeUrlInput = document.getElementById("scrape_url");
@@ -32,6 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
     loadConfig()
     toggleThePosterDBElements();
+    detectEnvironment();
 });
 
 // Specific event listeners
@@ -40,10 +43,94 @@ document.getElementById("bulk_import_text").addEventListener("input", updateBulk
 document.getElementById("scraper-filters-global").addEventListener("change", inheritGlobalFiltersForScraper);
 document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
 document.getElementById("btnUpdate").addEventListener("click", updateApp);
+document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
+document.getElementById("test_plex_btn").addEventListener("click", testPlexConnect);
+document.getElementById("debug-mode").addEventListener("change", function() {
+    socket.emit("debug_mode", { instance_id: instanceId, action: "toggle" });
+});
 
 // ==================================================
 // General helper functions
 // ==================================================
+
+function detectEnvironment() {
+    socket.emit("detect_docker", { instance_id: instanceId });
+    socket.emit("debug_mode", { instance_id: instanceId, action: "get" });
+}
+
+socket.on("debug_mode", function(data) {
+    if (validResponse(data)) {
+        // Set the correct state of the debug mode toggle based on the backend value
+        document.getElementById("debug-mode").checked = data.debug;
+    }
+});
+
+function toggleDockerWarning() {
+    socket.emit("detect_docker", { instance_id: instanceId });
+}
+socket.on("docker_detected", (data) => {
+    const dockerWarning = document.getElementById("docker_warning");
+    const kometaBase = document.getElementById("kometa_base");
+    const tempDir = document.getElementById("temp_dir");
+    const saveToKometaCheckbox = document.getElementById("save_to_kometa");
+    const optionTemp = document.getElementById("option-temp");
+    const uploadOptionTemp = document.getElementById("upload-option-temp");
+
+    if (validResponse(data)) {
+        if (data.docker == "true") {
+            // If not Kometa asset directory has been bind mounted to the container /asset path, disable the
+            // ability to turn on saving to Kometa asset directory
+            if (data.kometa_base == "(not defined)") {
+                saveToKometaCheckbox.disabled = true;
+                saveToKometaCheckbox.checked = false;
+                toggleKometaSettings();
+                dockerWarning.innerHTML = '<i class="bi bi-exclamation-triangle"></i>&ensp;Kometa base path not defined in <span class="text-nowrap"><code>docker-compose.yml</code></span>. Saving assets to Kometa asset directory is not available.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+                dockerWarning.classList.add("alert-danger");
+            }
+            dockerWarning.style.display = "block";
+            kometaBase.disabled = true;
+            kometaBase.value = data.kometa_base; // Set to host path detected by backend
+            tempDir.disabled = true;
+            tempDir.value = data.temp_dir; // Set to host path detected by backend
+            // If no host path ha been bound to the container /temp path, disable the ability to use a temp dir
+            if (data.temp_dir == "(not defined)") {
+                optionTemp.checked = false;
+                optionTemp.parentElement.classList.add("d-none");
+                uploadOptionTemp.checked = false;
+                uploadOptionTemp.parentElement.classList.add("d-none");
+            }
+        } else {
+            dockerWarning.style.display = "none";
+        }
+    }
+})
+
+// Test connection to Plex server
+function testPlexConnect() {
+    baseUrl = document.getElementById("plex_base_url").value
+    token = document.getElementById("plex_token").value
+    tvLibraries = document.getElementById("tv_library").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values
+    movieLibraries = document.getElementById("movie_library").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values
+    socket.emit("test_plex_connect", { instance_id: instanceId, url: baseUrl, token: token, tv_libs: tvLibraries, movie_libs: movieLibraries });
+}
+
+// Send test notification
+function testNotifications() {
+    urls = document.getElementById("apprise_urls").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values
+    if (urls.length == 0) {
+        updateStatus("Set at least one notification URL", "warning", false, false, "exclamation-triangle")
+    } else {
+        socket.emit("test_notifications", { instance_id: instanceId, urls: urls });
+    }}
 
 // Check incoming socket message is for this instance
 function validResponse(data, broadcast = false) {
@@ -107,11 +194,18 @@ function updateStatus(message, color = "info", sticky = false, spinner = false, 
 
     if (!statusEl) return;
 
+    // Check if message has timestamp with milliseconds [00:00:00.000] to [23:59:59.999]
+    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}\]/.test(message);
+
+    // Remove timestamp if present
+    if (hasTimestamp) {
+        message = message.replace(/^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}\]\s*/, '');
+    }
+
     // Update the message and color
     messageEl.innerHTML = message;
 
     // If the passed color is not valid, default to 'info'
-    const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
     if (!bootstrapColors.includes(color)) {
         color = 'info';
     }
@@ -179,11 +273,20 @@ socket.on("status_update", (data) => {
 function updateLog(message, color = null, artwork_title = null) {
     let statusElement = document.getElementById("scraping_log");
 
-    // Get current timestamp
-    let timestamp = new Date().toLocaleTimeString("en-GB", {hour12: false});
+    // Match [00:00:00.000] to [23:59:59] at the start
+    const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}\]/.test(message);
+
+    // Add timestamp if message doesn't already have one
+    if (!hasTimestamp) {
+        let timestamp = new Date().toLocaleTimeString("en-GB", { hour12: false });
+        message = '[' + timestamp + '] ' + message;
+    } else {
+        // Remove timestamp milliseconds for consistency
+        message = message.replace(/^\[(\d{2}:\d{2}:\d{2})\.\d{3}\]/, '[$1]');
+    }
 
     // Prepend the new message with timestamp
-    statusElement.innerHTML = '<div class="log_message">[' + timestamp + '] ' + message + '</div>' + statusElement.innerHTML;
+    statusElement.innerHTML = '<div class="log_message">' + message + '</div>' + statusElement.innerHTML;
 }
 
 socket.on("log_update", (data) => {
@@ -402,6 +505,12 @@ function saveConfig() {
 
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
 
+    // Convert comma-separated Apprise URLs to array
+    save_config.apprise_urls = document.getElementById("apprise_urls").value
+        .split(",")
+        .map(item => item.trim())
+        .filter(item => item !== ""); // Remove empty values
+
     // Convert comma-separated library inputs to arrays
     save_config.tv_library = document.getElementById("tv_library").value
         .split(",")
@@ -518,6 +627,7 @@ function loadConfig() {
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
+            document.getElementById("apprise_urls").value = (data.config.apprise_urls || []).join(", ");
 
             // Load authentication settings
             document.getElementById("auth_enabled").checked = data.config.auth_enabled || false;
@@ -666,6 +776,7 @@ function toggleThePosterDBElements() {
 
     const url = urlInput.value;
     const elements = document.querySelectorAll(".theposterdb");
+    const filts = document.querySelectorAll('[id^="tpdb-');
 
     // Define the regex pattern from the input
     const pattern = /^https:\/\/theposterdb\.com\/set\/\d+$/;
@@ -673,6 +784,7 @@ function toggleThePosterDBElements() {
     // Validate the URL before showing elements
     if (pattern.test(url)) {
         elements.forEach(el => el.style.display = "block");
+        filts.forEach(filt => filt.style.display = "none");
     } else {
         elements.forEach(el => {
             el.style.display = "none";
@@ -681,6 +793,7 @@ function toggleThePosterDBElements() {
                 checkbox.checked = false;
             });
         });
+        filts.forEach(filt => filt.style.display = "block");
     }
 
 }
@@ -1134,6 +1247,26 @@ document.getElementById("create_icon").addEventListener("click", function () {
     });
 });
 
+// Function to handle downloading the current bulk file
+document.getElementById("download_icon").addEventListener("click", function () {
+    const filename = currentBulkImport || document.getElementById("switch_bulk_file").value;
+    if (filename) {
+        downloadBulkImportFile(filename)
+    socket.emit("display_message", { "instance_id": instanceId, "message": `📥 ${filename} • File successfully downloaded`, "level": "log" });
+    updateStatus(filename + " successfully downloaded", "success", false, false, "check-circle");
+    }
+});
+
+function downloadBulkImportFile(filename) {
+    const file = new Blob([document.getElementById("bulk_import_text").value], { type: 'text/plain' });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(file);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
 document.getElementById("upload_icon").addEventListener("click", function () {
     document.getElementById("bulk_import_upload").value = "";
     document.getElementById("bulk_import_upload").click(); // Trigger file input click
@@ -1485,17 +1618,6 @@ function updateSchedulerIcon() {
 function getScheduleDetails(fileName) {
     return schedules.find(s => s.file === fileName);
 }
-
-// Check for update on page load
-socket.emit("check_for_update", {instance_id: instanceId});
-
-socket.on("update_available", function (data) {
-    if (validResponse(data)) {
-        updateLog("Update available: " + data.version, "info");
-        document.getElementById("latest_version").innerText = data.version;
-        document.getElementById("version_notifier").style.display = "block";
-    }
-});
 
 function updateApp() {
     document.getElementById("version_notifier").style.display = "none";

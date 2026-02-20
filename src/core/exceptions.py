@@ -109,3 +109,18 @@ class NotProcessedByFilter(UploadError):
 class NotProcessedByExclusion(UploadError):
     """An item was not uploaded due to an exclusion being applied."""
     pass
+
+# ============================================================================
+# Parsing errors
+# ============================================================================
+
+class ParseError(ArtworkUploaderException):
+    """Base class for URL parsing errors"""
+    def __init__(self, message:str) -> None:
+        super().__init__(message)
+
+class InvalidUrl (ParseError):
+    pass
+
+class InvalidFlag (ParseError):
+    pass
