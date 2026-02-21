@@ -35,18 +35,18 @@ document.addEventListener("DOMContentLoaded", function () {
     loadConfig()
     toggleThePosterDBElements();
     detectEnvironment();
-});
 
-// Specific event listeners
-document.getElementById("switch_bulk_file").addEventListener("change", bulkFileSwitched);
-document.getElementById("bulk_import_text").addEventListener("input", updateBulkSaveButtonState);
-document.getElementById("scraper-filters-global").addEventListener("change", inheritGlobalFiltersForScraper);
-document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
-document.getElementById("btnUpdate").addEventListener("click", updateApp);
-document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
-document.getElementById("test_plex_btn").addEventListener("click", testPlexConnect);
-document.getElementById("debug-mode").addEventListener("change", function() {
-    socket.emit("debug_mode", { instance_id: instanceId, action: "toggle" });
+    // Specific event listeners
+    document.getElementById("switch_bulk_file").addEventListener("change", bulkFileSwitched);
+    document.getElementById("bulk_import_text").addEventListener("input", updateBulkSaveButtonState);
+    document.getElementById("scraper-filters-global").addEventListener("change", inheritGlobalFiltersForScraper);
+    document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
+    document.getElementById("btnUpdate").addEventListener("click", updateApp);
+    document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
+    document.getElementById("test_plex_btn").addEventListener("click", testPlexConnect);
+    document.getElementById("debug-mode").addEventListener("change", function() {
+        socket.emit("debug_mode", { instance_id: instanceId, action: "toggle" });
+    });
 });
 
 // ==================================================

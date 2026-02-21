@@ -1,0 +1,2 @@
+## This is a blank bulk import file
+// You can use comments with # or // like this
