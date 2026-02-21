@@ -78,26 +78,13 @@ socket.on("docker_detected", (data) => {
 
     if (validResponse(data)) {
         if (data.docker == "true") {
-            // If not Kometa asset directory has been bind mounted to the container /asset path, disable the
-            // ability to turn on saving to Kometa asset directory
-            if (data.kometa_base == "(not defined)") {
-                saveToKometaCheckbox.disabled = true;
-                saveToKometaCheckbox.checked = false;
-                toggleKometaSettings();
-                dockerWarning.innerHTML = '<i class="bi bi-exclamation-triangle"></i>&ensp;Kometa base path not defined in <span class="text-nowrap"><code>docker-compose.yml</code></span>. Saving assets to Kometa asset directory is not available.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
-                dockerWarning.classList.add("alert-danger");
-            }
             dockerWarning.style.display = "block";
-            kometaBase.disabled = true;
-            kometaBase.value = data.kometa_base; // Set to host path detected by backend
-            tempDir.disabled = true;
-            tempDir.value = data.temp_dir; // Set to host path detected by backend
-            // If no host path ha been bound to the container /temp path, disable the ability to use a temp dir
-            if (data.temp_dir == "(not defined)") {
-                optionTemp.checked = false;
-                optionTemp.parentElement.classList.add("d-none");
-                uploadOptionTemp.checked = false;
-                uploadOptionTemp.parentElement.classList.add("d-none");
+            // Populate fields from config values (editable, not locked)
+            if (data.kometa_base) {
+                kometaBase.value = data.kometa_base;
+            }
+            if (data.temp_dir) {
+                tempDir.value = data.temp_dir;
             }
         } else {
             dockerWarning.style.display = "none";

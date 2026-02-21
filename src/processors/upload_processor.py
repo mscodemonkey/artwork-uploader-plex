@@ -28,7 +28,6 @@ class UploadProcessor:
         self.options: Options = Options()
         self.config: Config = Config()
         self.config.load()
-        self.docker: bool = os.getenv("RUNNING_IN_DOCKER") == "1"
         self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
         self.staging: bool = self.kometa and (
             globals.config.stage_assets or self.options.stage)
@@ -397,10 +396,7 @@ class UploadProcessor:
 
     def _get_kometa_dest_dir(self, library: str, asset_folder: str) -> str:
         """Constructs the destination directory path for Kometa assets."""
-        if self.docker:
-            base_dir = "/temp" if self.options.temp else "/assets"
-        else:
-            config_attr = "temp_dir" if self.options.temp else "kometa_base"
-            base_dir = getattr(globals.config, config_attr, None)
+        config_attr = "temp_dir" if self.options.temp else "kometa_base"
+        base_dir = getattr(globals.config, config_attr, "")
         library_dir = globals.config.resolve_library_directory(library)
         return os.path.join(base_dir, library_dir, asset_folder)

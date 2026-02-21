@@ -569,13 +569,9 @@ def setup_socket_handlers(
         """Detects whether app is running in docker and informs frontend."""
         instance = Instance(data.get("instance_id"), "web")
         if globals.docker:
-            kometa_base = utils.get_host_path("/assets")
-            temp_dir = utils.get_host_path("/temp")
             logger.info("Docker environment detected")
-            debug_me(f"Docker detected, Kometa asset path mapped to '{kometa_base}', temp dir mapped to '{temp_dir}'", "docker_detection")
-            if kometa_base == "(not defined)":
-                logger.info("Kometa base path is not defined in docker-compose.yml file. Saving assets to Kometa asset directory is not available.")
-            notify_web(instance, "docker_detected", {"docker": "true", "kometa_base": kometa_base, "temp_dir": temp_dir})
+            debug_me(f"Docker detected, Kometa asset path: '{config.kometa_base}', temp dir: '{config.temp_dir}'", "docker_detection")
+            notify_web(instance, "docker_detected", {"docker": "true", "kometa_base": config.kometa_base, "temp_dir": config.temp_dir})
         else:
             notify_web(instance, "docker_detected", {"docker": "false"})
 
