@@ -107,11 +107,11 @@ def parse_title(title: str):
             "media_metadata/parse_title")
         return artwork
 
-    # Check if it's a TV show background
+    # Check if it's a background
     background_match = re.match(background_pattern, title, re.IGNORECASE)
     if background_match:
         artwork = {
-            "media": MEDIA_TYPE_TV_SHOW,
+            "media": "Unknown",
             "title": background_match.group('title').strip(),
             "year": background_match.group('year'),
             "season": SEASON_BACKDROP,
@@ -119,7 +119,7 @@ def parse_title(title: str):
             "type": FILTER_BACKGROUND,
             "author": None
         }
-        debug_me(f"Matched '{title}' as TV Show Background for '{artwork['title']} ({artwork['year']})'",
+        debug_me(f"Matched '{title}' as either movie, TV show or collection background for '{artwork['title']} ({artwork['year']})'",
                  "media_metadata/parse_title")
         return artwork
 
@@ -144,10 +144,10 @@ def parse_title(title: str):
     if collection_match:
         artwork = {
             "media": MEDIA_TYPE_COLLECTION,
-            "title": title.strip(),
+            "title": title.removesuffix(" - Backdrop").strip(),
             "season": None,
             "episode": None,
-            "type": "collection poster",
+            "type": "collection_poster",
             "author": None
         }
         debug_me(

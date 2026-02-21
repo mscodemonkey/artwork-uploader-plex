@@ -4,7 +4,8 @@ ENV PATH="/app/venv/bin:$PATH"
 
 WORKDIR /app
 
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 ENV PATH="/app/venv/bin:${PATH}"
 ENV PYTHONPATH="/app/src:${PYTHONPATH}"
 
@@ -25,6 +26,7 @@ RUN apt-get update && \
     groupadd -g 1027 artwork && \
     useradd -u 1027 -g artwork -m artwork
 
+# Expose web UI port
 EXPOSE 4567
 
 USER artwork
@@ -32,4 +34,3 @@ USER artwork
 ENTRYPOINT ["python", "/app/src/artwork_uploader.py"]
 
 CMD ["--debug"]
-

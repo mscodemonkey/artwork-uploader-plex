@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 from pathlib import PureWindowsPath, PurePosixPath
+from core.exceptions import InvalidUrl, InvalidFlag
 
 import validators
 from core.constants import (
@@ -158,65 +159,70 @@ def parse_url_and_options(line):
     Each line could contain the URL and any options
     """
 
-    debug_me(f"Line: {line}")
+    debug_me(f"Line: {line}", "parse_url_and_options")
 
-    # Split the line by spaces
-    parts = line.strip().split()
-
-    # The first part should be the URL
-    url = parts[0]
-
-    # Initialise filters list or None
-    exclude = None
-    filters = None
     year = None
+    options = Options()
 
-    # Process optional flags
-    if '--filters' in parts:
-        index = parts.index('--filters') + 1
-        if index < len(parts) and not parts[index].startswith('--'):
-            filters = []
-            while index < len(parts) and not parts[index].startswith('--'):
-                filters.append(parts[index])
-                index += 1
+    # Split the line by flag delimiters (--) as in '--exclude s01 s02', '--filters title_card', '--year 2025' or simply '--temp'
+    parts = line.strip().split(" --")
 
-    if '--exclude' in parts:
-        index = parts.index('--exclude') + 1
-        if index < len(parts) and not parts[index].startswith('--'):
-            exclude = []
-            while index < len(parts) and not parts[index].startswith('--'):
-                exclude.append(parts[index])
-                index += 1
+    # The first part should be a valid URL, raise exception otherwise
+    url = parts[0].strip()
+    if not validators.url(url) and not url.endswith('.html'):
+        raise InvalidUrl(url)
 
-    if '--year' in parts:
-        index = parts.index('--year') + 1
-        if index < len(parts) and not parts[index].startswith('--'):
-            year_str = ""
-            while index < len(parts) and not parts[index].startswith('--'):
-                year_str = year_str + parts[index]
-                index += 1
-            # Convert to integer if we got a value, otherwise leave as None
-            if year_str:
+    # Initiate list of invalid flags for logging purposes
+    inv_flags = []
+
+    # Iterate through each flag provided
+    for option in parts[1:]:
+        # Split each option into its parts by spaces
+        option_parts = option.strip().split(" ")
+        # The option flag is the first one
+        flag = option_parts[0].strip()
+        # If it has more than one part, it's a flag with arguments (it should only be --filters, --exclude or --year)
+        if len(option_parts) > 1:
+            # The flag arguments follow the flag
+            args = option_parts[1:]
+            if flag == "filters":
+                # Set the filters
+                options.filters = args
+            elif flag == "exclude":
+                # Set the exclusions
+                options.exclude = args
+            elif flag == "year":
+                # The --year flag should only have one argument
+                if len(args) > 1:
+                    inv_flags.append(f"--{flag} requires a single argument")
+                    continue
+                year_str = args[0]
                 try:
                     year = int(year_str)
-                except ValueError:
-                    # If conversion fails, leave as None
-                    debug_me(f"Invalid year value: {year_str}, ignoring")
+                except Exception:
                     year = None
+                options.year = year
+            # If it's one of these flags it shouldn't have any arguments
+            elif flag in ["add-posters", "add-sets", "add-to-bulk", "force", "kometa", "stage", "temp"]:
+                inv_flags.append(f"--{flag} has too many arguments")
+            # If we get to this point it's not a valid flag
+            else:
+                inv_flags.append(f"--{flag} is not a valid flag")
+        # If it only has one part, it should be one of the boolean flags
+        else:
+            if flag in ["filters", "exclude", "year"]:
+                inv_flags.append(f"--{flag} needs at least one argument")
+            elif flag not in ["add-posters", "add-sets", "add-to-bulk", "force", "kometa", "stage", "temp"]:
+                inv_flags.append(f"--{flag} is not a valid flag")
+            else:
+                setattr(options, flag.replace("-", "_"), True)
 
-    options = Options(
-        add_posters='--add-posters' in parts,
-        add_sets='--add-sets' in parts,
-        add_to_bulk='--add-to-bulk' in parts,
-        force='--force' in parts,
-        kometa='--kometa' in parts,
-        stage='--stage' in parts,
-        temp='--temp' in parts,
-        filters=filters,  # Store the list of filters or None
-        exclude=exclude,
-        year=year  # Store the year as int or None
-    )
+    # If we've collected any invalid flags, raise exception and provide the list of invalid flags and reasons for logging purposes
+    if inv_flags:
+        error = ", ".join(inv_flags)
+        raise InvalidFlag(error)
 
+    # If URL and all flags are valid, return URL and options
     return URLItem(url, options)
 
 
@@ -266,3 +272,27 @@ def get_path_parts(path: str) -> tuple[str, ...] | None:
         return PureWindowsPath(path).parts
     else:
         return PurePosixPath(path).parts
+
+
+def get_host_path(container_path: str) -> str:
+    """
+    Parses /proc/self/mountinfo to find the host path
+    corresponding to the given container path.
+    """
+    try:
+        with open("/proc/self/mountinfo", "r") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) < 5:
+                    continue
+                target = parts[4].strip()
+                if container_path == target:
+                    host_path = parts[3]
+                    if "path=" in line:
+                        drive = line.split("path=")[1].split(";")[0].rstrip('\\')
+                        full_path = f"{drive}{host_path}".replace("/", "\\")
+                        return full_path
+                    return host_path
+    except Exception as e:
+        debug_me(f"Error reading /proc/self/mountinfo: {e}", "get_host_path")
+    return "(not defined)"

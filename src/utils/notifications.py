@@ -2,6 +2,8 @@ from core import globals
 from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
 from models.instance import Instance
 from logging_config import get_logger
+from pprint import pformat
+from services.notify_service import NotifyService
 
 logger = get_logger(__name__)
 
@@ -21,13 +23,17 @@ def update_status(instance: Instance, message, color="primary", sticky=False, sp
                     "icon": icon if icon else bootstrap_colors.get(color, {}).get('icon', None)})
 
 
-def debug_me(message: str, title: str = None):
+def debug_me(message, title: str = None):
     if globals.debug:
         if title:
             logger.debug(
                 f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{title}] {ANSI_RESET}{message}")
         else:
-            logger.debug(f"{ANSI_RESET}{message}")
+            if isinstance(message, (list, dict)):
+                logger.debug(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}{ANSI_RESET}")
+                logger.debug(pformat(message))
+            else:
+                logger.debug(f"{ANSI_RESET}{message}")
 
 
 def update_log(instance: Instance, update_text: str, artwork_title: str = None, force_print: bool = False) -> None:
@@ -60,3 +66,41 @@ def notify_web(instance: Instance, event, data_to_include=None):
         debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}",
                  "notify_web")
         globals.web_socket.emit(event, merged_arguments)
+
+
+def send_notification(instance: Instance, message: str) -> None:
+    """
+    Sends a notification using the NotifyService class.
+
+    Args:
+        instance (Instance):
+        message (str):
+
+    Returns:
+        None
+    """
+    try:
+        if len(globals.config.apprise_urls) > 0:
+            notifier = NotifyService()
+            notify_success = True
+            for idx, url in enumerate(globals.config.apprise_urls):
+                notifier.add_url(url)
+                url_success = notifier.send_notification("Artwork Uploader", message)
+                if url_success:
+                    debug_me(f"📢 Notification sent successfully for URL #{idx + 1}", "send_notification")
+                    update_log(instance, f"📢 Notification sent successfully for URL #{idx + 1}")
+                else:
+                    debug_me(f"⚠️ Notification failed to send for URL #{idx + 1}", "send_notification")
+                    update_log(instance, f"⚠️ Notification failed to send for URL #{idx + 1}")
+                notify_success = notify_success and url_success
+                notifier.clear_urls()
+            if len(globals.config.apprise_urls) > 1:
+                if notify_success:
+                    debug_me(f"✅ {len(globals.config.apprise_urls)} notifications sent successfully.", "send_notification")
+                    update_log(instance, f"✅ {len(globals.config.apprise_urls)} notifications sent successfully.")
+                elif not notify_success:
+                    debug_me("⚠️ Some notifications failed to send. Check logs for details.", "send_notification")
+                    update_log(instance, "⚠️ Some notifications failed to send. Check logs for details.")
+    except Exception as e:
+        debug_me(f"🚨 Error sending notification: {str(e)}", "send_notification")
+        update_log(instance, f"🚨 Error sending notification: {str(e)}")

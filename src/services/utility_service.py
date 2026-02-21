@@ -28,7 +28,7 @@ class UtilityService:
             return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     @staticmethod
-    def sort_key(item: dict) -> Tuple[str, float, float, str]:
+    def sort_key(item: dict) -> Tuple[str, str, float, float, str]:
         """
         Generate a sort key for artwork items.
 
@@ -61,5 +61,6 @@ class UtilityService:
         season_value = parse_season(item.get('season'))
         episode_value = parse_episode(item.get('episode'))  # Same for episode
         source_value = parse_source(item.get('source'))  # Same for source
+        title_value = item.get('title', '')  # Default to empty string if title is missing
 
-        return item['media'], season_value, episode_value, source_value
+        return item['media'], title_value, season_value, episode_value, source_value
