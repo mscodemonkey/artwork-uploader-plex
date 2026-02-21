@@ -3,8 +3,6 @@ from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
 from models.instance import Instance
 from logging_config import get_logger
 from pprint import pformat
-from services.notify_service import NotifyService
-
 logger = get_logger(__name__)
 
 # For backwards compatibility
@@ -81,6 +79,7 @@ def send_notification(instance: Instance, message: str) -> None:
     """
     try:
         if len(globals.config.apprise_urls) > 0:
+            from services.notify_service import NotifyService
             notifier = NotifyService()
             notify_success = True
             for idx, url in enumerate(globals.config.apprise_urls):
