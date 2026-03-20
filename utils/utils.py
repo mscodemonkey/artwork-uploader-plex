@@ -59,8 +59,18 @@ def title_cleaner(string):
 
     return title
 
+def elapsed_time(seconds: float) -> str:
+    """ Converts seconds into 2h 31m 12s, 9m 34s or 32s format for readability"""
+    seconds = int(round(seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    
+    m, s = divmod(seconds, 60)
+    h, m = divmod(m, 60)
 
-
+    if h > 0:
+        return f"{h}h {m}m {s}s"
+    return f"{m}m {s}s"
 
 def parse_string_to_dict(input_string):
     # Remove unnecessary replacements

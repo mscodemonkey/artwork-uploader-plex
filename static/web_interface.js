@@ -9,11 +9,12 @@ let schedules = [];             // Scheduled imports
 let currentBulkImport = '';     // Current bulk import file
 let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
 let barTimer = null;            // Timer for progress bar
+let docker = false;             // Docker environment detected or not
 
 const socket = io();
 const instanceId = getInstanceId();
 const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
-const CHUNK_SIZE = 1024 * 64; // 64 KB per chunk for uploads
+const CHUNK_SIZE = 1024 * 512; // 512 KB per chunk for uploads
 
 const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
 const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
@@ -40,12 +41,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
 // Specific event listeners
 document.getElementById("switch_bulk_file").addEventListener("change", bulkFileSwitched);
+document.getElementById("switch_bulk_file").addEventListener("mousedown", loadBulkFileList);
 document.getElementById("bulk_import_text").addEventListener("input", updateBulkSaveButtonState);
 document.getElementById("scraper-filters-global").addEventListener("change", inheritGlobalFiltersForScraper);
 document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
 document.getElementById("btnUpdate").addEventListener("click", updateApp);
 document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
-document.getElementById("test_plex_btn").addEventListener("click", testPlexConnect);
+document.getElementById("test_plex_btn").addEventListener("click", () => { testPlexConnect(false); });
 document.getElementById("debug-mode").addEventListener("change", function() {
     socket.emit("debug_mode", { instance_id: instanceId, action: "toggle" });
 });
@@ -100,7 +102,8 @@ socket.on("docker_detected", (data) => {
 
     if (validResponse(data)) {
         if (data.docker == "true") {
-            // If not Kometa asset directory has been bind mounted to the container /asset path, disable the
+            docker = true;
+            // If no Kometa asset directory has been bind-mounted to the container /asset path, disable the
             // ability to turn on saving to Kometa asset directory
             if (data.kometa_base == "(not defined)") {
                 saveToKometaCheckbox.disabled = true;
@@ -109,10 +112,10 @@ socket.on("docker_detected", (data) => {
                 dockerWarning.innerHTML = '<i class="bi bi-exclamation-triangle"></i>&ensp;Kometa base path not defined in <span class="text-nowrap"><code>docker-compose.yml</code></span>. Saving assets to Kometa asset directory is not available.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
                 dockerWarning.classList.add("alert-danger");
             }
-            dockerWarning.style.display = "block";
-            kometaBase.disabled = true;
+            dockerWarning.classList.remove("d-none");
+            kometaBase.disabled = true; // Disable the Kometa base path input field
             kometaBase.value = data.kometa_base; // Set to host path detected by backend
-            tempDir.disabled = true;
+            tempDir.disabled = true; // Disable the Temp directory input field
             tempDir.value = data.temp_dir; // Set to host path detected by backend
             // If no host path ha been bound to the container /temp path, disable the ability to use a temp dir
             if (data.temp_dir == "(not defined)") {
@@ -122,29 +125,48 @@ socket.on("docker_detected", (data) => {
                 uploadOptionTemp.parentElement.classList.add("d-none");
             }
         } else {
-            dockerWarning.style.display = "none";
+            docker = false;
+            dockerWarning.classList.add("d-none");
         }
     }
 })
 
 // Test connection to Plex server
-function testPlexConnect() {
-    baseUrl = document.getElementById("plex_base_url").value
-    token = document.getElementById("plex_token").value
-    tvLibraries = document.getElementById("tv_library").value
+function testPlexConnect(savingConfig) {
+    const baseUrl = document.getElementById("plex_base_url").value
+    const token = document.getElementById("plex_token").value
+    const tvLibraries = document.getElementById("tv_library").value
         .split(",")
         .map(item => item.trim())
         .filter(item => item !== ""); // Remove empty values    
-    movieLibraries = document.getElementById("movie_library").value
+    const movieLibraries = document.getElementById("movie_library").value
         .split(",")
         .map(item => item.trim())
-        .filter(item => item !== ""); // Remove empty values    
-    socket.emit("test_plex_connect", { instance_id: instanceId, url: baseUrl, token: token, tv_libs: tvLibraries, movie_libs: movieLibraries });
+        .filter(item => item !== ""); // Remove empty values
+    
+    return new Promise((resolve) => {
+        socket.emit("test_plex_connect", { 
+            instance_id: instanceId, 
+            url: baseUrl, 
+            token: token, 
+            tv_libs: tvLibraries, 
+            movie_libs: movieLibraries, 
+            saving_config: savingConfig 
+        });
+
+        socket.once("test_plex_connect", function(data) {
+            if (validResponse(data)) {
+                resolve(data.success); // This "returns" the value to the awaiter
+            } else {
+                resolve(false); // Handle bad responses
+            }
+        });
+    });
 }
 
 // Send test notification
 function testNotifications() {
-    urls = document.getElementById("apprise_urls").value
+    const urls = document.getElementById("apprise_urls").value
         .split(",")
         .map(item => item.trim())
         .filter(item => item !== ""); // Remove empty values    
@@ -152,7 +174,8 @@ function testNotifications() {
         updateStatus("Set at least one notification URL", "warning", false, false, "exclamation-triangle")
     } else {
         socket.emit("test_notifications", { instance_id: instanceId, urls: urls });
-    }}
+    }
+}
 
 // Check incoming socket message is for this instance
 function validResponse(data, broadcast = false) {
@@ -202,6 +225,35 @@ function element_disable(element_ids, mode = true) {
 socket.on("element_disable", (data) => {
     if (validResponse(data)) {
         element_disable(data.element, data.mode);
+    }
+});
+
+function addSpinner(elementId, mode = true) {
+    if (!elementId) return;  // Exit if no element_ids provided
+
+    let element = document.getElementById(elementId);
+    if (element) {
+        if (mode == true) {
+            if (elementId == "scrape_button") {
+                element.innerHTML = '<span class="spinner-border spinner-border-sm"></span>&ensp;Scraping...';
+            } else if (elementId == "bulk_button") {
+                element.innerHTML = '<span class="spinner-border spinner-border-sm"></span>&ensp;Running Bulk Import...';
+            }           
+
+        } else {
+            if (elementId == "scrape_button") {
+                element.innerHTML = '<i class="bi bi-play-circle"></i>&ensp;Start Scrape';
+            } else if (elementId == "bulk_button") {
+                element.innerHTML = '<i class="bi bi-play-circle"></i>&ensp;Run Bulk Import';
+            }
+        }
+    } else {
+        console.warn('Element with ID "${id}" not found.');
+    };
+}
+socket.on("add_spinner", (data) => {
+    if (validResponse(data)) {
+        addSpinner(data.element, data.mode);
     }
 });
 
@@ -317,34 +369,58 @@ socket.on("log_update", (data) => {
 });
 
 
-// Update the progress bar, showing and hiding as required
-function progress_bar(percent, message = "") {
+// Update the progress bars, showing and hiding as required
+function progressBar(percent, message = "", barType = "main", speed = "smooth") {
 
-    const bar_container = document.getElementById("progress_bar_container")
-    const bar = document.getElementById("progress_bar")
+    const suffix = barType === "bulk" ? "_bulk" : "_main";
+    const container = document.getElementById("progress_bar_container" + suffix);
+    const bar = document.getElementById("progress_bar" + suffix);
+    const barTitle = document.getElementById("progress_bar_title" + suffix);
+    const barPercent = document.getElementById("progress_bar_percent" + suffix);
 
-    percent = percent > 100 ? 100 : percent;
+    if (!container || !bar) return;
 
-    if (percent <= 100) {
-        if (barTimer) {
-            clearTimeout(barTimer); // Cancel the previous timeout
-        }
-        bar_container.classList.add("show")
-        bar.style.width = percent + "%"
-        bar_container.ariaValueNow = message
-        bar.innerHTML = message || ""
+    percent = Math.min(Math.max(percent, 0), 100);
+
+    container.classList.add("show");
+
+    if (barTimer) clearTimeout(barTimer);
+
+    if (barTitle) barTitle.innerText = message;
+    if (barPercent) barPercent.innerText = Math.round(percent) + "%";
+
+    const currentPercent = parseFloat(bar.style.width) || 0;
+
+    if (speed == "fast") transition = "none";
+    else transition = "width 0.5s ease";
+
+    if (percent < currentPercent) {
+        bar.style.transition = "none";
+        void bar.offsetWidth;
+        bar.style.width = percent + "%";
+        void bar.offsetHeight;
+    } else {
+        bar.style.transition = transition;
+        bar.style.width = percent + "%";
     }
 
-    if (percent == 100) {
+    //bar.offsetHeight;
+    //bar.style.width = percent + "%";
+    
+    if (percent === 100) {
         barTimer = setTimeout(() => {
-            bar_container.classList.remove('show'); // Fade out the progress bar after a second
+            // Hide both containers
+            document.getElementById("progress_bar_container_main").classList.remove("show");
+            document.getElementById("progress_bar_container_bulk").classList.remove("show");
+            document.getElementById("progress_bar_main").style.width = "0%";
+            document.getElementById("progress_bar_bulk").style.width = "0%";
         }, 2000);
     }
 }
 socket.on("progress_bar", (data) => {
     if (validResponse(data)) {
-        progress_bar(data.percent, data.message)
-        }
+        progressBar(data.percent, data.message, data.bar_type, data.bar_speed)
+    }
 })
 
 
@@ -367,9 +443,9 @@ socket.on("add_to_bulk_list", (data) => {
 
         if (!regex.test(bulkText)) {
             if (config.auto_manage_bulk_files) {
-                document.getElementById("bulk_import_text").value = processAndSortUrls(bulkText, data.title, cleanedUrl);
+                document.getElementById("bulk_import_text").value = processAndSortUrls(bulkText, data.title, data.author, cleanedUrl);
             } else {
-                document.getElementById("bulk_import_text").value += `\n// ${data.title}\n${cleanedUrl}\n`;
+                document.getElementById("bulk_import_text").value += `\n// ${data.title} | ${data.author}\n${cleanedUrl}\n`;
             }
 
         }
@@ -381,7 +457,7 @@ socket.on("add_to_bulk_list", (data) => {
 
 
 // Sort the bulk list into order by media title
-function processAndSortUrls(inputText, newTitle, newUrl) {
+function processAndSortUrls(inputText, newTitle, newAuthor, newUrl) {
 
   // Initialize data structures
   const titleMap = {};
@@ -437,6 +513,7 @@ function processAndSortUrls(inputText, newTitle, newUrl) {
   });
 
   // Add the new title and URL
+  newTitle = newTitle + ' | ' + newAuthor
   addTitleAndUrl(newTitle, newUrl);
 
   // Format the output
@@ -481,9 +558,12 @@ function processAndSortUrls(inputText, newTitle, newUrl) {
 // ==================================================
 
 // Button handler for save configuration
-document.getElementById("save_config_button").addEventListener("click", function(event) {
+document.getElementById("save_config_button").addEventListener("click", async function(event) {
     event.preventDefault(); // Prevent actual form submission
-    saveConfig();
+    let success = await testPlexConnect(true);
+    if (success == true) {
+        saveConfig();
+    };
 });
 
 // Save configuration
@@ -624,6 +704,9 @@ function loadConfig() {
             // Toggle Kometa settings visibility
             toggleKometaSettings();
 
+            // Toggle Add to Bulk checkbox visibility
+            toggleAddToBulkCheckbox();
+
             // Toggle auth settings visibility
             toggleAuthSettings();
             
@@ -707,6 +790,8 @@ function saveBulkChangesModal(filename) {
 function startScrape() {
     var form = document.getElementById('scraperForm');
     const logTab = document.querySelector('#scraping-log-tab');
+    // Switch to the log tab
+    bootstrap.Tab.getOrCreateInstance(logTab).show();
 
     // Check if the form is valid
     if (form.checkValidity()) {
@@ -762,7 +847,7 @@ function toggleThePosterDBElements() {
 
         const url = urlInput.value;
         const elements = document.querySelectorAll(".theposterdb");
-        const filts = document.querySelectorAll('[id^="tpdb-');
+        const filts = document.querySelectorAll('[id^="tpdb-"');
 
         // Define the regex pattern from the input
         const pattern = /^https:\/\/theposterdb\.com\/set\/\d+$/;
@@ -1011,6 +1096,10 @@ function inheritGlobalFiltersForScraper() {
     if (document.getElementById("scraper-filters-global").checked) {
         document.getElementById("scraper-filters").classList.remove("show");
     } else {
+        // If the "As set by global filters" checkbox is turned off, turn off each individual filter checkbox
+        document.querySelectorAll('[id^="filter-"]:checked').forEach(checkbox => {
+            checkbox.checked = false;
+        });
         document.getElementById("scraper-filters").classList.add("show");
     }
 }
@@ -1019,6 +1108,10 @@ function inheritGlobalFiltersForUploads() {
     if (document.getElementById("upload-filters-global").checked) {
         document.getElementById("upload-filters").classList.remove("show");
     } else {
+        // If the "As set by global filters" checkbox is turned off, turn off each individual filter checkbox
+        document.querySelectorAll('[id^=upload-filter-]:checked').forEach(checkbox => {
+            checkbox.checked = false;
+        });        
         document.getElementById("upload-filters").classList.add("show");
     }
 }
@@ -1416,6 +1509,7 @@ function uploadFile(file) {
     reader.onload = function (event) {
         const arrayBuffer = event.target.result;
         const totalChunks = Math.ceil(arrayBuffer.byteLength / CHUNK_SIZE);
+        let startTime = performance.now()
 
         function arrayBufferToBase64(buffer) {
             return new Promise((resolve) => {
@@ -1453,7 +1547,8 @@ function uploadFile(file) {
                 //socket.emit("display_message", { "instance_id": instanceId, "message": `Successfully uploaded '${file.name}'`, "title": "uploadFile", "level": "debug" });
                 //socket.emit("display_message", { "instance_id": instanceId, "message": `✅️ ${file.name} • Upload completed successfully`, "level": "log" });
                 socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, options: options, filters: filters, plex_title: plex_title, plex_year: plex_year });
-                progress_bar(100, "Upload complete!");
+                let totalSize = Math.round(arrayBuffer.byteLength / 1000000);
+                progressBar(100, `Uploading ${file.name} • ${totalSize} of ${totalSize} MB`);
 
                 return; // Ensure no further execution in this function
             }
@@ -1461,43 +1556,45 @@ function uploadFile(file) {
             const chunk = arrayBuffer.slice(offset, offset + CHUNK_SIZE);
 
             arrayBufferToBase64(chunk).then(base64Chunk => {
+                //console.log(`Sending chunk ${(offset / CHUNK_SIZE) + 1} of ${totalChunks}: ${offset / 1024} to ${(offset + CHUNK_SIZE) / 1024}`)
                 socket.emit("upload_artwork_chunk", {
                     instance_id: instanceId,
                     fileName: file.name,
                     chunkData: base64Chunk,
                     chunkIndex: offset / CHUNK_SIZE,
                     totalChunks: totalChunks
+                }, (ack) => {
+                    if (ack === "ok") {
+                        offset += CHUNK_SIZE; // Offset is in bytes
+                        let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
+                        updateStatus(`Uploading '${file.name}'...`, "info", false, false, "cloud-upload");
+                        let progressMBytes = Math.round(offset / 1000000); // Divide by 1M to get MB
+                        let currentTime = performance.now();
+                        let currentRate = (progressMBytes * 1000 / (currentTime - startTime)).toFixed(2); // Times are in ms, hence multiply by 1000
+                        let totalSize = Math.round(arrayBuffer.byteLength / 1000000);
+                        if (totalSize < 80) barSpeed = "fast"; else barSpeed = "smooth";
+                        progressBar(progress, `${file.name} • ${progressMBytes} MB of ${totalSize} MB • ${currentRate} MB/s`, "main", barSpeed);
+                        sendChunk();
+                    } else {
+                        console.error("Backend failed to acknowledge chunk.")
+                    }
                 });
-
-                offset += CHUNK_SIZE;
-                let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
-                updateStatus(`Uploading '${file.name}'...`, "info", false, false, "cloud-upload");
-                progress_bar(progress, `${progress}%`);
-
-                if (offset < arrayBuffer.byteLength) {
-                    setTimeout(sendChunk, 10);
-                } else {
-                    console.log("Final chunk sent, triggering upload_complete...");
-                    sendChunk(); // This ensures the final event fires
-                }
             });
         }
-
         sendChunk();
     };
-
     reader.readAsArrayBuffer(file);
 }
 
 socket.on("upload_progress", function (data) {
     if(validResponse(data)) {
-        progress_bar(data.progress, `${progress}%`);
+        progressBar(data.progress, `${progress}%`);
     }
 });
 
 socket.on("upload_complete", function (data) {
     if(validResponse(data)) {
-        progress_bar(100,"Upload complete!");
+        progressBar(100,"Upload complete!");
     }
 });
 
@@ -1589,17 +1686,17 @@ socket.on("upload_complete", function (data) {
         if (details && details['time']) {
             scheduleIcon.classList.remove("bi-clock");
             scheduleIcon.classList.add("bi-clock-fill"); // Change to filled icon
-            setContainer.classList.remove("show"); // Hide set button
-            cancelContainer.classList.add("show"); // Show cancel button
+            setContainer.classList.remove("show"); // Hide Set button
+            cancelContainer.classList.add("show"); // Show Delete button
             scheduleTimeInput.value = details['time'];
             scheduleTimeInput.readOnly = true;
-            scheduleIcon.classList.add("text-success");
+            scheduleIcon.classList.add("text-success"); // Turn icon green
         } else {
-            scheduleIcon.classList.add("bi-clock");
-            scheduleIcon.classList.remove("bi-clock-fill"); // Change to filled icon
-            scheduleIcon.classList.remove("text-success");
-            setContainer.classList.add("show"); // Show set button
-            cancelContainer.classList.remove("show"); // Hide cancel button
+            scheduleIcon.classList.add("bi-clock"); // Change to unfilled icon
+            scheduleIcon.classList.remove("bi-clock-fill");
+            scheduleIcon.classList.remove("text-success"); // Remove green color
+            setContainer.classList.add("show"); // Show Set button
+            cancelContainer.classList.remove("show"); // Hide Delete button
             scheduleTimeInput.value = "";
             scheduleTimeInput.readOnly = false;
         }
@@ -1662,15 +1759,29 @@ function toggleKometaSettings() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const kometaSettings = document.getElementById("kometa_settings");
     const kometaBase = document.getElementById("kometa_base");
+    const dockerWarning = document.getElementById("docker_warning");
 
     if (saveToKometa) {
         kometaSettings.style.display = "block";
+        if (docker) {
+            if (dockerWarning) {
+                dockerWarning.classList.remove("d-none");
+            }
+        } else {
+            if (dockerWarning) {
+                dockerWarning.classList.add("d-none");
+            }
+        }
         if (kometaBase) {
+            // Make the Kometa base directory field required
             kometaBase.required = true;
             // Optionally clear any previous invalid state so the user can re-validate
             kometaBase.classList.remove('is-invalid');
         }
     } else {
+        if (dockerWarning) {
+            dockerWarning.classList.add("d-none");
+        }
         kometaSettings.style.display = "none";
         if (kometaBase) {
             kometaBase.required = false;
@@ -1759,6 +1870,24 @@ function togglePlexOptions() {
 
 // Add event listener for save_to_kometa checkbox
 document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);
+
+// Add event listener for auto_manage_bulk_files checkbox
+document.getElementById("auto_manage_bulk_files").addEventListener("change", toggleAddToBulkCheckbox);
+
+function toggleAddToBulkCheckbox() {
+    const autoManageBulkFiles = document.getElementById("auto_manage_bulk_files").checked;
+    const addToBulkCheckbox = document.getElementById("option-add-to-bulk")
+    const addToBulk = addToBulkCheckbox.parentElement;
+    if (autoManageBulkFiles) {
+        // Hides the scraper-level add-to-bulk checkbox if the global settings is enabled
+        addToBulkCheckbox.checked = true;
+        addToBulk.classList.add("d-none");
+    } else {
+        // Shows the scraper-level add-to-bulk cehckbox if the global setting is disabled
+        addToBulkCheckbox.checked = false;
+        addToBulk.classList.remove("d-none");
+    }
+}
 
 // Add event listener for temp_dir input to toggle temp option visibility
 document.getElementById("temp_dir").addEventListener("input", toggleTempCheckbox);

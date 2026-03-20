@@ -20,6 +20,8 @@ import base64
 import tempfile
 import zipfile
 import subprocess
+import time
+
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
@@ -183,7 +185,7 @@ def setup_socket_handlers(
             update_log(instance, f"🚨 Update available: {latest_version} (current: {current_version})")
             notify_web(instance, "version_check", { "new_version": latest_version, "current_version": current_version, "docker": "true" if globals.docker else "false" })
         else:
-            update_log(instance, f"✅ You are running the latest version: {current_version}")
+            update_log(instance, f"🏷️ You are running the latest version: {current_version}")
             notify_web(instance, "version_check", { "new_version": None, "current_version": current_version, "docker": "true" if globals.docker else "false" })
 
     @globals.web_socket.on("update_app")
@@ -257,9 +259,9 @@ def setup_socket_handlers(
             notify_web(
                 instance,
                 "element_disable",
-                {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True}
+                { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True }
             )
-            update_log(instance, f"🔄 Starting scrape for URL: {url}")
+            notify_web(instance, "add_spinner", { "element": "scrape_button", "mode": True })
             process_scrape_url_from_web(instance, url)
 
     @globals.web_socket.on("start_bulk_import")
@@ -375,14 +377,17 @@ def setup_socket_handlers(
         """Test connectivity to Plex server"""
 
         def fail(status, log):
+            if saving_config:
+                log = f"Configuration not saved ({log})"
+                status = f"Configuration not saved ({status})"
             update_log(instance, log)
             update_status(instance, status, "danger", False, False, "x-circle")
-            notify_web(instance, "test_plex_connect", { "success": False, "status": status, "log": log })
+            notify_web(instance, "test_plex_connect", { "success": False })
             notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
 
         instance = Instance(data.get("instance_id"), "web")
         instance.broadcast = True
-        update_status(instance, "Testing connection to Plex server", "info", False, True)
+        update_status(instance, "Testing connection to Plex server", "info", True, True)
 
         # Disable the test button to prevent multiple clicks
         notify_web(instance, "element_disable", {"element": ["test_plex_btn"], "mode": True})
@@ -396,15 +401,20 @@ def setup_socket_handlers(
         debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}", "test_plex_connect")
         movie_libs = data.get("movie_libs", "")
         debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}", "test_plex_connect")
+        saving_config = data.get("saving_config")
+        if saving_config:
+            debug_me(f"Testing Plex connectivity before saving configuration", "test_plex_connect")
+        else:
+            debug_me(f"Testing Plex connectivity", "test_plex_connect")
         
         # Check for a valid Plex server URL and token
-        url_pattern = r"^https?:\/\/((([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?$"
+        url_pattern = r"^https?:\/\/([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?$"
         token_pattern = r"^[A-Za-z0-9_-]{20,}$"
         if not re.fullmatch(url_pattern, url):
-            fail("Invalid Plex URL", f"❌ Invalid Plex URL • {url}")
+            fail("Invalid Plex URL", f"❌ Invalid Plex URL")
             return
         if not re.fullmatch(token_pattern, token):
-            fail("Invalid Plex token", f"❌ Invalid Plex token • {token}")
+            fail("Invalid Plex token", f"❌ Invalid Plex token")
             return
         
         # Check connectivity to server
@@ -412,18 +422,19 @@ def setup_socket_handlers(
             plex_server = PlexServer(url, token, timeout=5)
         except Exception as e:
             if "NewConnectionError" in str(e):
-                log = f"❌ Error connecting to Plex • Connection refused"
+                log = f"❌ Error connecting to Plex (Connection refused)"
             elif "ConnectTimeoutError" in str(e) or "timed out" in str(e):
-                log = f"❌ Error connecting to Plex • Timed out"
+                log = f"❌ Error connecting to Plex (Timed out)"
             elif "unauthorized" in str(e):
-                log = f"❌ Error connecting to Plex • Invalid token"
+                log = f"❌ Error connecting to Plex (Invalid token)"
             elif "NameResolutionError" in str(e):
-                log = f"❌ Error connecting to Plex • Cannot resolve server name"
+                log = f"❌ Error connecting to Plex (Cannot resolve server name)"
             elif "SSLError" in str(e):
-                log = f"❌ Error connecting to Plex • SSL certificate validation failed"
+                log = f"❌ Error connecting to Plex (SSL certificate validation failed)"
             else:
                 log = f"❌ Unknown error connecting to Plex: {str(e)}"
             fail ("Error connecting to Plex, check log for details", log)
+            debug_me(f"Error connecting to Plex: {str(e)}", "test_plex_connect")
             return
 
         # Check that the provided libraries exist in the server        
@@ -498,13 +509,11 @@ def setup_socket_handlers(
             new_config = Config()
             new_config.load()
             new_config_dict = vars(new_config)
-            #global_config = globals.config
             current_config_dict = vars(globals.config).copy()
             password_change = False
             # Capture the provided password and see if it's different 
             password = data.get("config").get("auth_password")
             if password:
-                debug_me(f"Captured password as: {password}", "save_config")
                 password_change = not AuthenticationService.verify_password(password, globals.config.auth_password_hash)
 
             # Unpack the config dictionary into the local config
@@ -544,7 +553,7 @@ def setup_socket_handlers(
             globals.config = config
 
             # Reconnect to Plex because the Plex server or token might have changed
-            update_log(instance, "💾 Saving updated configuration and reconnecting to Plex")
+            update_log(instance, "💾 Configuration saved")
             globals.plex.reconnect(config)
             notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
         except Exception as config_error:
@@ -652,27 +661,33 @@ def setup_socket_handlers(
 
     @globals.web_socket.on("upload_artwork_chunk")
     def handle_upload_chunk(data):
-        """Handle chunked file upload."""
+        """Handle chunked file upload - writes directly to temp file for memory efficiency."""
+        
         instance = Instance(data.get("instance_id"), "web")
-
         file_name = data["fileName"]
         chunk_data = data["chunkData"]
         chunk_index = data["chunkIndex"]
         total_chunks = data["totalChunks"]
-
         if file_name not in upload_chunks:
+            # Create a temporary file to stream chunks to disk instead of memory
+            temp_file = tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.upload')            
             upload_chunks[file_name] = {
-                "chunks": [],
+                "temp_file": temp_file,
+                "temp_path": temp_file.name,
+                "chunks_received": 0,
                 "total_chunks": total_chunks,
                 "instance": instance
             }
 
-        # Ensure decoding to bytes
+        # Decode and write chunks directly to disk
         try:
             decoded_chunk = base64.b64decode(chunk_data)
-            upload_chunks[file_name]["chunks"].append(decoded_chunk)
+            upload_chunks[file_name]["temp_file"].write(decoded_chunk)
+            upload_chunks[file_name]["chunks_received"] += 1
+            return "ok"
         except Exception as e:
-            print(f"Error decoding chunk {chunk_index}: {e}")
+            debug_me(f"Error decoding chunk {chunk_index + 1}: {str(e)}", "handle_upload_chunk")
+            return "error"
 
     @globals.web_socket.on("upload_complete")
     def handle_upload_complete(data):
@@ -687,11 +702,13 @@ def setup_socket_handlers(
 
         instance = Instance(data.get("instance_id"), "web")
 
-        if file_name in upload_chunks and len(upload_chunks[file_name]["chunks"]) == int(
+        if file_name in upload_chunks and upload_chunks[file_name]["chunks_received"] == int(
             upload_chunks[file_name]["total_chunks"]
         ):
-            debug_me(f"Upload complete for {file_name}, saving file...", "handle_upload_complete")
-            update_log(instance, f"✅ {file_name} • Upload completed successfully")
+            temp_path = upload_chunks[file_name]["temp_path"]
+            debug_me(f"Uploaded {file_name} to {temp_path}, processing file...", "handle_upload_complete")
+            upload_chunks[file_name]["temp_file"].close()
+            update_log(instance, f"✔️ {file_name} • Upload completed successfully")
             save_uploaded_file(
                 instance,
                 file_name,
@@ -707,20 +724,31 @@ def setup_socket_handlers(
 
             # Cleanup after saving the file
             try:
+                temp_path = upload_chunks[file_name]["temp_path"]
+                # Delete the temp file if it still exists
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                # Delete the metadata for the file
                 del upload_chunks[file_name]
-            except KeyError:
-                pass
+            except OSError as e:
+                debug_me(f"Error during cleanup: {str(e)}", "handle_upload_complete")
         else:
+            chunks_received = upload_chunks[file_name]["chunks_received"] if file_name in upload_chunks else 0
+            expected_chunks = upload_chunks[file_name]["total_chunks"] if file_name in upload_chunks else 0
             debug_me(
                 f'Upload complete event received for {file_name}, but with '
-                f'{len(upload_chunks[file_name]["chunks"])} of '
-                f'{int(upload_chunks[file_name]["total_chunks"])}, some chunks are missing.',
+                f'{chunks_received} of {expected_chunks}, some chunks are missing.',
                 "handle_upload_complete"
             )
             try:
-                del upload_chunks[file_name]
-            except KeyError:
-                pass
+                # Clean up temp file
+                if file_name in upload_chunks:
+                    upload_chunks[file_name]["temp_file"].close()
+                    temp_path = upload_chunks[file_name]["temp_path"]
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+            except OSError as e:
+                debug_me(f"Error during cleanup: {str(e)}", "handle_upload_complete")
 
 
 def save_uploaded_file(
@@ -736,7 +764,7 @@ def save_uploaded_file(
     sort_key_func
 ):
     """
-    Assemble chunks and save the uploaded file.
+    Process the uploaded file from temp storage.
 
     Args:
         instance: Instance object for web notifications
@@ -744,28 +772,28 @@ def save_uploaded_file(
         filters: List of filters to apply
         plex_title: Optional title override
         plex_year: Optional year override
-        upload_chunks: Dictionary of upload chunks
+        upload_chunks: Dictionary with temp file metadata
         filename_pattern: Regex pattern for validating filenames
         check_image_orientation_func: Function to check image orientation
         sort_key_func: Function to generate sort keys
     """
     from artwork_uploader import process_uploaded_artwork
 
-    #temp_zip_path = tempfile.mktemp(suffix=".zip")
+    # Get the temp file path that was used during chunk uploads
+    temp_upload_path = upload_chunks[file_name]["temp_path"]
+    debug_me(f"Processing uploaded file {file_name} from temp path: {temp_upload_path}", "save_uploaded_file")
+
+    # Move to a proper file location with correct filename for processing
     temp_zip_folder = tempfile.mkdtemp()
     temp_zip_path = os.path.join(temp_zip_folder, file_name)
-    debug_me(f"Saving uploaded file {file_name} to temporary path: {temp_zip_folder}", "save_uploaded_file")
+    
+    import shutil
+    shutil.move(temp_upload_path, temp_zip_path)
+    debug_me(f"Moved {file_name} to temporary path: {temp_zip_folder}", "save_uploaded_file")
 
-    with open(temp_zip_path, "wb") as f:
-        for chunk in upload_chunks[file_name]["chunks"]:
-            if isinstance(chunk, str):  # Convert strings to bytes if needed
-                chunk = chunk.encode('utf-8')
-            f.write(chunk)
-
-    del upload_chunks[file_name]  # Free memory
     debug_me(f"Saved ZIP file: {temp_zip_path}", "save_uploaded_file")
 
-    update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file...")
+    update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file and parsing files...")
     extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
         instance,
         temp_zip_path,
@@ -813,10 +841,10 @@ def extract_and_list_zip(
         List of artwork dictionaries sorted by media type, season, episode
     """
     extract_dir = tempfile.mkdtemp()
-    #valid_files = []
     file_list = []
     zip_source = "theposterdb"
     filtered_files = 0
+    errored_files = 0
 
     debug_me(f"Extracting ZIP file: {zip_path} to {extract_dir}", "extract_and_list_zip")
 
@@ -831,20 +859,18 @@ def extract_and_list_zip(
         debug_me(f"Detected ZIP author: {zip_author}", "extract_and_list_zip")
     else:
         zip_source = "mediux"
-
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         # Pre-process the file list to determine source and extract valid files
         zip_infos = [zip_info for zip_info in zip_ref.infolist() if os.path.basename(zip_info.filename) and not os.path.basename(zip_info.filename).startswith(".") and os.path.basename(zip_info.filename) not in {"ds_store", "__macosx"}]
         total_files_in_zip = len(zip_infos)
         
         update_status(instance, "Extracting ZIP file...", "info", sticky=True, spinner=True)
+        notify_web(instance, "progress_bar", { "percent": 0, "message": "Parsing...", "bar_type": "main", "bar_speed": "fast" })
         for n, zip_info in enumerate(zip_infos, 1):
             filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
             debug_me(f"{n} / {total_files_in_zip} • Processing '{filename}'", "extract_and_list_zip")
             percent = (n/total_files_in_zip)*100 if total_files_in_zip > 0 else 0
-            message = f"{n} / {total_files_in_zip} ({percent.__round__()}%)"
-            notify_web(instance, "progress_bar", { "percent": percent, "message": message })
-            #time.sleep(0.01)
+            notify_web(instance, "progress_bar", { "percent": percent, "message": f"Parsing {n} of {total_files_in_zip} • {filename}", "bar_type": "main", "bar_speed": "fast" })
 
             # Mediux ZIP files contain a source.txt file with metadata, we obtain title and author from there
             if filename == "source.txt":
@@ -884,14 +910,31 @@ def extract_and_list_zip(
                 artwork["checksum"] = md5
                 artwork["id"] = "Upload"
                 artwork["author"] = zip_author
-                # Determine media type via Plex lookup if not a collection
+                # Determine media type via Plex lookup if not a collection, find TMDb ID, title
+                # and year in the process for better matching later when processing artwork items
                 if artwork["media"] != "Collection":
                     media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-                    if media_type is None:
+                    if media_type == "unavailable" or "Error" in media_type:
                         # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
                         artwork["title"] = re.sub(r'-', '', artwork.get('title')).replace('...', '').strip()
                         media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-                    artwork["media"] = media_type if media_type else "unavailable"
+                        if media_type == "DNSError":
+                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Cannot resolve server name")
+                            errored_files += 1
+                            continue
+                        elif media_type == "ConnectionError":
+                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Connection error")
+                            errored_files += 1
+                            continue
+                        elif media_type == "TimeoutError":
+                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Timed out")
+                            errored_files += 1
+                            continue
+                        elif media_type == "Error":
+                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex")
+                            errored_files += 1
+                            continue
+                    artwork["media"] = media_type
                     artwork["title"] = title if title and title != artwork.get('title') else artwork.get('title')
                     artwork["tmdb_id"] = tmdb_id
                     if artwork.get('year') is None and year is not None:
@@ -948,10 +991,10 @@ def extract_and_list_zip(
 
     sorted_data = sorted(file_list, key=sort_key_func)
 
+    debug_me(f"❌ Encountered {errored_files} error(s) parsing filenames", "extract_and_list_zip")
     debug_me(f"⏩ Skipped {filtered_files} assets(s) out of {total_files} based on filters).", "extract_and_list_zip")
     debug_me(f"✅ Included {len(sorted_data)} assets:", "extract_and_list_zip")
-    if globals.debug:
-        pprint.pprint(sorted_data)
+    debug_me(sorted_data)
 
     return sorted_data, filtered_files, zip_title, zip_author, zip_source
 

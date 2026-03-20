@@ -76,6 +76,74 @@
             background: #f0f8ff;
         }
 
+        /* The container that handles the sliding animation */
+        .progress-wrapper {
+            /* Step 1: Force it to take zero vertical space */
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin: 0 !important;
+            padding: 0 !important;
+            
+            /* Step 2: Smooth transition for all properties */
+            transition: 
+                max-height 0.4s ease-out, 
+                opacity 0.4s ease, 
+                margin 0.4s ease-out;
+        }
+
+        .progress-wrapper.show {
+            /* Step 3: Allow it to grow to its natural content size */
+            max-height: 100px; /* Needs to be larger than your bar's height */
+            opacity: 1;
+            margin-top: 1rem !important;
+            margin-bottom: 0.5rem !important;
+        }
+
+        /* Force the internal Bootstrap progress bar to have no margins */
+        .progress-wrapper .progress {
+            margin: 0 !important;
+        }
+
+        .progress.position-relative {
+            position: relative; /* This is the anchor for the absolute text */
+        }
+
+        .progress-text-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            /* Responsive Font Styling */
+            font-weight: 600;
+            font-size: 0.75rem; /* Slightly smaller to feel less "crammed" */
+            line-height: 1;
+            pointer-events: none;
+            z-index: 10;
+
+            /* Light/Dark Mode Color Logic */
+            /* This uses the standard Bootstrap text color variable */
+            color: var(--bs-body-color); 
+            
+            /* Adds a slight glow/shadow so it's readable over the blue bar */
+            text-shadow: 0 0 3px var(--bs-body-bg);
+        }
+
+        /* Custom "Purple" bar */
+        .bg-custom {
+            background-color: #14abfd !important;
+        }
+        .bg-custom2 {
+            background-color: #59e179 !important;
+        }
+        .bg-custom3 {
+            background-color: #9e7fdc !important;
+        }        
         #progress-container {
             width: 80%;
             margin: auto;

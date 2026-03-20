@@ -11,6 +11,7 @@ import re
 from core import globals
 import threading
 import sys
+import time
 
 from models import arguments
 from models.instance import Instance
@@ -18,7 +19,7 @@ from utils.notifications import update_log, update_status, notify_web, debug_me,
 from core.config import Config
 from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException, InvalidUrl, InvalidFlag
 from scrapers.theposterdb_scraper import ThePosterDBScraper
-from utils.utils import is_not_comment, parse_url_and_options
+from utils.utils import is_not_comment, parse_url_and_options, elapsed_time
 from models.options import Options
 from plex.plex_connector import PlexConnector
 from core.constants import (
@@ -38,9 +39,9 @@ from services import (
     SchedulerService,
     UtilityService
 )
-from services.artwork_processor import ArtworkProcessor, ProcessingCallbacks
+from services.artwork_processor import ArtworkProcessor
+from models.callbacks import ProcessingCallbacks
 from services.update_service import UpdateService
-from services.notify_service import NotifyService
 
 
 # ----------------------------------------------
@@ -105,6 +106,7 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
     except FileNotFoundError:
         print("File not found. Please enter a valid file path.")
 
+    start_time = time.time()
     update_log(instance, f"🎬 Bulk process started for '{os.path.basename(file_path)}'")
 
     # Loop through the file, process the URL and options, then scrape according to the URL
@@ -123,24 +125,17 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                 update_log(instance, f"❌ One or more invalid flags found in bulk import file '{os.path.basename(file_path)}', line {n}: {str(e)}")
                 continue
 
-            # Parse according to whether it's a user portfolio or poster / set URL
-            if "/user/" in parsed_url.url:
-                try:
-                    scrape_tpdb_user(instance, parsed_url.url, parsed_url.options)
-                except ScraperException as scraper_error:
-                    debug_me(f"ScraperException: {str(scraper_error)}", "parse_bulk_file_from_cli")
-                except Exception as unknown_error:
-                    debug_me(f"Unknown exception: {str(unknown_error)}", "parse_bulk_file_from_cli")
-            else:
-                try:
-                    success_counter = [0]
-                    scrape_and_upload(instance, parsed_url.url, parsed_url.options, success_counter)
-                except ScraperException as e:
-                    debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
-                except Exception as e:
-                    debug_me(f"Unknown Exception: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
+            try:
+                success_counter = [0]
+                scrape_and_upload(instance, parsed_url.url, parsed_url.options, False, success_counter)
+            except ScraperException as e:
+                debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
+            except Exception as e:
+                debug_me(f"Unknown Exception: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
 
-    update_log(instance, f"🏁 Bulk process completed for '{os.path.basename(file_path)}'")
+    end_time = time.time()
+    elapsed = elapsed_time(end_time - start_time)
+    update_log(instance, f"🏁 Bulk process completed in {elapsed} for '{os.path.basename(file_path)}'")
 
 # ---------------------- GUI FUNCTIONS ----------------------
 
@@ -173,31 +168,30 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         # Process the URL and options passed from the GUI or website
         parsed_line = parse_url_and_options(url)
 
-        # Scrape the URL indicated, with the required options
-        if "/user/" in parsed_line.url:
-            scrape_tpdb_user(instance, parsed_line.url, parsed_line.options)
-        else:
-            success_counter = [0]
-            title = scrape_and_upload(instance, parsed_line.url, parsed_line.options, success_counter)
-
-        # And update the UI when we're done
-        update_status(instance, f"Processed all artwork at {parsed_line.url}", color="success")
+        success_counter = [0]
+        title, author = scrape_and_upload(instance, parsed_line.url, parsed_line.options, False, success_counter)
 
         # Update the web ui bulk list with this URL and artwork (only if it's not already in the bulk list)
         if instance.mode == "web" and parsed_line.options.add_to_bulk and title:
-            notify_web(instance, "add_to_bulk_list", {"url": url, "title": title})
+            notify_web(instance, "add_to_bulk_list", {"url": url, "title": title, "author": author})
 
     except ScraperException as scraping_error:
         update_status(instance, f"{scraping_error}", color="danger")
 
     finally:
         if instance.mode == "web":
-            notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
+            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
+            notify_web(instance, "add_spinner", { "element": "scrape_button", "mode": False })
 
 
 def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, scheduled: bool = False) -> None:
 
     """Run the bulk import scrape in a separate thread."""
+
+    if instance.mode == "web":
+        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
+        notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": True })
+        #update_status(instance, f"Starting bulk import for {filename}", "info", True, True)
 
     parsed_urls = []
 
@@ -220,11 +214,10 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
                 update_log(instance, f"❌ One or more invalid flags found in bulk import file '{filename}', line {n}: {str(e)}")
                 continue                
     if len(parsed_urls) == 0:
-        update_status(instance, "No valid bulk import entries found.", color="danger")
+        update_status(instance, "No valid bulk import entries found. Check logs for details", color="danger", icon="x-circle")
+        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
+        notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": False })
         return
-
-    if instance.mode == "web":
-        notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True})
 
     # Pass the processing of the parsed URLs off to a thread
     try:
@@ -250,7 +243,6 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     success_counter = [0]
     assets_processed = [0]
     errors = 0
-    libraries = [0]
 
     try:
 
@@ -259,92 +251,63 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             update_status(instance, "Plex setup incomplete. Please check the settings.", color="red")
             return
 
+        start_time = time.time()
         # Log the start of the bulk import process
         display_filename = filename if filename else "bulk_import.txt"
 #        update_log(instance, f"🎬 Bulk process started for '{display_filename}'")
 
         # Show the progress bar on the web UI
-        notify_web(instance, "progress_bar", {"percent" : 0})
+        notify_web(instance, "progress_bar", {"percent" : 0, "message": f"{display_filename} • 0 of {len(parsed_urls)}", "bar_type": "bulk"})
 
         # Loop through the bulk list
-        for i, parsed_line in enumerate(parsed_urls):
+        for i, parsed_line in enumerate(parsed_urls, 1):
 
             notify_web(instance, "element_disable", {"element": ["bulk_button"], "mode": True})
 
-            # Parse according to whether it's a user portfolio or poster / set URL
-            if "/user/" in parsed_line.url:
-                try:
-                    scrape_tpdb_user(instance, parsed_line.url, parsed_line.options, success_counter, assets_processed)
-                except Exception:
-                    debug_me(f"Failed to scrape TPDb user URL: {parsed_line.url}", "process_bulk_import_from_ui")
-                    pass
-            else:
-                try:
-                    scrape_and_upload(instance, parsed_line.url, parsed_line.options, success_counter, assets_processed)
-                except ScraperException as e:
-                    update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
-                    debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}", "process_bulk_import_from_ui")
-                    errors += 1 
-                    pass
+            try:
+                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed)
+                #time.sleep(1)
+            except ScraperException as e:
+                update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
+                debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}", "process_bulk_import_from_ui")
+                errors += 1 
+                pass
 
-            percent = ((i + 1) / len(parsed_urls)) * 100
-            notify_web(instance, "progress_bar", {"message": f"{i + 1} / {len(parsed_urls)} ({percent.__round__()}%)", "percent" : percent})
+            percent = (i / len(parsed_urls)) * 100
+            notify_web(instance, "progress_bar", {"message": f"{display_filename} • {i} of {len(parsed_urls)}", "percent" : percent, "bar_type": "bulk"})
 
         # All done, update the UI
-        notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} of {len(parsed_urls)} (100%)", "percent" : 100})
+        #notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} / {len(parsed_urls)} (100%)", "percent" : 100, "bar_type": "bulk"})
 
         # Log the completion of the bulk import process
-        poster_count = success_counter[0]
+        end_time = time.time()
+        elapsed = elapsed_time(end_time - start_time)
 
         message = (
             ("🏁 " if errors == 0 else "⚠️ ")
             + ("Scheduled b" if scheduled else "B")
             + f"ulk import of '{display_filename}' completed "
-            + ("successfully • " if errors == 0 else f"with {errors} error(s), check logs for details • ")
+            + (f"successfully in {elapsed} • " if errors == 0 else f"with {errors} error(s) in {elapsed}, check logs for details • ")
             + f"{assets_processed[0]} asset(s) processed • "
-            + f"{poster_count} asset(s) updated"
-            + (f" • {errors} error(s)" if errors > 0 else "")
+            + f"{success_counter[0]} asset(s) updated"
         )
         
-        update_status(instance, message[2:], color="success" if errors == 0 else "warning")
+        update_status(instance, message[2:], color="success" if errors == 0 else "warning", sticky=False, spinner=False)
         update_log(instance, message)
         if scheduled:
             debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).", "process_bulk_import_from_ui")
             send_notification(instance, message)
 
     except Exception as bulk_import_exception:
-        notify_web(instance, "progress_bar", {"percent": 100})
+        notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
         update_status(instance, f"Error during bulk import: {bulk_import_exception}", color="danger")
 
     finally:
-        notify_web(instance, "element_disable", {"element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False})
+        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
+        notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": False })
 
-
-# Scrape all pages of a TPDb user's uploaded artwork
-def scrape_tpdb_user(instance: Instance, url, options, success_counter=None, assets_processed=None):
-
-    if "?" in url:
-        cleaned_url = url.split("?")[0]
-        url = cleaned_url
-
-    try:
-        user_scraper = ThePosterDBScraper(url)
-        user_scraper.scrape_user_info()
-        pages = user_scraper.user_pages
-    except ScraperException as cannot_scrape:
-        debug_me(str(cannot_scrape),"scrape_tpdb_user")
-        raise
-
-    try:
-        for page in range(pages):
-            page_url = f"{url}?section=uploads&page={page + 1}"
-            scrape_and_upload(instance, page_url, options, success_counter, assets_processed)
-    except Exception:
-        raise ScraperException(f"Failed to process and upload from URL: {url}")
-
-
-# Scraped the URL then uploads what it's scraped to Plex
-def scrape_and_upload(instance: Instance, url, options, success_counter=None, assets_processed=None):
+# Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
+def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None):
     """
     Scrape artwork from a URL and upload to Plex.
 
@@ -358,23 +321,38 @@ def scrape_and_upload(instance: Instance, url, options, success_counter=None, as
     def log_callback(message: str):
         update_log(instance, message)
 
+    def debug_callback(message: str, context: str = None):
+        debug_me(message, context)
+
+    def progress_callback(current: int, total: int, title: str, bar_type:str = "main", bar_speed:str = "smooth"):
+        percent = (current / total * 100) if total > 0 else 0
+        #message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
+        #message = f"{title} • {percent.__round__()}%" #if current > 0 else ""
+        notify_web(instance, "progress_bar", {"message": title, "percent": percent, "bar_type": bar_type, "bar_speed": bar_speed})
+
     callbacks = ProcessingCallbacks(
         on_status_update=status_callback,
         on_log_update=log_callback,
+        on_debug=debug_callback,
+        on_progress_update=progress_callback,
         success_counter=success_counter,
         assets_processed=assets_processed
     )
 
     # Use the service to do the actual work
     try:
-        processor = ArtworkProcessor(globals.plex)
-        return processor.scrape_and_process(url, options, callbacks)
+        processor = ArtworkProcessor(globals.plex, callbacks)
+        title, author = processor.scrape_and_process(url, bulk, options)
+        return title, author
     except PlexConnectorException as not_connected:
         debug_me(f"PlexConnectorException: {str(not_connected)}", "scrape_and_upload")
         update_status(instance, str(not_connected), "danger")
         raise
     except ScraperException as scraper_error:
         debug_me(f"ScraperException: {str(scraper_error)}", "scrape_and_upload")
+        raise
+    except Exception as e:
+        debug_me(f"Exception: {str(e)}", "scrape_and_upload")
         raise
 
 
@@ -392,12 +370,13 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
     def log_callback(message: str):
         update_log(instance, message)
 
-    def progress_callback(current: int, total: int):
+    def progress_callback(current: int, total: int, title: str, bar_type:str = "main", bar_speed:str = "smooth"):
         percent = (current / total * 100) if total > 0 else 0
-        message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
-        notify_web(instance, "progress_bar", {"message": message, "percent": percent})
+        #message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
+        #message = f"{title} • {percent.__round__()}%" #if current > 0 else ""
+        notify_web(instance, "progress_bar", {"message": title, "percent": percent, "bar_type": bar_type, "bar_speed": bar_speed})
 
-    def debug_callback(message: str, context: str):
+    def debug_callback(message: str, context: str = None):
         debug_me(message, context)
 
     callbacks = ProcessingCallbacks(
@@ -415,8 +394,8 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
         stage=True if "stage" in options else False, 
         force=True if "force" in options else False
     )
-    processor = ArtworkProcessor(globals.plex)
-    processor.process_uploaded_files(file_list, skipped, zip_title, zip_author, zip_source, opts, callbacks, override_title=plex_title)
+    processor = ArtworkProcessor(globals.plex, callbacks)
+    processor.process_uploaded_files(file_list, skipped, zip_title, zip_author, zip_source, opts, override_title=plex_title)
 
 
 # * Bulk import file I/O functions ---
@@ -431,7 +410,7 @@ def load_bulk_import_file(instance: Instance, filename = None):
             if instance.mode == "cli":
                 print(f"File does not exist: {bulk_import_filename}")
             if instance.mode == "web":
-                update_status(instance, f"File does not exist: {bulk_import_filename}")
+                update_status(instance, f"File does not exist: {bulk_import_filename}", color="danger", sticky=False, spinner=False, icon="x-circle")
             return
 
         # Read file using service
@@ -444,7 +423,7 @@ def load_bulk_import_file(instance: Instance, filename = None):
         debug_me(f"File not found: {str(e)}", "load_bulk_import_file")
         notify_web(instance, "load_bulk_import", {"loaded": False, "error": f"File not found: {str(e)}"})
     except Exception as e:
-        debug_me(f"Error loading bulk import: {str(e)}", "load_bulk_import_file")
+        debug_me(f"Error loading bulk import file: {str(e)}", "load_bulk_import_file")
         import traceback
         traceback.print_exc()
         notify_web(instance, "load_bulk_import", {"loaded": False, "error": str(e)})
@@ -463,6 +442,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
             notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
             update_status(instance, f"Could not rename {old_name}", "warning")
             update_log(instance, f"🔴 Could not rename bulk import file '{old_name}'")
+            debug_me(f"Could not rename bulk import file '{old_name}': {e}", "rename_bulk_import_file")
 
 
 def delete_bulk_import_file(instance: Instance, file_name):
@@ -476,6 +456,7 @@ def delete_bulk_import_file(instance: Instance, file_name):
             notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
             update_status(instance, f"Could not delete {file_name}", "warning")
             update_log(instance, f"🔴 Could not delete bulk import file '{file_name}'")
+            debug_me(f"Could not delete bulk import file '{file_name}': {e}", "delete_bulk_import_file")
 
 
 def save_bulk_import_file(instance: Instance, contents = None, filename = None, now_load = None):
@@ -488,13 +469,14 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
 
             globals.bulk_file_service.write_file(contents, bulk_import_filename)
 
-            update_status(instance, message=f"Bulk import file {filename} saved", color="success")
+            update_status(instance, message=f"Bulk import file {bulk_import_filename} saved", color="success")
             notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
             update_log(instance, f"💾 Saved bulk import file '{bulk_import_filename}'")
         except Exception as e:
             update_status(instance, message="Error saving bulk import file", color="danger")
             notify_web(instance, "save_bulk_import", {"saved": False, "now_load": now_load})
             update_log(instance, f"🔴 Error saving bulk import file '{bulk_import_filename}'")
+            debug_me(f"Error saving bulk import file '{bulk_import_filename}': {e}", "save_bulk_import_file")
 
 
 def check_for_bulk_import_file(instance: Instance):
@@ -748,17 +730,21 @@ if __name__ == "__main__":
             cli_options.add_posters = False
             cli_options.add_sets = False
             try:
-                scrape_tpdb_user(cli_instance, cli_command, cli_options)
+                success_counter = [0]
+                scrape_and_upload(cli_instance, cli_command, cli_options, False, success_counter)
+                debug_me(f"Finished scraping TPDb user URL from CLI with {success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
-                debug_me(f"Error scraping user: {str(e)}","__main__")
-                print(f"Error scraping TPDb user: {str(e)}")
+                debug_me(f"Error scraping TPDb user URL from CLI: {str(e)}", "__main__")
+                update_status(cli_instance, str(e), color="danger")
 
         # User passed in a poster or set URL, so let's process that
         else:
             try:
                 success_counter = [0]
-                scrape_and_upload(cli_instance, cli_command, cli_options, success_counter)
+                scrape_and_upload(cli_instance, cli_command, cli_options, False, success_counter)
+                debug_me(f"Finished scraping URL from CLI with {success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
+                debug_me(f"Error scraping URL from CLI: {str(e)}", "__main__")
                 update_status(cli_instance, str(e),color="danger")
     else:
 
