@@ -94,14 +94,28 @@ class KometaSaver:
                 return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
         try:
             url = self.artwork["url"]
-            debug_me(f"Downloading {self.artwork_type} from URL: {url}", "KometaSaver/save_to_kometa")
+            debug_me(f"Downloading {self.artwork_type.lower()} from URL: {url}", "KometaSaver/save_to_kometa")
             r = requests.get(url, headers=headers, stream=True, timeout=5)
             r.raise_for_status()
             content_type = r.headers.get('Content-Type', '')
             ext = mimetypes.guess_extension(content_type.split(';')[0])
             self.dest_file_ext = ext if ext is not None else self.dest_file_ext
+        except requests.exceptions.Timeout:
+            debug_me(f"Downloading asset from {url} timed out (5 seconds): {str(e)}")
+            return f"❌ {self.description} | Error saving {self.artwork_type}: Asset download timed out (5 seconds)"
+        except requests.exceptions.ConnectionError:
+            debug_me(f"Connection error: {str(e)}")
+            return f"❌ {self.description} | Error saving {self.artwork_type}: Could not connect to server, check your internet connection or the site's status"
+        except requests.exceptions.HTTPError:
+            if r.status_code == 429:
+                debug_me(f"Obtained error 429: too many requests (connection has been rate-limited)")
+                return f"❌ {self.description} | Error saving {self.artwork_type}: Too many requets (connection rate-limtied)"
+            else:
+                debug_me(f"HTTP status code {r.status_code}")
+                return f"❌ {self.description} | Error saving {self.artwork_type}: HTTP Error: {r.status_code}"
         except Exception as e:
-            return f"❌ {self.description} | Error saving {self.artwork_type}: Error fetching URL: {e}"
+            debug_me(f"❌ {self.description} | Error saving {self.artwork_type}: Unknown error")
+            raise Exception from e
 
         dest_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
         try:

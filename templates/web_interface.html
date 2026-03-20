@@ -148,8 +148,21 @@
             </a>
         </nav>
 
-        <div class="progress mt-3 collapse" id="progress_bar_container" role="progressbar" aria-label="Progress" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-            <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" id="progress_bar" style="width: 0%"></div>
+        <div id="progress_bar_container_bulk" class="progress-wrapper">
+            <div class="d-flex justify-content-between small text-muted">
+                <span id="progress_bar_title_bulk" class="small"></span><span id="progress_bar_percent_bulk" class="small"></span>
+            </div>            
+            <div class="progress position-relative">
+                <div class="progress-bar bg-custom3 progress-bar-striped progress-bar-animated" id="progress_bar_bulk" role="progressbar" style="width: 0%"></div>
+            </div>
+        </div>
+        <div id="progress_bar_container_main" class="progress-wrapper">
+            <div class="d-flex justify-content-between small text-muted">
+                <span id="progress_bar_title_main" class="small"></span><span id="progress_bar_percent_main" class="small"></span>
+            </div>
+            <div class="progress position-relative">
+                <div class="progress-bar bg-custom progress-bar-striped progress-bar-animated" id="progress_bar_main" role="progressbar" style="width: 0%"></div>
+            </div>
         </div>
 
         <div class="tab-content" id="myTabContent">
@@ -166,7 +179,7 @@
                                     <label for="plex_base_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Base URL</label>
                                     <input type="url" id="plex_base_url" name="plex_base_url" class="form-control" required
                                         placeholder="https://plex.example.com"
-                                        pattern="https?:\/\/((([a-zA-Z0-9\-]+\.)+[a-zA-Z]{2,})|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?"
+                                        pattern="https?:\/\/([a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?"
                                         title="Please enter a valid URL (e.g., https://plex.example.com)">
                                     <div class="invalid-feedback">
                                         Please provide a valid Plex base URL.
@@ -430,7 +443,7 @@
                             <!-- Icons at the end -->
                             <a title="Delete this file"><i id="delete_icon" class="bi bi-trash3 h4 ms-3" role="button"></i></a>
                             <a title="Rename this file"><i id="rename_icon" class="bi bi-pencil-square h4 ms-3" role="button"></i></a>
-                            <a title="Schedule upload"><i id="schedule_icon" class="bi bi-clock h4 ms-3" role="button"></i></a>
+                            <a title="Schedule bulk file run"><i id="schedule_icon" class="bi bi-clock h4 ms-3" role="button"></i></a>
                             <a title="Create a new bulk file"><i id="create_icon" class="bi bi-file-earmark-plus h4 ms-3" role="button"></i></a>
                             <a title="Upload a new bulk file"><i id="upload_icon" class="bi bi-upload h4 ms-3" role="button"></i></a>
                             <a title="Download current bulk file"><i id="download_icon" class="bi bi-download h4 ms-3" role="button"></i></a>
@@ -524,8 +537,8 @@
                                 </div>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input" type="checkbox" value="--stage" id="option-stage"/>
-                                    <label for="option-stage" class="form-check-label">Download assets for seasons and 
-                                        episodes not yet in Plex (excluding Specials)</label>
+                                    <label for="option-stage" class="form-check-label">Stage assests&ensp;</label>
+                                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Saves assets for seasons and episodes not yet in Plex (excluding specials)"></i>
                                 </div>
                                 <div class="form-check form-switch mb-2" style="display: none;">
                                     <input class="form-check-input" type="checkbox" value="--temp"
@@ -685,8 +698,8 @@
                             </div>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" value="stage" id="upload-option-stage"/>
-                                <label for="upload-option-stage" class="form-check-label">Apply assets for seasons and 
-                                    episodes not yet in Plex (excluding Specials)</label>
+                                    <label for="upload-option-stage" class="form-check-label">Stage assests&ensp;</label>
+                                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Saves assets for seasons and episodes not yet in Plex (excluding specials)"></i>
                             </div>
                             <div class="form-check form-switch mb-2" style="display: none;">
                                 <input class="form-check-input" type="checkbox" value="temp"
@@ -715,25 +728,25 @@
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="show_cover" name="filter" id="upload-filter-show_cover"/>
-                                            <label for="filter-show_cover" class="form-check-label">Show cover</label>
+                                            <label for="upload-filter-show_cover" class="form-check-label">Show cover</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="season_cover" name="filter" id="upload-filter-season_cover"/>
-                                            <label for="filter-season_cover" class="form-check-label">Season covers</label>
+                                            <label for="upload-filter-season_cover" class="form-check-label">Season covers</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-filter-background"/>
-                                            <label for="filter-background" class="form-check-label">Background</label>
+                                            <label for="upload-filter-background" class="form-check-label">Background</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="upload-filter-title_card"/>
-                                            <label for="filter-title_card" class="form-check-label">Title cards</label>
+                                            <label for="upload-filter-title_card" class="form-check-label">Title cards</label>
                                         </div>
                                     </div>
                                 </div>
@@ -742,13 +755,13 @@
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="movie_poster" id="upload-filter-movie_poster"/>
-                                            <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
+                                            <label for="upload-filter-movie_poster" class="form-check-label">Movie poster</label>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-8 col-lg-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="collection_poster" id="upload-filter-collection_poster"/>
-                                            <label for="filter-collection_poster" class="form-check-label">Collection poster</label>
+                                            <label for="upload-filter-collection_poster" class="form-check-label">Collection poster</label>
                                         </div>
                                     </div>
                                 </div>

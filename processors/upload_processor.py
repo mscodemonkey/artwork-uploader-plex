@@ -7,10 +7,11 @@ from plex.plex_connector import PlexConnector
 from plex.plex_uploader import PlexUploader
 from plexapi.exceptions import NotFound
 from kometa.kometa_saver import KometaSaver
-from core.exceptions import CollectionNotFound, MovieNotFound, ShowNotFound
+from core.exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, PlexConnectorException
 from utils import soup_utils
 from utils.utils import is_numeric, get_path_parts
 from core.enums import ScraperSource
+from core.exceptions import ScraperException
 from models.artwork_types import MovieArtwork, TVArtwork, CollectionArtwork
 import os
 from core import globals
@@ -31,10 +32,14 @@ class UploadProcessor:
     def process_collection_artwork(self, artwork: CollectionArtwork) -> Optional[str]:
 
         
-        collection_items, libraries = self.plex.find_collection(artwork["title"])
-
-        if not collection_items:
-            collection_items, libraries = self.plex.find_collection(artwork["title"].replace(" Collection",""))
+        try:
+            collection_items, libraries = self.plex.find_collection(artwork["title"])
+            if not collection_items:
+                collection_items, libraries = self.plex.find_collection(artwork["title"].replace(" Collection",""))
+        except PlexConnectorException as e:
+            raise PlexConnectorException(f"Error searching Plex for {artwork["title"]}")
+        except Exception as e:
+            raise Exception from e
 
         result = None
         results = []
@@ -46,7 +51,7 @@ class UploadProcessor:
             debug_me(f"Found collection '{artwork['title']}' in {len(libraries)} libraries.", "UploadProcessor/process_collection_artwork")
             for collection_item, library in zip(collection_items, libraries):
                 if self.options.kometa or globals.config.save_to_kometa:
-                    asset_folder = collection_item.title
+                    asset_folder = collection_item.title.replace("/", "").replace(":", "")
                     saver = KometaSaver(artwork_type, library)
                     saver.set_artwork(artwork)
                     base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
@@ -74,26 +79,36 @@ class UploadProcessor:
     def process_movie_artwork(self, artwork: MovieArtwork) -> Optional[str]:
 
         artwork["year"] = self.options.year if self.options.year else artwork["year"]
-
-        # Since the TBDb scraper doesn't fetch the TMDb ID up front for each poster, we need to get it here
-        if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value and artwork.get("id") != "Upload":
-            poster_id=artwork.get("id", None)
-            poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
-            debug_me(f"Fetching TMDb ID from '{poster_page_url}'", "UploadProcessor/process_movie_artwork")
-            poster_page_soup = soup_utils.cook_soup(poster_page_url)
-            try:
-                artwork["tmdb_id"] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
-            except (KeyError, TypeError, ValueError) as e:
-                debug_me(f"Failed to extract TMDb ID from poster page, trying another way. Error was: {e}", "UploadProcessor/process_movie_artwork")
-                _, artwork["tmdb_id"], _, _= self.plex.movie_or_show(artwork.get("title"), artwork.get("year"))
-                debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.", "UploadProcessor/process_movie_artwork")
-        movie_items, libraries = self.plex.find_in_library("movie", artwork)
         
         result = None
         results = []
         description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']}"
         artwork_type = "Poster" if artwork.get("type") == "movie_poster" else "Background"
         artwork_id = artwork_type[0]
+
+        # Since the TBDb scraper doesn't fetch the TMDb ID up front for each poster, we need to get it here
+        if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value and artwork.get("id") != "Upload":
+            poster_id=artwork.get("id", None)
+            poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
+            debug_me(f"Fetching TMDb ID from '{poster_page_url}'", "UploadProcessor/process_movie_artwork")
+            try:
+                poster_page_soup = soup_utils.cook_soup(poster_page_url)
+            except ScraperException as e:
+                debug_me(f"Unable to fetch TMDb ID due to error: {str(e)}", "UploadProcesser/process_tv_artwork")
+                raise ScraperException(f"{description} | {str(e)}") from None
+            try:
+                artwork["tmdb_id"] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
+            except (KeyError, TypeError, ValueError) as e:
+                debug_me(f"Failed to extract TMDb ID from poster page, trying another way. Error was: {e}", "UploadProcessor/process_movie_artwork")
+                _, artwork["tmdb_id"], _, _= self.plex.movie_or_show(artwork.get("title"), artwork.get("year"))
+                debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.", "UploadProcessor/process_movie_artwork")
+
+        try:
+            movie_items, libraries = self.plex.find_in_library("movie", artwork)
+        except PlexConnectorException as e:
+            raise PlexConnectorException(str(e))
+        except Exception as e:
+            raise Exception from e
 
         if movie_items:
             debug_me(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.", "UploadProcessor/process_movie_artwork")
@@ -159,8 +174,12 @@ class UploadProcessor:
         if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value and artwork.get("id") != "Upload":
             poster_id=artwork.get("id", None)
             poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
-            debug_me(f"Fetching TMDb ID from {poster_page_url}", "UploadProcessor/process_tv_artwork")
-            poster_page_soup = soup_utils.cook_soup(poster_page_url)
+            debug_me(f"Fetching TMDb ID from '{poster_page_url}'", "UploadProcessor/process_tv_artwork")
+            try:
+                poster_page_soup = soup_utils.cook_soup(poster_page_url)
+            except ScraperException as e:
+                debug_me(f"Unable to fetch TMDb ID due to error: {str(e)}", "UploadProcesser/process_tv_artwork")
+                raise ScraperException(f"{description} | {str(e)}") from None
             try:
                 artwork["tmdb_id"] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
             except (KeyError, TypeError, ValueError) as e:
@@ -169,7 +188,12 @@ class UploadProcessor:
                 debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.", "UploadProcessor/process_tv_artwork")
 
 
-        tv_show_items, libraries = self.plex.find_in_library("tv", artwork)
+        try:
+            tv_show_items, libraries = self.plex.find_in_library("tv", artwork)
+        except PlexConnectorException as e:
+            raise PlexConnectorException(str(e))
+        except Exception as e:
+            raise Exception from e
 
         if tv_show_items:
             debug_me(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.", "UploadProcessor/process_tv_artwork")

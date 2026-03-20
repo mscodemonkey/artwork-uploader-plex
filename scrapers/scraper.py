@@ -2,10 +2,11 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from models.options import Options
+from models.callbacks import ProcessingCallbacks
 from core.exceptions import ScraperException
 from scrapers.theposterdb_scraper import ThePosterDBScraper
 from scrapers.mediux_scraper import MediuxScraper
-from utils.notifications import debug_me
+from utils.notifications import debug_me, update_status
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 class Scraper:
@@ -24,9 +25,10 @@ class Scraper:
         scrape_html():          Scrapes a local HTML file using the Poster DB scraper
     """
 
-    def __init__(self, url: str) -> None:
+    def __init__(self, url: str, callbacks: Optional[ProcessingCallbacks]) -> None:
         self.url: str = url
         self.options: Options = Options()
+        self.callbacks: Optional[ProcessingCallbacks] = callbacks
         self.movie_artwork: MovieArtworkList = []
         self.tv_artwork: TVArtworkList = []
         self.collection_artwork: CollectionArtworkList = []
@@ -36,6 +38,7 @@ class Scraper:
         self.skipped: int = 0
         self.exclusions: int = 0
         self.filtered: int = 0
+        self.errored: int = 0
         self.total: int = 0
 
         # Set source based on the contents of the URL
@@ -77,7 +80,7 @@ class Scraper:
 
     def scrape_theposterdb(self) -> None:
         try:
-            theposterdb_scraper = ThePosterDBScraper(self.url)
+            theposterdb_scraper = ThePosterDBScraper(self.url, self.callbacks)
             theposterdb_scraper.set_options(self.options)
             theposterdb_scraper.scrape()
 
@@ -89,6 +92,7 @@ class Scraper:
             self.skipped = theposterdb_scraper.skipped
             self.exclusions = theposterdb_scraper.exclusions
             self.filtered = theposterdb_scraper.filtered
+            self.errored = theposterdb_scraper.errored
             self.total = theposterdb_scraper.total
 
         except ScraperException as scraper_exception:
@@ -110,7 +114,7 @@ class Scraper:
 
         try:
 
-            mediux_scraper = MediuxScraper(self.url)
+            mediux_scraper = MediuxScraper(self.url, self.callbacks)
             mediux_scraper.set_options(self.options)
             mediux_scraper.scrape()
 
@@ -122,6 +126,7 @@ class Scraper:
             self.skipped = mediux_scraper.skipped
             self.exclusions = mediux_scraper.exclusions
             self.filtered = mediux_scraper.filtered
+            self.errored = mediux_scraper.errored
             self.total = mediux_scraper.total
 
         except ScraperException:
