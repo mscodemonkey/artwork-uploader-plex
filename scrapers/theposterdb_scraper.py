@@ -318,7 +318,7 @@ class ThePosterDBScraper:
             else:
                 self.errored += 1
                 self.callbacks.debug(f"⏩ Skipping artwork item - unknown media type: {title_p} | {poster_url}", "ThePostedDBScraper/get_posters")
-                self.callbacks.log(f"⚠️ {self.title} • {self.author} | Skipping asset (unknown media type): {title_p}")
+                self.callbacks.log(f"{f'⚠️ {self.title} • ' if self.title is not None else ''}{self.author} | Skipping asset (unknown media type): {title_p}")
 
     def scrape_additional_posters(self) -> None:
 

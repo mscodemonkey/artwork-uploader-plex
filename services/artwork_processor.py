@@ -61,7 +61,7 @@ class ArtworkProcessor:
             raise PlexConnectorException(f"Plex connection error: {str(e)}") from e
 
         # Scrape the artwork
-        scraper = Scraper(url, self.callbacks)
+        scraper = Scraper(url=url, callbacks=self.callbacks)
         scraper.set_options(options)
 
         try:
@@ -92,9 +92,6 @@ class ArtworkProcessor:
         if scraper.total - scraper.skipped == 0:
             self.callbacks.progress(1, 1, f"{description} • All assets skipped", "main")
         
-        # Update total assets processed
-        self.callbacks.assets(1)
-
         # Process collections
         n = 1
         title = f"for {scraper.title}" if scraper.title else ""
@@ -126,6 +123,7 @@ class ArtworkProcessor:
 
         end_time = time.time()
         elapsed = elapsed_time(end_time - start_time)
+        self.callbacks.assets(count=(scraper.total - scraper.skipped))
         self.callbacks.log(f"✔️ {description} | {scraper.total - scraper.skipped} asset(s) processed in {elapsed} • {self.callbacks.success_counter[0]} asset(s) updated")
         if not bulk:
             self.callbacks.status(f"Processed all artwork {title} by {scraper.author}", "success")
