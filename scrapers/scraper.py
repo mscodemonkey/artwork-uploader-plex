@@ -80,7 +80,7 @@ class Scraper:
 
     def scrape_theposterdb(self) -> None:
         try:
-            theposterdb_scraper = ThePosterDBScraper(self.url, self.callbacks)
+            theposterdb_scraper = ThePosterDBScraper(url=self.url, callbacks=self.callbacks)
             theposterdb_scraper.set_options(self.options)
             theposterdb_scraper.scrape()
 
@@ -114,7 +114,7 @@ class Scraper:
 
         try:
 
-            mediux_scraper = MediuxScraper(self.url, self.callbacks)
+            mediux_scraper = MediuxScraper(url=self.url, callbacks=self.callbacks)
             mediux_scraper.set_options(self.options)
             mediux_scraper.scrape()
 
