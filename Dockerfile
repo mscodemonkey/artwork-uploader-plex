@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.14-slim-bookworm
 
 # Prevent Python from writing .pyc files and buffer logs
 ENV PYTHONDONTWRITEBYTECODE=1 \

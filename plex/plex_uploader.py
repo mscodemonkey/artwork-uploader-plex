@@ -80,7 +80,7 @@ class PlexUploader:
             else:
                 return f'⏩ {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}'
         except Exception as e:
-            return f'❌ {self.description} | failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle} - More info: {str(e)}'
+            return f'❌ {self.description} | Failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}: {str(e)}'
 
     def artwork_exists_on_plex(self) -> bool:
         existing_artwork = False
