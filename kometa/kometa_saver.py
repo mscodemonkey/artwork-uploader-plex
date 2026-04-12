@@ -61,6 +61,7 @@ class KometaSaver:
         }
 
         replaced_file: bool = False
+        existing_file: Optional[str] = None
 
         # Check if an asset already exists for this item, skip if so (unless force is specified, in which case delete existing asset first)
         try:
@@ -69,10 +70,11 @@ class KometaSaver:
                 if os.path.exists(existing_file) and not self.options.force:
                     return f"⏩ {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
                 elif os.path.exists(existing_file) and self.options.force:
-                    os.remove(existing_file)
+                    #os.remove(existing_file)
                     replaced_file = True
+                    break
         except OSError as e:
-            return f"❌ {self.description} | failed to save {self.artwork_type} asset: {e}"
+            return f"❌ {self.description} | Error checking existing {self.artwork_type.lower()} asset: {e}"
 
         if self.type == "file":
             # Save from local file path
@@ -89,9 +91,9 @@ class KometaSaver:
                 else:
                     return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
             except OSError:
-                return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
+                return f"❌ {self.description} | Error saving {self.artwork_type.lower()} (invalid path): '{self.dest_dir}'"
             except Exception as e:
-                return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
+                return f"❌ {self.description} | Failed to save {self.artwork_type.lower()}: {e}"
         try:
             url = self.artwork["url"]
             debug_me(f"Downloading {self.artwork_type.lower()} from URL: {url}", "KometaSaver/save_to_kometa")
@@ -100,35 +102,39 @@ class KometaSaver:
             content_type = r.headers.get('Content-Type', '')
             ext = mimetypes.guess_extension(content_type.split(';')[0])
             self.dest_file_ext = ext if ext is not None else self.dest_file_ext
-        except requests.exceptions.Timeout:
+        except requests.exceptions.Timeout as e:
             debug_me(f"Downloading asset from {url} timed out (5 seconds): {str(e)}")
-            return f"❌ {self.description} | Error saving {self.artwork_type}: Asset download timed out (5 seconds)"
-        except requests.exceptions.ConnectionError:
+            return f"❌ {self.description} | Error saving {self.artwork_type.lower()}: Asset download timed out (5 seconds)"
+        except requests.exceptions.ConnectionError as e:
             debug_me(f"Connection error: {str(e)}")
-            return f"❌ {self.description} | Error saving {self.artwork_type}: Could not connect to server, check your internet connection or the site's status"
+            return f"❌ {self.description} | Error saving {self.artwork_type.lower()}: Could not connect to server, check your internet connection or the site's status"
         except requests.exceptions.HTTPError:
             if r.status_code == 429:
                 debug_me(f"Obtained error 429: too many requests (connection has been rate-limited)")
-                return f"❌ {self.description} | Error saving {self.artwork_type}: Too many requets (connection rate-limtied)"
+                return f"❌ {self.description} | Error saving {self.artwork_type.lower()}: Too many requets (connection rate-limtied)"
             else:
                 debug_me(f"HTTP status code {r.status_code}")
-                return f"❌ {self.description} | Error saving {self.artwork_type}: HTTP Error: {r.status_code}"
+                return f"❌ {self.description} | Error saving {self.artwork_type.lower()}: HTTP Error: {r.status_code}"
         except Exception as e:
-            debug_me(f"❌ {self.description} | Error saving {self.artwork_type}: Unknown error")
-            raise Exception from e
+            debug_me(f"❌ {self.description} | Error saving {self.artwork_type.lower()}: Unknown error")
+            raise
 
         dest_file = os.path.join(self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
+        temp_file = f"{dest_file}.tmp"
         try:
             os.makedirs(self.dest_dir, exist_ok=True)
-            with open(dest_file, 'wb') as f:
+            with open(temp_file, 'wb') as f:
                 for chunk in r.iter_content(1024):
                     f.write(chunk)
+            if replaced_file and existing_file != dest_file:
+                os.remove(existing_file)
+            os.replace(temp_file, dest_file)
             if replaced_file:
                 return f"♻️ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
             else:
                 return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
         except OSError:
-            return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'"
+            return f"❌ {self.description} | Error saving {self.artwork_type.lower()} (invalid path): '{self.dest_dir}'"
         except Exception as e:
-            return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
+            return f"❌ {self.description} | Failed to save {self.artwork_type.lower()}: {e}"
 
