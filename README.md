@@ -181,7 +181,7 @@ If you're interested in contributing to this project or want to understand how i
 # Installation
 
 ### 1. Install Python
-[Install Python](https://www.python.org/downloads/) (if not installed already).  You'll need version 3.10 or later.
+[Install Python](https://www.python.org/downloads/) (if not installed already).  You'll need version 3.12 or later.
 
 ### 2. Get Artwork Uploader for Plex
 Either download the Zip and extract all files into a folder, or Git Clone the repository
@@ -293,7 +293,7 @@ Open a web browser and point it to `http://your_ip_address:4567` and you're read
 
 ## Directly as a python script
 
-**NOTE**: THIS REQUIRES AT LEAST PYTHON 3.10.  You will encounter odd errors in the scraping log for earlier versions of Python, due to a bug that was fixed in 3.10.
+**NOTE**: THIS REQUIRES AT LEAST PYTHON 3.12.
 
 ### Running the Application
 
@@ -407,7 +407,7 @@ python3 -m pip install -r requirements.txt
 ```
 
 #### 2. **Wrong Python version**
-Artwork Uploader requires Python 3.10 or later. Check your version:
+Artwork Uploader requires Python 3.12 or later. Check your version:
 ```bash
 python3 --version
 ```
@@ -484,20 +484,6 @@ If you see errors like this in your logs:
 Flask correctly rejects these with a 400 error since it doesn't support HTTPS by default. You can safely ignore these messages - they don't affect functionality.
 
 If you want to access the app over HTTPS you can use a reverse proxy like Nginx or Caddy.
-
-### "eventlet monkey_patch" errors
-
-If you see errors related to eventlet on Python 3.13, consider using Python 3.11 or 3.12 instead, as eventlet has known compatibility issues with Python 3.13.
-
-```bash
-# Install Python 3.12 via Homebrew (macOS)
-brew install python@3.12
-
-# Create venv with Python 3.12
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
 
 ### Plex connection issues
 

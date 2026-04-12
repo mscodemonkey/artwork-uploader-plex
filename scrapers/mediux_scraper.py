@@ -292,7 +292,8 @@ class MediuxScraper:
                 else:
                     # Unknown file type or structure, skip
                     self.callbacks.debug(f"⏩ Skipping unknown TV show file type: {data.get('fileType')}", "MediuxScraper/_process_set")
-                    self.callbacks.log(f"⚠️ {self.title} • {self.author} | Skipping asset (unknown TV show file tye)")
+                    self.callbacks.debug(data)
+                    self.callbacks.log(f"⚠️ {self.title} • {self.author} | Skipping asset (unknown TV show file type: {data.get('fileType')})")
                     self.errored += 1
                     continue
 
