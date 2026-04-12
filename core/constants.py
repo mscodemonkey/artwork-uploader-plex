@@ -11,7 +11,7 @@ GITHUB_REPO = __url__.replace("https://github.com/", "")
 
 # Python version requirements
 MIN_PYTHON_MAJOR = 3
-MIN_PYTHON_MINOR = 10
+MIN_PYTHON_MINOR = 12
 
 # Server configuration
 DEFAULT_WEB_PORT = 4567
