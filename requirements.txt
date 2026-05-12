@@ -26,7 +26,7 @@ requests==2.33.1
 schedule==1.2.2
 simple-websocket==1.1.0
 soupsieve==2.8.3
-strongtyping==3.13.6
+strongtyping==3.13.7
 urllib3==2.6.3
 validators==0.35.0
 Werkzeug==3.1.8
