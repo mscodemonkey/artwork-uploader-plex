@@ -22,7 +22,7 @@ pillow==12.2.0
 PlexAPI==4.18.1
 python-engineio==4.13.1
 python-socketio==5.16.1
-requests==2.33.1
+requests==2.34.0
 schedule==1.2.2
 simple-websocket==1.1.0
 soupsieve==2.8.3
