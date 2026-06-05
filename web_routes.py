@@ -949,14 +949,20 @@ def extract_and_list_zip(
                 if artwork['media'] == "Movie":
                     if check_image_orientation_func(artwork["path"]) == "landscape":
                         artwork['type'] = "background"
+                    elif artwork['type'] == "square_art" or check_image_orientation_func(artwork["path"]) == "square":
+                        artwork['type'] = "square_art"
                     else:
                         artwork['type'] = "movie_poster"
                 if artwork['media'] == "Collection":
                     if check_image_orientation_func(artwork["path"]) == "landscape":
                         artwork['type'] = "background"
+                    if check_image_orientation_func(artwork["path"]) == "square":
+                        artwork['type'] = "square_art"
                 if artwork['media'] == "unavailable":
                     if check_image_orientation_func(artwork["path"]) == "landscape":
                         artwork['type'] = "background"
+                    if check_image_orientation_func(artwork["path"]) == "square":
+                        artwork['type'] = "square_art"
                     if artwork['type'] == "season_cover":
                         artwork['media'] = "TV Show"
                     else:

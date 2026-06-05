@@ -24,10 +24,11 @@ class UploadProcessor:
         self.options: Options = Options()
         self.config: Config = Config()
         self.config.load()
-        self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
+
 
     def set_options(self, options: Options) -> None:
         self.options = options
+        self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
 
     def process_collection_artwork(self, artwork: CollectionArtwork) -> Optional[str]:
 
@@ -44,20 +45,20 @@ class UploadProcessor:
         result = None
         results = []
         description = f"{artwork["title"]} • {artwork["author"]}"
-        artwork_type = "Poster" if artwork["type"] == "collection_poster" else "Background"
-        artwork_id = artwork_type[0]
+        artwork_type = "Poster" if artwork["type"] == "collection_poster" else "Square art" if artwork["type"] == "square_art" else "Background"
+        artwork_id = "SA" if artwork["type"] == "square_art" else artwork_type[0]
 
         if collection_items:
             debug_me(f"Found collection '{artwork['title']}' in {len(libraries)} libraries.", "UploadProcessor/process_collection_artwork")
             for collection_item, library in zip(collection_items, libraries):
-                if self.options.kometa or globals.config.save_to_kometa:
+                if self.kometa:
                     asset_folder = collection_item.title.replace("/", "").replace(":", "")
                     saver = KometaSaver(artwork_type, library)
                     saver.set_artwork(artwork)
                     base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                     saver.dest_dir = os.path.join(base_dir, library, asset_folder)
                     debug_me(f"Destination directory is {saver.dest_dir}", "UploadProcessor/process_collection_artwork")
-                    saver.dest_file_name = artwork_type.lower()
+                    saver.dest_file_name = "square" if artwork_type.lower() == "square art" else artwork_type.lower()
                     saver.dest_file_ext = ".jpg"
                     saver.set_description(description)
                     saver.set_options(self.options)
@@ -83,8 +84,8 @@ class UploadProcessor:
         result = None
         results = []
         description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']}"
-        artwork_type = "Poster" if artwork.get("type") == "movie_poster" else "Background"
-        artwork_id = artwork_type[0]
+        artwork_type = "Poster" if artwork.get("type") == "movie_poster" else "Square art" if artwork.get("type") == "square_art" else "Background"
+        artwork_id = "SA" if artwork.get("type") == "square_art" else artwork_type[0]
 
         # Since the TBDb scraper doesn't fetch the TMDb ID up front for each poster, we need to get it here
         if not artwork.get("tmdb_id") and artwork.get("source") == ScraperSource.THEPOSTERDB.value and artwork.get("id") != "Upload":
@@ -115,7 +116,7 @@ class UploadProcessor:
             for movie_item, library in zip(movie_items, libraries):
                 # Use the actual movie title from Plex in case it differs from the artwork title (if it's a foreign title, etc.)
                 desc = description.replace(artwork["title"], movie_item.title) if movie_item.title != artwork["title"] else description
-                if self.options.kometa or globals.config.save_to_kometa:
+                if self.kometa:
                     item_path = movie_item.media[0].parts[0].file
                     path_parts = []
                     path_parts = get_path_parts(item_path)
@@ -125,7 +126,7 @@ class UploadProcessor:
                     base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                     saver.dest_dir = os.path.join(base_dir, library, asset_folder)
                     debug_me(f"Destination directory is {saver.dest_dir}", "UploadProcessor/process_movie_artwork")
-                    saver.dest_file_name = artwork_type.lower()
+                    saver.dest_file_name = "square" if artwork.get("type") == "square_art" else artwork_type.lower()
                     saver.dest_file_ext = ".jpg"
                     saver.set_description(desc)
                     saver.set_options(self.options)
@@ -165,7 +166,7 @@ class UploadProcessor:
             description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']} • {season} • Episode {artwork['episode']:02}"
         elif (artwork['episode'] is None or artwork['episode'] == "Cover") and is_numeric(artwork['season']):
             description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']} • {season}"
-        elif artwork['season'] is None or artwork["season"] == "Cover" or artwork["season"] == "Backdrop":
+        elif artwork['season'] is None or artwork["season"] == "Cover" or artwork["season"] == "Backdrop" or artwork["season"] == "SquareArt":
             description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']}"
 
         artwork["year"] = self.options.year if self.options.year else artwork["year"]
@@ -217,6 +218,11 @@ class UploadProcessor:
                         artwork_id = "B"
                         artwork_type = "Background"
                         file_name = "background"
+                    elif artwork["season"] == "SquareArt":
+                        upload_target = tv_show
+                        artwork_id = "SA"
+                        artwork_type = "Square art"
+                        file_name = "square"
                     elif artwork["season"] >= 0:
                         if artwork["episode"] == "Cover" or artwork["episode"] is None:
                             if artwork["season"] in [S.index for S in tv_show.seasons()] or (self.staging and season != "Specials"):
@@ -251,28 +257,27 @@ class UploadProcessor:
                     raise ShowNotFound(f"{desc} | Not available on Plex in {library}: {e}") from e
                     
                 try:
-                    if upload_target or (self.options.kometa or globals.config.save_to_kometa):
-                        if self.kometa:
-                            saver = KometaSaver(artwork_type, library)
-                            saver.set_artwork(artwork)
-                            base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
-                            saver.dest_dir = os.path.join(base_dir, library, asset_folder)
-                            debug_me(f"Destination directory is {saver.dest_dir}", "UploadProcessor/process_tv_artwork")
-                            saver.dest_file_name = file_name
-                            saver.dest_file_ext = ".jpg"
-                            saver.set_description(desc)
-                            saver.set_options(self.options)
-                            result = saver.save_to_kometa()
-                            results.append(result)
-                        else:
-                            uploader = PlexUploader(upload_target, artwork_type, artwork_id)
-                            uploader.set_artwork(artwork)
-                            uploader.track_artwork_ids = self.config.track_artwork_ids
-                            uploader.reset_overlay = self.config.reset_overlay
-                            uploader.set_description(desc)
-                            uploader.set_options(self.options)
-                            result = uploader.upload_to_plex()
-                            results.append(result)
+                    if self.kometa:
+                        saver = KometaSaver(artwork_type, library)
+                        saver.set_artwork(artwork)
+                        base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
+                        saver.dest_dir = os.path.join(base_dir, library, asset_folder)
+                        debug_me(f"Destination directory is {saver.dest_dir}", "UploadProcessor/process_tv_artwork")
+                        saver.dest_file_name = file_name
+                        saver.dest_file_ext = ".jpg"
+                        saver.set_description(desc)
+                        saver.set_options(self.options)
+                        result = saver.save_to_kometa()
+                        results.append(result)
+                    elif upload_target:
+                        uploader = PlexUploader(upload_target, artwork_type, artwork_id)
+                        uploader.set_artwork(artwork)
+                        uploader.track_artwork_ids = self.config.track_artwork_ids
+                        uploader.reset_overlay = self.config.reset_overlay
+                        uploader.set_description(desc)
+                        uploader.set_options(self.options)
+                        result = uploader.upload_to_plex()
+                        results.append(result)
                 except Exception:
                     raise
         else:

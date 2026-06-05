@@ -22,7 +22,7 @@ class PlexUploader:
     ) -> None:
         self.upload_target: Union[Movie, Show, Season, Episode, Collection] = upload_target
         self.artwork_type: str = artwork_type
-        self.artwork_id: str = artwork_id.upper() + "ID:"  # This will be BID, CID, PID, SID or EID - for [B]ackgrounds, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
+        self.artwork_id: str = artwork_id.upper() + "ID:"  # This will be BID, SAID, CID, PID, SID or EID - for [B]ackgrounds, [S]quare[A]rt, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
         self.description: str = "item"
         self.label: Optional[str] = None
         self.artwork: Optional[AnyArtwork] = None
@@ -62,16 +62,25 @@ class PlexUploader:
 
                 if self.artwork_id == "BID:":
                     if self.type == "file":
-                        self.upload_target.uploadArt( filepath = self.artwork['path'])
+                        self.upload_target.uploadArt(filepath = self.artwork['path'])
                     else:
-                        self.upload_target.uploadArt( url = self.artwork["url"])
+                        self.upload_target.uploadArt(url = self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
+
+                elif self.artwork_id == "SAID:":
+                    if self.type == "file":
+                        self.upload_target.uploadSquareArt(filepath = self.artwork['path'])
+                    else:
+                        self.upload_target.uploadSquareArt(url = self.artwork["url"])
+                    if self.track_artwork_ids:
+                        self.upload_target.addLabel(self.label)
+
                 else:
                     if self.type == "file":
-                        self.upload_target.uploadPoster( filepath = self.artwork['path'])
+                        self.upload_target.uploadPoster(filepath = self.artwork['path'])
                     else:
-                        self.upload_target.uploadPoster( url = self.artwork["url"])
+                        self.upload_target.uploadPoster(url = self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
                 if self.artwork["source"] == ScraperSource.THEPOSTERDB.value and self.type == "url":

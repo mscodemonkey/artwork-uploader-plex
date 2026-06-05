@@ -22,7 +22,7 @@ There are also a couple of new options for thePosterDb, which will allow you to 
 And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it. You can also exclude entire seasons or individual episodes, that way the app doesn't have to provess all the previous seasons for which you already have artwork applied.
 
 ### Kometa support
-Kometa support is offered in two different ways. The simple way is for the script to reset Kometa's overlay label so the next time Kometa runs the overlay gets added to the new artwork (`reset_overlay` set to `true` in config.json). Alternatively, if you're using Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) to manage all your Plex custom art, you can check the option to save the artwork to the Kometa asset directory instead of applying it direectly to Plex (either in the GUI or by setting `save_to_kometa` to `true` in the config.json file). In that case, whenever Kometa runs again it will apply all new or updated artwork with its corresponding overlays. If this option is enabled, you will have to set the Kometa base directory (`kometa_base` in the config file, or with the appropriate text field in the GUI) to the base asset directory.
+Kometa support is offered in two different ways. The simple way is for the script to reset Kometa's overlay label so the next time Kometa runs the overlay gets added to the new artwork (`reset_overlay` set to `true` in config.json). Alternatively, if you're using Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) to manage all your Plex custom art, you can check the option to save the artwork to the Kometa asset directory instead of applying it directly to Plex (either in the GUI or by setting `save_to_kometa` to `true` in the config.json file). In that case, whenever Kometa runs again it will apply all new or updated artwork with its corresponding overlays. If this option is enabled, you will have to set the Kometa base directory (`kometa_base` in the config file, or with the appropriate text field in the GUI) to the base asset directory.
 
 Kometa asset directory support works on the following assumptions:
 
@@ -249,13 +249,14 @@ This is optional - if you don't do this, a new config.json will be created when 
 - Provide a comma-separated list of Apprise service URLs to send notifications upong completion of scheduled bulk imports. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
 
 ### Filter options
-Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]. TPDb does not provide title cards or backgrounds so these filters are not available in the web UI.
-      - show_cover
-      - background
-      - season_cover
-      - title_card
-      - movie_poster
-      - collection_poster
+Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]. TPDb does not provide title cards, backgrounds or square art so these filters are not available in the web UI.
+- show_cover
+- background
+- square_art
+- season_cover
+- title_card
+- movie_poster
+- collection_poster
 
 ---
 # Usage
@@ -356,9 +357,10 @@ The script supports various command-line arguments for flexible use.
   - ```--exclude s00e01 s02``` - Excludes specials episode 1 and all of season 2
   - You can mix artwork IDs and episode/season patterns in the same command
     
-```--filters <filter1> [<filter2> <filter3> ...]``` will **only** upload the selected artwork types, based on the options below
+```--filters <filter1> [<filter2> <filter3> ...]``` will **only** upload the selected artwork types, based on the options below:
 - show_cover
 - background
+- square_art
 - season_cover
 - title_card 
 - movie_poster
@@ -584,6 +586,8 @@ Both the ```mediux_filters``` and ```tvdb_filters``` options in **config.json** 
 ```show_cover``` - Upload a cover for the TV show
 
 ```background``` - Upload background images
+
+```square_art``` - Upload square art background images for mobile platforms
 
 ```season_cover``` - Upload covers for each individual season
 
