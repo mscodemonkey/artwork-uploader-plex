@@ -289,6 +289,12 @@ class MediuxScraper:
                         self.errored += 1
                         continue
 
+                elif data["fileType"] == FileType.SQUARE_ART.value:
+                    self.callbacks.debug(f"Square art detected for set id: {data.get('set_id', {}).get('id', "unknown")}", "MediuxScraper/_process_set")
+                    season = "SquareArt"
+                    episode = None
+                    file_type = "square_art" 
+
                 else:
                     # Unknown file type or structure, skip
                     self.callbacks.debug(f"⏩ Skipping unknown TV show file type: {data.get('fileType')}", "MediuxScraper/_process_set")
@@ -298,7 +304,6 @@ class MediuxScraper:
                     continue
 
             elif media_type == MediaType.MOVIE.value:
-
                 if data["movie_id"]:
                     movie_id = data["movie_id"]["id"]
                     if set_data.get("movie"):
@@ -318,11 +323,25 @@ class MediuxScraper:
                     title = set_data["collection"]["collection_name"]
                     file_type = "collection_poster"
                 else:
-                    if data["fileType"] == "movie_poster":
+                    if data["fileType"] == FileType.MOVIE_POSTER.value:
                         # This is a collection poster
                         file_type = "collection_poster"
                         title = set_data["collection"]["collection_name"]
-                    elif data["fileType"] == "backdrop":
+
+                    elif data["fileType"] == FileType.SQUARE_ART.value:
+                        # This is a square art
+                        if data["movie_id_ost"]:
+                            movie_id = data["movie_id_ost"]["id"]
+                            if set_data.get("collection") is not None:
+                                movies = set_data["collection"]["movies"]
+                                movie_data = [movie for movie in movies if movie["id"] == movie_id][0]
+                            else:
+                                movie_data = set_data["movie"]
+                            title = movie_data["title"]
+                            year = int(movie_data["release_date"][:4])
+                            file_type = "square_art"
+
+                    elif data["fileType"] == FileType.BACKDROP.value:
                         # This is a movie background
                         if data["movie_id_backdrop"]:
                             movie_id = data["movie_id_backdrop"]["id"]

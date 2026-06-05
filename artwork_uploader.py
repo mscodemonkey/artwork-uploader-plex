@@ -367,8 +367,6 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
 
     def progress_callback(current: int, total: int, title: str, bar_type:str = "main", bar_speed:str = "smooth"):
         percent = (current / total * 100) if total > 0 else 0
-        #message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
-        #message = f"{title} • {percent.__round__()}%" #if current > 0 else ""
         notify_web(instance, "progress_bar", {"message": title, "percent": percent, "bar_type": bar_type, "bar_speed": bar_speed})
 
     def debug_callback(message: str, context: str = None):

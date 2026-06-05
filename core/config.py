@@ -109,7 +109,7 @@ class Config:
             "bulk_txt": "bulk_import.txt",
             "tv_library": ["TV Shows"],
             "movie_library": ["Movies"],
-            "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"],
+            "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster", "square_art"],
             "tpdb_filters": ["season_cover", "show_cover", "movie_poster", "collection_poster"],
             "kometa_base": "",
             "temp_dir": "",

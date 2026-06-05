@@ -307,6 +307,7 @@
                                                     <label for="p_filter-movie_poster" class="form-check-label">Movie poster</label>
                                                 </div>
                                             </div>
+                                            <div class="col-12 mb-2"><strong>General</strong></div>
                                             <div class="col-6 col-md-4 col-xl-4">
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input" type="checkbox" checked value="collection_poster" id="p_filter-collection_poster"/>
@@ -340,12 +341,6 @@
                                             </div>
                                             <div class="col-6 col-md-4 col-xl-3">
                                                 <div class="form-check form-switch mb-2">
-                                                    <input class="form-check-input" type="checkbox" value="background" id="m_filter-background"/>
-                                                    <label for="m_filter-background" class="form-check-label">Background</label>
-                                                </div>
-                                            </div>
-                                            <div class="col-6 col-md-4 col-xl-3">
-                                                <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input" type="checkbox" value="title_card" id="m_filter-title_card"/>
                                                     <label for="m_filter-title_card" class="form-check-label">Title cards</label>
                                                 </div>
@@ -357,6 +352,19 @@
                                                 <div class="form-check form-switch mb-2">
                                                     <input class="form-check-input" type="checkbox" value="movie_poster" id="m_filter-movie_poster"/>
                                                     <label for="m_filter-movie_poster" class="form-check-label">Movie poster</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-12 mb-2"><strong>General</strong></div>
+                                            <div class="col-6 col-md-4 col-xl-3">
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input" type="checkbox" value="background" id="m_filter-background"/>
+                                                    <label for="m_filter-background" class="form-check-label">Background</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-6 col-md-4 col-xl-3">
+                                                <div class="form-check form-switch mb-2">
+                                                    <input class="form-check-input" type="checkbox" value="square_art" id="m_filter-square_art"/>
+                                                    <label for="m_filter-square_art" class="form-check-label">Square art</label>
                                                 </div>
                                             </div>
                                             <div class="col-6 col-md-4 col-xl-4 mb-3">
@@ -600,12 +608,6 @@
                                             </div>
                                         </div>
                                         <div class="col-6 col-md-4 col-lg-3">
-                                            <div class="form-check form-switch mb-2" id="tpdb-background" style="display: block;">
-                                                <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="filter-background"/>
-                                                <label for="filter-background" class="form-check-label">Background</label>
-                                            </div>
-                                        </div>
-                                        <div class="col-6 col-md-4 col-lg-3">
                                             <div class="form-check form-switch mb-2" id="tpdb-card" style="display: block;">
                                                 <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="filter-title_card"/>
                                                 <label for="filter-title_card" class="form-check-label">Title cards</label>
@@ -621,12 +623,25 @@
                                                 <label for="filter-movie_poster" class="form-check-label">Movie poster</label>
                                             </div>
                                         </div>
+                                        <div class="col-12 mb-2"><strong>General</strong></div>
                                         <div class="col-6 col-md-8 col-lg-3">
                                             <div class="form-check form-switch mb-2">
                                                 <input class="form-check-input" type="checkbox" checked
                                                     value="collection_poster" id="filter-collection_poster"/>
                                                 <label for="filter-collection_poster" class="form-check-label">Collection
                                                     poster</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-lg-3">
+                                            <div class="form-check form-switch mb-2" id="tpdb-background" style="display: block;">
+                                                <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="filter-background"/>
+                                                <label for="filter-background" class="form-check-label">Background</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6 col-md-4 col-lg-3">
+                                            <div class="form-check form-switch mb-2" id="tpdb-square" style="display: block;">
+                                                <input class="form-check-input" type="checkbox" checked value="square_art" name="filter" id="filter-square_art"/>
+                                                <label for="filter-square_art" class="form-check-label">Square art</label>
                                             </div>
                                         </div>
                                     </div>
@@ -739,12 +754,6 @@
                                     </div>
                                     <div class="col-6 col-md-4 col-lg-3">
                                         <div class="form-check form-switch mb-2">
-                                            <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-filter-background"/>
-                                            <label for="upload-filter-background" class="form-check-label">Background</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-4 col-lg-3">
-                                        <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="title_card" name="filter" id="upload-filter-title_card"/>
                                             <label for="upload-filter-title_card" class="form-check-label">Title cards</label>
                                         </div>
@@ -758,10 +767,23 @@
                                             <label for="upload-filter-movie_poster" class="form-check-label">Movie poster</label>
                                         </div>
                                     </div>
+                                    <div class="col-12 mb-2"><strong>General</strong></div>
                                     <div class="col-6 col-md-8 col-lg-3">
                                         <div class="form-check form-switch mb-2">
                                             <input class="form-check-input" type="checkbox" checked value="collection_poster" id="upload-filter-collection_poster"/>
                                             <label for="upload-filter-collection_poster" class="form-check-label">Collection poster</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="background" name="filter" id="upload-filter-background"/>
+                                            <label for="upload-filter-background" class="form-check-label">Background</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-4 col-lg-3">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" checked value="square_art" name="filter" id="upload-filter-square_art"/>
+                                            <label for="upload-filter-square_art" class="form-check-label">Square art</label>
                                         </div>
                                     </div>
                                 </div>

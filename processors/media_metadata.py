@@ -55,6 +55,8 @@ def parse_title(title: str):
 
     movie_or_show_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)"
     background_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)\s-\sBackdrop"
+    tv_sq_art_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)\s-\sS\d+\sOST" # Mediux square art for season 1 OSTs have this unique format so we can use it to identify them
+    movie_sq_art_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)\s-\sOST"
     collection_pattern = r"^(?!.*\(\d{4}\))(?P<title>.+)$" # Collections don't have a year in their name and some collection poster files don't have the word "Collection" in them
 
     # If it matches the episode pattern (SxxExx), it's a TV show title card
@@ -134,6 +136,36 @@ def parse_title(title: str):
             "author": None
         }
         debug_me(f"Matched '{title}' as either movie, TV show or collection background for '{artwork['title']} ({artwork['year']})'", "media_metadata/parse_title")
+        return artwork
+    
+    # Check if it's a Mediux square art for TV Show
+    tv_sq_art_match = re.match(tv_sq_art_pattern, title, re.IGNORECASE)
+    if tv_sq_art_match:
+        artwork = {
+            "media": "TV Show",
+            "title": tv_sq_art_match.group('title').strip(),
+            "year": tv_sq_art_match.group('year'),
+            "season": "SquareArt",
+            "episode": None,
+            "type": "square_art",
+            "author": None
+        }
+        debug_me(f"Matched '{title}' as square art for TV Show '{artwork['title']} ({artwork['year']})'", "media_metadata/parse_title")
+        return artwork
+    
+    # Check if it's a Mediux square art for Movie
+    movie_sq_art_match = re.match(movie_sq_art_pattern, title, re.IGNORECASE)
+    if movie_sq_art_match:
+        artwork = {
+            "media": "Movie",
+            "title": movie_sq_art_match.group('title').strip(),
+            "year": movie_sq_art_match.group('year'),
+            "season": None,
+            "episode": None,
+            "type": "square_art",
+            "author": None
+        }
+        debug_me(f"Matched '{title}' as square art for Movie '{artwork['title']} ({artwork['year']})'", "media_metadata/parse_title")
         return artwork
 
     # If we got to this point and it doesn't contain "Backdrop", it could still be a background or a movie ot tv show poster
