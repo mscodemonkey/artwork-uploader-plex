@@ -166,8 +166,3 @@ jobs:
             --notes-file CHANGELOG.md \
             ${PRERELEASE} \
             dist/*.zip dist/*.tar.gz
-
-      - name: Update latest tag
-        run: |
-          git tag -f latest
-          git push -f origin latest
