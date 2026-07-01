@@ -4,6 +4,15 @@ on:
   push:
     tags:
       - 'v*.*.*'  # Triggers on tags like v0.5.2, v1.0.0, etc.
+  # Manual escape hatch: GitHub suppresses tag push events when more than three
+  # tags are pushed at once, which silently skips the release. Dispatch this
+  # workflow against an existing tag to (re)build a release for it.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to release (e.g. v0.8.6)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -22,6 +31,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
+          # On a tag push this is refs/tags/vX.Y.Z; on manual dispatch use the
+          # tag supplied as input so the build/changelog target the right commit.
+          ref: ${{ github.event.inputs.tag || github.ref }}
           fetch-depth: 0  # Fetch all history for changelog generation
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -29,9 +41,13 @@ jobs:
       - name: Extract version from tag
         id: get_version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "VERSION=${TAG#v}" >> $GITHUB_OUTPUT
+          echo "TAG=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Generate changelog
         id: changelog
