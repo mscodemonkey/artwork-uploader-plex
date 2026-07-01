@@ -98,6 +98,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
+        id: image
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
@@ -106,6 +107,25 @@ jobs:
           tags: |
             ghcr.io/jabrown93/artwork-uploader:${{ steps.get_version.outputs.VERSION }}
             ghcr.io/jabrown93/artwork-uploader:latest
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          # Pin the cosign binary (not just the installer) so signature/bundle
+          # format stays stable and Kyverno verification is reproducible.
+          cosign-release: 'v3.1.1'
+
+      # Keyless (Fulcio/rekor) signature over the pushed digest so the homelab
+      # Kyverno verify-ghcr-images policy can verify this image.
+      - name: Sign image (keyless)
+        env:
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::build-push-action produced no digest; cannot sign image" >&2
+            exit 1
+          fi
+          cosign sign --yes "ghcr.io/jabrown93/artwork-uploader@${DIGEST}"
 
       - name: Create GitHub Release
         env:
