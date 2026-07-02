@@ -30,6 +30,8 @@ class Config:
         track_artwork_ids: Whether to track artwork IDs using Plex labels
         skip_locked_artwork: Whether to skip artwork whose target field is locked in Plex (already set)
         local_library_matching: Whether to match scraped artwork against the local libraries before fetching poster pages
+        cache_user_scrapes: Whether to keep a persistent index of ThePosterDB users' uploads so repeat scrapes only fetch new ones
+        user_cache_refresh_days: Days between full re-crawls of a cached user's uploads (catches edits and deletions)
         auto_manage_bulk_files: Whether to auto-organize bulk files
         reset_overlay: Whether to reset Kometa overlay labels on upload
         schedules: List of scheduled bulk import jobs
@@ -55,6 +57,8 @@ class Config:
         self.track_artwork_ids: bool = True
         self.skip_locked_artwork: bool = False
         self.local_library_matching: bool = True
+        self.cache_user_scrapes: bool = False
+        self.user_cache_refresh_days: int = 7
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
         self.schedules: List[Dict[str, Any]] = []
@@ -94,6 +98,8 @@ class Config:
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.skip_locked_artwork = config.get("skip_locked_artwork", False)
             self.local_library_matching = config.get("local_library_matching", True)
+            self.cache_user_scrapes = config.get("cache_user_scrapes", False)
+            self.user_cache_refresh_days = config.get("user_cache_refresh_days", 7)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
             self.reset_overlay = config.get("reset_overlay", False)
             self.schedules = config.get("schedules", [])
@@ -122,6 +128,8 @@ class Config:
             "track_artwork_ids": True,
             "skip_locked_artwork": False,
             "local_library_matching": True,
+            "cache_user_scrapes": False,
+            "user_cache_refresh_days": 7,
             "auto_manage_bulk_files": True,
             "reset_overlay": True,
             "schedules": [],
@@ -164,6 +172,8 @@ class Config:
             "track_artwork_ids": self.track_artwork_ids,
             "skip_locked_artwork": self.skip_locked_artwork,
             "local_library_matching": self.local_library_matching,
+            "cache_user_scrapes": self.cache_user_scrapes,
+            "user_cache_refresh_days": self.user_cache_refresh_days,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
             "reset_overlay": self.reset_overlay,
             "schedules": self.schedules,
