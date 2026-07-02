@@ -27,6 +27,7 @@ class KometaSaver:
         self.type: Optional[str] = None
         self.artwork: Optional[AnyArtwork] = None
         self.options: Options = Options()
+        self.confirm_match = None
 
     def set_artwork(self, artwork: AnyArtwork) -> None:
         self.artwork = artwork
@@ -74,6 +75,9 @@ class KometaSaver:
                     break
         except OSError as e:
             return f"❌ {self.description} | Error checking existing {self.artwork_type.lower()} asset: {e}"
+
+        if self.confirm_match is not None and not self.confirm_match():
+            return f"⚠️ {self.description} | {self.artwork_type} skipped for {self.library} - artwork is for a different title"
 
         if self.type == "file":
             # Save from local file path
