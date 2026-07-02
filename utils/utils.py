@@ -215,7 +215,7 @@ def parse_url_and_options(line):
                     year == None
                 options.year = year
             # If it's one of these flags it shouldn't have any arguments
-            elif flag in ["add-posters", "add-sets", "add-to-bulk", "force", "kometa", "stage", "temp"]:
+            elif flag in ["add-posters", "add-sets", "add-to-bulk", "force", "kometa", "stage", "temp", "skip-locked"]:
                 inv_flags.append(f"--{flag} has too many argumens")
             # If we ge to this point it's not a valid flag
             else:
@@ -224,7 +224,7 @@ def parse_url_and_options(line):
         else:
             if flag in ["filters", "exclude", "year"]:
                 inv_flags.append(f"--{flag} needs at least one argument")
-            elif flag not in ["add-posters", "add-sets" ,"add-to-bulk" ,"force", "kometa", "stage", "temp"]:
+            elif flag not in ["add-posters", "add-sets" ,"add-to-bulk" ,"force", "kometa", "stage", "temp", "skip-locked"]:
                 inv_flags.append(f"--{flag} is not a valid flag")
             else:
                 setattr(options, flag.replace("-","_"), True) # Convert add-posters into add_posters as the Options class expects

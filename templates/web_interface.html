@@ -390,6 +390,10 @@
                                             <input class="form-check-input" type="checkbox" value="auto_manage" id="auto_manage_bulk_files"/>
                                             <label for="auto_manage_bulk_files" class="form-check-label">Sort and label bulk files automatically</label>
                                         </div>
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" value="skip_locked_artwork" id="skip_locked_artwork"/>
+                                            <label for="skip_locked_artwork" class="form-check-label">Skip artwork that's locked in Plex, so scheduled runs only fill default artwork</label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -542,6 +546,10 @@
                                     <input class="form-check-input" type="checkbox" value="--force" id="option-force"/>
                                     <label for="option-force" class="form-check-label">Force upload the artwork, even if it
                                         already exists</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" value="--skip-locked" id="option-skip-locked"/>
+                                    <label for="option-skip-locked" class="form-check-label">Skip artwork that's locked in Plex (already set), unless forced</label>
                                 </div>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input" type="checkbox" value="--stage" id="option-stage"/>

@@ -158,6 +158,8 @@ The basic version is available now on the bulk imports page, click on the clock 
 
 It's there for when we have API access (and works for scrapers in the meantime) but is limited to running once a day which should be fine.
 
+If you enable ```skip_locked_artwork```, a scheduled user or bulk scrape will only fill items that are still on their default artwork and leave anything you've set by hand untouched, so it's safe to leave running against a curated library.
+
 Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the ```apprise_urls``` variable in the ```config.json```file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
 
 ## Coming soon
@@ -223,6 +225,10 @@ This is optional - if you don't do this, a new config.json will be created when 
 ```"track_artwork_ids"```
 - Setting this to ```true``` will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.
 - By setting this to ```false```, it'll upload every artwork every time you run (like using the --force option for every item).  This can result in long run-times, especially if you're using ThePosterDB.  We recommend you leave this as **true** and use --force when you need to!
+
+```"skip_locked_artwork"```
+- Setting this to ```true``` will skip any artwork whose target field (poster, background or square art) is locked in Plex, unless ```--force``` is used.  Plex locks a field whenever artwork is deliberately set - manually or by an upload - so this makes scheduled bulk imports and user scrapes fill items still on default artwork while leaving anything you've already set alone.
+- Setting to ```false``` (the default) keeps the existing behaviour where artwork is applied regardless of locks.
 
 ```"auto_manage_bulk_files"```
 - Setting this to ```true``` will automatically add, label and sort URLs from the scrape tab into the currently loaded bulk import file.  At the moment it won't auto-save, but I might add that later.
@@ -346,6 +352,8 @@ The script supports various command-line arguments for flexible use.
 ```--add-posters``` will also parse the additional posters section of the set, when using the Poster DB
    
 ```--force``` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
+    
+```--skip-locked``` will skip any artwork whose target field is locked in Plex (i.e. it's been deliberately set, manually or by a previous upload), unless ```--force``` is also used.  This is the same as setting ```skip_locked_artwork``` to ```true``` in ```config.json```, but per URL.
     
 ```--exclude <id1> [<id2> <id3> ...]``` will exclude the poster or artwork with the specified ID from being uploaded.  Grab the ID from the session log...
 - ThePosterDB is a number

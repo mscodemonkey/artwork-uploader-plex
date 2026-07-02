@@ -618,6 +618,9 @@ function saveConfig() {
     // Checkbox for reset overlay for Kometa
     save_config.reset_overlay = document.getElementById("reset_overlay").checked;
 
+    // Checkbox for skipping artwork with locked fields in Plex
+    save_config.skip_locked_artwork = document.getElementById("skip_locked_artwork").checked;
+
     // Get selected mediux filters
     save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
         .map(checkbox => checkbox.value);
@@ -694,6 +697,7 @@ function loadConfig() {
             document.getElementById("temp_dir").value = data.config.temp_dir || "";
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
+            document.getElementById("skip_locked_artwork").checked = data.config.skip_locked_artwork;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
             document.getElementById("apprise_urls").value = data.config.apprise_urls.join(", ");
 

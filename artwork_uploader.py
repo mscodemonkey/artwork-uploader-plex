@@ -640,6 +640,7 @@ if __name__ == "__main__":
     cli_options = Options(add_posters=args.add_posters,
                           add_sets=args.add_sets,
                           force=args.force,
+                          skip_locked=args.skip_locked,
                           filters=args.filters,
                           exclude=args.exclude,
                           year=args.year,
