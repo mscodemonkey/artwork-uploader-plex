@@ -162,6 +162,7 @@ The basic version is available now on the bulk imports page, click on the clock 
 It's there for when we have API access (and works for scrapers in the meantime) but is limited to running once a day which should be fine.
 
 If you enable ```skip_locked_artwork```, a scheduled user or bulk scrape will only fill items that are still on their default artwork and leave anything you've set by hand untouched, so it's safe to leave running against a curated library.
+With ```local_library_matching``` enabled (the default), a user-catalog scrape skips everything that isn't in your libraries without any web requests, so full-catalog runs take minutes rather than hours.
 
 Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the ```apprise_urls``` variable in the ```config.json```file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
 
@@ -233,6 +234,9 @@ This is optional - if you don't do this, a new config.json will be created when 
 - Setting this to ```true``` will skip any artwork whose target field (poster, background or square art) is locked in Plex, unless ```--force``` is used.  Plex locks a field whenever artwork is deliberately set - manually or by an upload - so this makes scheduled bulk imports and user scrapes fill items still on default artwork while leaving anything you've already set alone.
 - Setting to ```false``` (the default) keeps the existing behaviour where artwork is applied regardless of locks.
 
+```"local_library_matching"```
+- Setting this to ```true``` (the default) matches scraped artwork against your Plex libraries locally before fetching each poster's page, so big user scrapes skip everything you don't own without a web request and run dramatically faster.  The poster page is still checked right before anything is uploaded, so nothing less accurate ever gets written.
+- Setting to ```false``` restores the previous per-poster lookups.  Use this if items you own start logging "not available on Plex" because their Plex titles differ from the titles on ThePosterDB.
 ```"auto_manage_bulk_files"```
 - Setting this to ```true``` will automatically add, label and sort URLs from the scrape tab into the currently loaded bulk import file.  At the moment it won't auto-save, but I might add that later.
 - Setting to ```false``` will leave the organisation of your bulk files up to you.
