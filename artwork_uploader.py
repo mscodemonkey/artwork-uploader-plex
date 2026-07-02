@@ -670,7 +670,8 @@ if __name__ == "__main__":
                           year=args.year,
                           kometa=args.kometa,
                           stage=args.stage,
-                          temp=args.temp)  # Arguments per url to process
+                          temp=args.temp,
+                          no_cache=args.no_cache)  # Arguments per url to process
 
     # Create config as a global object
     config = Config()

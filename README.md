@@ -16,7 +16,7 @@ We (optionally) store an artwork ID in a Plex label against each movie, show, ep
 If you really want to upload artwork again, use the ```--force``` option at the command line, in the bulk file, or when entering the URL in the Web UI.
 
 ### ThePosterDB scraping
-There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.  This is against the terms of service of theposterdb.com so we encourage you to login, download the files you want, and upload them using this tool, rather than scraping.  Once an API is available we'll switch over ASAP.
+There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.  This is against the terms of service of theposterdb.com so we encourage you to login, download the files you want, and upload them using this tool, rather than scraping.  Once an API is available we'll switch over ASAP.  If you regularly scrape the same ThePosterDB users, enable ```cache_user_scrapes``` so repeat scrapes only fetch new uploads instead of re-crawling the whole catalogue every time.
 
 ### Per-URL filtering and artwork excludes 
 And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it. You can also exclude entire seasons or individual episodes, that way the app doesn't have to provess all the previous seasons for which you already have artwork applied.
@@ -159,7 +159,7 @@ Basic scheduler, so that you can leave this running and update all your artwork 
 
 The basic version is available now on the bulk imports page, click on the clock to enable or disable per file.  
 
-It's there for when we have API access (and works for scrapers in the meantime) but is limited to running once a day which should be fine.
+It's there for when we have API access (and works for scrapers in the meantime) but is limited to running once a day which should be fine.  If you enable ```cache_user_scrapes```, a daily scheduled user scrape only fetches uploads that are new since the last run, so scheduled full-catalogue runs stay fast.
 
 If you enable ```skip_locked_artwork```, a scheduled user or bulk scrape will only fill items that are still on their default artwork and leave anything you've set by hand untouched, so it's safe to leave running against a curated library.
 
@@ -232,6 +232,12 @@ This is optional - if you don't do this, a new config.json will be created when 
 ```"skip_locked_artwork"```
 - Setting this to ```true``` will skip any artwork whose target field (poster, background or square art) is locked in Plex, unless ```--force``` is used.  Plex locks a field whenever artwork is deliberately set - manually or by an upload - so this makes scheduled bulk imports and user scrapes fill items still on default artwork while leaving anything you've already set alone.
 - Setting to ```false``` (the default) keeps the existing behaviour where artwork is applied regardless of locks.
+```"cache_user_scrapes"```
+- Setting this to ```true``` keeps a local index of each ThePosterDB user's uploads (a small SQLite file in your config directory), so scraping a user page again only fetches pages until it reaches uploads it has already seen - full-catalogue re-runs drop from hundreds of page requests to a couple, which is also much kinder to ThePosterDB.  Every ```user_cache_refresh_days``` days the next scrape of that user re-crawls every page to pick up edited or deleted uploads.
+- Setting to ```false``` (the default) crawls every page on every user scrape, exactly as before.
+
+```"user_cache_refresh_days"```
+- The number of days between full re-crawls of a cached user's uploads (default ```7```).  Only used when ```cache_user_scrapes``` is ```true```.
 
 ```"auto_manage_bulk_files"```
 - Setting this to ```true``` will automatically add, label and sort URLs from the scrape tab into the currently loaded bulk import file.  At the moment it won't auto-save, but I might add that later.
@@ -386,6 +392,8 @@ The script supports various command-line arguments for flexible use.
 ```--temp``` for testing purposes, will save artwork to a temporary directory ```temp_dir``` specified in ```config.json``` instead of the Kometa asset directory.
 
 ```--stage```, in conjuction with --kometa (or if ```save_to_kometa```is true in ```config.json```), will download assets for TV show seasons and episodes not yet available in Plex. This can be useful if you run the script before a particular season or episode is downloaded by your automation. If ```stage_assets``` is set to ```true``` in ```config.json``` then this argument is not necessary. This option does not apply to the Specials season (Season 0).
+
+```--no-cache``` will crawl every page of a ThePosterDB user this run, ignoring the cached index (the index is still refreshed).  Handy to force a full refresh of a user when you have ```cache_user_scrapes``` enabled.  Works on the command line, in bulk files and in the Web UI.
 
 ### Using these options in files and GUI
 

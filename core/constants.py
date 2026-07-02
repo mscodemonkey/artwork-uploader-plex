@@ -20,6 +20,7 @@ DEFAULT_WEB_HOST = "0.0.0.0"
 
 # File paths
 DEFAULT_CONFIG_PATH = "config.json"
+ASSET_INDEX_PATH = "config/asset_index.db"
 DEFAULT_BULK_IMPORTS_DIR = "bulk_imports"
 DEFAULT_BULK_IMPORT_FILE = "bulk_import.txt"
 
