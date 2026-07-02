@@ -44,6 +44,7 @@ FILTER_SEASON_COVER = "season_cover"
 FILTER_SHOW_COVER = "show_cover"
 FILTER_MOVIE_POSTER = "movie_poster"
 FILTER_COLLECTION_POSTER = "collection_poster"
+FILTER_SQUARE_ART = "square_art"
 
 ALL_FILTERS = [
     FILTER_TITLE_CARD,
@@ -52,6 +53,7 @@ ALL_FILTERS = [
     FILTER_SHOW_COVER,
     FILTER_MOVIE_POSTER,
     FILTER_COLLECTION_POSTER,
+    FILTER_SQUARE_ART,
 ]
 
 # Artwork ID prefixes (for Plex labels)
@@ -86,6 +88,7 @@ MEDIUX_QUALITY_SUFFIX = "&w=3840&q=80"
 # Season/Episode special values
 SEASON_COVER = "Cover"
 SEASON_BACKDROP = "Backdrop"
+SEASON_SQUARE_ART = "SquareArt"
 SEASON_SPECIALS = "Specials"
 SEASON_SPECIALS_NUMBER = 0
 EPISODE_COVER = "Cover"

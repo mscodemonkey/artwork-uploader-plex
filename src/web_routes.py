@@ -17,7 +17,7 @@ from services import UtilityService, AuthenticationService
 from services import NotifyService
 from processors.media_metadata import parse_title
 from models.instance import Instance
-from core.constants import SOURCE_MEDIUX, SOURCE_THEPOSTERDB
+from core.constants import SOURCE_MEDIUX, SOURCE_THEPOSTERDB, SEASON_SQUARE_ART
 from core.config import Config
 from core.enums import FilterType
 from core.exceptions import InvalidUrl, InvalidFlag
@@ -1089,13 +1089,18 @@ def extract_and_list_zip(
                         if artwork.get('year') is None and year is not None:
                             artwork['year'] = year
                 if artwork['media'] == "TV Show":
-                    if artwork['season'] is None:
-                        artwork['season'] = "Cover"
-                        artwork['type'] = FilterType.SHOW_COVER.value
-                    if artwork['season'] == "Cover" and check_image_orientation_func(artwork["path"]) == "landscape":
-                        artwork['season'] = "Backdrop"
-                        artwork['type'] = FilterType.BACKGROUND.value
-                if artwork['media'] == "Movie":
+                    if artwork['type'] == FilterType.SQUARE_ART.value:
+                        # Square art is identified by its filename OST suffix; don't let the
+                        # orientation checks below reclassify it as a cover or backdrop
+                        artwork['season'] = SEASON_SQUARE_ART
+                    else:
+                        if artwork['season'] is None:
+                            artwork['season'] = "Cover"
+                            artwork['type'] = FilterType.SHOW_COVER.value
+                        if artwork['season'] == "Cover" and check_image_orientation_func(artwork["path"]) == "landscape":
+                            artwork['season'] = "Backdrop"
+                            artwork['type'] = FilterType.BACKGROUND.value
+                if artwork['media'] == "Movie" and artwork['type'] != FilterType.SQUARE_ART.value:
                     if check_image_orientation_func(artwork["path"]) == "landscape":
                         artwork['type'] = FilterType.BACKGROUND.value
                     else:

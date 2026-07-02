@@ -13,6 +13,7 @@ class FilterType(str, Enum):
     SHOW_COVER = "show_cover"
     MOVIE_POSTER = "movie_poster"
     COLLECTION_POSTER = "collection_poster"
+    SQUARE_ART = "square_art"
 
 
 class MediaType(str, Enum):
@@ -69,3 +70,4 @@ class FileType(str, Enum):
     TITLE_CARD = "title_card"
     BACKDROP = "backdrop"
     POSTER = "poster"
+    SQUARE_ART = "album_art"

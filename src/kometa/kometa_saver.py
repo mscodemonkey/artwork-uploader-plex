@@ -43,6 +43,21 @@ class KometaSaver:
         if isinstance(options, Options):
             self.options = options
 
+    @staticmethod
+    def _remove_quietly(path: str) -> None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+    def _install_new_asset(self, temp_file: str, dest_file: str, existing_files: list[str]) -> None:
+        """Atomically move the new asset into place, then clear out any stale assets
+        with a different extension left over from previous runs."""
+        os.replace(temp_file, dest_file)
+        for stale_file in existing_files:
+            if stale_file != dest_file:
+                self._remove_quietly(stale_file)
+
     def save_to_kometa(self) -> str:
 
         headers = {
@@ -61,17 +76,20 @@ class KometaSaver:
         }
 
         replaced_file: bool = False
+        existing_files: list[str] = []
 
-        # Check if an asset already exists for this item, skip if so (unless force is specified, in which case delete existing asset first)
+        # Check if an asset already exists for this item, skip if so (unless force is specified). Existing
+        # assets are only removed AFTER the replacement has landed (see _install_new_asset) so a failed
+        # download or copy can never destroy the user's current artwork.
         try:
             for check_ext in IMAGE_EXTENSIONS:
                 existing_file = os.path.join(
                     self.dest_dir, f"{self.dest_file_name}{check_ext}")
-                if os.path.exists(existing_file) and not self.options.force:
-                    return f"⏩ {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
-                elif os.path.exists(existing_file) and self.options.force:
-                    os.remove(existing_file)
+                if os.path.exists(existing_file):
+                    if not self.options.force:
+                        return f"⏩ {self.description} | {self.artwork_type} skipped (already exists) for {self.library}"
                     replaced_file = True
+                    existing_files.append(existing_file)
         except OSError as e:
             return f"❌ {self.description} | failed to save {self.artwork_type} asset: {e}"
 
@@ -82,18 +100,22 @@ class KometaSaver:
                 source_file)[1]  # Use the original file extension
             dest_file = os.path.join(
                 self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
+            temp_file = f"{dest_file}.tmp"
             try:
                 os.makedirs(self.dest_dir, exist_ok=True)
                 with open(source_file, 'rb') as src_f:
-                    with open(dest_file, 'wb') as dest_f:
+                    with open(temp_file, 'wb') as dest_f:
                         dest_f.write(src_f.read())
+                self._install_new_asset(temp_file, dest_file, existing_files)
                 if replaced_file:
                     return f"♻️ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
                 else:
                     return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
             except OSError as e:
+                self._remove_quietly(temp_file)
                 return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'. {e}"
             except Exception as e:
+                self._remove_quietly(temp_file)
                 return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"
         try:
             url = self.artwork["url"]
@@ -104,21 +126,36 @@ class KometaSaver:
             content_type = r.headers.get('Content-Type', '')
             ext = mimetypes.guess_extension(content_type.split(';')[0])
             self.dest_file_ext = ext if ext is not None else self.dest_file_ext
+        except requests.exceptions.Timeout as e:
+            debug_me(f"Downloading asset from {url} timed out (5 seconds): {e}",
+                     "KometaSaver/save_to_kometa")
+            return f"❌ {self.description} | Error saving {self.artwork_type}: asset download timed out (5 seconds)"
+        except requests.exceptions.ConnectionError as e:
+            debug_me(f"Connection error: {e}", "KometaSaver/save_to_kometa")
+            return f"❌ {self.description} | Error saving {self.artwork_type}: could not connect to server"
+        except requests.exceptions.HTTPError:
+            if r.status_code == 429:
+                return f"❌ {self.description} | Error saving {self.artwork_type}: too many requests (rate-limited)"
+            return f"❌ {self.description} | Error saving {self.artwork_type}: HTTP error {r.status_code}"
         except Exception as e:
             return f"❌ {self.description} | Error saving {self.artwork_type}: Error fetching URL: {e}"
 
         dest_file = os.path.join(
             self.dest_dir, f"{self.dest_file_name}{self.dest_file_ext}")
+        temp_file = f"{dest_file}.tmp"
         try:
             os.makedirs(self.dest_dir, exist_ok=True)
-            with open(dest_file, 'wb') as f:
+            with open(temp_file, 'wb') as f:
                 for chunk in r.iter_content(1024):
                     f.write(chunk)
+            self._install_new_asset(temp_file, dest_file, existing_files)
             if replaced_file:
                 return f"♻️ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
             else:
                 return f"✅ {self.description} | {self.artwork_type} saved at '{dest_file}' in {self.library}"
         except OSError as e:
+            self._remove_quietly(temp_file)
             return f"❌ {self.description} | Error saving {self.artwork_type} (invalid path): '{self.dest_dir}'. {e}"
         except Exception as e:
+            self._remove_quietly(temp_file)
             return f"❌ {self.description} | Failed to save {self.artwork_type}: {e}"

@@ -22,7 +22,7 @@ class PlexUploader:
         self.upload_target: Union[Movie, Show,
                                   Season, Episode, Collection] = upload_target
         self.artwork_type: str = artwork_type
-        # This will be BID, CID, PID, SID or EID - for [B]ackgrounds, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
+        # This will be BID, SAID, CID, PID, SID or EID - for [B]ackgrounds, [S]quare[A]rt, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
         self.artwork_id: str = artwork_id.upper() + "ID:"
         self.description: str = "item"
         self.label: Optional[str] = None
@@ -70,6 +70,15 @@ class PlexUploader:
                             filepath=self.artwork['path'])
                     else:
                         self.upload_target.uploadArt(url=self.artwork["url"])
+                    if self.track_artwork_ids:
+                        self.upload_target.addLabel(self.label)
+                elif self.artwork_id == "SAID:":
+                    if self.type == "file":
+                        self.upload_target.uploadSquareArt(
+                            filepath=self.artwork['path'])
+                    else:
+                        self.upload_target.uploadSquareArt(
+                            url=self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
                 else:

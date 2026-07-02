@@ -23,7 +23,8 @@
         "season_cover",
         "show_cover",
         "movie_poster",
-        "collection_poster"
+        "collection_poster",
+        "square_art"
     ],
     "_mediux_filters_help": "Default artwork types to process from MediUX. Remove types you don't want to upload",
 
@@ -45,7 +46,7 @@
     "_save_to_kometa_help": "Saves artwork to Kometa asset directory instead of applying it to Plex directly",
 
     "stage_assets": false,
-    "_stage_assets": "Saves artwork for seasons and episodes not yet in Plex (except season specials)"
+    "_stage_assets": "Saves artwork for seasons and episodes not yet in Plex (except season specials)",
 
     "track_artwork_ids": true,
     "_track_artwork_ids_help": "Use Plex labels to track uploaded artwork and prevent duplicate uploads",

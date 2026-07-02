@@ -57,7 +57,7 @@ class Config:
         self.tv_library: List[str] = DEFAULT_TV_LIBRARY
         self.movie_library: List[str] = DEFAULT_MOVIE_LIBRARY
         self.mediux_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster",
-                                          "collection_poster"]
+                                          "collection_poster", "square_art"]
         self.tpdb_filters: List[str] = ["season_cover", "show_cover", "movie_poster",
                                         "collection_poster"]
         self.kometa_base: str = "/assets" if RUNNING_IN_DOCKER else ""
@@ -162,7 +162,7 @@ class Config:
             "tv_library": ["TV Shows"],
             "movie_library": ["Movies"],
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster",
-                               "collection_poster"],
+                               "collection_poster", "square_art"],
             "tpdb_filters": ["season_cover", "show_cover", "movie_poster",
                              "collection_poster"],
             "kometa_base": "",

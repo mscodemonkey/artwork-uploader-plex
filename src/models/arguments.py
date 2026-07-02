@@ -10,7 +10,7 @@ import argparse
 # --add-sets        Adds ALL the "additional set" sections from TPDb page as well as the main posters
 # --add-posters     Adds the "additional posters" section from TPDb page as well as the main posters
 # --force           Forces each poster to upload even, if the same artwork is already there according to the label.
-# --filters         Specify one or more filters, only these types will be applied (e.g., title_card, background, season_cover, show_cover, movie_poster, collection_poster)
+# --filters         Specify one or more filters, only these types will be applied (e.g., title_card, background, season_cover, show_cover, movie_poster, collection_poster, square_art)
 # --exclude         Specify one or more IDs to exclude from any uploads
 # --year            Override the year for matching (use the year in Plex)
 # --debug           Spits out debugging information
@@ -38,7 +38,7 @@ def parse_arguments():
     parser.add_argument('--force', action='store_true',
                         help="Force upload/save even if its the same artwork or artwork already exists")
     parser.add_argument("--filters", nargs='+',
-                        help="Only these artwork types will be applied (e.g., title_card, background, season_cover, show_cover, movie_poster, collection_poster).")
+                        help="Only these artwork types will be applied (e.g., title_card, background, season_cover, show_cover, movie_poster, collection_poster, square_art).")
     parser.add_argument("--exclude", nargs='+',
                         help="Specify one or more IDs to exclude from any uploads.")
     parser.add_argument(

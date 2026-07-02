@@ -111,7 +111,7 @@ Docker: `RUNNING_IN_DOCKER=1` hardcodes Kometa base to `/assets` and temp dir to
 
 ## Filter Types
 
-Defined in `src/core/constants.py`: `show_cover`, `background`, `season_cover`, `title_card`, `movie_poster`, `collection_poster`.
+Defined in `src/core/constants.py`: `show_cover`, `background`, `season_cover`, `title_card`, `movie_poster`, `collection_poster`, `square_art`.
 
 Set globally in config or per-URL via `--filters`. Exclude by artwork ID or season/episode (`--exclude s01e05`).
 

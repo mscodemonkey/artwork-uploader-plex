@@ -13,7 +13,7 @@ from core.enums import FilterType, MediaType, ScraperSource, FileType
 from core.constants import (
     ANSI_BOLD, ANSI_RESET, BOOTSTRAP_COLORS,
     MEDIUX_API_BASE_URL, MEDIUX_BASE_URL, MEDIUX_QUALITY_SUFFIX,
-    SEASON_COVER, SEASON_BACKDROP, EPISODE_COVER
+    SEASON_COVER, SEASON_BACKDROP, SEASON_SQUARE_ART, EPISODE_COVER
 )
 from core import globals
 import time
@@ -374,6 +374,14 @@ class MediuxScraper:
                             f"Skipping poster - missing show_id and season_id", "MediuxScraper/_process_set")
                         continue
 
+                elif data["fileType"] == FileType.SQUARE_ART.value:
+                    # Square art (e.g. soundtrack / OST) applied to the show itself
+                    debug_me(f"Square art detected for set id: {(data.get('set_id') or {}).get('id', 'unknown')}",
+                             "MediuxScraper/_process_set")
+                    season = SEASON_SQUARE_ART
+                    episode = None
+                    file_type = FilterType.SQUARE_ART.value
+
                 else:
                     # Unknown file type or structure, skip
                     debug_me(f"Skipping unknown TV show file type: {data.get('fileType')}",
@@ -406,6 +414,23 @@ class MediuxScraper:
                         # This is a collection poster
                         file_type = FilterType.COLLECTION_POSTER.value
                         title = set_data["collection"]["collection_name"]
+                    elif data["fileType"] == FileType.SQUARE_ART.value:
+                        # Square art (e.g. movie soundtrack / OST)
+                        if data.get("movie_id_ost"):
+                            movie_id = data["movie_id_ost"]["id"]
+                            if set_data.get("collection") is not None:
+                                movies = set_data["collection"]["movies"]
+                                movie_data = [
+                                    movie for movie in movies if movie["id"] == movie_id][0]
+                            else:
+                                movie_data = set_data["movie"]
+                            title = movie_data["title"]
+                            year = int(movie_data["release_date"][:4])
+                            file_type = FilterType.SQUARE_ART.value
+                        else:
+                            debug_me(f"Skipping square art - missing movie_id_ost",
+                                     "MediuxScraper/_process_set")
+                            continue
                     elif data["fileType"] == FileType.BACKDROP.value:
                         # This is a movie background
                         if data["movie_id_backdrop"]:
