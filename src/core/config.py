@@ -4,7 +4,7 @@ Application configuration management.
 
 import json
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from core.constants import (
     DEFAULT_CONFIG_PATH, DEFAULT_BULK_IMPORT_FILE, DEFAULT_TV_LIBRARY, DEFAULT_MOVIE_LIBRARY,
@@ -47,6 +47,12 @@ class Config:
         kometa_library_paths: Dictionary mapping Plex library names to Kometa directory names
         apprise_urls: List of Apprise notification URLs
         zip_title_strip_words: Max words to strip from end of ZIP filename titles for progressive title matching
+        radarr_url: Radarr server URL, used to pre-seed Kometa artwork for movies not yet in Plex
+        radarr_api_key: Radarr API key
+        sonarr_url: Sonarr server URL, used to pre-seed Kometa artwork for shows/seasons not yet in Plex
+        sonarr_api_key: Sonarr API key
+        arr_root_folder_library_map: Dictionary mapping Radarr/Sonarr root folder paths to Plex library names
+        preseed_arr: Whether to fall back to Radarr/Sonarr to pre-seed Kometa artwork when an item isn't in Plex
     """
 
     def __init__(self, config_path: str = DEFAULT_CONFIG_PATH) -> None:
@@ -64,7 +70,7 @@ class Config:
         self.temp_dir: str = "/temp" if RUNNING_IN_DOCKER else ""
         self.save_to_kometa: bool = False
         self.stage_assets: bool = True
-        self.stage_specials: bool = False
+        self.stage_specials: bool = True
         self.stage_collections: bool = False
         self.track_artwork_ids: bool = True
         self.auto_manage_bulk_files: bool = True
@@ -78,6 +84,12 @@ class Config:
         self.kometa_library_paths: Dict[str, str] = {}
         self.apprise_urls: List[str] = []
         self.zip_title_strip_words: int = DEFAULT_ZIP_TITLE_STRIP_WORDS
+        self.radarr_url: str = ""
+        self.radarr_api_key: str = ""
+        self.sonarr_url: str = ""
+        self.sonarr_api_key: str = ""
+        self.arr_root_folder_library_map: Dict[str, str] = {}
+        self.preseed_arr: bool = False
 
     def load(self) -> None:
         """Load the configuration from the JSON file."""
@@ -116,7 +128,7 @@ class Config:
                 self.temp_dir = loaded_temp_dir
             self.save_to_kometa = config.get("save_to_kometa", False)
             self.stage_assets = config.get("stage_assets", True)
-            self.stage_specials = config.get("stage_specials", False)
+            self.stage_specials = config.get("stage_specials", True)
             self.stage_collections = config.get("stage_collections", False)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
@@ -141,6 +153,13 @@ class Config:
             if zip_title_strip_words < 0:
                 zip_title_strip_words = 0
             self.zip_title_strip_words = zip_title_strip_words
+            self.radarr_url = config.get("radarr_url", "")
+            self.radarr_api_key = config.get("radarr_api_key", "")
+            self.sonarr_url = config.get("sonarr_url", "")
+            self.sonarr_api_key = config.get("sonarr_api_key", "")
+            self.arr_root_folder_library_map = config.get(
+                "arr_root_folder_library_map", {})
+            self.preseed_arr = config.get("preseed_arr", False)
 
         except Exception as e:
             raise ConfigLoadError(
@@ -169,7 +188,7 @@ class Config:
             "temp_dir": "",
             "save_to_kometa": False,
             "stage_assets": False,
-            "stage_specials": False,
+            "stage_specials": True,
             "stage_collections": False,
             "track_artwork_ids": True,
             "auto_manage_bulk_files": True,
@@ -177,7 +196,13 @@ class Config:
             "schedules": [],
             "debug": False,
             "kometa_library_paths": {},
-            "apprise_urls": []
+            "apprise_urls": [],
+            "radarr_url": "",
+            "radarr_api_key": "",
+            "sonarr_url": "",
+            "sonarr_api_key": "",
+            "arr_root_folder_library_map": {},
+            "preseed_arr": False
         }
 
         # Create the config.json file if it doesn't exist
@@ -235,7 +260,13 @@ class Config:
             "debug": self.debug,
             "kometa_library_paths": self.kometa_library_paths,
             "apprise_urls": self.apprise_urls,
-            "zip_title_strip_words": self.zip_title_strip_words
+            "zip_title_strip_words": self.zip_title_strip_words,
+            "radarr_url": self.radarr_url,
+            "radarr_api_key": self.radarr_api_key,
+            "sonarr_url": self.sonarr_url,
+            "sonarr_api_key": self.sonarr_api_key,
+            "arr_root_folder_library_map": self.arr_root_folder_library_map,
+            "preseed_arr": self.preseed_arr
         }
 
         try:
@@ -259,3 +290,37 @@ class Config:
             The directory name to use in the Kometa asset structure
         """
         return self.kometa_library_paths.get(library_name, library_name)
+
+    def resolve_arr_library(self, root_folder_path: Optional[str], media_type: str) -> str:
+        """
+        Resolve the Plex library name for a Radarr/Sonarr root folder path.
+
+        Matches root_folder_path against arr_root_folder_library_map using the
+        longest matching prefix (trailing slashes are ignored). Falls back to
+        the first configured movie_library/tv_library entry when no mapping matches.
+
+        Args:
+            root_folder_path: The root folder path reported by Radarr/Sonarr.
+            media_type: "movie" or "tv" - selects the fallback library list.
+
+        Returns:
+            The Plex library name to use.
+        """
+        if root_folder_path:
+            normalized_path = root_folder_path.rstrip("/\\")
+            best_match_library = None
+            best_match_len = -1
+            for mapped_path, library_name in self.arr_root_folder_library_map.items():
+                normalized_mapped = mapped_path.rstrip("/\\")
+                if normalized_path == normalized_mapped or normalized_path.startswith(
+                        normalized_mapped + "/") or normalized_path.startswith(normalized_mapped + "\\"):
+                    if len(normalized_mapped) > best_match_len:
+                        best_match_library = library_name
+                        best_match_len = len(normalized_mapped)
+            if best_match_library is not None:
+                return best_match_library
+
+        fallback = self.movie_library if media_type == "movie" else self.tv_library
+        if isinstance(fallback, list):
+            return fallback[0] if fallback else ""
+        return fallback or ""

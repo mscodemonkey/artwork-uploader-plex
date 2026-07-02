@@ -616,6 +616,9 @@ def setup_socket_handlers(
             # Also update globals
             globals.config = config
 
+            # Rebuild the Radarr/Sonarr clients in case their URL/API key changed
+            globals.arr.reconfigure(config)
+
             # Reconnect to Plex because the Plex server or token might have changed
             update_log(
                 instance, "Saving updated configuration and reconnecting to Plex")

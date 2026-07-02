@@ -464,6 +464,26 @@ function saveConfig() {
         save_config.kometa_library_paths = {};
     }
 
+    // Parse arr_root_folder_library_map from JSON
+    const arrRootFolderLibraryMapInput = document.getElementById("arr_root_folder_library_map").value.trim();
+    if (arrRootFolderLibraryMapInput) {
+        try {
+            save_config.arr_root_folder_library_map = JSON.parse(arrRootFolderLibraryMapInput);
+            // Validate it's an object with string keys/values
+            if (save_config.arr_root_folder_library_map === null ||
+                typeof save_config.arr_root_folder_library_map !== 'object' ||
+                Array.isArray(save_config.arr_root_folder_library_map)) {
+                throw new Error("Must be an object");
+            }
+        } catch (e) {
+            document.getElementById("arr_root_folder_library_map").classList.add("is-invalid");
+            updateStatus("Invalid JSON in Root Folder Library Mappings", "danger");
+            return;
+        }
+    } else {
+        save_config.arr_root_folder_library_map = {};
+    }
+
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
 
     // Convert comma-separated Apprise URLs to array
@@ -498,6 +518,13 @@ function saveConfig() {
 
     // Checkbox for staging collections
     save_config.stage_collections = document.getElementById("stage_collections").checked;
+
+    // Checkbox for Radarr/Sonarr pre-seeding
+    save_config.preseed_arr = document.getElementById("preseed_arr").checked;
+    save_config.radarr_url = document.getElementById("radarr_url").value.trim();
+    save_config.radarr_api_key = document.getElementById("radarr_api_key").value.trim();
+    save_config.sonarr_url = document.getElementById("sonarr_url").value.trim();
+    save_config.sonarr_api_key = document.getElementById("sonarr_api_key").value.trim();
 
     // Checkbox for managing bulk files
     save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
@@ -585,6 +612,19 @@ function loadConfig() {
                 document.getElementById("kometa_library_paths").value = "";
             }
 
+            // Load Radarr/Sonarr pre-seeding settings
+            document.getElementById("preseed_arr").checked = data.config.preseed_arr || false;
+            document.getElementById("radarr_url").value = data.config.radarr_url || "";
+            document.getElementById("radarr_api_key").value = data.config.radarr_api_key || "";
+            document.getElementById("sonarr_url").value = data.config.sonarr_url || "";
+            document.getElementById("sonarr_api_key").value = data.config.sonarr_api_key || "";
+            if (data.config.arr_root_folder_library_map) {
+                document.getElementById("arr_root_folder_library_map").value =
+                    JSON.stringify(data.config.arr_root_folder_library_map, null, 2);
+            } else {
+                document.getElementById("arr_root_folder_library_map").value = "";
+            }
+
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
@@ -596,6 +636,9 @@ function loadConfig() {
 
             // Toggle Kometa settings visibility
             toggleKometaSettings();
+
+            // Toggle Radarr/Sonarr pre-seed settings visibility
+            toggleArrSettings();
 
             // Toggle auth settings visibility
             toggleAuthSettings();
@@ -1731,6 +1774,23 @@ document.getElementById("save_to_kometa").addEventListener("change", toggleKomet
 
 // Add event listener for kometa_library_paths textarea to clear invalid state on input
 document.getElementById("kometa_library_paths").addEventListener("input", function() {
+    this.classList.remove("is-invalid");
+});
+
+// ==================================================
+// Radarr/Sonarr Pre-Seed Settings Toggle
+// ==================================================
+
+function toggleArrSettings() {
+    const preseedArr = document.getElementById("preseed_arr").checked;
+    document.getElementById("arr_settings").style.display = preseedArr ? "block" : "none";
+}
+
+// Add event listener for preseed_arr checkbox
+document.getElementById("preseed_arr").addEventListener("change", toggleArrSettings);
+
+// Add event listener for arr_root_folder_library_map textarea to clear invalid state on input
+document.getElementById("arr_root_folder_library_map").addEventListener("input", function() {
     this.classList.remove("is-invalid");
 });
 

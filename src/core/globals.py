@@ -4,6 +4,7 @@ web_app = None  # Flask app
 web_socket = None  # SocketIO instance
 debug = False  # Debug mode
 plex = None  # Plex connector
+arr = None  # ArrService (Radarr/Sonarr pre-seed fallback)
 # Services (initialized in main)
 bulk_file_service = None
 scheduler_service = None

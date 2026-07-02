@@ -34,6 +34,7 @@ from models.options import Options
 from plex.plex_connector import PlexConnector
 from scrapers.theposterdb_scraper import ThePosterDBScraper
 from services import (
+    ArrService,
     BulkFileService,
     ImageService,
     ArtworkProcessor,
@@ -770,6 +771,9 @@ if __name__ == "__main__":
 
     # Create a connector for Plex
     globals.plex = PlexConnector(config.base_url, config.token)
+
+    # Create the Radarr/Sonarr pre-seed fallback service (clients are lazy; no connect at startup)
+    globals.arr = ArrService(config)
 
     # Check for CLI arguments regardless of interactive_cli flag
     if cli_command:
