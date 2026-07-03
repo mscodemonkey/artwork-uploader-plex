@@ -798,6 +798,12 @@ function saveConfig() {
     save_config.auth_username = document.getElementById("auth_username").value.trim();
     save_config.auth_password = document.getElementById("auth_password").value;
 
+    // Webhook settings
+    save_config.enable_webhooks = document.getElementById("enable_webhooks").checked;
+    save_config.webhook_token = document.getElementById("webhook_token").value.trim();
+    save_config.webhook_tpdb_users = document.getElementById("webhook_tpdb_users").value.split(",").map(u => u.trim()).filter(u => u);
+    save_config.webhook_apply_delay = parseInt(document.getElementById("webhook_apply_delay").value, 10) || 0;
+
     // Process every possible condition of auth enable/disable and same/different username and password/no password provided
     // If auth is enabled and a password is NOT provided
     if (save_config.auth_enabled && !save_config.auth_password) {
@@ -893,6 +899,12 @@ function updateConfigUI(config) {
     document.getElementById("auth_enabled").checked = config.auth_enabled || false;
     document.getElementById("auth_username").value = config.auth_username || "";
     
+    // Load webhook settings
+    document.getElementById("enable_webhooks").checked = config.enable_webhooks || false;
+    document.getElementById("webhook_token").value = config.webhook_token || "";
+    document.getElementById("webhook_tpdb_users").value = (config.webhook_tpdb_users || []).join(", ");
+    document.getElementById("webhook_apply_delay").value = config.webhook_apply_delay ?? 30;
+    
     // Toggle Kometa settings visibility
     toggleKometaSettings();
     
@@ -901,6 +913,9 @@ function updateConfigUI(config) {
     
     // Toggle auth settings visibility
     toggleAuthSettings();
+    
+    // Toggle webhook settings visibility
+    toggleWebhookSettings();
     
     // Make sure Plex options visibility is set correctly on load
     togglePlexOptions();
@@ -1998,6 +2013,24 @@ function toggleAuthSettings() {
 
 // Add event listener for auth_enabled checkbox
 document.getElementById("auth_enabled").addEventListener("change", toggleAuthSettings);
+
+// ==================================================
+// Webhook Settings Toggle
+// ==================================================
+
+function toggleWebhookSettings() {
+    const enabled = document.getElementById("enable_webhooks").checked;
+    document.getElementById("webhook_settings").style.display = enabled ? "block" : "none";
+    // When enabling with an empty token, pre-fill a random one. getRandomValues works in
+    // insecure (plain http) contexts, unlike crypto.randomUUID.
+    const tokenField = document.getElementById("webhook_token");
+    if (enabled && !tokenField.value) {
+        tokenField.value = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+            .map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+}
+
+document.getElementById("enable_webhooks").addEventListener("change", toggleWebhookSettings);
 
 // ==================================================
 // Kometa Settings Toggle
