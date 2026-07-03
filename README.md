@@ -154,6 +154,13 @@ Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you
 ### Web UI
 Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
 
+### Automatic artwork for new imports (Sonarr/Radarr webhook)
+With ```cache_user_scrapes``` enabled, the app already knows every poster your favourite ThePosterDB users have uploaded, so it can apply the right artwork within about a minute of Sonarr or Radarr importing something, instead of waiting for the next scheduled run.  Turn on ```enable_webhooks```, set a ```webhook_token``` and list the ThePosterDB users to apply from (in order of preference) under Webhook settings in the web UI, then add a webhook connection in each app:
+
+- **Radarr / Sonarr:** Settings -> Connect -> + -> Webhook.  URL ```http://<artwork-uploader host>:4567/webhook/radarr``` (or ```/webhook/sonarr```), Method POST.  Tick only the "On File Import" trigger.  Send the token as the connection's Password, or as a header: click the **Advanced** (cog) button and add a Header with Key ```X-Webhook-Token``` and Value set to the token.  The Test button is acknowledged so you can save the connection.
+
+On an import the title is looked up in the cached index; if one of the configured users covers it, that single poster (plus season covers for the imported seasons, on TV) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same.  Imports usually reach the webhook before Plex has scanned the new file, so the apply retries quietly for a few minutes, then gives up and leaves it to the next scheduled run.  Ambiguous title matches (for example same-name remakes) are skipped rather than guessed, and nothing is applied when no configured user has the title.  The endpoints return 404 while ```enable_webhooks``` is off.
+
 ### Scheduler with Apprise notifications
 Basic scheduler, so that you can leave this running and update all your artwork every day. 
 
@@ -262,6 +269,18 @@ This is optional - if you don't do this, a new config.json will be created when 
 
 ```"apprise_urls"```
 - Provide a comma-separated list of Apprise service URLs to send notifications upong completion of scheduled bulk imports. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
+
+```"enable_webhooks"```
+- Set to ```true``` to enable the Sonarr/Radarr import webhook endpoints (```/webhook/radarr``` and ```/webhook/sonarr```).  ```false``` (default) leaves them disabled and returning 404, so the app is unchanged unless you turn this on.  Requires ```cache_user_scrapes``` so there is an index to look artwork up in.
+
+```"webhook_token"```
+- The shared secret that webhook requests must provide, in an ```X-Webhook-Token``` header, as the HTTP Basic password, or a ```?token=``` query parameter.  Required when ```enable_webhooks``` is ```true```.
+
+```"webhook_tpdb_users"```
+- A list of ThePosterDB user names to apply cached artwork from on import, in order of preference (first match wins).  Only used when ```enable_webhooks``` is ```true```.
+
+```"webhook_apply_delay"```
+- Seconds to wait after an import before applying artwork (default ```30```).  The *arr apps fire the webhook the moment they import a file, usually before Plex has scanned it, so this gives Plex a head start; if the item still is not in Plex the apply retries for a few minutes before giving up.
 
 ### Filter options
 Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]. TPDb does not provide title cards, backgrounds or square art so these filters are not available in the web UI.

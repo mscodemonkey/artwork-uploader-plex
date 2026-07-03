@@ -107,6 +107,10 @@ TPDB_USER_UPLOADS_PER_PAGE = 24
 # crawl cut short by a bad page must never be mistaken for a catalogue that shrank.
 RECONCILE_MIN_COVERAGE = 0.9
 
+# Webhook (Sonarr/Radarr on-import trigger)
+WEBHOOK_TOKEN_HEADER = "X-Webhook-Token"
+WEBHOOK_RETRY_DELAYS = [20, 60, 180, 600]  # seconds; retries while the imported item is not yet in Plex
+
 # MediUX configuration
 MEDIUX_BASE_URL = "https://mediux.pro"
 MEDIUX_API_BASE_URL = "https://api.mediux.pro/assets/"

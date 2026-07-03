@@ -16,6 +16,7 @@ import flask.cli
 import sys
 import re
 import base64
+import hmac
 import tempfile
 import zipfile
 import subprocess
@@ -36,6 +37,8 @@ from core.enums import FileType, MediaType, ScraperSource, StatusColor
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService
+from services.webhook_service import parse_event
+from core.constants import WEBHOOK_TOKEN_HEADER
 
 
 def login_required(f):
@@ -121,6 +124,45 @@ def setup_routes(web_app, config: Config):
         """Serve files from the uploads directory."""
         uploads_path = os.path.join(UtilityService.get_exe_dir(), 'uploads')
         return send_from_directory(uploads_path, filename)
+
+    def webhook_token_ok():
+        """A webhook request is authorised when it carries the configured token, sent as the
+           X-Webhook-Token header, the HTTP Basic password, or a ?token= query parameter."""
+        token = globals.config.webhook_token
+        if not token:
+            return False
+        provided = (request.headers.get(WEBHOOK_TOKEN_HEADER)
+                    or (request.authorization.password if request.authorization else None)
+                    or request.args.get("token") or "")
+        return hmac.compare_digest(provided, token)
+
+    @web_app.route("/webhook/radarr", methods=["POST"])
+    @web_app.route("/webhook/sonarr", methods=["POST"])
+    def arr_webhook():
+        """Receive a Sonarr/Radarr import event and apply the cached artwork for it. Disabled
+           by default (404), so the endpoint is indistinguishable from upstream when off."""
+        if not globals.config.enable_webhooks:
+            return {"status": "not found"}, 404
+        if not webhook_token_ok():
+            update_log(Instance(broadcast=True), "⛔ Webhook request rejected (missing or invalid token)")
+            return {"status": "unauthorized"}, 401
+        payload = request.get_json(silent=True)
+        if payload is None:
+            return {"status": "invalid json"}, 400
+        event = parse_event(payload)
+        if event == "test":
+            update_log(Instance(broadcast=True), "🧪 Webhook test received")
+            return {"status": "test ok"}, 200
+        if event is None:
+            return {"status": "ignored"}, 200
+        if globals.plex is None or not (globals.plex.movie_libraries or globals.plex.tv_libraries):
+            update_log(Instance(broadcast=True), "⛔ Webhook received but Plex libraries are not configured")
+            return {"status": "plex not configured"}, 503
+        if not globals.config.webhook_tpdb_users:
+            update_log(Instance(broadcast=True), "📥 Webhook received but no ThePosterDB users are configured (webhook_tpdb_users)")
+            return {"status": "no users configured"}, 200
+        globals.webhook_service.enqueue(event)
+        return {"status": "queued"}, 200
 
 
 def setup_socket_handlers(

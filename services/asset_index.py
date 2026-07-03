@@ -245,6 +245,41 @@ class AssetIndex:
         finally:
             conn.close()
 
+    def lookup(self, user_keys: List[str], title: str, year: Optional[int],
+               media_types: List[str], season: Optional[int] = None) -> Optional[sqlite3.Row]:
+        """Find the best cached asset for an imported title, or None.
+
+           user_keys is the preferred-first list of ThePosterDB users; the first user with an
+           acceptable match wins, and within a user the newest (highest asset_id) is taken. Year
+           is matched exactly then within one year; a missing year only matches when the
+           candidates share a single year, so same-name remakes are skipped rather than guessed."""
+        title_keys = {normalize_title(title)}
+        stripped = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
+        if stripped and stripped != title:
+            title_keys.add(normalize_title(stripped))
+        title_keys = [key for key in title_keys if key]
+        if not title_keys or not user_keys or not media_types:
+            return None
+        conn = self._connect()
+        try:
+            sql = (
+                "SELECT * FROM user_assets WHERE missing_since IS NULL "
+                f"AND media_type IN ({','.join('?' * len(media_types))}) "
+                f"AND title_key IN ({','.join('?' * len(title_keys))})"
+            )
+            params = list(media_types) + title_keys
+            if season is not None:
+                sql += " AND season = ?"
+                params.append(season)
+            rows = conn.execute(sql, params).fetchall()
+        finally:
+            conn.close()
+        for user_key in user_keys:
+            chosen = _best_by_year([row for row in rows if row["user_key"] == user_key], year)
+            if chosen is not None:
+                return chosen
+        return None
+
 
 def page_is_fully_known(page_ids: Set[int], known_ids: Set[int]) -> bool:
     """Incremental stop rule: a page halts the crawl only if it had assets and every one was
@@ -264,3 +299,18 @@ def full_crawl_due(last_full_crawl: Optional[str], refresh_days: int) -> bool:
     except (TypeError, ValueError):
         return True
     return (datetime.now(timezone.utc) - last).total_seconds() >= refresh_days * 86400
+
+
+def _best_by_year(candidates: List[sqlite3.Row], year: Optional[int]) -> Optional[sqlite3.Row]:
+    """Pick the newest candidate whose year matches (exact, then within one year). With no year
+       to match on, only pick when every candidate shares one year - otherwise it is ambiguous
+       (a same-name remake) and nothing is returned."""
+    if not candidates:
+        return None
+    if year is not None:
+        pool = [row for row in candidates if row["year"] == year] or \
+               [row for row in candidates if row["year"] is not None and abs(row["year"] - year) <= 1]
+        return max(pool, key=lambda row: row["asset_id"]) if pool else None
+    if len({row["year"] for row in candidates}) > 1:
+        return None
+    return max(candidates, key=lambda row: row["asset_id"])

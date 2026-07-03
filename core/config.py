@@ -40,6 +40,10 @@ class Config:
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
         apprise_urls: List of Apprise notification URLs
+        enable_webhooks: Whether the Sonarr/Radarr import webhook endpoint is enabled
+        webhook_token: Shared secret required on webhook requests
+        webhook_tpdb_users: ThePosterDB users to apply cached artwork from on import, in priority order
+        webhook_apply_delay: Seconds to wait after an import before applying artwork (lets Plex scan first)
     """
 
     def __init__(self, config_path: str = "config/config.json") -> None:
@@ -66,6 +70,10 @@ class Config:
         self.auth_username: str = ""
         self.auth_password_hash: str = ""
         self.apprise_urls: List[str] = []
+        self.enable_webhooks: bool = False
+        self.webhook_token: str = ""
+        self.webhook_tpdb_users: List[str] = []
+        self.webhook_apply_delay: int = 30
 
 
     def load(self) -> None:
@@ -106,6 +114,10 @@ class Config:
             self.auth_username = config.get("auth_username", "")
             self.auth_password_hash = config.get("auth_password_hash", "")
             self.apprise_urls = config.get("apprise_urls", [])
+            self.enable_webhooks = config.get("enable_webhooks", False)
+            self.webhook_token = config.get("webhook_token", "")
+            self.webhook_tpdb_users = config.get("webhook_tpdb_users", [])
+            self.webhook_apply_delay = config.get("webhook_apply_delay", 30)
 
         except Exception as e:
             raise ConfigLoadError(f"Error loading configuration from '{self.path}': {e}") from e
@@ -131,7 +143,11 @@ class Config:
             "auto_manage_bulk_files": True,
             "reset_overlay": True,
             "schedules": [],
-            "apprise_urls": []
+            "apprise_urls": [],
+            "enable_webhooks": False,
+            "webhook_token": "",
+            "webhook_tpdb_users": [],
+            "webhook_apply_delay": 30
         }
 
         if globals.docker:
@@ -177,7 +193,11 @@ class Config:
             "auth_enabled": self.auth_enabled,
             "auth_username": self.auth_username,
             "auth_password_hash": self.auth_password_hash,
-            "apprise_urls": self.apprise_urls
+            "apprise_urls": self.apprise_urls,
+            "enable_webhooks": self.enable_webhooks,
+            "webhook_token": self.webhook_token,
+            "webhook_tpdb_users": self.webhook_tpdb_users,
+            "webhook_apply_delay": self.webhook_apply_delay
         }
 
         try:

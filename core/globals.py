@@ -10,6 +10,7 @@ docker: bool = False # Running in Docker
 bulk_file_service = None
 scheduler_service = None
 update_service = None
+webhook_service = None
 
 # Scrape cancellation (user-initiated "Stop" from the web UI)
 cancel_scrape: bool = False   # Set when the user asks to stop; long loops check it and stop cleanly

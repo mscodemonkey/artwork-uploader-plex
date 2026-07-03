@@ -30,6 +30,7 @@ from services import (
     BulkFileService,
     ImageService,
     SchedulerService,
+    WebhookService,
     UtilityService
 )
 from services.artwork_processor import ArtworkProcessor
@@ -693,6 +694,7 @@ if __name__ == "__main__":
     # Create services
     globals.bulk_file_service = BulkFileService(get_exe_dir())
     globals.scheduler_service = SchedulerService(check_interval=SCHEDULER_CHECK_INTERVAL)
+    globals.webhook_service = WebhookService()
     globals.update_service = UpdateService(
         github_repo=GITHUB_REPO,
         current_version=current_version,
