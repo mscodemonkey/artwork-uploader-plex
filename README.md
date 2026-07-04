@@ -1,5 +1,11 @@
 
 # Artwork Uploader for Plex 
+
+[![Release](https://img.shields.io/github/v/release/jabrown93/artwork-uploader-plex)](https://github.com/jabrown93/artwork-uploader-plex/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/jabrown93/artwork-uploader-plex/release.yml?label=build)](https://github.com/jabrown93/artwork-uploader-plex/actions/workflows/release.yml)
+[![Issues](https://img.shields.io/github/issues/jabrown93/artwork-uploader-plex)](https://github.com/jabrown93/artwork-uploader-plex/issues)
+[![License](https://img.shields.io/github/license/jabrown93/artwork-uploader-plex)](LICENSE.md)
+
 Adapted from a fork of plex-poster-set-helper by Brian Brown
 
 Artwork Uploader is a tool to help process sets of posters from ThePosterDB or MediUX (including sets and boxsets) and upload them to your Plex server or download them to your Kometa asset directory in seconds!
