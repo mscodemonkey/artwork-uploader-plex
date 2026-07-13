@@ -304,6 +304,11 @@ class MediuxScraper:
                     continue
 
             elif media_type == MediaType.MOVIE.value:
+                # Classify by branch, not by whether the title happens to contain the
+                # word "Collection": collection artwork never sets `year`, so routing a
+                # collection whose name lacks "Collection" into the movie branch below
+                # raised UnboundLocalError on `year`.
+                is_collection = False
                 if data["movie_id"]:
                     movie_id = data["movie_id"]["id"]
                     if set_data.get("movie"):
@@ -322,11 +327,13 @@ class MediuxScraper:
                     # This is a collection poster
                     title = set_data["collection"]["collection_name"]
                     file_type = "collection_poster"
+                    is_collection = True
                 else:
                     if data["fileType"] == FileType.MOVIE_POSTER.value:
                         # This is a collection poster
                         file_type = "collection_poster"
                         title = set_data["collection"]["collection_name"]
+                        is_collection = True
 
                     elif data["fileType"] == FileType.SQUARE_ART.value:
                         # This is a square art
@@ -357,6 +364,7 @@ class MediuxScraper:
                             # The only remaining artwork can be the collection background
                             title = set_data["collection"]["collection_name"]
                             file_type = "background"
+                            is_collection = True
 
             image_stub = data["id"]
             poster_url = f"{base_url}{image_stub}{quality_suffix}{cache_buster}"
@@ -401,7 +409,7 @@ class MediuxScraper:
                     )
 
             elif media_type == MediaType.MOVIE.value:
-                if "Collection" in title:
+                if is_collection:
                     if (self.options.has_no_filters() and file_type in self.config.mediux_filters) or self.options.has_filter(file_type):
                         if not self.options.is_excluded(image_stub):
                             self.callbacks.debug(f"{i+1}. ✅ Including {file_type.replace('_', ' ')} for '{title}'.", "MediuxScraper/_process_set")
