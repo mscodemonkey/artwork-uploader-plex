@@ -30,6 +30,7 @@ class Config:
         track_artwork_ids: Whether to track artwork IDs using Plex labels
         skip_locked_artwork: Whether to skip artwork whose target field is locked in Plex (already set)
         local_library_matching: Whether to match scraped artwork against the local libraries before fetching poster pages
+        allow_artist_updates: Whether to update locked artwork we applied when the same artist has posted a newer version (requires skip_locked_artwork and track_artwork_ids)
         cache_user_scrapes: Whether to keep a persistent index of ThePosterDB users' uploads so repeat scrapes only fetch new ones
         user_cache_refresh_days: Days between full re-crawls of a cached user's uploads (catches edits and deletions)
         auto_manage_bulk_files: Whether to auto-organize bulk files
@@ -57,6 +58,7 @@ class Config:
         self.track_artwork_ids: bool = True
         self.skip_locked_artwork: bool = False
         self.local_library_matching: bool = True
+        self.allow_artist_updates: bool = False
         self.cache_user_scrapes: bool = False
         self.user_cache_refresh_days: int = 7
         self.auto_manage_bulk_files: bool = True
@@ -98,6 +100,7 @@ class Config:
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.skip_locked_artwork = config.get("skip_locked_artwork", False)
             self.local_library_matching = config.get("local_library_matching", True)
+            self.allow_artist_updates = config.get("allow_artist_updates", False)
             self.cache_user_scrapes = config.get("cache_user_scrapes", False)
             self.user_cache_refresh_days = config.get("user_cache_refresh_days", 7)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
@@ -128,6 +131,7 @@ class Config:
             "track_artwork_ids": True,
             "skip_locked_artwork": False,
             "local_library_matching": True,
+            "allow_artist_updates": False,
             "cache_user_scrapes": False,
             "user_cache_refresh_days": 7,
             "auto_manage_bulk_files": True,
@@ -172,6 +176,7 @@ class Config:
             "track_artwork_ids": self.track_artwork_ids,
             "skip_locked_artwork": self.skip_locked_artwork,
             "local_library_matching": self.local_library_matching,
+            "allow_artist_updates": self.allow_artist_updates,
             "cache_user_scrapes": self.cache_user_scrapes,
             "user_cache_refresh_days": self.user_cache_refresh_days,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,

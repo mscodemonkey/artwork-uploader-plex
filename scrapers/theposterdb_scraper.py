@@ -2,6 +2,7 @@ import math, time
 from typing import Optional, Any
 from processors import media_metadata
 from utils import soup_utils
+from utils.utils import calculate_md5
 from models.options import Options
 from models.callbacks import ProcessingCallbacks
 from core.exceptions import ScraperException
@@ -42,6 +43,7 @@ class ThePosterDBScraper:
 
         self.user_uploads: int = 0
         self.user_pages: int = 0
+        self.artist_assets: Optional[dict] = None  # {md5(asset url): asset id} from the cached index, for allow_artist_updates
 
         # When set to a list, get_posters records every parsed asset (pre-filter) into it so a
         # user crawl can populate the persistent index. None (default) disables recording.
@@ -488,6 +490,13 @@ class ThePosterDBScraper:
         if new_rows:
             self.callbacks.cached(new_rows)
             self.callbacks.log(f"🆕 TPDb user • {self.author} | {new_rows} new asset(s) added to the cache")
+
+        # Map md5(url) -> asset id for every asset ever recorded for this user (tombstones
+        # included), so allow_artist_updates can recognise artwork we applied from this artist.
+        self.artist_assets = {
+            calculate_md5(row["url"].split("&_cb=")[0]): row["asset_id"]
+            for row in index.owned_asset_urls(user_key)
+        }
 
         self._hydrate_from_cache(index, user_key)
 

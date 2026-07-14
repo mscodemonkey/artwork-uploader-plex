@@ -25,12 +25,18 @@ class UploadProcessor:
         self.config: Config = Config()
         self.config.load()
         self._match_confirm_cache: dict = {}
+        self.artist_assets: Optional[dict] = None  # {md5(asset url): asset id} for the artist being processed
 
 
     def set_options(self, options: Options) -> None:
         self.options = options
         self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
         self.skip_locked: bool = self.options.skip_locked or globals.config.skip_locked_artwork
+        self.allow_artist_updates: bool = self.options.allow_artist_updates or globals.config.allow_artist_updates
+        if self.allow_artist_updates and not self.config.track_artwork_ids:
+            debug_me("allow_artist_updates has no effect while track_artwork_ids is off - without "
+                     "artwork IDs there's no way to tell artwork we applied from artwork set by "
+                     "hand, so locked items are all left alone.", "UploadProcessor/set_options")
 
     def _resolve_tmdb_id(self, artwork, description: str, kind: Literal[MediaType.TV_SHOW, MediaType.MOVIE]) -> bool:
         """
@@ -148,6 +154,8 @@ class UploadProcessor:
                     uploader.track_artwork_ids = self.config.track_artwork_ids
                     uploader.reset_overlay = self.config.reset_overlay
                     uploader.skip_locked = self.skip_locked
+                    uploader.allow_artist_updates = self.allow_artist_updates
+                    uploader.artist_assets = self.artist_assets
                     uploader.set_description(description)
                     uploader.set_options(self.options)
                     result = uploader.upload_to_plex()
@@ -205,6 +213,8 @@ class UploadProcessor:
                     uploader.track_artwork_ids = self.config.track_artwork_ids
                     uploader.reset_overlay = self.config.reset_overlay
                     uploader.skip_locked = self.skip_locked
+                    uploader.allow_artist_updates = self.allow_artist_updates
+                    uploader.artist_assets = self.artist_assets
                     if locally_matched:
                         uploader.confirm_match = lambda a=artwork, item=movie_item: self._artwork_matches_item(a, item, "movie")
                     uploader.set_description(desc)
@@ -341,6 +351,8 @@ class UploadProcessor:
                         uploader.track_artwork_ids = self.config.track_artwork_ids
                         uploader.reset_overlay = self.config.reset_overlay
                         uploader.skip_locked = self.skip_locked
+                        uploader.allow_artist_updates = self.allow_artist_updates
+                        uploader.artist_assets = self.artist_assets
                         if locally_matched:
                             uploader.confirm_match = lambda a=artwork, item=tv_show: self._artwork_matches_item(a, item, "tv")
                         uploader.set_description(desc)

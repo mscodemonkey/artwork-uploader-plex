@@ -779,6 +779,9 @@ function saveConfig() {
     // ThePosterDB user cache expiration threshold
     save_config.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value);
 
+    // Checkbox for taking an artist's newer artwork for posters we applied
+    save_config.allow_artist_updates = document.getElementById("allow_artist_updates").checked;
+
     // Get selected mediux filters
     save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
         .map(checkbox => checkbox.value);
@@ -882,6 +885,7 @@ function updateConfigUI(config) {
     document.getElementById("local_library_matching").checked = config.local_library_matching;
     document.getElementById("cache_user_scrapes").checked = config.cache_user_scrapes;
     document.getElementById("user_cache_refresh_days").value = config.user_cache_refresh_days;
+    document.getElementById("allow_artist_updates").checked = config.allow_artist_updates;
     document.getElementById("option-add-to-bulk").checked = config.auto_manage_bulk_files;
     document.getElementById("apprise_urls").value = config.apprise_urls.join(", ");
     
