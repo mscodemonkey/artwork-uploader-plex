@@ -30,6 +30,7 @@ class PlexUploader:
         self.type: Optional[str] = None
         self.track_artwork_ids: bool = True
         self.reset_overlay: bool = False
+        self.skip_locked: bool = False
 
     def set_artwork(self, artwork: AnyArtwork) -> None:
         self.artwork = artwork
@@ -56,6 +57,8 @@ class PlexUploader:
 
     def upload_to_plex(self) -> str:
         try:
+            if self.skip_locked and not self.options.force and self.artwork_field_is_locked():
+                return f'🔒 {self.description} | {self.artwork_type} locked, skipped in {self.upload_target.librarySectionTitle}'
             if self.artwork_exists_on_plex() is False or self.options.force:
 
                 self.process_overlay_label()
@@ -107,4 +110,12 @@ class PlexUploader:
                     self.upload_target.reload()
 
         return existing_artwork
+
+    def artwork_field_is_locked(self) -> bool:
+        # Backgrounds lock the art field, square art locks squareArt, all poster types lock thumb
+        locked_field = "art" if self.artwork_id == "BID:" else "squareArt" if self.artwork_id == "SAID:" else "thumb"
+        for field in self.upload_target.fields:
+            if field.name == locked_field and field.locked:
+                return True
+        return False
 

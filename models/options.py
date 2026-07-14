@@ -20,6 +20,7 @@ class Options:
         stage: Download artwork for seasons and episodes not yet in Plex (except Specials)
         temp: Use temporary directory instead of Kometa asset directory
         force: Force re-upload even if artwork hasn't changed
+        skip_locked: Skip artwork when the target Plex field is locked (already set)
         filters: List of artwork types to include (e.g., ['show_cover', 'title_card'])
         exclude: List of artwork IDs to skip
         year: Override year for Plex matching
@@ -32,6 +33,7 @@ class Options:
     stage: bool = False
     temp: bool = False
     force: bool = False
+    skip_locked: bool = False
     filters: List[str] = field(default_factory=list)
     exclude: Optional[List[str]] = None
     year: Optional[int] = None

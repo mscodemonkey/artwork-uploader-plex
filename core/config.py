@@ -30,6 +30,7 @@ class Config:
         save_to_kometa: Whether to save artwork to Kometa
         stage_assets: Whether to download assets for seasons and episodes that are not in Plex yet (except Specials)
         track_artwork_ids: Whether to track artwork IDs using Plex labels
+        skip_locked_artwork: Whether to skip artwork whose target field is locked in Plex (already set)
         auto_manage_bulk_files: Whether to auto-organize bulk files
         reset_overlay: Whether to reset Kometa overlay labels on upload
         schedules: List of scheduled bulk import jobs
@@ -53,6 +54,7 @@ class Config:
         self.save_to_kometa: bool = False
         self.stage_assets: bool = False
         self.track_artwork_ids: bool = True
+        self.skip_locked_artwork: bool = False
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
         self.schedules: List[Dict[str, Any]] = []
@@ -90,6 +92,7 @@ class Config:
             self.stage_assets = config.get("stage_assets", True)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
+            self.skip_locked_artwork = config.get("skip_locked_artwork", False)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
             self.reset_overlay = config.get("reset_overlay", False)
             self.schedules = config.get("schedules", [])
@@ -116,6 +119,7 @@ class Config:
             "save_to_kometa": False,
             "stage_assets": False,
             "track_artwork_ids": True,
+            "skip_locked_artwork": False,
             "auto_manage_bulk_files": True,
             "reset_overlay": True,
             "schedules": [],
@@ -156,6 +160,7 @@ class Config:
             "stage_assets": self.stage_assets,
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,
+            "skip_locked_artwork": self.skip_locked_artwork,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
             "reset_overlay": self.reset_overlay,
             "schedules": self.schedules,

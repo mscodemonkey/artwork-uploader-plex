@@ -384,11 +384,17 @@
                                         <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Additional settings</h5>
                                         <div class="form-check form-switch mb-3" style="display: none;">
                                             <input class="form-check-input" type="checkbox" value="--force" id="track_artwork_ids"/>
-                                            <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex labels (recommend to leave checked)</label>
+                                            <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex labels</label>
+                                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="(Recommended) Tracks artwork IDs through Plex labels, avoiding having to download assets that have already been downloaded and set"></i>
                                         </div>
                                         <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" value="auto_manage" id="auto_manage_bulk_files"/>
                                             <label for="auto_manage_bulk_files" class="form-check-label">Sort and label bulk files automatically</label>
+                                        </div>
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" value="skip_locked_artwork" id="skip_locked_artwork"/>
+                                            <label for="skip_locked_artwork" class="form-check-label">Skip locked artwork</label>
+                                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Skips artwork that is locked in Plex, so scheduled runs only update default artwork"></i>
                                         </div>
                                     </div>
                                 </div>
@@ -542,6 +548,11 @@
                                     <input class="form-check-input" type="checkbox" value="--force" id="option-force"/>
                                     <label for="option-force" class="form-check-label">Force upload the artwork, even if it
                                         already exists</label>
+                                </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" value="--skip-locked" id="option-skip-locked"/>
+                                    <label for="option-skip-locked" class="form-check-label">Skip locked artwork</label>
+                                    <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Skips artwork that is locked in Plex, so scheduled runs only update default artwork"></i>
                                 </div>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input" type="checkbox" value="--stage" id="option-stage"/>
@@ -711,6 +722,11 @@
                                 <label for="upload-option-force" class="form-check-label">Force upload the artwork, even if it
                                     already exists</label>
                             </div>
+                                <div class="form-check form-switch mb-2">
+                                    <input class="form-check-input" type="checkbox" value="skip-locked" id="upload-option-skip-locked"/>
+                                    <label for="upload-option-skip-locked" class="form-check-label">Skip locked artwork</label>
+                                    <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Skips artwork that is locked in Plex, so scheduled runs only update default artwork"></i>
+                                </div>                            
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" value="stage" id="upload-option-stage"/>
                                     <label for="upload-option-stage" class="form-check-label">Stage assests&ensp;</label>
