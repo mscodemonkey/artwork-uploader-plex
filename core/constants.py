@@ -102,6 +102,10 @@ TPDB_BASE_URL = "https://theposterdb.com"
 TPDB_API_ASSETS_URL = "https://theposterdb.com/api/assets"
 TPDB_RATE_LIMIT_DELAY = 6  # seconds between requests
 TPDB_USER_UPLOADS_PER_PAGE = 24
+# A full crawl only tombstones assets it didn't see if it reached at least this share of the
+# user's reported uploads. ThePosterDB's counter runs a little high, so this is below 1.0, but a
+# crawl cut short by a bad page must never be mistaken for a catalogue that shrank.
+RECONCILE_MIN_COVERAGE = 0.9
 
 # MediUX configuration
 MEDIUX_BASE_URL = "https://mediux.pro"

@@ -10,7 +10,7 @@ from core.exceptions import ScraperException
 from core.config import Config
 from core import globals
 from core.enums import MediaType, ScraperSource
-from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
+from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, RECONCILE_MIN_COVERAGE, BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 import sqlite3
@@ -454,11 +454,26 @@ class ThePosterDBScraper:
                 new_rows, seen_ids, clean = self._crawl_user_pages(index, user_key, full=True)
 
         # Only reconcile/record over a crawl with no failed pages, so an invisible page error
-        # never mass-tombstones live assets.
+        # never mass-tombstones live assets. A full crawl now stops at the first empty page, which
+        # is normally the end of the uploads - but a TPDB markup change could make a mid-catalogue
+        # page parse to zero and cut the crawl short, and reconciling then would tombstone
+        # everything it didn't reach. So only count it as a full crawl (reconcile + advance the
+        # full-crawl timestamp) when it actually covered most of the user's reported uploads;
+        # otherwise leave the index alone so the next run retries the full crawl.
         if clean:
-            if full:
+            covered = len(seen_ids) >= self.user_uploads * RECONCILE_MIN_COVERAGE
+            if full and covered:
                 index.reconcile(user_key, seen_ids, crawl_started_at)
-            index.record_crawl(user_key, full, self.user_uploads)
+            elif full:
+                self.callbacks.debug(
+                    f"Full crawl for {self.author} saw only {len(seen_ids)} of {self.user_uploads} "
+                    f"reported uploads; not tombstoning and retrying a full crawl next run",
+                    "ThePosterDBScraper/scrape")
+            index.record_crawl(user_key, full and covered, self.user_uploads)
+
+        if new_rows:
+            self.callbacks.cached(new_rows)
+            self.callbacks.log(f"🆕 TPDb user • {self.author} | {new_rows} new asset(s) added to the cache")
 
         self._hydrate_from_cache(index, user_key)
 
@@ -483,6 +498,12 @@ class ThePosterDBScraper:
             else:
                 clean = False
             self.callbacks.debug(f"Processed {user_page + 1} out of {self.user_pages} user pages. Collected {collected} assets so far", "ThePosterDBScraper/scrape")
+            # The uploads counter can be higher than the number of assets actually listed, so the
+            # page count can overshoot. A page that fetched cleanly but held nothing is the end of
+            # the user's uploads - stop here rather than fetching the phantom pages after it.
+            if ok and not page_catalog:
+                self.callbacks.debug(f"No assets on page {user_page + 1}, the user's uploads end here", "ThePosterDBScraper/scrape")
+                break
             if not full and ok and page_is_fully_known(page_ids, known):
                 self.callbacks.debug(f"Reached already-indexed uploads at page {user_page + 1}, stopping incremental crawl", "ThePosterDBScraper/scrape")
                 break
