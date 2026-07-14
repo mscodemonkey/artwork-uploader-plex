@@ -359,8 +359,18 @@ function updateLog(message, color = null, artwork_title = null) {
         message = message.replace(/^\[(\d{2}:\d{2}:\d{2})\.\d{3}\]/, '[$1]');
     }
 
-    // Prepend the new message with timestamp
-    statusElement.innerHTML = '<div class="log_message">' + message + '</div>' + statusElement.innerHTML;
+    // Prepend the new message (newest first) as a node, so we do not re-parse the entire log
+    // on every line. That, plus the line cap below, stops a long scrape from growing the page
+    // until the browser runs out of memory.
+    const entry = document.createElement("div");
+    entry.className = "log_message";
+    entry.innerHTML = message;
+    statusElement.prepend(entry);
+
+    const MAX_LOG_LINES = 500;
+    while (statusElement.childElementCount > MAX_LOG_LINES) {
+        statusElement.removeChild(statusElement.lastElementChild);
+    }
 }
 socket.on("log_update", (data) => {
     if (validResponse(data,true)) {
