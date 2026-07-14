@@ -620,6 +620,7 @@ function saveConfig() {
 
     // Checkbox for skipping artwork with locked fields in Plex
     save_config.skip_locked_artwork = document.getElementById("skip_locked_artwork").checked;
+    toggleSkipLockedCheckbox();
 
     // Get selected mediux filters
     save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
@@ -722,6 +723,9 @@ function loadConfig() {
 
             // Make sure scraper stage option visibility is set correctly on load
             toggleScraperStageCheckbox();
+
+            // Make sure skip locked artwork option visibility is set correctly on load
+            toggleSkipLockedCheckbox();
 
             // Show/hide logout button based on auth enabled
             if (data.config.auth_enabled) {
@@ -1801,8 +1805,8 @@ function toggleKometaSettings() {
             forceLabel.textContent = 'Force save the artwork, replacing any existing asset';
             forceLabelUpload.textContent = 'Force save the artwork, replacing any existing asset';
         } else {
-            forceLabel.textContent = 'Force upload the artwork, even if it already exists';
-            forceLabelUpload.textContent = 'Force upload the artwork, even if it already exists';
+            forceLabel.textContent = 'Force upload the artwork, even if it\'s locked or it already exists';
+            forceLabelUpload.textContent = 'Force upload the artwork, even if it\'s locked or it already exists';
         }
     }
 
@@ -1810,7 +1814,38 @@ function toggleKometaSettings() {
     toggleTempCheckbox();
     togglePlexOptions();
     toggleScraperStageCheckbox();
+    toggleSkipLockedCheckbox();
 }
+
+function toggleSkipLockedCheckbox() {
+    const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const globalSetting = document.getElementById("skip_locked_artwork").checked;
+    const skipLockedCheckbox = document.getElementById("option-skip-locked");
+    const skipLockedCheckboxUpload = document.getElementById("upload-option-skip-locked");
+
+    // Hide and uncheck the skip locked option if Kometa is enabled
+    if (saveToKometa) {
+        skipLockedCheckbox.parentElement.style.display = "none";
+        skipLockedCheckbox.checked = false;
+        skipLockedCheckboxUpload.parentElement.style.display = "none";
+        skipLockedCheckboxUpload.checked = false;
+    } else {
+        if (globalSetting) {
+            skipLockedCheckbox.parentElement.style.display = "none";
+            skipLockedCheckbox.checked = true;
+            skipLockedCheckboxUpload.parentElement.style.display = "none";
+            skipLockedCheckboxUpload.checked = true;
+        } else {
+            skipLockedCheckbox.parentElement.style.display = "block";
+            skipLockedCheckbox.checked = false;
+            skipLockedCheckboxUpload.parentElement.style.display = "block";
+            skipLockedCheckboxUpload.checked = false;
+        }
+    }
+}
+
+// Add event listener for global skip locked artwork checkbox
+document.getElementById("skip_locked_artwork").addEventListener("change", toggleSkipLockedCheckbox);
 
 function toggleScraperStageCheckbox() {
     const globalStageSetting = document.getElementById("stage_assets").checked;
@@ -1859,15 +1894,19 @@ function toggleTempCheckbox() {
 function togglePlexOptions() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const trackArtworkIDs = document.getElementById("track_artwork_ids").parentElement;
+    const skipLocked = document.getElementById("skip_locked_artwork").parentElement;
     const resetOverlay = document.getElementById("reset_overlay").parentElement;
 
     // Ony show the Track Artwork IDs and Reset Overlay options if Kometa is disabled
     if (!saveToKometa) {
         trackArtworkIDs.style.display = "block";
         resetOverlay.style.display = "block";
+        skipLocked.style.display = "block";
     } else {
         trackArtworkIDs.style.display = "none";
         resetOverlay.style.display = "none";
+        skipLocked.style.display = "none";
+        document.getElementById("skip_locked_artwork").checked = false; // Uncheck the skip locked option if Kometa is enabled
         document.getElementById("track_artwork_ids").checked = true;
     }
 }
