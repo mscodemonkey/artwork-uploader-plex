@@ -3,6 +3,7 @@ Application-wide constants.
 """
 
 from core.__version__ import __version__, __url__
+from core.enums import ArtworkIDPrefix, FileType
 
 # Application metadata
 APP_NAME = "Artwork Uploader for Plex"
@@ -46,9 +47,32 @@ ALL_FILTERS = [
 # Artwork ID prefixes (for Plex labels)
 ARTWORK_ID_BACKGROUND = "BID:"
 ARTWORK_ID_SHOW_COVER = "CID:"
+ARTWORK_ID_SQUARE_ART = "SAID:"
 ARTWORK_ID_POSTER = "PID:"
 ARTWORK_ID_SEASON = "SID:"
 ARTWORK_ID_EPISODE = "EID:"
+
+# Artwork type to Plex label prefix mapping
+ARTWORK_ID_MAP = {
+    FileType.BACKGROUND.value: ArtworkIDPrefix.BACKGROUND.value,
+    FileType.SQUARE_ART.value: ArtworkIDPrefix.SQUARE_ART.value,
+    FileType.SHOW_COVER.value: ArtworkIDPrefix.SHOW_COVER.value,
+    FileType.MOVIE_POSTER.value: ArtworkIDPrefix.POSTER.value,
+    FileType.COLLECTION_POSTER.value: ArtworkIDPrefix.POSTER.value,
+    FileType.SEASON_COVER.value: ArtworkIDPrefix.SEASON.value,
+    FileType.TITLE_CARD.value: ArtworkIDPrefix.EPISODE.value
+}
+
+# Artwork type to display string mapping
+ARTWORK_TYPE_MAP = {
+    FileType.BACKGROUND.value: "Background",
+    FileType.SQUARE_ART.value: "Square art",
+    FileType.SHOW_COVER.value: "Show cover",
+    FileType.MOVIE_POSTER.value: "Poster",
+    FileType.COLLECTION_POSTER.value: "Poster",
+    FileType.SEASON_COVER.value: "Season cover",
+    FileType.TITLE_CARD.value: "Title card"
+}
 
 # Media types
 MEDIA_TYPE_TV_SHOW = "TV Show"
@@ -114,8 +138,8 @@ MODE_WEB = "web"
 COMMENT_PREFIXES = ('#', '//')
 
 # File type patterns
-IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png')
-VALID_FILENAME_PATTERN = r'^[^/]+(?:\.jpg|\.jpeg|\.png)$'
+IMAGE_EXTENSIONS = ('.jpg', '.jpeg', '.png', '.webp')
+VALID_FILENAME_PATTERN = r'^[^/]+(?:\.jpg|\.jpeg|\.png|\.webp)$'
 
 # Status messages
 STATUS_COLORS = {

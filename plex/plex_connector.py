@@ -1,5 +1,4 @@
 from typing import Optional, List, Tuple, Union
-import socket
 import requests
 from plexapi.server import PlexServer
 from plexapi.library import MovieSection, ShowSection
@@ -7,7 +6,6 @@ from plexapi.video import Movie, Show
 from plexapi.collection import Collection
 import plexapi.exceptions
 import xml.etree.ElementTree
-from urllib.parse import urlparse
 
 from core.exceptions import PlexConnectorException, LibraryNotFound
 from models.artwork_types import AnyArtwork
@@ -99,7 +97,7 @@ class PlexConnector:
                 raise LibraryNotFound(
                     f'TV library named "{tv_library}" not found. Please check the "tv_library" in config.json or provide one.',
                     f'TV library named "{tv_library}" not found.')
-        debug_me(f"The following TV libraries have been set: {[library.title for library in self.tv_libraries]}", "PlexConnector/set_tv_libraries")
+        debug_me(f"The following TV libraries have been set: {[library.title for library in self.tv_libraries]}")
         return self.tv_libraries
 
     def set_movie_libraries(self, movie_libraries: Union[str, List[str]]) -> List[MovieSection]:
@@ -121,7 +119,7 @@ class PlexConnector:
                 raise LibraryNotFound(
                     f'Movie library named "{movie_library}" not found. Please check the "movie_library" in config.json or provide one.',
                     f'Movie library named "{movie_library}" not found')
-        debug_me(f"The following movie libraries have been set: {[library.title for library in self.movie_libraries]}", "PlexConnector/set_movie_libraries")
+        debug_me(f"The following movie libraries have been set: {[library.title for library in self.movie_libraries]}")
         return self.movie_libraries
 
 
@@ -139,12 +137,12 @@ class PlexConnector:
                 plex_collections = movie_library.collections()
                 for collection in plex_collections:
                     if collection.title == collection_title:
-                        debug_me(f"Found '{collection_title}' in '{movie_library.title}'", "PlexConnector/find_collection")
+                        debug_me(f"Found '{collection_title}' in '{movie_library.title}'")
                         collections.append(collection)
                         libraries.append(movie_library.title)
             except Exception as e:
                 # Continue checking other libraries if one fails
-                debug_me(f"Error searching collection in library: {e}", "PlexConnector/find_collection")
+                debug_me(f"Error searching collection in library: {e}")
                 raise PlexConnectorException(f"Error seraching Plex for {collection_title}")
 
         if collections:
@@ -178,18 +176,18 @@ class PlexConnector:
             try:
                 library_item = library.getGuid(f"tmdb://{artwork.get('tmdb_id')}")
                 library_name = library.title
-                debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'", "PlexConnector/find_in_library")
+                debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'")
 
                 if library_item:
                     items.append(library_item)
                     lib_names.append(library_name)
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
-                debug_me(f"Plex server timed out while searching '{artwork.get('title')} ({artwork.get('year')})' in {library.title}", "PlexConnector/find_in_library")
+                debug_me(f"Plex server timed out while searching '{artwork.get('title')} ({artwork.get('year')})' in {library.title}")
                 lib_names.append(f"ERROR:{library.title}")
                 pass
             except Exception as e:
                 # Continue checking other libraries if one fails
-                debug_me(f"Unable to find '{artwork.get('title')} ({artwork.get('year')})' as TMDb ID '{artwork.get('tmdb_id')}' in '{library.title}': {e}", "PlexConnector/find_in_library")
+                debug_me(f"Unable to find '{artwork.get('title')} ({artwork.get('year')})' as TMDb ID '{artwork.get('tmdb_id')}' in '{library.title}': {e}")
                 pass
         for lib_name in lib_names:
             if "ERROR" in lib_name:
@@ -218,7 +216,7 @@ class PlexConnector:
             try:
                 self.connect()
             except PlexConnectorException as e:
-                debug_me(f"PlexConnectorException raised: {str(e)}", "PlexConnector/movie_or_show")
+                debug_me(f"PlexConnectorException raised: {str(e)}")
                 return "Error", None, None, None
 
         # First check movie libraries
@@ -252,24 +250,24 @@ class PlexConnector:
                                pass
                            break
                     if tmdb_id is not None:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} with TMDb ID: {tmdb_id}", "PlexConnector/movie_or_show")
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} with TMDb ID: {tmdb_id}")
                     else:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} but TMDb ID not found", "PlexConnector/movie_or_show")
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} but TMDb ID not found")
                     return media_type, tmdb_id, found_title, found_year
             except TimeoutError as e:
-                debug_me(f"Error searching in library '{library.title}' (Timed out) {str(e)}", "PlexConnector/movie_or_show")
+                debug_me(f"Error searching in library '{library.title}' (Timed out) {str(e)}")
                 return "TimeoutError", None, None, None
             except ConnectionError as e:
-                debug_me(f"Error searching in library '{library.title}' (Connection error) {str(e)}", "PlexConnector/movie_or_show")
+                debug_me(f"Error searching in library '{library.title}' (Connection error) {str(e)}")
                 return "ConnectionError", None, None, None
             except Exception as e:
                 if "NameResolutionError" in {str(e)}:
-                    debug_me(f"Error searching in library '{library.title}' (Cannot resolve server)' {str(e)}", "PlexConnector/movie_or_show")
+                    debug_me(f"Error searching in library '{library.title}' (Cannot resolve server)' {str(e)}")
                     return "DNSError", None, None, None
                 else:
-                    debug_me(f"Error searching in library '{library.title}' ({e.__class__.__name__})' {str(e)}", "PlexConnector/movie_or_show")
+                    debug_me(f"Error searching in library '{library.title}' ({e.__class__.__name__})' {str(e)}")
                     return "Error", None, None, None
                 pass
 
-        debug_me(f"'{title} ({year})' not found in any library", "PlexConnector/movie_or_show")
+        debug_me(f"'{title} ({year})' not found in any library")
         return "unavailable", None, None, None

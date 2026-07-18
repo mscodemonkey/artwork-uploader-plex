@@ -76,7 +76,8 @@ The structure of your Kometa asset directories should look like this:
   │   │   ├── poster.jpg
   │   │   └── background.jpg
   │   ├── Die Another Day (2002)
-  │   │   └── poster.png
+  │   │   ├── poster.jpg
+  │   │   └── square.png
   │   ├── Spy Kids Collection
   ·   ·   ├── poster.jpg
   ·   ·   └── background.png
@@ -95,6 +96,7 @@ The structure of your Kometa asset directories should look like this:
   ├── TV Shows
   │   ├── Ted Lasso (2020) {tmdb-97546}
   │   │   ├── poster.png
+  │   │   ├── square.webp
   │   │   ├── Season01.jpg
   │   │   ├── Season02.jpg
   │   │   ├── Season03.jpg
@@ -107,6 +109,7 @@ The structure of your Kometa asset directories should look like this:
   ·   ·
   │   └── Alien - Earth
   │       ├── poster.jpg
+  │   │   ├── square.jpeg
   │       └── background.png
   └── TV Shows 4K
       ├── Foundation (2021)
@@ -263,6 +266,8 @@ Both mediux_filters and tpdb_filters specify which artwork types to upload by in
 - title_card
 - movie_poster
 - collection_poster
+
+A NOTE ON SQUARE ART ASSETS: Even though MediUX supports per-season ```square_art``` assets for TV Shows, Plex only supports a single ```square_art``` asset at the show level. When saving assets to the Kometa asset directory, the first asset processed will be saved as ```square.ext``` and will be the one applied by Kometa. Subsequent assets will be saved as ```square_alt_#.ext``` in case you want to select an alternative one which you can rename as ```square.ext``` for Kometa to pick up. When applying artwork directly to a Plex server, Artwork Uploader will apply the first one and ignore the rest.
 
 ---
 # Usage

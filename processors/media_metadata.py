@@ -1,6 +1,7 @@
 import re
 
 from utils.notifications import debug_me
+from core.enums import MediaType, FileType
 
 
 def parse_show(media_title):
@@ -47,26 +48,26 @@ def parse_title(title: str):
     title = re.sub(r"\s+\.", ".", title).strip()
 
     # Regular expression patterns to match TV shows, movies, collections, episodes, and backgrounds
-    episode_pattern = r".*S(?P<season>\d+)\sE(?P<episode>\d+).*"
-    season_pattern = r".*Season\s(?P<season>\d+).*"
-    specials_pattern = r".*- Specials.*"
-    title_pattern_with_year = r"^(?P<title>.+)\s\((?P<year>\d{4})\)$"
+    episode_pattern = r".*S(?P<season>\d+)\s+E(?P<episode>\d+).*"
+    season_pattern = r".*Season\s+(?P<season>\d+).*"
+    specials_pattern = r".*-\s*Specials.*"
+    title_pattern_with_year = r"^(?P<title>.+)\s+\((?P<year>\d{4})\)$"
     title_pattern_without_year = r"^(?P<title>.+)$"
 
-    movie_or_show_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)"
-    background_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)\s-\sBackdrop"
-    tv_sq_art_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)\s-\sS\d+\sOST" # Mediux square art for season 1 OSTs have this unique format so we can use it to identify them
-    movie_sq_art_pattern = r"^(?P<title>.+)\s\((?P<year>\d{4})\)\s-\sOST"
+    movie_or_show_pattern = r"^(?P<title>.+)\s+\((?P<year>\d{4})\)"
+    background_pattern = r"^(?P<title>.+)\s+\((?P<year>\d{4})\)\s+-\s+Backdrop"
+    tv_sq_art_pattern = r"^(?P<title>.+)\s+\((?P<year>\d{4})\)\s+-\s+S(?P<season>\d+)\s+OST" # Mediux square art items have this unique format so we can use it to identify them
+    movie_sq_art_pattern = r"^(?P<title>.+)\s+\((?P<year>\d{4})\)\s+-\s+OST"
     collection_pattern = r"^(?!.*\(\d{4}\))(?P<title>.+)$" # Collections don't have a year in their name and some collection poster files don't have the word "Collection" in them
 
-    # If it matches the episode pattern (SxxExx), it's a TV show title card
+    # If it matches the episode pattern (SxxExx or SxEx), it's a TV show title card
     # We populate the season, episode and set artwork type to title_card, and then extract the base title for further processing
     episode_match = re.match(episode_pattern, title, re.IGNORECASE)
     if episode_match:
         season = int(episode_match.group('season'))
         episode = int(episode_match.group('episode'))
-        type = "title_card"
-        base = re.split(r"\s-\sS\d+\s*E\d+.*", title, 1)[0].strip()
+        type = FileType.TITLE_CARD.value
+        base = re.split(r"\s+-\s+S\d+\s*E\d+.*", title, 1, flags=re.IGNORECASE)[0].strip()
 
     # If it matches the season pattern, it's a TV show season cover
     # We populate the season, set episode to None and artwork type to season_cover, and then extract the base title for further processing
@@ -74,8 +75,8 @@ def parse_title(title: str):
     if season_match:
         season = int(season_match.group('season'))
         episode = None
-        type = "season_cover"
-        base = re.split(r"\s-\sSeason\s\d+.*", title, 1)[0].strip()
+        type = FileType.SEASON_COVER.value
+        base = re.split(r"\s+-\s+Season\s+\d+.*", title, 1, flags=re.IGNORECASE)[0].strip()
     
     # If it matches the specials pattern, it's a TV show specials season cover
     # We set season to 0, episode to None, and artwork type to season_cover, and then extract the base title for further processing
@@ -83,8 +84,8 @@ def parse_title(title: str):
     if specials_match:
         season = 0
         episode = None
-        type = "season_cover"
-        base = re.split(r"\s-\sSpecials.*", title, 1)[0].strip()
+        type = FileType.SEASON_COVER.value
+        base = re.split(r"\s+-\s+Specials.*", title, 1, flags=re.IGNORECASE)[0].strip()
 
     # If any of the above matched, we process as a TV show
     if episode_match or season_match or specials_match:
@@ -106,18 +107,18 @@ def parse_title(title: str):
             year = int(title_match.group('year'))
         # Finally, we return the parsed TV show artwork metadata with as much data as possible
         artwork = {
-            "media": "TV Show",
+            "media": MediaType.TV_SHOW.value,
             "title": title_only,
             "year": year,
             "season": season,
             "episode": episode,
-            "type": type,
+            "file_type": type,
             "author": None
         }
         debug_me(
             f"Matched '{title}' as TV Show {"Title Card" if episode is not None else "Season Cover"} "
             + f"for '{artwork['title']}{f" ({artwork['year']})" if artwork['year'] else ''}', "
-            + f"Season {artwork['season']}{f", Episode {artwork['episode']}" if artwork['episode'] is not None else ''}", "media_metadata/parse_title"
+            + f"Season {artwork['season']}{f", Episode {artwork['episode']}" if artwork['episode'] is not None else ''}"
         )
         return artwork
 
@@ -132,40 +133,41 @@ def parse_title(title: str):
             "year": background_match.group('year'),
             "season": "Backdrop",
             "episode": None,
-            "type": "background",
+            "file_type": FileType.BACKGROUND.value,
             "author": None
         }
-        debug_me(f"Matched '{title}' as either movie, TV show or collection background for '{artwork['title']} ({artwork['year']})'", "media_metadata/parse_title")
+        debug_me(f"Matched '{title}' as either movie, TV show or collection background for '{artwork['title']} ({artwork['year']})'")
         return artwork
     
     # Check if it's a Mediux square art for TV Show
     tv_sq_art_match = re.match(tv_sq_art_pattern, title, re.IGNORECASE)
     if tv_sq_art_match:
         artwork = {
-            "media": "TV Show",
+            "media": MediaType.TV_SHOW.value,
             "title": tv_sq_art_match.group('title').strip(),
             "year": tv_sq_art_match.group('year'),
             "season": "SquareArt",
+            # "season": int(tv_sq_art_match.group('season')),
             "episode": None,
-            "type": "square_art",
+            "file_type": FileType.SQUARE_ART.value,
             "author": None
         }
-        debug_me(f"Matched '{title}' as square art for TV Show '{artwork['title']} ({artwork['year']})'", "media_metadata/parse_title")
+        debug_me(f"Matched '{title}' as square art for TV Show '{artwork['title']} ({artwork['year']})'")
         return artwork
     
     # Check if it's a Mediux square art for Movie
     movie_sq_art_match = re.match(movie_sq_art_pattern, title, re.IGNORECASE)
     if movie_sq_art_match:
         artwork = {
-            "media": "Movie",
+            "media": MediaType.MOVIE.value,
             "title": movie_sq_art_match.group('title').strip(),
             "year": movie_sq_art_match.group('year'),
             "season": None,
             "episode": None,
-            "type": "square_art",
+            "file_type": FileType.SQUARE_ART.value,
             "author": None
         }
-        debug_me(f"Matched '{title}' as square art for Movie '{artwork['title']} ({artwork['year']})'", "media_metadata/parse_title")
+        debug_me(f"Matched '{title}' as square art for Movie '{artwork['title']} ({artwork['year']})'")
         return artwork
 
     # If we got to this point and it doesn't contain "Backdrop", it could still be a background or a movie ot tv show poster
@@ -178,29 +180,29 @@ def parse_title(title: str):
             "year": movie_or_show_match.group('year'),
             "season": None,
             "episode": None,
-            "type": "poster",
+            "file_type": FileType.POSTER.value,
             "author": None
         }
-        debug_me(f"Matched '{title}' as either Movie or TV Show poster for '{artwork['title']} ({artwork['year']})'", "media_metadata/parse_title")
+        debug_me(f"Matched '{title}' as either Movie or TV Show poster for '{artwork['title']} ({artwork['year']})'")
         return artwork
 
     # At the point we can only check if it's a collection (case insensitive)
     collection_match = re.match(collection_pattern, title, re.IGNORECASE)
     if collection_match:
         artwork = {
-            "media": "Collection",
-            "title": title.removesuffix(" - Backdrop").strip(),  # Remove trailing " - Backdrop" if present
+            "media": MediaType.COLLECTION.value,
+            "title": re.sub(r"\s+-\s+Backdrop$", "", title, flags=re.IGNORECASE).strip(),  # Remove trailing " - Backdrop" if present
             "year": None,
             "season": None,
             "episode": None,
-            "type": "collection_poster",
+            "file_type": FileType.COLLECTION_POSTER.value,
             "author": None
         }
-        debug_me(f"Matched '{title}' as Collection poster for '{artwork['title']}'", "media_metadata/parse_title")
+        debug_me(f"Matched '{title}' as Collection poster for '{artwork['title']}'")
         return artwork
 
-    # If none of the above matched, return unknown
-    return {"media": "Unknown", "message": "The title format is unrecognized."}
+    # If none of the above matched, return "unable_to_parse"
+    return {"media": "unable_to_parse", "message": "The title format is unrecognized."}
 
 
 

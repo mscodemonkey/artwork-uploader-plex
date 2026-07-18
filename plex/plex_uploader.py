@@ -1,4 +1,3 @@
-import os
 from typing import Union, Optional
 import time
 
@@ -6,7 +5,6 @@ from plexapi.video import Movie, Show, Season, Episode
 from plexapi.collection import Collection
 
 from utils import utils
-from utils.notifications import debug_me
 from models.options import Options
 from core.enums import ScraperSource, ArtworkIDPrefix
 from core.constants import TPDB_RATE_LIMIT_DELAY, KOMETA_OVERLAY_LABEL
@@ -22,7 +20,7 @@ class PlexUploader:
     ) -> None:
         self.upload_target: Union[Movie, Show, Season, Episode, Collection] = upload_target
         self.artwork_type: str = artwork_type
-        self.artwork_id: str = artwork_id.upper() + "ID:"  # This will be BID, SAID, CID, PID, SID or EID - for [B]ackgrounds, [S]quare[A]rt, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
+        self.artwork_id: str = artwork_id  # This will be BID, SAID, CID, PID, SID or EID - for [B]ackgrounds, [S]quare[A]rt, show [C]overs, [P]osters, [S]eason covers or [T]itle cards for [E]pisodes
         self.description: str = "item"
         self.label: Optional[str] = None
         self.artwork: Optional[AnyArtwork] = None
@@ -63,7 +61,7 @@ class PlexUploader:
 
                 self.process_overlay_label()
 
-                if self.artwork_id == "BID:":
+                if self.artwork_id == ArtworkIDPrefix.BACKGROUND.value:
                     if self.type == "file":
                         self.upload_target.uploadArt(filepath = self.artwork['path'])
                     else:
@@ -71,7 +69,7 @@ class PlexUploader:
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
 
-                elif self.artwork_id == "SAID:":
+                elif self.artwork_id == ArtworkIDPrefix.SQUARE_ART.value:
                     if self.type == "file":
                         self.upload_target.uploadSquareArt(filepath = self.artwork['path'])
                     else:
@@ -113,7 +111,7 @@ class PlexUploader:
 
     def artwork_field_is_locked(self) -> bool:
         # Backgrounds lock the art field, square art locks squareArt, all poster types lock thumb
-        locked_field = "art" if self.artwork_id == "BID:" else "squareArt" if self.artwork_id == "SAID:" else "thumb"
+        locked_field = "art" if self.artwork_id == ArtworkIDPrefix.BACKGROUND.value else "squareArt" if self.artwork_id == ArtworkIDPrefix.SQUARE_ART.value else "thumb"
         for field in self.upload_target.fields:
             if field.name == locked_field and field.locked:
                 return True

@@ -1,5 +1,3 @@
-from email import errors
-
 import uuid
 import os
 import re
@@ -13,7 +11,6 @@ from models.instance import Instance
 from utils.notifications import update_log, update_status, notify_web, debug_me, send_notification
 from core.config import Config
 from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException, InvalidUrl, InvalidFlag
-from scrapers.theposterdb_scraper import ThePosterDBScraper
 from utils.utils import is_not_comment, parse_url_and_options, elapsed_time
 from models.options import Options
 from plex.plex_connector import PlexConnector
@@ -25,7 +22,8 @@ from core.constants import (
     SCHEDULER_CHECK_INTERVAL,
     UPDATE_CHECK_INTERVAL,
     MIN_PYTHON_MAJOR,
-    MIN_PYTHON_MINOR
+    MIN_PYTHON_MINOR,
+    VALID_FILENAME_PATTERN
 )
 from core.enums import InstanceMode
 from services import (
@@ -124,9 +122,9 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                 success_counter = [0]
                 scrape_and_upload(instance, parsed_url.url, parsed_url.options, False, success_counter)
             except ScraperException as e:
-                debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
+                debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}")
             except Exception as e:
-                debug_me(f"Unknown Exception: Error processing {parsed_url.url}: {str(e)}", "parse_bulk_file_from_cli")
+                debug_me(f"Unknown Exception: Error processing {parsed_url.url}: {str(e)}")
 
     end_time = time.time()
     elapsed = elapsed_time(end_time - start_time)
@@ -281,7 +279,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 #time.sleep(1)
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
-                debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}", "process_bulk_import_from_ui")
+                debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}")
                 errors += 1 
                 pass
 
@@ -317,7 +315,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             update_status(instance, message[2:], color="success" if errors == 0 else "warning", sticky=False, spinner=False)
         update_log(instance, message)
         if scheduled:
-            debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).", "process_bulk_import_from_ui")
+            debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).")
             send_notification(instance, message)
 
     except Exception as bulk_import_exception:
@@ -371,14 +369,14 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, success_coun
         title, author = processor.scrape_and_process(url, bulk, options)
         return title, author
     except PlexConnectorException as not_connected:
-        debug_me(f"PlexConnectorException: {str(not_connected)}", "scrape_and_upload")
+        debug_me(f"PlexConnectorException: {str(not_connected)}")
         update_status(instance, str(not_connected), "danger")
         raise
     except ScraperException as scraper_error:
-        debug_me(f"ScraperException: {str(scraper_error)}", "scrape_and_upload")
+        debug_me(f"ScraperException: {str(scraper_error)}")
         raise
     except Exception as e:
-        debug_me(f"Exception: {str(e)}", "scrape_and_upload")
+        debug_me(f"Exception: {str(e)}")
         raise
 
 
@@ -445,17 +443,17 @@ def load_bulk_import_file(instance: Instance, filename = None):
             notify_web(instance, "load_bulk_import", {"loaded": True, "filename": bulk_import_filename, "bulk_import_text": content})
 
     except FileNotFoundError as e:
-        debug_me(f"File not found: {str(e)}", "load_bulk_import_file")
+        debug_me(f"File not found: {str(e)}")
         notify_web(instance, "load_bulk_import", {"loaded": False, "error": f"File not found: {str(e)}"})
     except Exception as e:
-        debug_me(f"Error loading bulk import file: {str(e)}", "load_bulk_import_file")
+        debug_me(f"Error loading bulk import file: {str(e)}")
         import traceback
         traceback.print_exc()
         notify_web(instance, "load_bulk_import", {"loaded": False, "error": str(e)})
 
 
 def rename_bulk_import_file(instance: Instance, old_name, new_name):
-    debug_me(f"Renaming from {old_name} to {new_name}", "rename_bulk_import_file")
+    debug_me(f"Renaming from {old_name} to {new_name}")
 
     if old_name != new_name:
         try:
@@ -467,7 +465,7 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
             notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
             update_status(instance, f"Could not rename {old_name}", "warning")
             update_log(instance, f"🔴 Could not rename bulk import file '{old_name}'")
-            debug_me(f"Could not rename bulk import file '{old_name}': {e}", "rename_bulk_import_file")
+            debug_me(f"Could not rename bulk import file '{old_name}': {e}")
 
 
 def delete_bulk_import_file(instance: Instance, file_name):
@@ -481,7 +479,7 @@ def delete_bulk_import_file(instance: Instance, file_name):
             notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
             update_status(instance, f"Could not delete {file_name}", "warning")
             update_log(instance, f"🔴 Could not delete bulk import file '{file_name}'")
-            debug_me(f"Could not delete bulk import file '{file_name}': {e}", "delete_bulk_import_file")
+            debug_me(f"Could not delete bulk import file '{file_name}': {e}")
 
 
 def save_bulk_import_file(instance: Instance, contents = None, filename = None, now_load = None):
@@ -490,7 +488,7 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
         try:
             bulk_import_filename = filename if filename is not None else (config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt")
 
-            debug_me(f"Saving {bulk_import_filename}", "save_bulk_import_file")
+            debug_me(f"Saving {bulk_import_filename}")
 
             globals.bulk_file_service.write_file(contents, bulk_import_filename)
 
@@ -501,7 +499,7 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
             update_status(instance, message="Error saving bulk import file", color="danger")
             notify_web(instance, "save_bulk_import", {"saved": False, "now_load": now_load})
             update_log(instance, f"🔴 Error saving bulk import file '{bulk_import_filename}'")
-            debug_me(f"Error saving bulk import file '{bulk_import_filename}': {e}", "save_bulk_import_file")
+            debug_me(f"Error saving bulk import file '{bulk_import_filename}': {e}")
 
 
 def check_for_bulk_import_file(instance: Instance):
@@ -581,7 +579,7 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
                 content = file.read()
             if content:
                 update_log(instance, f"🕘 Scheduled bulk import started for '{filename}'")
-                debug_me(f"Scheduled import started for instance {instance.id} mode {instance.mode}", "process_bulk_file_on_schedule")
+                debug_me(f"Scheduled import started for instance {instance.id} mode {instance.mode}")
                 send_notification(instance, f"🕘 Scheduled bulk import started for '{filename}'")
                 run_bulk_import_scrape_in_thread(instance, content, filename, scheduled=True)
         else:
@@ -633,9 +631,9 @@ def setup_scheduler_on_first_load(instance: Instance):
 
         # Start the scheduler
         if globals.scheduler_service.start():
-            debug_me("Scheduler started.", "setup_scheduler_on_first_load")
+            debug_me("Scheduler started.")
 
-        debug_me(globals.config.schedules, "setup_scheduler_on_first_load")
+        debug_me(globals.config.schedules)
 
 
 # Update the job references for any scheduled jobs if we reload the config file
@@ -657,7 +655,7 @@ if __name__ == "__main__":
     scheduler_thread = None
 
     # Updated regex: "Movie Title (YYYY).png" OR "Movie Title.png"
-    filename_pattern = re.compile(r'^[^/]+(?:\.jpg|\.jpeg|\.png)$', re.IGNORECASE)
+    filename_pattern = re.compile(VALID_FILENAME_PATTERN, re.IGNORECASE)
 
     # Process command line arguments
     args = arguments.parse_arguments()
@@ -782,10 +780,10 @@ if __name__ == "__main__":
             # Setup scheduler only in the main process to avoid duplication
             if os.getenv("WERKZEUG_RUN_MAIN") == "true" or not globals.debug:
                 update_log(cli_instance, "🗓️ Setting up scheduler for scheduled tasks")
-                debug_me("This is the main process - setting up scheduler", "__main__")
+                debug_me("This is the main process - setting up scheduler")
                 setup_scheduler_on_first_load(cli_instance)
             else:
-                debug_me("Not the main process - skipping scheduler setup", "__main__")
+                debug_me("Not the main process - skipping scheduler setup")
                 update_log(cli_instance, "⚠️ Skipping scheduler setup in debug mode")            
 
             # Connect to the TV and Movie libraries

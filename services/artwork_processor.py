@@ -156,14 +156,6 @@ class ArtworkProcessor:
             callbacks: Optional callbacks for UI updates
         """
         try:
-            # Update status if callback provided
-            # self.callbacks.status(
-            #     f'Processing artwork for {artwork["title"]}',
-            #     "info",
-            #     True,  # spinner
-            #     True   # sticky
-            # )
-
             # Process the artwork
             results = process_func(artwork)
 
@@ -186,15 +178,15 @@ class ArtworkProcessor:
 
         except ScraperException as e:
             self.callbacks.log(f"❌ {str(e)}")
-            self.callbacks.debug(f"ScraperException: {str(e)}", "ArtworkProcessor/_process_single_artwork")
+            self.callbacks.debug(f"ScraperException: {str(e)}")
 
         except PlexConnectorException as e:
             self.callbacks.log(f"❌ {str(e)}")
-            self.callbacks.debug(f"PlexConnectorException: {str(e)}", "ArtworkProcessor/_process_single_artwork")
+            self.callbacks.debug(f"PlexConnectorException: {str(e)}")
 
         except Exception as e:
             self.callbacks.log(f"❌ {str(e)}")
-            self.callbacks.debug(f"Error processing {artwork["title"]} ({artwork["year"]}):{str(e)}", "ArtworkProcessor/_process_single_artwork")
+            self.callbacks.debug(f"Error processing {artwork["title"]} ({artwork["year"]}):{str(e)}")
             self.callbacks.status(
                 f"Error: {str(e)}",
                 "danger",
@@ -235,15 +227,15 @@ class ArtworkProcessor:
             # We determine if it's a single movie/TV ZIP by checking if the title of the ZIP file is part of the title of the first file
             # Otherwise we assume it's a ZIP file containing artwork for multiple shows/movies/collections and leave year as None
             year = file_list[0].get('year', 'unknown') if title in file_list[0].get('title', 'unknown') else None
-            self.callbacks.debug(f"Processing {total_files} files from {source} ZIP file for {title}{f' ({year})' if year else ''}", "process_uploaded_artwork")
+            self.callbacks.debug(f"Processing {total_files} files from {source} ZIP file for {title}{f' ({year})' if year else ''}")
         else:
             year = None
-            self.callbacks.debug("No files to process in uploaded ZIP file", "process_uploaded_artwork")
+            self.callbacks.debug("No files to process in uploaded ZIP file")
         
         success_counter = 0  # Mutable counter to track successful uploads
 
         # Initial progress update
-        self.callbacks.debug("Processing uploaded file...", "process_uploaded_artwork")
+        self.callbacks.debug("Processing uploaded file...")
         self.callbacks.progress(0, total_files, "Processing ZIP file")
 
         self.callbacks.log(f"⚙️ {title}{f' ({year})' if year else ''} • {author} | Obtained {total_files + skipped} asset(s) from uploaded {'MediUX' if source=="mediux" else 'TPDb'} ZIP file.")
@@ -267,13 +259,13 @@ class ArtworkProcessor:
             elif media_type == "TV Show":
                 process_func = processor.process_tv_artwork
             elif media_type == "unavailable":
-                self.callbacks.log(f"⚠️ {artwork['title']} {f"({artwork['year']})" if artwork.get('year') else ''} : {artwork['author']} | Not available on Plex.")
+                self.callbacks.log(f"⚠️ {artwork['title']} {f"({artwork['year']})" if artwork.get('year') else ''} : {artwork['author']} | Movie or TV Show not available on Plex")
                 os.remove(artwork['path'])  # Remove the temporary file after processing
                 try:
                     os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
-                    self.callbacks.debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}", "process_uploaded_artwork")
+                    self.callbacks.debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}")
                 except OSError as e:
-                    self.callbacks.debug(f"Error deleting temporary directory: {os.path.dirname(artwork['path'])} - {str(e)}", "process_uploaded_artwork")
+                    self.callbacks.debug(f"Error deleting temporary directory: {os.path.dirname(artwork['path'])} - {str(e)}")
                     pass
                 continue
             else:
@@ -286,7 +278,7 @@ class ArtworkProcessor:
             status_msg = f'Processing {media_type.lower()} artwork for "{artwork["title"]}"{season_info}{episode_info}'
 
             # Debug logging
-            self.callbacks.debug(status_msg, "process_uploaded_artwork")
+            self.callbacks.debug(status_msg)
 
             # Update status
             self.callbacks.status(
@@ -328,13 +320,13 @@ class ArtworkProcessor:
                     self.callbacks.log(f"❌ {str(e)}")
             try:
                 os.remove(artwork['path'])  # Remove the temporary file after processing
-                self.callbacks.debug(f"Deleted temporary file: {artwork['path']}", "process_uploaded_artwork")
+                self.callbacks.debug(f"Deleted temporary file: {artwork['path']}")
             except OSError as e:
-                self.callbacks.debug(f"Failed to delete temporary file: {artwork['path']} - {str(e)}", "process_uploaded_artwork")
+                self.callbacks.debug(f"Failed to delete temporary file: {artwork['path']} - {str(e)}")
                 pass
             try:
                 os.rmdir(os.path.dirname(artwork['path']))  # Remove the temporary directory if empty
-                self.callbacks.debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}", "process_uploaded_artwork")
+                self.callbacks.debug(f"Deleted temporary directory: {os.path.dirname(artwork['path'])}")
             except OSError:
                 pass
         # Final progress update

@@ -2,7 +2,7 @@
 Enumerations for type-safe constants throughout the application.
 """
 
-from enum import Enum, auto
+from enum import Enum
 
 
 class FilterType(str, Enum):
@@ -34,6 +34,7 @@ class ScraperSource(str, Enum):
 class ArtworkIDPrefix(str, Enum):
     """Prefixes for artwork ID labels in Plex."""
     BACKGROUND = "BID:"
+    SQUARE_ART = "SAID:"
     SHOW_COVER = "CID:"
     POSTER = "PID:"
     SEASON = "SID:"
@@ -69,6 +70,11 @@ class FileType(str, Enum):
     """File types in MediUX responses."""
     TITLE_CARD = "title_card"
     BACKDROP = "backdrop"
+    BACKGROUND = "background"
     POSTER = "poster"
+    SEASON_COVER = "season_cover"
+    SHOW_COVER = "show_cover"
     MOVIE_POSTER = "movie_poster"
-    SQUARE_ART = "album_art"
+    COLLECTION_POSTER = "collection_poster"
+    ALBUM_ART = "album_art"
+    SQUARE_ART = "square_art"

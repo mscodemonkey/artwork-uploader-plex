@@ -1566,8 +1566,6 @@ function uploadFile(file) {
                 const plex_year = document.getElementById("plex_year").value;
                 const plex_title = document.getElementById("plex_title").value;
 
-                //socket.emit("display_message", { "instance_id": instanceId, "message": `Successfully uploaded '${file.name}'`, "title": "uploadFile", "level": "debug" });
-                //socket.emit("display_message", { "instance_id": instanceId, "message": `✅️ ${file.name} • Upload completed successfully`, "level": "log" });
                 socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, options: options, filters: filters, plex_title: plex_title, plex_year: plex_year });
                 let totalSize = Math.round(arrayBuffer.byteLength / 1000000);
                 progressBar(100, `Uploading ${file.name} • ${totalSize} of ${totalSize} MB`);

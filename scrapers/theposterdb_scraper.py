@@ -61,8 +61,8 @@ class ThePosterDBScraper:
 
             if "/user/" in self.url and not self.is_child:
                 self.soup = soup_utils.cook_soup(self.url)
-                self.callbacks.debug(f"★ Got a valid user URL {self.url}", "ThePosterDBScraper/scrape")
-                self.callbacks.debug(f"★ Processing user URL with options {self.options}", "ThePosterDBScraper/scrape")
+                self.callbacks.debug(f"★ Got a valid user URL {self.url}")
+                self.callbacks.debug(f"★ Processing user URL with options {self.options}")
 
                 # Get the user information, don't bother with set title because it's a user page
                 self.get_set_author(self.soup)
@@ -70,7 +70,7 @@ class ThePosterDBScraper:
                 # Find out how many total assets and pages there are for this user
                 self.scrape_user_info()
                 self.callbacks.log(f"🔄 TPDb user • {self.author} | Processing {self.user_pages} asset pages with {self.user_uploads} assets")
-                self.callbacks.debug(f"There are {self.user_uploads} assets and {self.user_pages} pages for user {self.author}", "ThePosterDBScraper/scrape")
+                self.callbacks.debug(f"There are {self.user_uploads} assets and {self.user_pages} pages for user {self.author}")
                 self.callbacks.progress(0, 0, f"Collecting assets from TPDb user {self.author}")
 
                 collected = 0
@@ -78,27 +78,26 @@ class ThePosterDBScraper:
                     if globals.cancel_scrape:
                         break
                     self.callbacks.progress(user_page + 1, self.user_pages, f"Collecting assets from TPDb user {self.author} • {user_page + 1} of {self.user_pages} pages • {collected} assets collected of {self.user_uploads}")
-                    #self.callbacks.status(f"Scraping TPDb asset pages for user {self.author}", color="info", sticky=True, spinner=True)
                     self.scrape_user_page(user_page)
                     movies = len(self.movie_artwork)
                     collections = len(self.collection_artwork)
                     shows = len(self.tv_artwork)
                     collected = movies + shows + collections
-                    self.callbacks.debug(f"Processed {user_page + 1} out of {self.user_pages} user pages. Collected {movies} movie, {collections} collection and {shows} TV show assets so far, skipped {self.skipped}", "ThePosterDBScraper/scrape")
-                self.callbacks.debug(f"---------> Total assets collected: {collected} of {self.user_uploads}", "ThePosterDBScraper/scrape")
+                    self.callbacks.debug(f"Processed {user_page + 1} out of {self.user_pages} user pages. Collected {movies} movie, {collections} collection and {shows} TV show assets so far, skipped {self.skipped}")
+                self.callbacks.debug(f"Total assets collected: {collected} of {self.user_uploads}")
 
                 return
 
             if "/poster/" in self.url:
-                self.callbacks.debug(f"★ Got a poster URL {self.url}, looking up the correct set URL...", "ThePosterDBScraper/scrape")
+                self.callbacks.debug(f"★ Got a poster URL {self.url}, looking up the correct set URL...")
                 poster_soup = soup_utils.cook_soup(self.url)
                 self.url = poster_soup.find('a', title='View Set Page')['href']
 
             if self.url and ("/set/" in self.url or "/user/" in self.url):
                 self.soup = soup_utils.cook_soup(self.url)
                 if not self.is_child:
-                    self.callbacks.debug(f"★ Got a valid URL {self.url}", "ThePosterDBScraper/scrape")
-                    self.callbacks.debug(f"★ Processing URL with options {self.options}", "ThePosterDBScraper/scrape")
+                    self.callbacks.debug(f"★ Got a valid URL {self.url}")
+                    self.callbacks.debug(f"★ Processing URL with options {self.options}")
 
                 if "/user/" not in self.url: # Only get the title if it's not a user URL
                     self.get_set_title(self.soup)
@@ -120,24 +119,18 @@ class ThePosterDBScraper:
                 self.total = len(self.movie_artwork) + len(self.tv_artwork) + len(self.collection_artwork) + self.skipped
 
                 if self.errored > 0:
-                    self.callbacks.debug(f"⚠️ Encountered errors scraping {self.errored} artwork items from {self.url}", "ThePosterDBScraper/scrape")
+                    self.callbacks.debug(f"⚠️ Encountered errors scraping {self.errored} artwork items from {self.url}")
                 if self.skipped > 0:
-                    self.callbacks.debug(f"⏩ Skipped {self.skipped} assets(s) out of {self.total} based on exclusions ({self.exclusions}), filters ({self.filtered}) or errors ({self.errored}).", "ThePosterDBScraper/scrape")
+                    self.callbacks.debug(f"⏩ Skipped {self.skipped} assets(s) out of {self.total} based on exclusions ({self.exclusions}), filters ({self.filtered}) or errors ({self.errored}).")
                 if self.collection_artwork:
-                    self.callbacks.debug(f"✅ Included {len(self.collection_artwork)} collection asset(s) for {len({item['title'] for item in self.collection_artwork})} collection(s):", "ThePosterDBScraper/scrape")
-                    self.callbacks.debug(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
+                    self.callbacks.debug(f"✅ Included {len(self.collection_artwork)} collection asset(s) for {len({item['title'] for item in self.collection_artwork})} collection(s):")
                     self.callbacks.debug(self.collection_artwork)
-                    self.callbacks.debug(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")  
                 if self.movie_artwork:
-                    self.callbacks.debug(f"✅ Included {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):","ThePosterDBScraper/scrape")
-                    self.callbacks.debug(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
+                    self.callbacks.debug(f"✅ Included {len(self.movie_artwork)} movie asset(s) for {len({item['title'] for item in self.movie_artwork})} movie(s):")
                     self.callbacks.debug(self.movie_artwork)
-                    self.callbacks.debug(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
                 if self.tv_artwork:
-                    self.callbacks.debug(f"✅ Included {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):", "ThePosterDBScraper/scrape")
-                    self.callbacks.debug(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
+                    self.callbacks.debug(f"✅ Included {len(self.tv_artwork)} TV show asset(s) for {len({item['title'] for item in self.tv_artwork})} TV show(s):")
                     self.callbacks.debug(self.tv_artwork)
-                    self.callbacks.debug(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}*************************************************************{ANSI_RESET}")
 
                 return
 
@@ -146,7 +139,7 @@ class ThePosterDBScraper:
         except ScraperException:
             raise
         except Exception as e:
-            self.callbacks.debug(f"Error processing URL {self.url} from ThePosterDB: {str(e)}", "ThePosterDBScraper/scrape")
+            self.callbacks.debug(f"Error processing URL {self.url} from ThePosterDB: {str(e)}")
             raise ScraperException(f"Could not process URL for ThePosterDB: {self.url}") from e
 
     def scrape_user_info(self) -> None:
@@ -182,15 +175,15 @@ class ThePosterDBScraper:
             self.total += child_scraper.total
 
         except Exception as e:
-            self.callbacks.debug(f"Failed to scrape user asset page {page}: {str(e)}", "ThePosterDBScraper/scrape_user_page")
+            self.callbacks.debug(f"Failed to scrape user asset page {page}: {str(e)}")
 
     def get_set_title(self, soup: Any) -> None:
         try:
             self.title = soup.find('p', id = "set-title").a.string
         except (AttributeError, TypeError) as e:
-            self.callbacks.debug(f"Set title lookup failed!", "ThePosterDBScraper/get_set_title")
+            self.callbacks.debug(f"Set title lookup failed!")
         if self.title:
-            self.callbacks.debug(f"Found set title: {self.title}", "ThePosterDBScraper/get_set_title")
+            self.callbacks.debug(f"Found set title: {self.title}")
 
     def get_set_author(self, soup: Any) -> None:
         """ 
@@ -200,15 +193,15 @@ class ThePosterDBScraper:
             try:
                 #self.author = soup.select_one('p#set-title span.font-italic a').string.strip()
                 self.author = soup.find('p', class_='uploaded-by text-white d-inline-block text-truncate w-100').a.string
-                self.callbacks.debug(f"Found set author: {self.author}", "ThePosterDBScraper/get_set_author")
+                self.callbacks.debug(f"Found set author: {self.author}")
             except:
-                self.callbacks.debug(f"Set author lookup failed {soup}", "ThePosterDBScraper/get_set_author")
+                self.callbacks.debug(f"Set author lookup failed {soup}")
         elif "/user/" in self.url:
             try:
                 self.author = soup.find('p', class_='h1 mb-0 mr-md-1').a.string
-                self.callbacks.debug(f"Found author: {self.author}", "ThePosterDBScraper/get_set_author")
+                self.callbacks.debug(f"Found author: {self.author}")
             except:
-                self.callbacks.debug(f"Author lookup failed {soup}", "ThePosterDBScraper/get_set_author")
+                self.callbacks.debug(f"Author lookup failed {soup}")
 
     def get_posters(self, poster_div: Any) -> None:
 
@@ -248,7 +241,7 @@ class ThePosterDBScraper:
                     if not self.options.is_excluded(poster_id, season if isinstance(season, int) else None, None):
                         self.callbacks.debug(
                             f"{i+1}. ✅ Including {file_type.replace('_', ' ')} for '{title} ({year})'"
-                            + (f", Season {season}." if isinstance(season, int) else "."), "ThePosterDBScraper/get_posters"
+                            + (f", Season {season}." if isinstance(season, int) else ".")
                         )
                         show_artwork = {
                             "title": title,
@@ -260,7 +253,7 @@ class ThePosterDBScraper:
                             "year": year,
                             "source": ScraperSource.THEPOSTERDB.value,
                             "id":poster_id,
-                            "type": file_type
+                            "file_type": file_type
                         }
                         self.tv_artwork.append(show_artwork)
                     else:
@@ -268,20 +261,20 @@ class ThePosterDBScraper:
                         self.callbacks.debug(
                             f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title} ({year})'"
                             + (f", Season {season}." if isinstance(season, int) else "")
-                            + f" based on exclusions.", "ThePosterDBScraper/get_posters"
+                            + f" based on exclusions."
                         )
                 else:
                     self.filtered += 1
                     self.callbacks.debug(
                         f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title} ({year})'"
                         + (f", Season {season}." if isinstance(season, int) else "")
-                        + f" based on filters.", "ThePosterDBScraper/get_posters"
+                        + f" based on filters."
                     )
             elif media_type == MediaType.MOVIE.value:
                 title, year = media_metadata.parse_movie(title_p)
                 if (self.options.has_no_filters() and "movie_poster" in self.config.tpdb_filters) or self.options.has_filter("movie_poster"):
                     if not self.options.is_excluded(poster_id):
-                        self.callbacks.debug(f"{i+1}. ✅ Including movie poster for '{title} ({year})'.", "ThePosterDBScraper/get_posters")
+                        self.callbacks.debug(f"{i+1}. ✅ Including movie poster for '{title} ({year})'.")
                         movie_artwork = {
                             "title": title,
                             "author": self.author,
@@ -290,38 +283,38 @@ class ThePosterDBScraper:
                             "year": year,
                             "source": ScraperSource.THEPOSTERDB.value,
                             "id":poster_id,
-                            "type": "movie_poster"
+                            "file_type": "movie_poster"
                         }
                         self.movie_artwork.append(movie_artwork)
                     else:
                         self.exclusions += 1
-                        self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on exclusions.", "ThePosterDBScraper/get_posters")
+                        self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on exclusions.")
                 else:
                     self.filtered += 1
-                    self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on filters.", "ThePosterDBScraper/get_posters")
+                    self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on filters.")
             elif media_type == MediaType.COLLECTION.value:
                 if (self.options.has_no_filters() and "collection_poster" in self.config.tpdb_filters) or self.options.has_filter("collection_poster"):
                     if not self.options.is_excluded(poster_id):
-                        self.callbacks.debug(f"{i+1}. ✅ Including collection poster for '{title_p}'.", "ThePosterDBScraper/get_posters")
+                        self.callbacks.debug(f"{i+1}. ✅ Including collection poster for '{title_p}'.")
                         collection_artwork = {
                             "title": title_p,
                             "author": self.author,
                             "url": poster_url,
                             "source": ScraperSource.THEPOSTERDB.value,
                             "id":poster_id,
-                            "type": "collection_poster"
+                            "file_type": "collection_poster"
                         }
                         self.collection_artwork.append(collection_artwork)
                     else:
                         self.exclusions += 1
-                        self.callbacks.debug(f"{i+1}. ⏩ Skipping collection poster for '{title_p}' based on exclusions.", "ThePosterDBScraper/get_posters")
+                        self.callbacks.debug(f"{i+1}. ⏩ Skipping collection poster for '{title_p}' based on exclusions.")
                 else:
                     self.filtered += 1
-                    self.callbacks.debug(f"{i+1}. ⏩ Skipping collection poster for '{title_p}' based on filters.", "ThePosterDBScraper/get_posters")
+                    self.callbacks.debug(f"{i+1}. ⏩ Skipping collection poster for '{title_p}' based on filters.")
             else:
                 self.errored += 1
-                self.callbacks.debug(f"⏩ Skipping artwork item - unknown media type: {title_p} | {poster_url}", "ThePostedDBScraper/get_posters")
-                self.callbacks.log(f"{f'⚠️ {self.title} • ' if self.title is not None else ''}{self.author} | Skipping asset (unknown media type): {title_p}")
+                self.callbacks.debug(f"⏩ Skipping artwork item - unknown media type: {title_p} | {poster_url}")
+                self.callbacks.log(f"{f'⚠️ {self.title} • ' if self.title is not None else '⚠️ '}{self.author} | Skipping asset (unknown media type): {title_p}")
 
     def scrape_additional_posters(self) -> None:
 
@@ -330,7 +323,7 @@ class ThePosterDBScraper:
         Returns:
 
         """
-        self.callbacks.debug("Looking for additional posters...", "ThePosterDBScraper/scrape_additional_posters")
+        self.callbacks.debug("Looking for additional posters...")
         poster_div = self.soup.find_all('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')[-1]
         mt4s = self.soup.find('main').find_all('div', class_='mt-4')
 
@@ -342,7 +335,7 @@ class ThePosterDBScraper:
 
     def scrape_additional_sets(self) -> None:
 
-        self.callbacks.debug("Looking for additional sets...", "ThePosterDBScraper/scrape_additional_sets")
+        self.callbacks.debug("Looking for additional sets...")
         mt4s = self.soup.find('main').find_all('div', class_='mt-4')
 
         for mt4 in mt4s:

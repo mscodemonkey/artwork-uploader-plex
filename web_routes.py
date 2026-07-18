@@ -13,14 +13,12 @@ The routes are organized into:
 import os
 import logging
 import flask.cli
-import pprint
 import sys
 import re
 import base64
 import tempfile
 import zipfile
 import subprocess
-import time
 
 from pathlib import Path
 from packaging import version
@@ -34,6 +32,7 @@ from services.notify_service import NotifyService
 from utils import utils
 from models.instance import Instance
 from core.config import Config
+from core.enums import FileType, MediaType, ScraperSource
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService
@@ -165,11 +164,11 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         if data.get("action") == "get":
             update_log(instance, f"🐞 Debug mode is {'On' if globals.debug else 'Off'}")
-            debug_me(f"Reporting current debug mode: {'On' if globals.debug else 'Off'}", "debug_mode")
+            debug_me(f"Reporting current debug mode: {'On' if globals.debug else 'Off'}")
             notify_web(instance, "debug_mode", { "debug": globals.debug })
         elif data.get("action") == "toggle":
             update_log(instance, f"🐞 Debug mode is {'Off' if globals.debug else 'On'}")
-            debug_me(f"Turning debug mode {'Off' if globals.debug else 'On'}", "debug_mode")
+            debug_me(f"Turning debug mode {'Off' if globals.debug else 'On'}")
             notify_web(instance, "debug_mode", { "debug": not globals.debug })
             if globals.debug:
                 globals.debug = False
@@ -180,7 +179,7 @@ def setup_socket_handlers(
     def check_for_update(data):
         """Check for updates when requested by the frontend."""
         instance = Instance(data.get("instance_id"), "web", broadcast=True)
-        debug_me(f"Checking for update by request from the frontend", "check_for_update")
+        debug_me(f"Checking for update by request from the frontend")
         latest_version = get_latest_version()
         if latest_version and version.parse(latest_version.lstrip('v')) > version.parse(current_version.lstrip('v')):
             update_log(instance, f"🚨 Update available: {latest_version} (current: {current_version})")
@@ -310,7 +309,7 @@ def setup_socket_handlers(
             folder_path = Path("bulk_imports")
             bulk_files = [f.name for f in folder_path.iterdir() if f.is_file()]
         except (FileNotFoundError, PermissionError) as e:
-            debug_me(f"Error loading bulk import file list: {e}", "load_bulk_filelist")
+            debug_me(f"Error loading bulk import file list: {e}")
         notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
 
     @globals.web_socket.on("load_bulk_import")
@@ -376,7 +375,7 @@ def setup_socket_handlers(
     def display_message(data):
         """Log a debug message from the frontend."""
         instance = Instance(data.get("instance_id"), "web")
-        debug_me(f"Received message from fronted: '{data.get('message')}' • Log level: '{data.get('level')}'", "display_message")
+        debug_me(f"Received message from fronted: '{data.get('message')}' • Log level: '{data.get('level')}'")
         if data.get("level") == "debug":
             debug_me(data.get("message"), data.get("title", "web_message"))
         elif data.get("level") == "log":
@@ -404,18 +403,18 @@ def setup_socket_handlers(
         
         # Capture Plex settings form parameters
         url = data.get("url", "")
-        debug_me(f"Obtained Plex URL: {url}", "test_plex_connect")
+        debug_me(f"Obtained Plex URL: {url}")
         token = data.get("token", "")
-        debug_me(f"Obtained Plex token: {token}", "test_plex_connect")
+        debug_me(f"Obtained Plex token: {token}")
         tv_libs = data.get("tv_libs", "")
-        debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}", "test_plex_connect")
+        debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}")
         movie_libs = data.get("movie_libs", "")
-        debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}", "test_plex_connect")
+        debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}")
         saving_config = data.get("saving_config")
         if saving_config:
-            debug_me(f"Testing Plex connectivity before saving configuration", "test_plex_connect")
+            debug_me(f"Testing Plex connectivity before saving configuration")
         else:
-            debug_me(f"Testing Plex connectivity", "test_plex_connect")
+            debug_me(f"Testing Plex connectivity")
         
         # Check for a valid Plex server URL and token
         url_pattern = r"^https?:\/\/([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?$"
@@ -444,7 +443,7 @@ def setup_socket_handlers(
             else:
                 log = f"❌ Unknown error connecting to Plex: {str(e)}"
             fail ("Error connecting to Plex, check log for details", log)
-            debug_me(f"Error connecting to Plex: {str(e)}", "test_plex_connect")
+            debug_me(f"Error connecting to Plex: {str(e)}")
             return
 
         # Check that the provided libraries exist in the server        
@@ -479,32 +478,32 @@ def setup_socket_handlers(
         failed = 0
         for url in urls:
             test_notification.add_url(url)
-            debug_me(f"Sending test notification to '{url}'", "test_notifications")
+            debug_me(f"Sending test notification to '{url}'")
             url_success = test_notification.send_notification(notification_title, notification_message)
             success = success and url_success
             if url_success:
-                debug_me(f"📢 Test notification sent successfully to '{url}'", "test_notifications")
+                debug_me(f"📢 Test notification sent successfully to '{url}'")
                 update_log(instance, f"📢 Test notification sent successfully to '{url}'")
                 if len(urls) == 1:
                     update_status(instance, f"Test notification sent successfully", "success", False, False, "check2-circle")
             else:
                 failed += 1
-                debug_me(f"❌ Test notification failed to send to '{url}'.", "test_notifications")
+                debug_me(f"❌ Test notification failed to send to '{url}'.")
                 update_log(instance, f"❌ Test notification failed to send to '{url}'")
                 if len(urls) == 1:
                     update_status(instance, f"Test notification failed to send", "danger", False, False, "x-circle")
             test_notification.clear_urls()
         if len(urls) > 1:
             if success and len(urls) > 1:
-                debug_me("All test notifications sent successfully", "test_notifications")
+                debug_me("All test notifications sent successfully")
                 update_log(instance, "✅ All test notifications sent successfully")
                 update_status(instance, "All test notifications sent successfully", "success", False, False, "check2-circle")
             elif failed < len(urls):
-                debug_me("Some test notifications failed to send", "test_notifications")
+                debug_me("Some test notifications failed to send")
                 update_log(instance, "⚠️ Some test notifications failed to send")
                 update_status(instance, "Some test notifications failed to send. Check logs for details.", "warning", False, False, "exclamation-triangle")
             else:
-                debug_me("All test notifications failed to send", "test_notifications")
+                debug_me("All test notifications failed to send")
                 update_log(instance, "❌ All test notifications failed to send")
                 update_status(instance, "All test notifications failed to send", "danger", False, False, "x-circle")
         notify_web(instance, "element_disable", { "element": ["test_notif_btn"], "mode": False })
@@ -596,7 +595,7 @@ def setup_socket_handlers(
                     # And update the front-end
                     notify_web(instance, "delete_schedule", { "file": schedule_file, "job_reference": job_id, "deleted": True })
                     update_log(instance, f"🗑️ Deleted scheduled task for '{schedule_file}'")
-                    debug_me(f"Deleted scheduled task for '{schedule_file}' with job ID '{job_id}'", "delete_task_from_scheduler")
+                    debug_me(f"Deleted scheduled task for '{schedule_file}' with job ID '{job_id}'")
                 else:
                     debug_me(f"Couldn't find a scheduled job for '{schedule_file}'")
                     notify_web(instance, "delete_schedule", {"deleted": False, "job_id": job_id})
@@ -630,17 +629,17 @@ def setup_socket_handlers(
 
                     notify_web(instance, "add_schedule", { "added": True, "file": schedule_file, "time": schedule_time, "jobReference": job_id })
                     update_log(instance, f"⏰ Added scheduled task '{schedule_file}' every day at {schedule_time}")
-                    debug_me(f"Added scheduled task '{schedule_file}' every day at {schedule_time} with job ID '{job_id}'", "add_tasks_to_scheduler")
+                    debug_me(f"Added scheduled task '{schedule_file}' every day at {schedule_time} with job ID '{job_id}'")
                 except Exception as e:
                     update_log(instance, f"🔴 Failed to add scheduled task '{schedule_file}'")
-                    debug_me(f"Error adding schedule: {e}", "add_tasks_to_scheduler")
+                    debug_me(f"Error adding schedule: {e}")
                     raise
 
                 # Start the scheduler if it's not already started
                 globals.scheduler_service.start()
 
         except Exception as e:
-            debug_me(f"Error in scheduler setup: {e}", "add_tasks_to_scheduler")
+            debug_me(f"Error in scheduler setup: {e}")
             raise
 
     def update_or_add_schedule(file_name, new_time):
@@ -662,7 +661,7 @@ def setup_socket_handlers(
             kometa_base = utils.get_host_path("/assets")
             temp_dir = utils.get_host_path("/temp")
             update_log(instance, f"🐳 Docker environment detected")
-            debug_me(f"Docker detected, Kometa asset path mapped to '{kometa_base}', temp dir mapped to '{temp_dir}'", "docker_detection")
+            debug_me(f"Docker detected, Kometa asset path mapped to '{kometa_base}', temp dir mapped to '{temp_dir}'")
             if kometa_base == "(not defined)":
                 update_log(instance, "⚠️ Kometa base path is not defined in docker-compose.yml file. Saving assets to Kometa asset directory is not available.")
             notify_web(instance, "docker_detected", { "docker": "true", "kometa_base": kometa_base, "temp_dir": temp_dir })
@@ -696,7 +695,7 @@ def setup_socket_handlers(
             upload_chunks[file_name]["chunks_received"] += 1
             return "ok"
         except Exception as e:
-            debug_me(f"Error decoding chunk {chunk_index + 1}: {str(e)}", "handle_upload_chunk")
+            debug_me(f"Error decoding chunk {chunk_index + 1}: {str(e)}")
             return "error"
 
     @globals.web_socket.on("upload_complete")
@@ -707,8 +706,8 @@ def setup_socket_handlers(
         plex_year = data.get("plex_year")
         plex_title = data.get("plex_title")
         options = data.get("options")
-        debug_me(f"Obtained filters from web form: {filters}", "handle_upload_complete")
-        debug_me(f"Obtained options from web form: {options}", "handle_upload_complete")
+        debug_me(f"Obtained filters from web form: {filters}")
+        debug_me(f"Obtained options from web form: {options}")
 
         instance = Instance(data.get("instance_id"), "web")
 
@@ -716,7 +715,7 @@ def setup_socket_handlers(
             upload_chunks[file_name]["total_chunks"]
         ):
             temp_path = upload_chunks[file_name]["temp_path"]
-            debug_me(f"Uploaded {file_name} to {temp_path}, processing file...", "handle_upload_complete")
+            debug_me(f"Uploaded {file_name} to {temp_path}, processing file...")
             upload_chunks[file_name]["temp_file"].close()
             update_log(instance, f"✔️ {file_name} • Upload completed successfully")
             save_uploaded_file(
@@ -741,14 +740,13 @@ def setup_socket_handlers(
                 # Delete the metadata for the file
                 del upload_chunks[file_name]
             except OSError as e:
-                debug_me(f"Error during cleanup: {str(e)}", "handle_upload_complete")
+                debug_me(f"Error during cleanup: {str(e)}")
         else:
             chunks_received = upload_chunks[file_name]["chunks_received"] if file_name in upload_chunks else 0
             expected_chunks = upload_chunks[file_name]["total_chunks"] if file_name in upload_chunks else 0
             debug_me(
                 f'Upload complete event received for {file_name}, but with '
-                f'{chunks_received} of {expected_chunks}, some chunks are missing.',
-                "handle_upload_complete"
+                f'{chunks_received} of {expected_chunks}, some chunks are missing.'
             )
             try:
                 # Clean up temp file
@@ -758,7 +756,7 @@ def setup_socket_handlers(
                     if os.path.exists(temp_path):
                         os.remove(temp_path)
             except OSError as e:
-                debug_me(f"Error during cleanup: {str(e)}", "handle_upload_complete")
+                debug_me(f"Error during cleanup: {str(e)}")
 
 
 def save_uploaded_file(
@@ -791,7 +789,7 @@ def save_uploaded_file(
 
     # Get the temp file path that was used during chunk uploads
     temp_upload_path = upload_chunks[file_name]["temp_path"]
-    debug_me(f"Processing uploaded file {file_name} from temp path: {temp_upload_path}", "save_uploaded_file")
+    debug_me(f"Processing uploaded file {file_name} from temp path: {temp_upload_path}")
 
     # Move to a proper file location with correct filename for processing
     temp_zip_folder = tempfile.mkdtemp()
@@ -799,9 +797,9 @@ def save_uploaded_file(
     
     import shutil
     shutil.move(temp_upload_path, temp_zip_path)
-    debug_me(f"Moved {file_name} to temporary path: {temp_zip_folder}", "save_uploaded_file")
+    debug_me(f"Moved {file_name} to temporary path: {temp_zip_folder}")
 
-    debug_me(f"Saved ZIP file: {temp_zip_path}", "save_uploaded_file")
+    debug_me(f"Saved ZIP file: {temp_zip_path}")
 
     update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file and parsing files...")
     extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
@@ -819,9 +817,9 @@ def save_uploaded_file(
     try:
         os.remove(temp_zip_path)
         os.rmdir(temp_zip_folder)
-        debug_me(f"Deleted temporary ZIP file: {temp_zip_path}", "save_uploaded_file")
+        debug_me(f"Deleted temporary ZIP file: {temp_zip_path}")
     except Exception as e:
-        debug_me(f"Error deleting temporary ZIP file: {e}", "save_uploaded_file")
+        debug_me(f"Error deleting temporary ZIP file: {e}")
 
     process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
 
@@ -852,23 +850,23 @@ def extract_and_list_zip(
     """
     extract_dir = tempfile.mkdtemp()
     file_list = []
-    zip_source = "theposterdb"
     filtered_files = 0
     errored_files = 0
 
-    debug_me(f"Extracting ZIP file: {zip_path} to {extract_dir}", "extract_and_list_zip")
+    debug_me(f"Extracting ZIP file: {zip_path} to {extract_dir}")
 
     # For ThePosterDB, extract title and author from filename
     pattern = r"^(?P<title>.+?)\s+set by\s+(?P<author>.+?)\s*-"
     match = re.search(pattern, os.path.basename(zip_path), re.IGNORECASE)
     if match:
+        zip_source = ScraperSource.THEPOSTERDB.value
         zip_title = match.group("title").strip()
         zip_author = match.group("author").strip()
-        debug_me(f"Detected ThePosterDB source", "extract_and_list_zip")
-        debug_me(f"Detected ZIP title: {zip_title}", "extract_and_list_zip")
-        debug_me(f"Detected ZIP author: {zip_author}", "extract_and_list_zip")
+        debug_me(f"Detected ThePosterDB source")
+        debug_me(f"Detected ZIP title: {zip_title}")
+        debug_me(f"Detected ZIP author: {zip_author}")
     else:
-        zip_source = "mediux"
+        zip_source = ScraperSource.MEDIUX.value
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         # Pre-process the file list to determine source and extract valid files
         zip_infos = [zip_info for zip_info in zip_ref.infolist() if os.path.basename(zip_info.filename) and not os.path.basename(zip_info.filename).startswith(".") and os.path.basename(zip_info.filename) not in {"ds_store", "__macosx"}]
@@ -876,26 +874,29 @@ def extract_and_list_zip(
         
         update_status(instance, "Extracting ZIP file...", "info", sticky=True, spinner=True)
         notify_web(instance, "progress_bar", { "percent": 0, "message": "Parsing...", "bar_type": "main", "bar_speed": "fast" })
+       
+        identified_media_map = {}
+
         for n, zip_info in enumerate(zip_infos, 1):
             filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
-            debug_me(f"{n} / {total_files_in_zip} • Processing '{filename}'", "extract_and_list_zip")
+            debug_me(f"{n} / {total_files_in_zip} • Processing '{filename}'")
             percent = (n/total_files_in_zip)*100 if total_files_in_zip > 0 else 0
             notify_web(instance, "progress_bar", { "percent": percent, "message": f"Parsing {n} of {total_files_in_zip} • {filename}", "bar_type": "main", "bar_speed": "fast" })
 
             # Mediux ZIP files contain a source.txt file with metadata, we obtain title and author from there
             if filename == "source.txt":
-                debug_me("Detected Mediux source", "extract_and_list_zip")
-                zip_source = "mediux"
+                debug_me("Detected Mediux source")
+                zip_source = ScraperSource.MEDIUX.value
                 with zip_ref.open(zip_info) as source, open(os.path.join(extract_dir, "source.txt"), "wb") as target:
                     target.write(source.read())
                 with open(os.path.join(extract_dir, "source.txt"), "r", encoding="utf-8") as source_file:
                     for line in source_file:
                         if line.startswith("Title:"):
                             zip_title = line.split("Title:")[1].strip()
-                            debug_me(f"Detected ZIP title: {zip_title}", "extract_and_list_zip")
+                            debug_me(f"Detected ZIP title: {zip_title}")
                         if line.startswith("Author:"):
                             zip_author = line.split("Author:")[1].strip()
-                            debug_me(f"Detected ZIP author: {zip_author}", "extract_and_list_zip")
+                            debug_me(f"Detected ZIP author: {zip_author}")
                             break
                 os.remove(os.path.join(extract_dir, "source.txt"))  # Clean up source.txt after obtaining author info
                 
@@ -909,8 +910,18 @@ def extract_and_list_zip(
                 md5 = utils.calculate_file_md5(full_path)
 
                 # Obtain artwork title, year, media type, season, episode and artwork type by parsing the filename
-                debug_me(f"Parsing artwork metadata from filename: {filename}", "extract_and_list_zip")
+                debug_me(f"Parsing artwork metadata from filename: {filename}")
                 artwork = parse_title(os.path.splitext(filename)[0])
+
+                if artwork["media"] == "unable_to_parse":
+                    update_log(instance, f"❌ {filename} • {zip_author} | Unable to parse file, formate unrecognized")
+                    errored_files += 1
+                    continue
+                
+                # We start building a Title -> Media map with the media type (Movie, TV, Collection) correctly parsed by parse_title
+                if artwork["media"] != "Unknown" and artwork["title"] not in identified_media_map:
+                    identified_media_map[artwork["title"]] = artwork["media"]
+
                 # Override title and year if provided
                 artwork["title"] = plex_title if plex_title else artwork["title"]
                 artwork["year"] = plex_year if plex_year else artwork.get("year")
@@ -944,7 +955,22 @@ def extract_and_list_zip(
                             update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex")
                             errored_files += 1
                             continue
-                    artwork["media"] = media_type
+
+                    # If we got a result from movie_or_show, we use that media type and we update the identified media map because the movie_or_show method is more accurate
+                    if media_type != "unavailable":
+                        artwork["media"] = media_type
+                        identified_media_map[artwork["title"]] = media_type
+
+                    # If we got "unavailable" from movie_or_show and we've already identified that title as a certain media type from another file, we use that
+                    elif artwork["title"] in identified_media_map:
+                        artwork["media"] = identified_media_map[artwork["title"]]
+
+                    # Otherwise we set it to "unavailable"
+                    # If we got "unavailable" from movie_or_show and we got "Unknown" from parse_title, we set it to "unavailable"
+                    elif media_type == "unavailable" and artwork["media"] == "Unknown":
+                        artwork["media"] = media_type
+                    # If we get here and none of fhe above conditions are met, we have kept whatever media_type was determined by parse_title
+
                     artwork["title"] = title if title and title != artwork.get('title') else artwork.get('title')
                     artwork["tmdb_id"] = tmdb_id
                     if artwork.get('year') is None and year is not None:
@@ -952,64 +978,85 @@ def extract_and_list_zip(
                 if artwork['media'] == "TV Show":
                     if artwork['season'] is None:
                         artwork['season'] = "Cover"
-                        artwork['type'] = "show_cover"
+                        artwork['file_type'] = "show_cover"
                     if artwork['season'] == "Cover" and check_image_orientation_func(artwork["path"]) == "landscape":
                         artwork['season'] = "Backdrop"
-                        artwork['type'] = "background"
+                        artwork['file_type'] = "background"
                 if artwork['media'] == "Movie":
                     if check_image_orientation_func(artwork["path"]) == "landscape":
-                        artwork['type'] = "background"
-                    elif artwork['type'] == "square_art" or check_image_orientation_func(artwork["path"]) == "square":
-                        artwork['type'] = "square_art"
+                        artwork['file_type'] = "background"
+                    elif artwork['file_type'] == "square_art" or check_image_orientation_func(artwork["path"]) == "square":
+                        artwork['file_type'] = "square_art"
                     else:
-                        artwork['type'] = "movie_poster"
+                        artwork['file_type'] = "movie_poster"
                 if artwork['media'] == "Collection":
                     if check_image_orientation_func(artwork["path"]) == "landscape":
-                        artwork['type'] = "background"
-                    if check_image_orientation_func(artwork["path"]) == "square":
-                        artwork['type'] = "square_art"
+                        artwork['file_type'] = "background"
+                    elif check_image_orientation_func(artwork["path"]) == "square":
+                        artwork['file_type'] = "square_art"
                 if artwork['media'] == "unavailable":
                     if check_image_orientation_func(artwork["path"]) == "landscape":
-                        artwork['type'] = "background"
-                    if check_image_orientation_func(artwork["path"]) == "square":
-                        artwork['type'] = "square_art"
-                    if artwork['type'] == "season_cover":
+                        artwork['file_type'] = "background"
+                    elif check_image_orientation_func(artwork["path"]) == "square" or "OST" in artwork["path"]:
+                        artwork['file_type'] = "square_art"
+                    elif artwork['file_type'] == "season_cover":
                         artwork['media'] = "TV Show"
                     else:
                         # If we get to this point, there is no way to determine if it's a TV show or Movie, so default to poster
                         # However this won't pass any filters (becuase it's either "movie_poster" or "show_cover"), so this artwork won't be processed further
-                        artwork['type'] = "poster"  
+                        artwork['file_type'] = "poster"  
 
                 # Check for filters and exclusions
-                if not filters or artwork["type"] in filters:
+                if not filters or artwork["file_type"] in filters:
                     debug_me(
-                        f"✅ Including {artwork["type"].replace('_', ' ')} "
+                        f"✅ Including {artwork["file_type"].replace('_', ' ')} "
                         f"for '{artwork['title']}"
                         + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
                         + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
                         + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
-                        + f". Type is {artwork['type']}.", "extract_and_list_zip"
+                        + f". Type is {artwork['file_type']}."
                     )
 
                     file_list.append(artwork)
                 else:
                     debug_me(
-                        f"⏩ Skipping {artwork["type"].replace('_', ' ')} "
+                        f"⏩ Skipping {artwork["file_type"].replace('_', ' ')} "
                         f"for '{artwork['title']}"
                         + (f" ({artwork['year']})'" if artwork['year'] is not None else "")
                         + (f", Season {artwork['season']}" if isinstance(artwork['season'], int) else "")
                         + (f", Episode {artwork['episode']}" if isinstance(artwork['episode'], int) else "")
-                        + f" based on filters. Type is {artwork['type']} and filters are {filters}.", "extract_and_list_zip"
+                        + f" based on filters. Type is {artwork['file_type']} and filters are {filters}."
                     )
                     filtered_files += 1
 
+    # Final clean-up in an effort to leave as few assets as possible unidentified
+    final_file_list = []
+    tv_sq_art = 0
+    for artwork in file_list:
+        # If the media type was not identified for a file but later we identified the title and
+        # added it to the identified_media_map, we go back and update all assets for that same title
+        if artwork["media"] == "unavailable" and artwork["title"] in identified_media_map:
+            artwork["media"] = identified_media_map[artwork["title"]]
+        # If the season and espisode are None but we identified it as a TV Show
+        # then this means the asset is a show cover
+        if artwork["season"] is None and artwork["episode"] is None and artwork["media"] == MediaType.TV_SHOW.value:
+            artwork["season"] = "Cover"
+            artwork["file_type"] = FileType.SHOW_COVER.value
+        # We tag the square_art assets sequentially in their "season" field so that
+        # the UploadProcessor can process the first one and decide what to do with the rest
+        if artwork["season"] == "SquareArt":
+            artwork["season"] = f"SquareArt_{tv_sq_art}"
+            tv_sq_art += 1
+        
+        final_file_list.append(artwork)
+
     total_files = len(os.listdir(extract_dir))
 
-    sorted_data = sorted(file_list, key=sort_key_func)
+    sorted_data = sorted(final_file_list, key=sort_key_func)
 
-    debug_me(f"❌ Encountered {errored_files} error(s) parsing filenames", "extract_and_list_zip")
-    debug_me(f"⏩ Skipped {filtered_files} assets(s) out of {total_files} based on filters).", "extract_and_list_zip")
-    debug_me(f"✅ Included {len(sorted_data)} assets:", "extract_and_list_zip")
+    debug_me(f"❌ Encountered {errored_files} error(s) parsing filenames")
+    debug_me(f"⏩ Skipped {filtered_files} assets(s) out of {total_files} based on filters).")
+    debug_me(f"✅ Included {len(sorted_data)} assets:")
     debug_me(sorted_data)
 
     return sorted_data, filtered_files, zip_title, zip_author, zip_source
@@ -1025,6 +1072,7 @@ def start_web_server(web_app, web_host: str, web_port: int, debug: bool = False)
         web_port: Port to bind to
         debug: Whether to run in debug mode
     """
+    debug_me("Initiating web server")
     flask.cli.show_server_banner = lambda *args: None
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)

@@ -1,10 +1,9 @@
 from typing import Union, Optional
 import time
 
-from utils import utils
 from utils.notifications import debug_me
 from models.options import Options
-from core.enums import ScraperSource, ArtworkIDPrefix
+from core.enums import ScraperSource
 from core.constants import IMAGE_EXTENSIONS, TPDB_RATE_LIMIT_DELAY
 from models.artwork_types import AnyArtwork
 import os
@@ -96,7 +95,7 @@ class KometaSaver:
                 return f"❌ {self.description} | Failed to save {self.artwork_type.lower()}: {e}"
         try:
             url = self.artwork["url"]
-            debug_me(f"Downloading {self.artwork_type.lower()} from URL: {url}", "KometaSaver/save_to_kometa")
+            debug_me(f"Downloading {self.artwork_type.lower()} from URL: {url}")
             r = requests.get(url, headers=headers, stream=True, timeout=5)
             r.raise_for_status()
             content_type = r.headers.get('Content-Type', '')

@@ -50,7 +50,7 @@ class UpdateService:
             Latest version tag if found, None otherwise
         """
         if self.update_found:
-            debug_me(f"Returning cached latest version: {self.update_found}", "UpdateService/get_latest_version")
+            debug_me(f"Returning cached latest version: {self.update_found}")
             return self.update_found
                     
         # The use of a token is only needed for development purposes, for testing
@@ -59,9 +59,9 @@ class UpdateService:
         headers = {}
         if token:
             headers = {"Authorization": f"token {token}"}
-            debug_me("Using GitHub token for authenticated requests.", "UpdateService/get_latest_version")
+            debug_me("Using GitHub token for authenticated requests.")
         else:
-            debug_me("No GitHub token found. Using unauthenticated requests.", "UpdateService/get_latest_version")
+            debug_me("No GitHub token found. Using unauthenticated requests.")
 
         url = f"https://api.github.com/repos/{self.github_repo}/releases/latest"
         try:
@@ -69,7 +69,7 @@ class UpdateService:
             if response.status_code == 200:
                 return response.json()["tag_name"]
             else:
-                debug_me(f"Failed to fetch latest version. GitHub API returned status code: {response.status_code}", "UpdateService/get_latest_version")
+                debug_me(f"Failed to fetch latest version. GitHub API returned status code: {response.status_code}")
         except Exception:
             pass
         return None
@@ -88,13 +88,13 @@ class UpdateService:
             current_normalized = self.current_version.lstrip('v')
 
             if version.parse(latest_normalized) > version.parse(current_normalized):
-                debug_me(f"Update available! Current version: {self.current_version}. Latest version: {latest_version}", "UpdateService/check_for_update")
+                debug_me(f"Update available! Current version: {self.current_version}. Latest version: {latest_version}")
                 self.update_found = latest_version
                 return latest_version
             else:
-                debug_me(f"No update available.", "UpdateService/check_for_update")
+                debug_me(f"No update available.")
         else:
-            debug_me("Could not determine latest version.", "UpdateService/check_for_update")
+            debug_me("Could not determine latest version.")
         return None
 
     def start_periodic_check(
@@ -142,7 +142,7 @@ class UpdateService:
             new_version = self.check_for_update()
             if new_version:
                 on_update_available(new_version)
-                debug_me(f"An update has been found, exiting periodic check thread", "UpdateService/_check_periodically")
+                debug_me(f"An update has been found, exiting periodic check thread")
                 break
-            debug_me(f"No update found, next check in {self.check_interval} seconds.", "UpdateService/_check_periodically")
+            debug_me(f"No update found, next check in {self.check_interval} seconds.")
             time.sleep(self.check_interval)

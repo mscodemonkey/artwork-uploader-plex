@@ -102,7 +102,7 @@ class Config:
             self.apprise_urls = config.get("apprise_urls", [])
 
         except Exception as e:
-            raise ConfigLoadError from e
+            raise ConfigLoadError(f"Error loading configuration from '{self.path}': {e}") from e
 
     def create(self) -> None:
         """Create a new configuration file with default values."""
@@ -137,9 +137,9 @@ class Config:
             try:
                 with open(self.path, "w", encoding="utf-8") as config_file:
                     json.dump(config_json, config_file, indent=4)
-                debug_me(f"Config file '{self.path}' created with default settings.", "Config/create")
+                debug_me(f"Config file '{self.path}' created with default settings.")
             except Exception as e:
-                raise ConfigCreationError from e
+                raise ConfigCreationError(f"Error creating configuration file as '{self.path}': {e}") from e
 
     def save(self) -> None:
         """Save the current configuration to the file."""
@@ -174,4 +174,4 @@ class Config:
             with open(self.path, "w", encoding="utf-8") as config_file:
                 json.dump(config_json, config_file, indent=4)
         except Exception as e:
-            raise ConfigSaveError from e
+            raise ConfigSaveError(f"Error saving configuration to '{self.path}': {e}") from e

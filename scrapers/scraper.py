@@ -4,9 +4,10 @@ from urllib.parse import urlparse
 from models.options import Options
 from models.callbacks import ProcessingCallbacks
 from core.exceptions import ScraperException
+from core.enums import ScraperSource
 from scrapers.theposterdb_scraper import ThePosterDBScraper
 from scrapers.mediux_scraper import MediuxScraper
-from utils.notifications import debug_me, update_status
+from utils.notifications import debug_me
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 class Scraper:
@@ -45,9 +46,9 @@ class Scraper:
         parsed_url = urlparse(url)
         host = parsed_url.hostname
         if host == "theposterdb.com":
-            self.source = "theposterdb"
+            self.source = ScraperSource.THEPOSTERDB.value
         elif host == "mediux.pro" and ("/sets/" in url or "/boxsets/" in url):
-            self.source = "mediux"
+            self.source = ScraperSource.MEDIUX.value
         elif ".html" in url:
             self.source = "html"
 
@@ -66,10 +67,10 @@ class Scraper:
             None
         """
         try:
-            debug_me(f"Scraping from {self.source}","Scraper/scrape")
-            if self.source == "theposterdb":
+            debug_me(f"Scraping from {self.source}")
+            if self.source == ScraperSource.THEPOSTERDB.value:
                 self.scrape_theposterdb()
-            elif self.source == "mediux":
+            elif self.source == ScraperSource.MEDIUX.value:
                 self.scrape_mediux()
             elif self.source == "html":
                 return self.scrape_html()

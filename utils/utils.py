@@ -171,7 +171,7 @@ def parse_url_and_options(line):
     Each line could contain the URL and any options
     """
 
-    debug_me(f"Line: {line}", "parse_url_and_options")
+    debug_me(f"Line: {line}")
 
     year = None
     options = Options()
@@ -306,6 +306,6 @@ def get_host_path(container_path: str) -> str:
                         return full_path
                     return host_path
     except Exception as e:
-        debug_me(f"Error reading /proc/self/mountinfo: {e}", "get_host_path")
+        debug_me(f"Error reading /proc/self/mountinfo: {e}")
     return "(not defined)"
 
