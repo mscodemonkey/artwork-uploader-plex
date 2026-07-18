@@ -15,6 +15,7 @@ from plex.plex_connector import PlexConnector
 from models.options import Options
 from models.callbacks import ProcessingCallbacks
 from utils.utils import elapsed_time
+from core import globals
 from core.exceptions import (
     PlexConnectorException,
     ScraperException,
@@ -96,6 +97,8 @@ class ArtworkProcessor:
         n = 1
         title = f"for {scraper.title}" if scraper.title else ""
         for artwork in scraper.collection_artwork:
+            if globals.cancel_scrape:
+                break
             self.callbacks.progress(n, scraper.total - scraper.skipped, f"{description} • {n} of {scraper.total - scraper.skipped}", "main")
             n += 1
             self._process_single_artwork(
@@ -105,6 +108,8 @@ class ArtworkProcessor:
 
         # Process movies
         for artwork in scraper.movie_artwork:
+            if globals.cancel_scrape:
+                break
             self.callbacks.progress(n, scraper.total - scraper.skipped, f"{description} • {n} of {scraper.total - scraper.skipped}", "main")
             n += 1
             self._process_single_artwork(
@@ -114,6 +119,8 @@ class ArtworkProcessor:
 
         # Process TV shows
         for artwork in scraper.tv_artwork:
+            if globals.cancel_scrape:
+                break
             self.callbacks.progress(n, scraper.total - scraper.skipped, f"{description} • {n} of {scraper.total - scraper.skipped}", "main")
             n += 1
             self._process_single_artwork(
@@ -123,10 +130,16 @@ class ArtworkProcessor:
 
         end_time = time.time()
         elapsed = elapsed_time(end_time - start_time)
-        self.callbacks.assets(count=(scraper.total - scraper.skipped))
-        self.callbacks.log(f"✔️ {description} | {scraper.total - scraper.skipped} asset(s) processed in {elapsed} • {self.callbacks.success_counter[0]} asset(s) updated")
-        if not bulk:
-            self.callbacks.status(f"Processed all artwork {title} by {scraper.author}", "success")
+        if globals.cancel_scrape:
+            self.callbacks.progress(1, 1, "", "main")  # nudge to 100% so the frontend clears the bar (it only hides at 100%)
+            self.callbacks.log(f"🛑 {description} | Stopped by user • {self.callbacks.success_counter[0]} asset(s) updated before stopping")
+            if not bulk:
+                self.callbacks.status(f"Stopped artwork {title} by {scraper.author}", "warning")
+        else:
+            self.callbacks.assets(count=(scraper.total - scraper.skipped))
+            self.callbacks.log(f"✔️ {description} | {scraper.total - scraper.skipped} asset(s) processed in {elapsed} • {self.callbacks.success_counter[0]} asset(s) updated")
+            if not bulk:
+                self.callbacks.status(f"Processed all artwork {title} by {scraper.author}", "success")
         return scraper.title, scraper.author
 
     def _process_single_artwork(

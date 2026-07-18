@@ -1,5 +1,6 @@
 from typing import Optional, Any
 from core.config import Config
+from core import globals
 from utils import soup_utils
 from utils import utils
 from models.options import Options
@@ -73,6 +74,8 @@ class MediuxScraper:
                         # Spawn and scrape a child MediuxScraper for each set in the boxset
                         collected = 0
                         for n, set_id in enumerate(set_ids,1):
+                            if globals.cancel_scrape:
+                                break
                             #self.callbacks.status(f"Scraping sets in MediUX boxset {self.title} by {self.author}", color="info", sticky=True, spinner=True)
                             self.callbacks.progress(n, len(set_ids), f"Collecting assets from MediUX boxset • {n} of {len(set_ids)} sets • {collected} assets collected", "main")
                             self._scrape_set_in_boxset(set_id)

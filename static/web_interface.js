@@ -840,6 +840,10 @@ function startScrape() {
     }
 }
 
+function stopScrape() {
+    socket.emit("stop_scrape", { instance_id: instanceId });
+}
+
 // Function to check for changes and enable/disable the save button
 function updateBulkSaveButtonState() {
 

@@ -8,6 +8,7 @@ from models.options import Options
 from models.callbacks import ProcessingCallbacks
 from core.exceptions import ScraperException
 from core.config import Config
+from core import globals
 from core.enums import MediaType, ScraperSource
 from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
@@ -74,6 +75,8 @@ class ThePosterDBScraper:
 
                 collected = 0
                 for user_page in range(self.user_pages):
+                    if globals.cancel_scrape:
+                        break
                     self.callbacks.progress(user_page + 1, self.user_pages, f"Collecting assets from TPDb user {self.author} • {user_page + 1} of {self.user_pages} pages • {collected} assets collected of {self.user_uploads}")
                     #self.callbacks.status(f"Scraping TPDb asset pages for user {self.author}", color="info", sticky=True, spinner=True)
                     self.scrape_user_page(user_page)

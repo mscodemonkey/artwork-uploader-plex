@@ -141,6 +141,15 @@ def get_exe_dir():
     return UtilityService.get_exe_dir()
 
 
+def request_scrape_stop() -> bool:
+    """Ask any in-flight scrape to stop. Returns True if a run was flagged to stop, or
+    False when nothing is running - a stale click must not arm the next run."""
+    if globals.scrapes_running:
+        globals.cancel_scrape = True
+        return True
+    return False
+
+
 def process_scrape_url_from_web(instance: Instance, url: str) -> None:
 
     """
@@ -155,6 +164,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
     title = None
 
     try:
+        globals.scrapes_running += 1
         # Check if the Plex TV and movie libraries are configured
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please configure your settings.", color="warning")
@@ -174,6 +184,10 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         update_status(instance, f"{scraping_error}", color="danger")
 
     finally:
+        globals.scrapes_running -= 1
+        if globals.scrapes_running <= 0:
+            globals.scrapes_running = 0
+            globals.cancel_scrape = False
         if instance.mode == "web":
             notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
             notify_web(instance, "add_spinner", { "element": "scrape_button", "mode": False })
@@ -240,6 +254,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     errors = 0
 
     try:
+        globals.scrapes_running += 1
 
         # Check if plex setup returned valid values
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
@@ -256,6 +271,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # Loop through the bulk list
         for i, parsed_line in enumerate(parsed_urls, 1):
+            if globals.cancel_scrape:
+                break
 
             notify_web(instance, "element_disable", {"element": ["bulk_button"], "mode": True})
 
@@ -278,16 +295,26 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         end_time = time.time()
         elapsed = elapsed_time(end_time - start_time)
 
-        message = (
-            ("🏁 " if errors == 0 else "⚠️ ")
-            + ("Scheduled b" if scheduled else "B")
-            + f"ulk import of '{display_filename}' completed "
-            + (f"successfully in {elapsed} • " if errors == 0 else f"with {errors} error(s) in {elapsed}, check logs for details • ")
-            + f"{assets_processed[0]} asset(s) processed • "
-            + f"{success_counter[0]} asset(s) updated"
-        )
-        
-        update_status(instance, message[2:], color="success" if errors == 0 else "warning", sticky=False, spinner=False)
+        if globals.cancel_scrape:
+            message = (
+                "🛑 "
+                + ("Scheduled b" if scheduled else "B")
+                + f"ulk import of '{display_filename}' stopped by user • "
+                + f"{assets_processed[0]} asset(s) processed • "
+                + f"{success_counter[0]} asset(s) updated"
+            )
+            update_status(instance, message[2:], color="warning", sticky=False, spinner=False)
+            notify_web(instance, "progress_bar", {"percent": 100, "bar_type": "bulk"})
+        else:
+            message = (
+                ("🏁 " if errors == 0 else "⚠️ ")
+                + ("Scheduled b" if scheduled else "B")
+                + f"ulk import of '{display_filename}' completed "
+                + (f"successfully in {elapsed} • " if errors == 0 else f"with {errors} error(s) in {elapsed}, check logs for details • ")
+                + f"{assets_processed[0]} asset(s) processed • "
+                + f"{success_counter[0]} asset(s) updated"
+            )
+            update_status(instance, message[2:], color="success" if errors == 0 else "warning", sticky=False, spinner=False)
         update_log(instance, message)
         if scheduled:
             debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).", "process_bulk_import_from_ui")
@@ -298,6 +325,10 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         update_status(instance, f"Error during bulk import: {bulk_import_exception}", color="danger")
 
     finally:
+        globals.scrapes_running -= 1
+        if globals.scrapes_running <= 0:
+            globals.scrapes_running = 0
+            globals.cancel_scrape = False
         notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
         notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": False })
 

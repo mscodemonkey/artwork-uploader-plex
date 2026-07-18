@@ -142,6 +142,7 @@ def setup_socket_handlers(
     # Import functions from artwork_uploader (to avoid circular imports at module level)
     from artwork_uploader import (
         process_scrape_url_from_web,
+        request_scrape_stop,
         run_bulk_import_scrape_in_thread,
         save_bulk_import_file,
         load_bulk_import_file,
@@ -263,6 +264,15 @@ def setup_socket_handlers(
             )
             notify_web(instance, "add_spinner", { "element": "scrape_button", "mode": True })
             process_scrape_url_from_web(instance, url)
+
+    @globals.web_socket.on("stop_scrape")
+    def handle_stop_scrape(data):
+        """Flag any in-flight scrape to stop cleanly (user pressed Stop in the web UI)."""
+        instance = Instance(data.get("instance_id"), "web")
+        if request_scrape_stop():
+            update_log(instance, "🛑 Stop requested - the current item will finish, then the run stops")
+        else:
+            update_log(instance, "ℹ️ Nothing to stop - no scrape is running")
 
     @globals.web_socket.on("start_bulk_import")
     def handle_bulk_import_from_web(data):
