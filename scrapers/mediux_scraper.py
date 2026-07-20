@@ -216,9 +216,9 @@ class MediuxScraper:
         # and collection_map.get(movie_id).get(year) returns the year
         elif collection_data:
             collection_map = {
-                m["id"]: {
-                    "title": m["title"],
-                    "year": m["release_date"][:4]
+                m.get("id"): {
+                    "title": m.get("title", "unknown"),
+                    "year": (m.get("release_date") or "")[:4]
                 } for m in collection_data.get("movies", [])
             }
 
