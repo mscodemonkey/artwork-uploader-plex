@@ -74,6 +74,18 @@ ARTWORK_TYPE_MAP = {
     FileType.TITLE_CARD.value: "Title card"
 }
 
+# Artwork type to Kometa asset filename mapping. Kometa's item-level asset names are
+# lowercase on disk (poster.ext / background.ext / square.ext) and its matching is
+# case-sensitive on Linux, so these must not use the display strings above.
+ARTWORK_FILENAME_MAP = {
+    FileType.BACKGROUND.value: "background",
+    FileType.BACKDROP.value: "background",
+    FileType.SQUARE_ART.value: "square",
+    FileType.MOVIE_POSTER.value: "poster",
+    FileType.COLLECTION_POSTER.value: "poster",
+    FileType.POSTER.value: "poster",
+}
+
 # Media types
 MEDIA_TYPE_TV_SHOW = "TV Show"
 MEDIA_TYPE_MOVIE = "Movie"

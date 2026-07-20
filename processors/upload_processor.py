@@ -4,7 +4,7 @@ from core.config import Config
 from core.exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, PlexConnectorException
 from core.enums import ScraperSource
 from core.exceptions import ScraperException
-from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP
+from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP, ARTWORK_FILENAME_MAP
 from models.options import Options
 from plex.plex_connector import PlexConnector
 from plex.plex_uploader import PlexUploader
@@ -58,7 +58,7 @@ class UploadProcessor:
                     base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                     saver.dest_dir = os.path.join(base_dir, library, asset_folder)
                     debug_me(f"Destination directory is {saver.dest_dir}")
-                    saver.dest_file_name = "square" if artwork_type == "square_art" else artwork_type
+                    saver.dest_file_name = ARTWORK_FILENAME_MAP.get(artwork.get('file_type'), 'poster')
                     saver.dest_file_ext = ".jpg"
                     saver.set_description(description)
                     saver.set_options(self.options)
@@ -127,7 +127,7 @@ class UploadProcessor:
                     base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                     saver.dest_dir = os.path.join(base_dir, library, asset_folder)
                     debug_me(f"Destination directory is {saver.dest_dir}")
-                    saver.dest_file_name = "square" if artwork_type == "square_art" else artwork_type
+                    saver.dest_file_name = ARTWORK_FILENAME_MAP.get(artwork.get('file_type'), 'poster')
                     saver.dest_file_ext = ".jpg"
                     saver.set_description(desc)
                     saver.set_options(self.options)
