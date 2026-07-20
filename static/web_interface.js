@@ -342,6 +342,15 @@ socket.on("status_update", (data) => {
     }
 });
 
+socket.on("scrape_state", (data) => {
+    if (validResponse(data, true)) {
+        const stopButton = document.getElementById("stop_scrape_button");
+        if (stopButton) {
+            stopButton.classList.toggle("d-none", !data.running);
+        }
+    }
+});
+
 
 // Update the log page
 function updateLog(message, color = null, artwork_title = null) {

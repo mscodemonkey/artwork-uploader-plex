@@ -162,6 +162,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
 
     try:
         globals.scrapes_running += 1
+        notify_web(instance, "scrape_state", {"running": True})
         # Check if the Plex TV and movie libraries are configured
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please configure your settings.", color=StatusColor.WARNING.value)
@@ -186,6 +187,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
+            notify_web(instance, "scrape_state", {"running": False})
         if instance.mode == "web":
             notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
             notify_web(instance, "add_spinner", { "element": "scrape_button", "mode": False })
@@ -252,6 +254,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
     try:
         globals.scrapes_running += 1
+        notify_web(instance, "scrape_state", {"running": True})
 
         # Check if plex setup returned valid values
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
@@ -323,6 +326,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
+            notify_web(instance, "scrape_state", {"running": False})
         notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
         notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": False })
 
