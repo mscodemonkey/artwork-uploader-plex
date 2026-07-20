@@ -808,8 +808,6 @@ function saveBulkChangesModal(filename) {
 function startScrape() {
     var form = document.getElementById('scraperForm');
     const logTab = document.querySelector('#scraping-log-tab');
-    // Switch to the log tab
-    bootstrap.Tab.getOrCreateInstance(logTab).show();
 
     // Check if the form is valid
     if (form.checkValidity()) {
@@ -1527,6 +1525,7 @@ function uploadFile(file) {
     const reader = new FileReader();
 
     let offset = 0;
+    let isAborted = false;
 
     reader.onload = function (event) {
         const arrayBuffer = event.target.result;
@@ -1546,6 +1545,8 @@ function uploadFile(file) {
         }
 
         function sendChunk() {
+            if (isAborted) return;
+
             if (offset >= arrayBuffer.byteLength) {
                 console.log("All chunks sent, emitting upload_complete event.");
 
@@ -1576,7 +1577,8 @@ function uploadFile(file) {
             const chunk = arrayBuffer.slice(offset, offset + CHUNK_SIZE);
 
             arrayBufferToBase64(chunk).then(base64Chunk => {
-                //console.log(`Sending chunk ${(offset / CHUNK_SIZE) + 1} of ${totalChunks}: ${offset / 1024} to ${(offset + CHUNK_SIZE) / 1024}`)
+                if (isAborted) return;
+
                 socket.emit("upload_artwork_chunk", {
                     instance_id: instanceId,
                     fileName: file.name,
@@ -1585,6 +1587,8 @@ function uploadFile(file) {
                     totalChunks: totalChunks
                 }, (ack) => {
                     if (ack === "ok") {
+                        if (isAborted) return;
+
                         offset += CHUNK_SIZE; // Offset is in bytes
                         let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
                         updateStatus(`Uploading '${file.name}'...`, "info", false, false, "cloud-upload");
@@ -1595,6 +1599,10 @@ function uploadFile(file) {
                         if (totalSize < 80) barSpeed = "fast"; else barSpeed = "smooth";
                         progressBar(progress, `${file.name} • ${progressMBytes} MB of ${totalSize} MB • ${currentRate} MB/s`, "main", barSpeed);
                         sendChunk();
+                    } else if (ack === "abort") {
+                        isAborted = true;
+                        progressBar(100, `${file.name} • Upload aborted`, "main", "fast");
+                        return;
                     } else {
                         console.error("Backend failed to acknowledge chunk.")
                     }

@@ -32,7 +32,7 @@ from services.notify_service import NotifyService
 from utils import utils
 from models.instance import Instance
 from core.config import Config
-from core.enums import FileType, MediaType, ScraperSource
+from core.enums import FileType, MediaType, ScraperSource, StatusColor
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService
@@ -257,20 +257,29 @@ def setup_socket_handlers(
             if filters and len(filters) < 6:
                 url = url + " --filters " + " ".join(filters)
             notify_web(
-                instance,
-                "element_disable",
-                { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True }
+                instance=instance,
+                event="element_disable",
+                data_to_include={
+                    "element": ["scrape_url", "scrape_button", "bulk_button"],
+                    "mode":
+                    True
+                }
             )
-            notify_web(instance, "add_spinner", { "element": "scrape_button", "mode": True })
+            notify_web(
+                instance=instance,
+                event="add_spinner",
+                data_to_include={
+                    "element": "scrape_button",
+                    "mode": True
+                }
+            )
             process_scrape_url_from_web(instance, url)
 
     @globals.web_socket.on("stop_scrape")
     def handle_stop_scrape(data):
         """Flag any in-flight scrape to stop cleanly (user pressed Stop in the web UI)."""
         instance = Instance(data.get("instance_id"), "web")
-        if request_scrape_stop():
-            update_log(instance, "🛑 Stop requested - the current item will finish, then the run stops")
-        else:
+        if not request_scrape_stop():
             update_log(instance, "ℹ️ Nothing to stop - no scrape is running")
 
     @globals.web_socket.on("start_bulk_import")
@@ -566,7 +575,7 @@ def setup_socket_handlers(
             globals.plex.reconnect(config)
             notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
         except Exception as config_error:
-            update_status(instance, str(config_error), color="warning")
+            update_status(instance, str(config_error), color=StatusColor.WARNING.value)
 
     @globals.web_socket.on("delete_schedule")
     def delete_task_from_scheduler(data):
@@ -677,6 +686,29 @@ def setup_socket_handlers(
         chunk_data = data["chunkData"]
         chunk_index = data["chunkIndex"]
         total_chunks = data["totalChunks"]
+
+        if chunk_index == 0:
+            globals.cancel_scrape = False
+            globals.scrapes_running += 1
+
+        if globals.cancel_scrape:
+            debug_me(f"File upload canceled by user")
+            update_log(instance, f"🛑 {file_name} • File upload canceled by user")
+            update_status(instance, f"File upload canceled by user", color=StatusColor.WARNING.value)
+            if file_name in upload_chunks:
+                try:
+                    upload_chunks[file_name]["temp_file"].close()
+                    if os.path.exists(upload_chunks[file_name]["temp_path"]):
+                        os.remove(upload_chunks[file_name]["temp_path"])
+                except Exception:
+                    pass
+                del upload_chunks[file_name]            
+            globals.scrapes_running -= 1
+            if globals.scrapes_running <= 0:
+                globals.scrapes_running = 0
+                globals.cancel_scrape = False
+            return "abort"
+
         if file_name not in upload_chunks:
             # Create a temporary file to stream chunks to disk instead of memory
             temp_file = tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.upload')            
@@ -696,6 +728,10 @@ def setup_socket_handlers(
             return "ok"
         except Exception as e:
             debug_me(f"Error decoding chunk {chunk_index + 1}: {str(e)}")
+            globals.scrapes_running -= 1
+            if globals.scrapes_running <= 0:
+                globals.scrapes_running = 0
+                globals.cancel_scrape = False
             return "error"
 
     @globals.web_socket.on("upload_complete")
@@ -709,6 +745,11 @@ def setup_socket_handlers(
         debug_me(f"Obtained filters from web form: {filters}")
         debug_me(f"Obtained options from web form: {options}")
 
+        globals.scrapes_running -= 1
+        if globals.scrapes_running <= 0:
+            globals.scrapes_running = 0
+            globals.cancel_scrape = False
+        
         instance = Instance(data.get("instance_id"), "web")
 
         if file_name in upload_chunks and upload_chunks[file_name]["chunks_received"] == int(
@@ -802,6 +843,7 @@ def save_uploaded_file(
     debug_me(f"Saved ZIP file: {temp_zip_path}")
 
     update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file and parsing files...")
+    globals.scrapes_running += 1
     extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
         instance,
         temp_zip_path,
@@ -812,6 +854,20 @@ def save_uploaded_file(
         check_image_orientation_func,
         sort_key_func
     )
+    if globals.cancel_scrape:
+        notify_web(instance, "progress_bar", {"message": "Parsing aborted by user...", "percent": 100})#, "bar_type": bar_type, "bar_speed": bar_speed})
+        update_log(instance, f"🛑 {os.path.basename(temp_zip_path)} • ZIP file parsing aborted by user")
+        update_status(instance, f"ZIP file parsing aborted by user", color=StatusColor.WARNING.value)
+        globals.scrapes_running -= 1
+        if globals.scrapes_running <= 0:
+            globals.scrapes_running = 0
+            globals.cancel_scrape = False
+        return
+
+    globals.scrapes_running -= 1
+    if globals.scrapes_running <= 0:
+        globals.scrapes_running = 0
+        globals.cancel_scrape = False
 
     # Delete the ZIP file after extraction
     try:
@@ -821,9 +877,19 @@ def save_uploaded_file(
     except Exception as e:
         debug_me(f"Error deleting temporary ZIP file: {e}")
 
+    globals.scrapes_running += 1
     process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
+    
+    if globals.cancel_scrape:
+        update_status(instance, "Uploaded file processing canceled by user", color=StatusColor.WARNING.value)
+    else:
+        update_status(instance, "Finished processing uploaded file", color=StatusColor.SUCCESS.value)
+    
+    globals.scrapes_running -= 1
+    if globals.scrapes_running <= 0:
+        globals.scrapes_running = 0
+        globals.cancel_scrape = False
 
-    update_status(instance, "Finished processing uploaded file.", color="success")
 
 
 def extract_and_list_zip(
@@ -850,6 +916,8 @@ def extract_and_list_zip(
     """
     extract_dir = tempfile.mkdtemp()
     file_list = []
+    zip_title = ""
+    zip_author = ""
     filtered_files = 0
     errored_files = 0
 
@@ -878,6 +946,8 @@ def extract_and_list_zip(
         identified_media_map = {}
 
         for n, zip_info in enumerate(zip_infos, 1):
+            if globals.cancel_scrape:
+                break
             filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
             debug_me(f"{n} / {total_files_in_zip} • Processing '{filename}'")
             percent = (n/total_files_in_zip)*100 if total_files_in_zip > 0 else 0
@@ -906,7 +976,6 @@ def extract_and_list_zip(
                 with zip_ref.open(zip_info) as source, open(full_path, "wb") as target:
                     target.write(source.read())
 
-                #full_path = os.path.join(extract_dir, filename)
                 md5 = utils.calculate_file_md5(full_path)
 
                 # Obtain artwork title, year, media type, season, episode and artwork type by parsing the filename

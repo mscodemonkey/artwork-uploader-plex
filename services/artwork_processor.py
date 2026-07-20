@@ -66,10 +66,6 @@ class ArtworkProcessor:
         scraper.set_options(options)
 
         try:
-            if "/boxsets/" in url:
-                pass #self.callbacks.status(f"Scraping MediUX Boxset from {url}, this may take a while...", "info", True, True)
-            else:
-                pass #self.callbacks.status(f"Scraping {url}", "info", True, True)
             start_time = time.time()
             scraper.scrape()
         except ScraperException as e:
@@ -232,6 +228,7 @@ class ArtworkProcessor:
             year = None
             self.callbacks.debug("No files to process in uploaded ZIP file")
         
+        processed_files = 0
         success_counter = 0  # Mutable counter to track successful uploads
 
         # Initial progress update
@@ -243,6 +240,8 @@ class ArtworkProcessor:
             self.callbacks.log(f"⏩ {title}{f' ({year})' if year else ''} • {author} | Skipping {skipped} asset(s) based on filters. Processing {total_files} asset(s).")
 
         for index, artwork in enumerate(file_list, start=1):
+            if globals.cancel_scrape:
+                break
             # Update progress
             self.callbacks.progress(index, total_files, f"Processing ZIP file • {index} of {total_files}")
             # Override title if provided
@@ -291,6 +290,7 @@ class ArtworkProcessor:
             # Process the artwork if media_type is known
             if media_type != "unavailable":
                 try:
+                    processed_files += 1
                     results = process_func(artwork)
 
                     for result in results:
@@ -330,5 +330,10 @@ class ArtworkProcessor:
             except OSError:
                 pass
         # Final progress update
-        self.callbacks.log(f"✔️ {title}{f' ({year})' if year else ''} • {author} | {total_files} file(s) processed • {success_counter} asset(s) updated.")
-        self.callbacks.progress(total_files, total_files, f"Processing ZIP file • {total_files} of {total_files}")
+        if globals.cancel_scrape:
+            self.callbacks.progress(1, 1, "", "main")
+            self.callbacks.log(f"🛑 {title}{f' ({year})' if year else ''} • {author} | Stopped by user. {processed_files} file(s) processed • {success_counter} asset(s) updated.")
+
+        else:
+            self.callbacks.log(f"✔️ {title}{f' ({year})' if year else ''} • {author} | {total_files} file(s) processed • {success_counter} asset(s) updated.")
+            self.callbacks.progress(total_files, total_files, f"Processing ZIP file • {total_files} of {total_files}")

@@ -25,7 +25,7 @@ from core.constants import (
     MIN_PYTHON_MINOR,
     VALID_FILENAME_PATTERN
 )
-from core.enums import InstanceMode
+from core.enums import InstanceMode, StatusColor
 from services import (
     BulkFileService,
     ImageService,
@@ -48,7 +48,6 @@ if sys.version_info[0] != MIN_PYTHON_MAJOR or sys.version_info[1] < MIN_PYTHON_M
     sys.exit(0)
 
 try:
-    from PIL import Image
     from flask import Flask, render_template
     from flask_socketio import SocketIO
 except (ModuleNotFoundError, ImportError) as e:
@@ -165,7 +164,8 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         globals.scrapes_running += 1
         # Check if the Plex TV and movie libraries are configured
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
-            update_status(instance, "Plex setup incomplete. Please configure your settings.", color="warning")
+            update_status(instance, "Plex setup incomplete. Please configure your settings.", color=StatusColor.WARNING.value)
+            globals.scrapes_running -= 1
             return
 
         # Process the URL and options passed from the GUI or website
@@ -179,7 +179,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "add_to_bulk_list", {"url": url, "title": title, "author": author})
 
     except ScraperException as scraping_error:
-        update_status(instance, f"{scraping_error}", color="danger")
+        update_status(instance, f"{scraping_error}", color=StatusColor.DANGER.value)
 
     finally:
         globals.scrapes_running -= 1
@@ -198,7 +198,6 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
     if instance.mode == "web":
         notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
         notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": True })
-        #update_status(instance, f"Starting bulk import for {filename}", "info", True, True)
 
     parsed_urls = []
 
@@ -221,7 +220,7 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
                 update_log(instance, f"❌ One or more invalid flags found in bulk import file '{filename}', line {n}: {str(e)}")
                 continue                
     if len(parsed_urls) == 0:
-        update_status(instance, "No valid bulk import entries found. Check logs for details", color="danger", icon="x-circle")
+        update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
         notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": False })
         return
@@ -256,7 +255,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         # Check if plex setup returned valid values
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
-            update_status(instance, "Plex setup incomplete. Please check the settings.", color="red")
+            update_status(instance, "Plex setup incomplete. Please check the settings.", color=StatusColor.DANGER.value)
+            globals.scrapes_running -= 1
             return
 
         start_time = time.time()
@@ -276,7 +276,6 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
             try:
                 scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed)
-                #time.sleep(1)
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
                 debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}")
@@ -285,9 +284,6 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
             percent = (i / len(parsed_urls)) * 100
             notify_web(instance, "progress_bar", {"message": f"{display_filename} • {i} of {len(parsed_urls)}", "percent" : percent, "bar_type": "bulk"})
-
-        # All done, update the UI
-        #notify_web(instance, "progress_bar", {"message": f"{len(parsed_urls)} / {len(parsed_urls)} (100%)", "percent" : 100, "bar_type": "bulk"})
 
         # Log the completion of the bulk import process
         end_time = time.time()
@@ -301,7 +297,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 + f"{assets_processed[0]} asset(s) processed • "
                 + f"{success_counter[0]} asset(s) updated"
             )
-            update_status(instance, message[2:], color="warning", sticky=False, spinner=False)
+            update_status(instance, message[2:], color=StatusColor.WARNING.value, sticky=False, spinner=False)
             notify_web(instance, "progress_bar", {"percent": 100, "bar_type": "bulk"})
         else:
             message = (
@@ -312,7 +308,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 + f"{assets_processed[0]} asset(s) processed • "
                 + f"{success_counter[0]} asset(s) updated"
             )
-            update_status(instance, message[2:], color="success" if errors == 0 else "warning", sticky=False, spinner=False)
+            update_status(instance, message[2:], color=StatusColor.SUCCESS.value if errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
         update_log(instance, message)
         if scheduled:
             debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).")
@@ -320,7 +316,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
-        update_status(instance, f"Error during bulk import: {bulk_import_exception}", color="danger")
+        update_status(instance, f"Error during bulk import: {bulk_import_exception}", color=StatusColor.DANGER.value)
 
     finally:
         globals.scrapes_running -= 1
@@ -350,8 +346,6 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, success_coun
 
     def progress_callback(current: int, total: int, title: str, bar_type:str = "main", bar_speed:str = "smooth"):
         percent = (current / total * 100) if total > 0 else 0
-        #message = f"{current} / {total} ({percent.__round__()}%)" if current > 0 else ""
-        #message = f"{title} • {percent.__round__()}%" #if current > 0 else ""
         notify_web(instance, "progress_bar", {"message": title, "percent": percent, "bar_type": bar_type, "bar_speed": bar_speed})
 
     callbacks = ProcessingCallbacks(
@@ -370,7 +364,7 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, success_coun
         return title, author
     except PlexConnectorException as not_connected:
         debug_me(f"PlexConnectorException: {str(not_connected)}")
-        update_status(instance, str(not_connected), "danger")
+        update_status(instance, str(not_connected), StatusColor.DANGER.value)
         raise
     except ScraperException as scraper_error:
         debug_me(f"ScraperException: {str(scraper_error)}")
@@ -433,7 +427,7 @@ def load_bulk_import_file(instance: Instance, filename = None):
             if instance.mode == "cli":
                 print(f"File does not exist: {bulk_import_filename}")
             if instance.mode == "web":
-                update_status(instance, f"File does not exist: {bulk_import_filename}", color="danger", sticky=False, spinner=False, icon="x-circle")
+                update_status(instance, f"File does not exist: {bulk_import_filename}", color=StatusColor.DANGER.value, sticky=False, spinner=False, icon="x-circle")
             return
 
         # Read file using service
@@ -459,11 +453,11 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
         try:
             globals.bulk_file_service.rename_file(old_name, new_name)
             notify_web(instance, "rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
-            update_status(instance, f"Renamed to {new_name}", "success")
+            update_status(instance, f"Renamed to {new_name}", StatusColor.SUCCESS.value)
             update_log(instance, f"✏️ Renamed bulk import file from '{old_name}' to '{new_name}'")
         except Exception as e:
             notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
-            update_status(instance, f"Could not rename {old_name}", "warning")
+            update_status(instance, f"Could not rename {old_name}", StatusColor.WARNING.value)
             update_log(instance, f"🔴 Could not rename bulk import file '{old_name}'")
             debug_me(f"Could not rename bulk import file '{old_name}': {e}")
 
@@ -473,11 +467,11 @@ def delete_bulk_import_file(instance: Instance, file_name):
         try:
             globals.bulk_file_service.delete_file(file_name)
             notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
-            update_status(instance, f"Deleted {file_name}", "success")
+            update_status(instance, f"Deleted {file_name}", StatusColor.SUCCESS.value)
             update_log(instance, f"🗑️ Deleted bulk import file '{file_name}'")
         except Exception as e:
             notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
-            update_status(instance, f"Could not delete {file_name}", "warning")
+            update_status(instance, f"Could not delete {file_name}", StatusColor.WARNING.value)
             update_log(instance, f"🔴 Could not delete bulk import file '{file_name}'")
             debug_me(f"Could not delete bulk import file '{file_name}': {e}")
 
@@ -492,11 +486,11 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
 
             globals.bulk_file_service.write_file(contents, bulk_import_filename)
 
-            update_status(instance, message=f"Bulk import file {bulk_import_filename} saved", color="success")
+            update_status(instance, message=f"Bulk import file {bulk_import_filename} saved", color=StatusColor.SUCCESS.value)
             notify_web(instance, "save_bulk_import", {"saved": True, "now_load": now_load})
             update_log(instance, f"💾 Saved bulk import file '{bulk_import_filename}'")
         except Exception as e:
-            update_status(instance, message="Error saving bulk import file", color="danger")
+            update_status(instance, message="Error saving bulk import file", color=StatusColor.DANGER.value)
             notify_web(instance, "save_bulk_import", {"saved": False, "now_load": now_load})
             update_log(instance, f"🔴 Error saving bulk import file '{bulk_import_filename}'")
             debug_me(f"Error saving bulk import file '{bulk_import_filename}': {e}")
@@ -508,7 +502,7 @@ def check_for_bulk_import_file(instance: Instance):
         bulk_import_filename = config.bulk_txt if config and config.bulk_txt is not None else "bulk_import.txt"
         globals.bulk_file_service.ensure_default_file_exists(bulk_import_filename)
     except Exception as e:
-        update_status(instance, message="Error creating bulk import file", color="danger")
+        update_status(instance, message="Error creating bulk import file", color=StatusColor.DANGER.value)
 
 
 def find_bulk_file(filename: str = None):
@@ -759,7 +753,7 @@ if __name__ == "__main__":
                 debug_me(f"Finished scraping TPDb user URL from CLI with {success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
                 debug_me(f"Error scraping TPDb user URL from CLI: {str(e)}", "__main__")
-                update_status(cli_instance, str(e), color="danger")
+                update_status(cli_instance, str(e), color=StatusColor.DANGER.value)
 
         # User passed in a poster or set URL, so let's process that
         else:
@@ -769,7 +763,7 @@ if __name__ == "__main__":
                 debug_me(f"Finished scraping URL from CLI with {success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
                 debug_me(f"Error scraping URL from CLI: {str(e)}", "__main__")
-                update_status(cli_instance, str(e),color="danger")
+                update_status(cli_instance, str(e),color=StatusColor.DANGER.value)
     else:
 
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
