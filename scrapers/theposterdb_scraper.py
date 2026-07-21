@@ -553,7 +553,7 @@ class ThePosterDBScraper:
                             "year": year,
                             "source": ScraperSource.THEPOSTERDB.value,
                             "id": poster_id,
-                            "type": file_type,
+                            "file_type": file_type,
                         })
                     else:
                         self.exclusions += 1
@@ -579,7 +579,7 @@ class ThePosterDBScraper:
                             "year": year,
                             "source": ScraperSource.THEPOSTERDB.value,
                             "id": poster_id,
-                            "type": "movie_poster",
+                            "file_type": "movie_poster",
                         })
                     else:
                         self.exclusions += 1
@@ -597,7 +597,7 @@ class ThePosterDBScraper:
                             "url": poster_url,
                             "source": ScraperSource.THEPOSTERDB.value,
                             "id": poster_id,
-                            "type": "collection_poster",
+                            "file_type": "collection_poster",
                         })
                     else:
                         self.exclusions += 1

@@ -149,3 +149,37 @@ def test_new_assets_are_reported_through_the_cached_counter(tmp_path, monkeypatc
     scraper._scrape_user_cached()
 
     assert cached[0] == 48                          # all 48 were new to the cache
+
+
+# --- regression: hydrate must key artwork as file_type, exactly as get_posters does ------------
+
+def test_hydrate_from_cache_uses_the_processor_file_type_key(tmp_path):
+    """_hydrate_from_cache rebuilds the artwork lists that feed the upload processor, so its dicts
+       must carry 'file_type' (what get_posters writes and the processor reads), not 'type'. With
+       'type', ARTWORK_ID_MAP.get(...) is None and the uploader crashes on None + md5 - the same
+       fault that broke the import webhook, latent here until a cached crawl meets an unlocked
+       in-library item."""
+    from core.constants import ARTWORK_ID_MAP
+
+    index = AssetIndex(str(tmp_path / "idx.db"))
+    index.record("someone", [
+        {"id": 1, "title": "Dune", "year": 2021, "season": None,
+         "media_type": "movie_poster", "author": "someone",
+         "url": "https://theposterdb.com/api/assets/1"},
+        {"id": 2, "title": "Severance", "year": 2022, "season": None,
+         "media_type": "show_cover", "author": "someone",
+         "url": "https://theposterdb.com/api/assets/2"},
+        {"id": 3, "title": "Severance", "year": 2022, "season": 1,
+         "media_type": "season_cover", "author": "someone",
+         "url": "https://theposterdb.com/api/assets/3"},
+    ])
+
+    scraper = _scraper()
+    scraper.config.tpdb_filters = ["movie_poster", "show_cover", "season_cover", "collection_poster"]
+    scraper._hydrate_from_cache(index, "someone")
+
+    produced = scraper.movie_artwork + scraper.tv_artwork
+    assert produced, "hydrate produced no artwork - fixture/filter setup is wrong"
+    for artwork in produced:
+        assert "file_type" in artwork, f"hydrated artwork missing file_type: {artwork}"
+        assert ARTWORK_ID_MAP.get(artwork["file_type"]) is not None
