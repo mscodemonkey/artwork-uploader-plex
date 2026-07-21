@@ -1,7 +1,11 @@
 """Unit tests for the Sonarr/Radarr import webhook (services/webhook_service.py)."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
+from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP
+from plex.plex_uploader import PlexUploader
 from services.asset_index import AssetIndex
 from services.webhook_service import WebhookEvent, WebhookService, parse_event
 
@@ -126,3 +130,33 @@ def test_dedupe_key():
     no_id = WebhookEvent(kind="movie", title="Léon", year=1994, tmdb_id=None, tvdb_id=None,
                          seasons=frozenset(), source="radarr")
     assert WebhookService._dedupe_key(no_id)[1] == "leon"
+
+
+# ------------------- regression: the file_type contract (the live crash) -------------------
+
+@pytest.mark.unit
+@pytest.mark.parametrize("artwork_type,season", [
+    ("movie_poster", None),
+    ("show_cover", None),
+    ("season_cover", 2),
+])
+def test_artwork_dict_carries_the_file_type_key_the_processor_reads(artwork_type, season):
+    """The webhook must key the artwork type as 'file_type' - the key get_posters writes and the
+       upload processor reads. Keyed as 'type' (the old bug), ARTWORK_ID_MAP.get(...) returns None
+       and PlexUploader.set_artwork does None + md5, the exact 'unsupported operand type(s) for +:
+       NoneType and str' that broke a real Radarr import in production."""
+    row = {"title": "Dune", "author": "someuser", "year": 2021, "asset_id": 42,
+           "url": "https://theposterdb.com/api/assets/42"}
+    artwork = WebhookService._artwork_dict(row, "&_cb=123", artwork_type, season)
+
+    assert artwork["file_type"] == artwork_type
+    assert ARTWORK_ID_MAP.get(artwork["file_type"]) is not None
+
+    # Reproduce the runtime path: the processor derives artwork_id from file_type and hands it to
+    # the uploader, whose set_artwork builds label = artwork_id + md5(url). A None artwork_id here
+    # is the crash.
+    artwork_id = ARTWORK_ID_MAP.get(artwork.get("file_type"))
+    artwork_type_str = ARTWORK_TYPE_MAP.get(artwork.get("file_type"))
+    uploader = PlexUploader(MagicMock(), artwork_type_str, artwork_id)
+    uploader.set_artwork(artwork)
+    assert isinstance(uploader.label, str) and uploader.label
