@@ -203,7 +203,10 @@ class WebhookService:
     @staticmethod
     def _artwork_dict(row, cache_buster: str, artwork_type: str, season=None) -> dict:
         """Build a get_posters-shaped artwork dict from an index row. tmdb_id stays None so the
-           processor resolves identity authoritatively from the poster page at write time."""
+           processor resolves identity authoritatively from the poster page at write time. The
+           artwork type MUST be keyed as 'file_type' - the key get_posters writes and the upload
+           processor reads to resolve the Plex label prefix; 'type' leaves it unresolved and the
+           uploader crashes on None + md5."""
         artwork = {
             "title": row["title"],
             "author": row["author"],
@@ -212,7 +215,7 @@ class WebhookService:
             "year": row["year"],
             "source": ScraperSource.THEPOSTERDB.value,
             "id": str(row["asset_id"]),
-            "type": artwork_type,
+            "file_type": artwork_type,
         }
         if artwork_type in ("show_cover", "season_cover"):
             artwork["season"] = "Cover" if artwork_type == "show_cover" else season
