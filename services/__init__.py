@@ -13,6 +13,8 @@ from .scheduler_service import SchedulerService
 from .utility_service import UtilityService
 from .authentication_service import AuthenticationService
 from .notify_service import NotifyService
+from .asset_index import AssetIndex
+from .webhook_service import WebhookService
 
 __all__ = [
     'BulkFileService',
@@ -23,5 +25,7 @@ __all__ = [
     #'UpdateService',
     'UtilityService',
     'AuthenticationService',
-    'NotifyService'
+    'NotifyService',
+    'AssetIndex',
+    'WebhookService'
 ]

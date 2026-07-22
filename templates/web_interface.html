@@ -285,6 +285,35 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Webhook settings -->
+                            <div class="p-3 border mt-3 rounded-3 shadow-sm">
+                                <h5 class="mb-3"><i class="bi bi-broadcast-pin"></i>&ensp;Webhook settings</h5>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="enable_webhooks"/>
+                                    <label for="enable_webhooks" class="form-check-label">Enable the Sonarr/Radarr import webhook, so newly imported items get cached artwork applied straight away</label>
+                                </div>
+                                <div id="webhook_settings" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="webhook_token" class="form-label"><i class="bi bi-key"></i>&ensp;Webhook token</label>
+                                        <input type="text" id="webhook_token" name="webhook_token" class="form-control" placeholder="required">
+                                    </div>
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle"></i> In Sonarr/Radarr go to Settings &rarr; Connect &rarr; + &rarr; Webhook. Set the URL to <code>/webhook/sonarr</code> or <code>/webhook/radarr</code> on this server, method POST, and tick only the "On File Import" trigger. Send this token either as the connection's Password, or as a header: click the <strong>Advanced</strong> (cog) button on the webhook connection and add a Header with Key <code>X-Webhook-Token</code> and Value set to this token.
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="webhook_tpdb_users" class="form-label"><i class="bi bi-people"></i>&ensp;ThePosterDB users to apply from, in order of preference</label>
+                                        <input type="text" id="webhook_tpdb_users" name="webhook_tpdb_users" class="form-control" placeholder="preferreduser, filleruser" title="Comma-separated ThePosterDB user names whose cached uploads are searched, first match wins.">
+                                    </div>
+                                    <div class="alert alert-info" role="alert">
+                                        <i class="bi bi-info-circle"></i> Comma-separated ThePosterDB user names, searched in this order (first match wins). Requires "Remember each ThePosterDB user's uploads" to be enabled, and a scrape of these users to have run at least once, so their artwork is cached and can be looked up.
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="webhook_apply_delay" class="form-label"><i class="bi bi-clock"></i>&ensp;Delay before applying (seconds)</label>
+                                        <input type="number" min="0" id="webhook_apply_delay" name="webhook_apply_delay" class="form-control" placeholder="30">
+                                        <small class="form-text text-muted">How long to wait after an import before applying artwork, giving Plex time to scan the new item. If it is still not ready, the apply retries for a few minutes.</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-lg-7">
                             <div class="row mb-3">
@@ -404,6 +433,10 @@
                                             <input class="form-check-input" type="checkbox" value="skip_locked_artwork" id="skip_locked_artwork"/>
                                             <label for="skip_locked_artwork" class="form-check-label">Skip locked artwork</label>
                                             <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Skips artwork that is locked in Plex, so scheduled runs only update default artwork"></i>
+                                        </div>
+                                        <div class="form-check form-switch mb-3">
+                                            <input class="form-check-input" type="checkbox" value="cache_user_scrapes" id="cache_user_scrapes"/>
+                                            <label for="cache_user_scrapes" class="form-check-label">Remember each ThePosterDB user's uploads between scrapes, so repeat scrapes only fetch new uploads</label>
                                         </div>
                                     </div>
                                 </div>
