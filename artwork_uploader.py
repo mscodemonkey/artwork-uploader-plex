@@ -161,8 +161,10 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
     title = None
 
     try:
+        if instance.mode == "web":
+            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
         globals.scrapes_running += 1
-        notify_web(instance, "scrape_state", {"running": True})
+        notify_web(instance, "scrape_state", { "running": True, "type": "scrape" })
         # Check if the Plex TV and movie libraries are configured
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please configure your settings.", color=StatusColor.WARNING.value)
@@ -187,10 +189,9 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
-            notify_web(instance, "scrape_state", {"running": False})
+            notify_web(instance, "scrape_state", { "running": False, "type": "scrape" })
         if instance.mode == "web":
             notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
-            notify_web(instance, "add_spinner", { "element": "scrape_button", "mode": False })
 
 
 def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, scheduled: bool = False) -> None:
@@ -199,7 +200,6 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
 
     if instance.mode == "web":
         notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
-        notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": True })
 
     parsed_urls = []
 
@@ -224,7 +224,6 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
     if len(parsed_urls) == 0:
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
-        notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": False })
         return
 
     # Pass the processing of the parsed URLs off to a thread
@@ -254,7 +253,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
     try:
         globals.scrapes_running += 1
-        notify_web(instance, "scrape_state", {"running": True})
+        notify_web(instance, "scrape_state", {"running": True, "type": "bulk"})
 
         # Check if plex setup returned valid values
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
@@ -265,7 +264,6 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         start_time = time.time()
         # Log the start of the bulk import process
         display_filename = filename if filename else "bulk_import.txt"
-#        update_log(instance, f"🎬 Bulk process started for '{display_filename}'")
 
         # Show the progress bar on the web UI
         notify_web(instance, "progress_bar", {"percent" : 0, "message": f"{display_filename} • 0 of {len(parsed_urls)}", "bar_type": "bulk"})
@@ -274,8 +272,6 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         for i, parsed_line in enumerate(parsed_urls, 1):
             if globals.cancel_scrape:
                 break
-
-            notify_web(instance, "element_disable", {"element": ["bulk_button"], "mode": True})
 
             try:
                 scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed)
@@ -326,9 +322,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
-            notify_web(instance, "scrape_state", {"running": False})
+            notify_web(instance, "scrape_state", {"running": False, "type": "bulk"})
         notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
-        notify_web(instance, "add_spinner", { "element": "bulk_button", "mode": False })
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
 def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None):

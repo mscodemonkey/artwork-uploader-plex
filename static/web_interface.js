@@ -10,6 +10,7 @@ let currentBulkImport = '';     // Current bulk import file
 let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
+let scrapeActive = false;       // Track whether a scrape is running
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -206,7 +207,7 @@ function getInstanceId() {
 // ==================================================
 
 // Disable frontend elements from backend
-function element_disable(element_ids, mode = true) {
+function disableElement(element_ids, mode = true) {
     if (!element_ids) return;  // Exit if no element_ids provided
 
     // Ensure it's always treated as an array
@@ -218,45 +219,15 @@ function element_disable(element_ids, mode = true) {
         if (element) {
             element.disabled = mode;
         } else {
-            console.warn('Element with ID "${id}" not found.');
+            console.warn(`Element with ID "${id}" not found.`);
         }
     });
 }
 socket.on("element_disable", (data) => {
     if (validResponse(data)) {
-        element_disable(data.element, data.mode);
+        disableElement(data.element, data.mode);
     }
 });
-
-function addSpinner(elementId, mode = true) {
-    if (!elementId) return;  // Exit if no element_ids provided
-
-    let element = document.getElementById(elementId);
-    if (element) {
-        if (mode == true) {
-            if (elementId == "scrape_button") {
-                element.innerHTML = '<span class="spinner-border spinner-border-sm"></span>&ensp;Scraping...';
-            } else if (elementId == "bulk_button") {
-                element.innerHTML = '<span class="spinner-border spinner-border-sm"></span>&ensp;Running Bulk Import...';
-            }           
-
-        } else {
-            if (elementId == "scrape_button") {
-                element.innerHTML = '<i class="bi bi-play-circle"></i>&ensp;Start Scrape';
-            } else if (elementId == "bulk_button") {
-                element.innerHTML = '<i class="bi bi-play-circle"></i>&ensp;Run Bulk Import';
-            }
-        }
-    } else {
-        console.warn('Element with ID "${id}" not found.');
-    };
-}
-socket.on("add_spinner", (data) => {
-    if (validResponse(data)) {
-        addSpinner(data.element, data.mode);
-    }
-});
-
 
 // Update the status bar
 function updateStatus(message, color = "info", sticky = false, spinner = false, icon = false) {
@@ -343,14 +314,55 @@ socket.on("status_update", (data) => {
 });
 
 socket.on("scrape_state", (data) => {
-    if (validResponse(data, true)) {
-        const stopButton = document.getElementById("stop_scrape_button");
-        if (stopButton) {
-            stopButton.classList.toggle("d-none", !data.running);
+    let cancelBtnId = ""
+    let tabId = ""
+    let btnId = ""
+    if (data.type == "bulk") {
+        cancelBtnId = "bulk-import-cancel";
+        tabId = "bulk-import-tab";
+        btnId = "bulk_button";
+    } else if (data.type == "scrape") {
+        cancelBtnId = "scrape-cancel";
+        tabId = "scraper-tab";
+        btnId = "scrape_button";
+    } else if (data.type == "upload") {
+        cancelBtnId = "upload-cancel";
+        tabId = "uploader-tab";
+    }
+    const cancelBtnElement = document.getElementById(cancelBtnId);
+    const tabElement = document.getElementById(tabId).querySelector("i");
+    const btnElement = document.getElementById(btnId);
+
+    if (validResponse(data)) {
+        // Shows or hides the cancel button on the appropriate tab
+        cancelBtnElement.classList.toggle("d-none", !data.running);
+
+        // Shows or hides the spinner on the appropriate tab
+        // and disables or enables the file drop area by toggling scrapeActive
+        if (data.running) {
+            scrapeActive = true;
+            dropArea.classList.add("highlight");
+
+            if (!tabElement.dataset.originalIcon) {
+                tabElement.dataset.originalIcon = tabElement.className;
+            }
+            tabElement.className = "spinner-border spinner-border-sm";
+            if (btnElement) {
+                if (!btnElement.querySelector("i").dataset.originalIcon) {
+                    btnElement.querySelector("i").dataset.originalIcon = btnElement.querySelector("i").className;
+                }
+                btnElement.querySelector("i").className = "spinner-border spinner-border-sm";
+            }
+        } else {
+            scrapeActive = false;
+            dropArea.classList.remove("highlight")
+            tabElement.className = tabElement.dataset.originalIcon || "bi bi-gear";
+            if (btnElement) {
+                btnElement.querySelector("i").className = btnElement.querySelector("i").dataset.originalIcon || "bi bi-gear";
+            }
         }
     }
 });
-
 
 // Update the log page
 function updateLog(message, color = null, artwork_title = null) {
@@ -848,6 +860,8 @@ function startScrape() {
 }
 
 function stopScrape() {
+    const logTab = document.querySelector('#scraping-log-tab');
+    bootstrap.Tab.getOrCreateInstance(logTab).show();
     socket.emit("stop_scrape", { instance_id: instanceId });
 }
 
@@ -1480,47 +1494,54 @@ document.getElementById("default_bulk_file_icon").addEventListener("click", func
 
 dropArea.addEventListener("dragover", (e) => {
     e.preventDefault();
-    dropArea.classList.add("highlight");
+    if (!scrapeActive) { // Ignore event if a scrape is running
+        dropArea.classList.add("highlight");
+    }
 });
 
 dropArea.addEventListener("dragleave", () => {
-    dropArea.classList.remove("highlight");
+    if (!scrapeActive) { // Ignore event if a scrape is running
+        dropArea.classList.remove("highlight");
+    } 
 });
 
 dropArea.addEventListener("drop", (e) => {
     e.preventDefault();
-    dropArea.classList.remove("highlight");
+    if (!scrapeActive) { // Ignore event if a scrape is running
+        dropArea.classList.remove("highlight");
 
-    const file = e.dataTransfer.files[0];
-    const form = document.getElementById("upload_form");
+        const file = e.dataTransfer.files[0];
+        const form = document.getElementById("upload_form");
 
-    if (!form.checkValidity()) {
-        form.classList.add('was-validated');
-        return;
-    }
-    if (file && file.name.endsWith(".zip")) {
-        uploadFile(file);
-    } else {
-        alert("Please drop a valid ZIP file.");
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+        if (file && file.name.endsWith(".zip")) {
+            uploadFile(file);
+        } else {
+            alert("Please drop a valid ZIP file.");
+        }
     }
 });
 
 dropArea.addEventListener("click", () => {
-
-    const form = document.getElementById("upload_form");
-    
-    if (!form.checkValidity()) {
-        form.classList.add('was-validated');
-        return;
+    if (!scrapeActive) { // Ignore event if a scrape is running
+        const form = document.getElementById("upload_form");
+        
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+        let input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".zip";
+        input.onchange = (e) => {
+            let file = e.target.files[0];
+            if (file) uploadFile(file);
+        };
+        input.click();
     }
-    let input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".zip";
-    input.onchange = (e) => {
-        let file = e.target.files[0];
-        if (file) uploadFile(file);
-    };
-    input.click();
 });
 
 function uploadFile(file) {

@@ -88,7 +88,6 @@ def update_log(instance: Instance, update_text: str, artwork_title: str = None, 
     """
     try:
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-#        if instance.mode == "cli" or force_print or globals.debug:
         with print_lock:
             print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{timestamp}]{ANSI_RESET} {update_text}")
         if instance.mode == "web":
@@ -103,7 +102,8 @@ def notify_web(instance: Instance, event, data_to_include = None):
 
     if instance.mode == "web":
         instance_data = {"instance_id": instance.id, "instance_mode": instance.mode, "broadcast": instance.broadcast}
-        merged_arguments = data_to_include | instance_data
+        payload = data_to_include or {}
+        merged_arguments = payload | instance_data
         debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('secondary').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}")
         globals.web_socket.emit(event, merged_arguments)
 

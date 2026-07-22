@@ -133,16 +133,25 @@
         <nav class="nav nav-tabs" id="myTab">
             <a class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab"
             aria-controls="config" aria-selected="false"><i class="bi bi-toggles"></i>&ensp;Config</a>
+
             <a class="nav-link collapse" id="bulk-import-tab" data-bs-toggle="tab" data-bs-target="#bulk-import" type="button"
-            role="tab" aria-controls="bulk-import" aria-selected="false"><i class="bi bi-text-left"></i>&ensp;Bulk Import</a>
+            role="tab" aria-controls="bulk-import" aria-selected="false"><i class="bi bi-text-left"></i>&ensp;Bulk Import
+            <i class="bi bi-stop-circle text-danger ms-2 d-none" id="bulk-import-cancel" onclick="stopScrape()" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
+            
             <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
-            role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&ensp;Scraper</a>
+            role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&ensp;Scraper
+            <i class="bi bi-stop-circle text-danger ms-2 d-none" id="scrape-cancel" onclick="stopScrape()" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
+            
             <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
-            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader</a>
+            role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader
+            <i class="bi bi-stop-circle text-danger ms-2 d-none" id="upload-cancel" onclick="stopScrape()" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
+            
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
             role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&ensp;Log</a>
+            
             <a class="nav-link collapse" id="about-tab" data-bs-toggle="tab" data-bs-target="#about" type="button"
             role="tab" aria-controls="about" aria-selected="false"><i class="bi bi-code-slash"></i>&ensp;About</a>
+            
             <a class="nav-link ms-auto" id="logout-link" href="/logout" style="display: none;">
                 <i class="bi bi-box-arrow-right"></i>&ensp;Logout
             </a>
@@ -505,7 +514,7 @@
                 <div class="row mb-3">
                     <div class="col">
                         <button class="btn btn-secondary me-3" id="save_bulk_button" onclick="checkBulkImportFileToSave()"><i class="bi bi-floppy2"></i>&ensp;Save Bulk File</button>
-                        <button class="btn btn-primary" id="bulk_button" onclick="runBulkImport()"><i class="bi bi-play-circle"></i>&ensp;Run Bulk Import</button>
+                        <button class="btn btn-primary me-3" id="bulk_button" onclick="runBulkImport()"><i class="bi bi-play-circle"></i>&ensp;Run Bulk Import</button>
                     </div>
                 </div>
                 <!--                </form> -->
@@ -812,7 +821,6 @@
 
             <!-- Scraping Log Tab -->
             <div class="tab-pane fade" id="scraping-log" role="tabpanel" aria-labelledby="scraping-log-tab" tabindex="0">
-                <button type="button" class="btn btn-danger btn-sm mt-3 d-none" id="stop_scrape_button" onclick="stopScrape()"><i class="bi bi-stop-circle"></i>&ensp;Stop</button>
                 <div class="mt-3" id="scraping_log"><!-- --></div>
             </div>
 
