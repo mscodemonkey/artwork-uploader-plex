@@ -652,6 +652,8 @@ function saveConfig() {
     // Checkbox for skipping artwork with locked fields in Plex
     save_config.skip_locked_artwork = document.getElementById("skip_locked_artwork").checked;
     toggleSkipLockedCheckbox();
+    // Checkbox for caching ThePosterDB user scrapes
+    save_config.cache_user_scrapes = document.getElementById("cache_user_scrapes").checked;
 
     // Get selected mediux filters
     save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
@@ -730,6 +732,7 @@ function loadConfig() {
             document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
             document.getElementById("reset_overlay").checked = data.config.reset_overlay;
             document.getElementById("skip_locked_artwork").checked = data.config.skip_locked_artwork;
+            document.getElementById("cache_user_scrapes").checked = data.config.cache_user_scrapes;
             document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
             document.getElementById("apprise_urls").value = data.config.apprise_urls.join(", ");
 

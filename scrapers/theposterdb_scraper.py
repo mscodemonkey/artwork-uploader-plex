@@ -10,8 +10,13 @@ from core.exceptions import ScraperException
 from core.config import Config
 from core import globals
 from core.enums import MediaType, ScraperSource
-from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
+from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, RECONCILE_MIN_COVERAGE, BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
+
+import sqlite3
+from datetime import datetime, timezone
+from urllib.parse import urlparse
+from services.asset_index import AssetIndex, page_is_fully_known, full_crawl_due
 
 
 class ThePosterDBScraper:
@@ -39,6 +44,10 @@ class ThePosterDBScraper:
 
         self.user_uploads: int = 0
         self.user_pages: int = 0
+
+        # When set to a list, get_posters records every parsed asset (pre-filter) into it so a
+        # user crawl can populate the persistent index. None (default) disables recording.
+        self.catalog: Optional[list] = None
 
 
     # Set options - otherwise will use defaults of False
@@ -72,6 +81,16 @@ class ThePosterDBScraper:
                 self.callbacks.log(f"🔄 TPDb user • {self.author} | Processing {self.user_pages} asset pages with {self.user_uploads} assets")
                 self.callbacks.debug(f"There are {self.user_uploads} assets and {self.user_pages} pages for user {self.author}")
                 self.callbacks.progress(0, 0, f"Collecting assets from TPDb user {self.author}")
+
+                # With the persistent index enabled, only fetch pages until we reach uploads we
+                # have already seen, then apply the user's full catalogue from the index.
+                if self.config.cache_user_scrapes:
+                    try:
+                        self._scrape_user_cached()
+                        return
+                    except sqlite3.Error as cache_error:
+                        self.callbacks.debug(f"Asset index unavailable ({cache_error}); crawling every page", "ThePosterDBScraper/scrape")
+                        self._reset_user_collections()
 
                 collected = 0
                 for user_page in range(self.user_pages):
@@ -152,13 +171,15 @@ class ThePosterDBScraper:
         except (AttributeError, KeyError, ValueError, TypeError) as e:
             raise ScraperException(f"Can't get user information, please check the URL you're using") from e
 
-    def scrape_user_page (self, page) -> None:
+    def scrape_user_page(self, page, catalog=None) -> bool:
         
         try:
             page_url = f"{self.url}?section=uploads&page={page + 1}"
             child_scraper = ThePosterDBScraper(page_url, self.callbacks)
             child_scraper.set_options(self.options)
             child_scraper.is_child = True
+            if catalog is not None:
+                child_scraper.catalog = catalog
             child_scraper.scrape()
 
             for artwork in child_scraper.collection_artwork:
@@ -173,9 +194,11 @@ class ThePosterDBScraper:
             self.filtered += child_scraper.filtered
             self.errored += child_scraper.errored
             self.total += child_scraper.total
+            return True
 
         except Exception as e:
-            self.callbacks.debug(f"Failed to scrape user asset page {page}: {str(e)}")
+            self.callbacks.debug(f"Failed to scrape user asset page {page}: {str(e)}", "ThePosterDBScraper/scrape_user_page")
+            return False
 
     def get_set_title(self, soup: Any) -> None:
         try:
@@ -236,6 +259,14 @@ class ThePosterDBScraper:
                     file_type = "show_cover"
                 else:
                     file_type = "season_cover"
+
+                if self.catalog is not None:
+                    self.catalog.append({
+                        "id": poster_id, "title": title, "year": year,
+                        "season": season if isinstance(season, int) else None,
+                        "media_type": file_type, "author": self.author,
+                        "url": f"{TPDB_API_ASSETS_URL}/{poster_id}",
+                    })
                     
                 if (self.options.has_no_filters() and file_type in self.config.tpdb_filters) or self.options.has_filter(file_type):
                     if not self.options.is_excluded(poster_id, season if isinstance(season, int) else None, None):
@@ -272,6 +303,12 @@ class ThePosterDBScraper:
                     )
             elif media_type == MediaType.MOVIE.value:
                 title, year = media_metadata.parse_movie(title_p)
+                if self.catalog is not None:
+                    self.catalog.append({
+                        "id": poster_id, "title": title, "year": year, "season": None,
+                        "media_type": "movie_poster", "author": self.author,
+                        "url": f"{TPDB_API_ASSETS_URL}/{poster_id}",
+                    })
                 if (self.options.has_no_filters() and "movie_poster" in self.config.tpdb_filters) or self.options.has_filter("movie_poster"):
                     if not self.options.is_excluded(poster_id):
                         self.callbacks.debug(f"{i+1}. ✅ Including movie poster for '{title} ({year})'.")
@@ -293,6 +330,12 @@ class ThePosterDBScraper:
                     self.filtered += 1
                     self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on filters.")
             elif media_type == MediaType.COLLECTION.value:
+                if self.catalog is not None:
+                    self.catalog.append({
+                        "id": poster_id, "title": title_p, "year": None, "season": None,
+                        "media_type": "collection_poster", "author": self.author,
+                        "url": f"{TPDB_API_ASSETS_URL}/{poster_id}",
+                    })
                 if (self.options.has_no_filters() and "collection_poster" in self.config.tpdb_filters) or self.options.has_filter("collection_poster"):
                     if not self.options.is_excluded(poster_id):
                         self.callbacks.debug(f"{i+1}. ✅ Including collection poster for '{title_p}'.")
@@ -312,6 +355,12 @@ class ThePosterDBScraper:
                     self.filtered += 1
                     self.callbacks.debug(f"{i+1}. ⏩ Skipping collection poster for '{title_p}' based on filters.")
             else:
+                if self.catalog is not None:
+                    self.catalog.append({
+                        "id": poster_id, "title": title_p, "year": None, "season": None,
+                        "media_type": "unknown", "author": self.author,
+                        "url": f"{TPDB_API_ASSETS_URL}/{poster_id}",
+                    })
                 self.errored += 1
                 self.callbacks.debug(f"⏩ Skipping artwork item - unknown media type: {title_p} | {poster_url}")
                 self.callbacks.log(f"{f'⚠️ {self.title} • ' if self.title is not None else '⚠️ '}{self.author} | Skipping asset (unknown media type): {title_p}")
@@ -353,3 +402,196 @@ class ThePosterDBScraper:
     def scrape_posters(self, soup: Any) -> None:
         poster_div = soup.find('div', class_='row d-flex flex-wrap m-0 w-100 mx-n1 mt-n1')
         return self.get_posters(poster_div)
+
+    def _reset_user_collections(self) -> None:
+        """Clear the collected artwork lists and skip counters for a user scrape."""
+        self.movie_artwork = []
+        self.tv_artwork = []
+        self.collection_artwork = []
+        self.skipped = 0
+        self.exclusions = 0
+        self.filtered = 0
+        self.errored = 0
+        self.total = 0
+
+    def _user_key(self) -> str:
+        """Stable key for a user URL: the handle after /user/, lower-cased so a web-entered
+           (lower-cased) URL and a CLI-cased one share a single index entry."""
+        parts = [segment for segment in urlparse(self.url).path.split("/") if segment]
+        if "user" in parts:
+            index = parts.index("user")
+            if index + 1 < len(parts):
+                return parts[index + 1].casefold()
+        return ""
+
+    def _scrape_user_cached(self) -> None:
+        """Incrementally crawl a user's uploads using the persistent index, then apply the
+           full catalogue from the index. Raises sqlite3.Error if the index is unusable, so the
+           caller can fall back to a full crawl."""
+        index = AssetIndex()
+        user_key = self._user_key()
+        crawl_started_at = datetime.now(timezone.utc).isoformat()
+        state = index.crawl_state(user_key)
+        full = self.options.no_cache or full_crawl_due(
+            state["last_full_crawl"] if state else None, self.config.user_cache_refresh_days)
+        self.callbacks.debug(
+            f"Cache {'full crawl' if full else 'incremental crawl'} for user {self.author}",
+            "ThePosterDBScraper/scrape")
+
+        new_rows, seen_ids, clean = self._crawl_user_pages(index, user_key, full)
+
+        # Cross-check ThePosterDB's own upload counter: if an incremental crawl's arithmetic
+        # doesn't add up, something moved below the stop point (an edit-bumped re-order or a
+        # deletion) - promote this run to a full crawl once so nothing is missed.
+        if not full and clean and state is not None:
+            expected = (state["last_seen_count"] or 0) + new_rows
+            if self.user_uploads != expected:
+                self.callbacks.debug(
+                    f"Upload count for {self.author} changed unexpectedly "
+                    f"(ThePosterDB reports {self.user_uploads}, expected {expected}); re-crawling every page",
+                    "ThePosterDBScraper/scrape")
+                full = True
+                new_rows, seen_ids, clean = self._crawl_user_pages(index, user_key, full=True)
+
+        # Only reconcile/record over a crawl with no failed pages, so an invisible page error
+        # never mass-tombstones live assets. A full crawl now stops at the first empty page, which
+        # is normally the end of the uploads - but a TPDB markup change could make a mid-catalogue
+        # page parse to zero and cut the crawl short, and reconciling then would tombstone
+        # everything it didn't reach. So only count it as a full crawl (reconcile + advance the
+        # full-crawl timestamp) when it actually covered most of the user's reported uploads;
+        # otherwise leave the index alone so the next run retries the full crawl.
+        if clean:
+            covered = len(seen_ids) >= self.user_uploads * RECONCILE_MIN_COVERAGE
+            if full and covered:
+                index.reconcile(user_key, seen_ids, crawl_started_at)
+            elif full:
+                self.callbacks.debug(
+                    f"Full crawl for {self.author} saw only {len(seen_ids)} of {self.user_uploads} "
+                    f"reported uploads; not tombstoning and retrying a full crawl next run",
+                    "ThePosterDBScraper/scrape")
+            index.record_crawl(user_key, full and covered, self.user_uploads)
+
+        if new_rows:
+            self.callbacks.cached(new_rows)
+            self.callbacks.log(f"🆕 TPDb user • {self.author} | {new_rows} new asset(s) added to the cache")
+
+        self._hydrate_from_cache(index, user_key)
+
+    def _crawl_user_pages(self, index: AssetIndex, user_key: str, full: bool):
+        """Crawl the user's upload pages, recording each into the index. An incremental crawl
+           stops after the first page whose assets are all already indexed. Returns
+           (new_rows_recorded, ids_seen_this_crawl, all_pages_succeeded)."""
+        known = index.known_ids(user_key)
+        seen_ids = set()
+        new_rows = 0
+        clean = True
+        collected = 0
+        for user_page in range(self.user_pages):
+            self.callbacks.progress(user_page + 1, self.user_pages, f"Collecting assets from TPDb user {self.author} • {user_page + 1} of {self.user_pages} pages • {collected} assets collected of {self.user_uploads}")
+            page_catalog = []
+            ok = self.scrape_user_page(user_page, catalog=page_catalog)
+            page_ids = {int(asset["id"]) for asset in page_catalog if str(asset.get("id", "")).isdigit()}
+            if ok:
+                new_rows += index.record(user_key, page_catalog)
+                seen_ids |= page_ids
+                collected += len(page_catalog)
+            else:
+                clean = False
+            self.callbacks.debug(f"Processed {user_page + 1} out of {self.user_pages} user pages. Collected {collected} assets so far", "ThePosterDBScraper/scrape")
+            # The uploads counter can be higher than the number of assets actually listed, so the
+            # page count can overshoot. A page that fetched cleanly but held nothing is the end of
+            # the user's uploads - stop here rather than fetching the phantom pages after it.
+            if ok and not page_catalog:
+                self.callbacks.debug(f"No assets on page {user_page + 1}, the user's uploads end here", "ThePosterDBScraper/scrape")
+                break
+            if not full and ok and page_is_fully_known(page_ids, known):
+                self.callbacks.debug(f"Reached already-indexed uploads at page {user_page + 1}, stopping incremental crawl", "ThePosterDBScraper/scrape")
+                break
+        return new_rows, seen_ids, clean
+
+    def _hydrate_from_cache(self, index: AssetIndex, user_key: str) -> None:
+        """Rebuild the artwork lists from the index, applying this run's filters/exclusions
+           exactly as get_posters does, so a cached run produces the same result as a full crawl."""
+        self._reset_user_collections()
+        cache_buster = f"&_cb={int(time.time())}"
+        for i, row in enumerate(index.assets_for_user(user_key)):
+            media_type = row["media_type"]
+            poster_id = str(row["asset_id"])
+            title = row["title"]
+            year = row["year"]
+            poster_url = f"{row['url']}{cache_buster}"
+
+            if media_type in ("show_cover", "season_cover"):
+                file_type = media_type
+                season = "Cover" if media_type == "show_cover" else row["season"]
+                if (self.options.has_no_filters() and file_type in self.config.tpdb_filters) or self.options.has_filter(file_type):
+                    if not self.options.is_excluded(poster_id, season if isinstance(season, int) else None, None):
+                        self.callbacks.debug(
+                            f"{i+1}. ✅ Including {file_type.replace('_', ' ')} for '{title} ({year})'"
+                            + (f", Season {season}." if isinstance(season, int) else "."), "ThePosterDBScraper/get_posters")
+                        self.tv_artwork.append({
+                            "title": title,
+                            "author": self.author,
+                            "tmdb_id": self.tmdb_id,
+                            "url": poster_url,
+                            "season": season,
+                            "episode": None,
+                            "year": year,
+                            "source": ScraperSource.THEPOSTERDB.value,
+                            "id": poster_id,
+                            "file_type": file_type,
+                        })
+                    else:
+                        self.exclusions += 1
+                        self.callbacks.debug(
+                            f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title} ({year})'"
+                            + (f", Season {season}." if isinstance(season, int) else "")
+                            + f" based on exclusions.", "ThePosterDBScraper/get_posters")
+                else:
+                    self.filtered += 1
+                    self.callbacks.debug(
+                        f"{i+1}. ⏩ Skipping {file_type.replace('_', ' ')} for '{title} ({year})'"
+                        + (f", Season {season}." if isinstance(season, int) else "")
+                        + f" based on filters.", "ThePosterDBScraper/get_posters")
+            elif media_type == "movie_poster":
+                if (self.options.has_no_filters() and "movie_poster" in self.config.tpdb_filters) or self.options.has_filter("movie_poster"):
+                    if not self.options.is_excluded(poster_id):
+                        self.callbacks.debug(f"{i+1}. ✅ Including movie poster for '{title} ({year})'.", "ThePosterDBScraper/get_posters")
+                        self.movie_artwork.append({
+                            "title": title,
+                            "author": self.author,
+                            "tmdb_id": self.tmdb_id,
+                            "url": poster_url,
+                            "year": year,
+                            "source": ScraperSource.THEPOSTERDB.value,
+                            "id": poster_id,
+                            "file_type": "movie_poster",
+                        })
+                    else:
+                        self.exclusions += 1
+                        self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on exclusions.", "ThePosterDBScraper/get_posters")
+                else:
+                    self.filtered += 1
+                    self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on filters.", "ThePosterDBScraper/get_posters")
+            elif media_type == "collection_poster":
+                if (self.options.has_no_filters() and "collection_poster" in self.config.tpdb_filters) or self.options.has_filter("collection_poster"):
+                    if not self.options.is_excluded(poster_id):
+                        self.callbacks.debug(f"{i+1}. ✅ Including collection poster for '{title}'.", "ThePosterDBScraper/get_posters")
+                        self.collection_artwork.append({
+                            "title": title,
+                            "author": self.author,
+                            "url": poster_url,
+                            "source": ScraperSource.THEPOSTERDB.value,
+                            "id": poster_id,
+                            "file_type": "collection_poster",
+                        })
+                    else:
+                        self.exclusions += 1
+                        self.callbacks.debug(f"{i+1}. ⏩ Skipping collection poster for '{title}' based on exclusions.", "ThePosterDBScraper/get_posters")
+                else:
+                    self.filtered += 1
+                    self.callbacks.debug(f"{i+1}. ⏩ Skipping collection poster for '{title}' based on filters.", "ThePosterDBScraper/get_posters")
+
+        self.skipped = self.exclusions + self.filtered + self.errored
+        self.total = len(self.movie_artwork) + len(self.tv_artwork) + len(self.collection_artwork) + self.skipped
+        self.callbacks.debug(f"---------> Total assets applied from cache: {len(self.movie_artwork) + len(self.tv_artwork) + len(self.collection_artwork)} of {self.user_uploads}", "ThePosterDBScraper/scrape")

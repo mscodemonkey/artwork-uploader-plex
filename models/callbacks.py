@@ -15,6 +15,7 @@ class ProcessingCallbacks:
     on_debug: Optional[Callable[[str, Optional[str]], None]] = None  # (message, context) - for debug messages
     success_counter: Optional[list] = None  # Mutable list to track successful uploads (contains count as single element)
     assets_processed: Optional[list] = None  # Mutable list to track total assets processed (contains count as single element)
+    cached_counter: Optional[list] = None  # Mutable list to track assets newly added to the user cache (contains count as single element)
 
     def status(self, message: str, color: str = "info", spinner: bool = False, sticky: bool = False):
         if self.on_status_update:
@@ -39,3 +40,7 @@ class ProcessingCallbacks:
     def assets(self, count: int):
         if self.assets_processed:
             self.assets_processed[0] += count
+
+    def cached(self, count: int):
+        if self.cached_counter:
+            self.cached_counter[0] += count
