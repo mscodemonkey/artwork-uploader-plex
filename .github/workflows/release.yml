@@ -80,19 +80,6 @@ jobs:
       # Create release artifacts
       # ----------------------------
 
-      - name: Generate changelog
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -z "$PREV_TAG" ]; then
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
-          else
-            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
-          fi
-
-          echo "## What's Changed" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "$CHANGELOG" >> CHANGELOG.md
-
       - name: Create source distribution
         run: |
           mkdir -p dist
@@ -105,5 +92,5 @@ jobs:
         run: |
           gh release create "${{ steps.get_version.outputs.TAG }}" \
             --title "Release ${{ steps.get_version.outputs.TAG }}" \
-            --notes-file CHANGELOG.md \
+            --generate-notes \
             dist/*.zip dist/*.tar.gz
