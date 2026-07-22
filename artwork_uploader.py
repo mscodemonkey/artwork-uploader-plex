@@ -6,6 +6,33 @@ import threading
 import sys
 import time
 
+# plexapi builds its X-Plex-Client-Identifier from uuid.getnode(), which can be
+# random on every process start (commonly in Docker, where no MAC is readable).
+# That registers each run as a brand new Plex device and fires new device
+# notifications. Persist one identifier in the config folder and pass it to
+# plexapi through its environment override, before plexapi is imported below.
+# An identifier already set in the environment always takes precedence.
+def _ensure_stable_plex_identifier() -> None:
+    if os.environ.get("PLEXAPI_HEADER_IDENTIFIER"):
+        return
+    id_file = os.path.join("config", ".plex_client_id")
+    try:
+        if os.path.isfile(id_file):
+            with open(id_file) as f:
+                client_id = f.read().strip()
+        else:
+            client_id = str(uuid.uuid4())
+            os.makedirs("config", exist_ok=True)
+            with open(id_file, "w") as f:
+                f.write(client_id)
+        if client_id:
+            os.environ["PLEXAPI_HEADER_IDENTIFIER"] = client_id
+            os.environ.setdefault("PLEXAPI_HEADER_DEVICE_NAME", "Artwork Uploader")
+    except OSError:
+        pass  # fall back to the plexapi default rather than block startup
+
+_ensure_stable_plex_identifier()
+
 from models import arguments
 from models.instance import Instance
 from utils.notifications import update_log, update_status, notify_web, debug_me, send_notification
