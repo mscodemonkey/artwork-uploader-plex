@@ -163,6 +163,27 @@
             margin-left: auto;
             margin-right: auto;
         }
+        /* Style Tom Select chips with Bootstrap Primary color */
+        .ts-control .item {
+            background-color: var(--bs-primary, #0d6efd) !important;
+            color: #ffffff !important;
+            border-color: var(--bs-primary, #0d6efd) !important;
+            border-radius: 0.375rem; /* Matches Bootstrap default rounded corners */
+            padding: 2px 8px;
+        }
+
+        /* Style the 'x' remove button inside the chip */
+        .ts-control .item .remove {
+            color: #ffffff !important;
+            border-left-color: rgba(255, 255, 255, 0.3) !important;
+            opacity: 0.8;
+        }
+
+        .ts-control .item .remove:hover {
+            background-color: rgba(0, 0, 0, 0.15) !important;
+            color: #ffffff !important;
+            opacity: 1;
+        }        
 
   #time_select_box {
     position: absolute;

@@ -115,3 +115,4 @@ DEVELOPER_GUIDE.md
 !TECHNICAL_INFO.md
 .gitignore
 docker-compose.yml
+config/.plex_client_id

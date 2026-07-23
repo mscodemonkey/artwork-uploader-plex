@@ -11,6 +11,7 @@ let bulkTextAsLoaded = '';      // File contents when loaded, to determine chang
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
 let scrapeActive = false;       // Track whether a scrape is running
+let tvPicker, moviePicker;
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -35,7 +36,17 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 // Event listeners
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
-    loadConfig()
+    tvPicker = new TomSelect('#tv_library', {
+        plugins: ['remove_button'],
+        create: true,
+        persist: false
+    });
+    moviePicker = new TomSelect('#movie_library', {
+        plugins: ['remove_button'],
+        create: true,
+        persist: false
+    });
+    loadConfig();
     toggleThePosterDBElements();
     detectEnvironment();
 });
@@ -52,10 +63,55 @@ document.getElementById("test_plex_btn").addEventListener("click", () => { testP
 document.getElementById("debug-mode").addEventListener("change", function() {
     socket.emit("debug_mode", { instance_id: instanceId, action: "toggle" });
 });
+document.getElementById("plex_token").addEventListener("change", updateLibraryPickers);
+document.getElementById("plex_base_url").addEventListener("change", updateLibraryPickers);
 
 // ==================================================
 // General helper functions
 // ==================================================
+
+function setPickerPlaceholder(instance, text) {
+    if (!instance) return;
+    instance.settings.placeholder = text;
+    if (instance.control_input) {
+        instance.control_input.placeholder = text;
+    }
+    instance.input.setAttribute('placeholder', text);
+}
+
+function updateLibraryPickers() {
+    const baseUrl = document.getElementById("plex_base_url").value;
+    const token = document.getElementById("plex_token").value;
+    
+    if (baseUrl && token) {
+        tvPicker.disable();
+        moviePicker.disable();
+        setPickerPlaceholder(tvPicker, "Loading libraries...");
+        setPickerPlaceholder(moviePicker, "Loading libraries...");
+        
+        socket.once("get_plex_libraries", (data) => {
+            if (validResponse(data)) {
+                if (data.tv_libraries && data.tv_libraries.length > 0) {
+                    data.tv_libraries.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
+                } else {
+                    tvPicker.clear();
+                    tvPicker.clearOptions();
+                }
+                if (data.movie_libraries && data.movie_libraries.length > 0) {
+                    data.movie_libraries.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
+                } else {
+                    moviePicker.clear();
+                    moviePicker.clearOptions();
+                }
+            }
+            tvPicker.enable();
+            moviePicker.enable();
+            setPickerPlaceholder(tvPicker, "Click to add...");
+            setPickerPlaceholder(moviePicker, "Click to add...");
+        });
+        socket.emit("get_plex_libraries", { instance_id: instanceId, url: baseUrl, token: token });
+    }
+}
 
 function detectEnvironment() {
     socket.emit("detect_docker", { instance_id: instanceId });
@@ -112,8 +168,11 @@ socket.on("docker_detected", (data) => {
                 toggleKometaSettings();
                 dockerWarning.innerHTML = '<i class="bi bi-exclamation-triangle"></i>&ensp;Kometa base path not defined in <span class="text-nowrap"><code>docker-compose.yml</code></span>. Saving assets to Kometa asset directory is not available.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
                 dockerWarning.classList.add("alert-danger");
+                dockerWarning.classList.remove("d-none");
             }
-            dockerWarning.classList.remove("d-none");
+            if (saveToKometaCheckbox.checked && !saveToKometaCheckbox.disabled) {
+                dockerWarning.classList.remove("d-none");
+            }
             kometaBase.disabled = true; // Disable the Kometa base path input field
             kometaBase.value = data.kometa_base; // Set to host path detected by backend
             tempDir.disabled = true; // Disable the Temp directory input field
@@ -130,20 +189,14 @@ socket.on("docker_detected", (data) => {
             dockerWarning.classList.add("d-none");
         }
     }
-})
+});
 
 // Test connection to Plex server
 function testPlexConnect(savingConfig) {
-    const baseUrl = document.getElementById("plex_base_url").value
-    const token = document.getElementById("plex_token").value
-    const tvLibraries = document.getElementById("tv_library").value
-        .split(",")
-        .map(item => item.trim())
-        .filter(item => item !== ""); // Remove empty values    
-    const movieLibraries = document.getElementById("movie_library").value
-        .split(",")
-        .map(item => item.trim())
-        .filter(item => item !== ""); // Remove empty values
+    const baseUrl = document.getElementById("plex_base_url").value;
+    const token = document.getElementById("plex_token").value;
+    const tvLibraries = tvPicker ? tvPicker.getValue() : [];
+    const movieLibraries = moviePicker ? moviePicker.getValue() : [];
     
     return new Promise((resolve) => {
         socket.emit("test_plex_connect", { 
@@ -623,15 +676,9 @@ function saveConfig() {
         .filter(item => item !== ""); // Remove empty values
 
     // Convert comma-separated library inputs to arrays
-    save_config.tv_library = document.getElementById("tv_library").value
-        .split(",")
-        .map(item => item.trim())
-        .filter(item => item !== ""); // Remove empty values
+    save_config.tv_library = tvPicker ? tvPicker.getValue() : [];
 
-    save_config.movie_library = document.getElementById("movie_library").value
-        .split(",")
-        .map(item => item.trim())
-        .filter(item => item !== ""); // Remove empty values
+    save_config.movie_library = moviePicker ? moviePicker.getValue() : [];
 
     // Checkbox for tracking artwork IDs
     save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
@@ -720,8 +767,23 @@ function loadConfig() {
             document.getElementById("plex_base_url").value = data.config.base_url;
             document.getElementById("plex_token").value = data.config.token;
             document.getElementById("bulk_import_file").value = data.config.bulk_txt;
-            document.getElementById("tv_library").value = data.config.tv_library.join(", ");
-            document.getElementById("movie_library").value = data.config.movie_library.join(", ");
+
+            // Load TV libraries
+            if (Array.isArray(data.config.tv_library)) {
+                // Add options first so Tom Select knows about them
+                data.config.tv_library.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
+                // Set active values (chips)
+                tvPicker.setValue(data.config.tv_library);
+            }
+            // Load Movie Libraries
+            if (Array.isArray(data.config.movie_library)) {
+                // Add options first
+                data.config.movie_library.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
+                // Set active values (chips)
+                moviePicker.setValue(data.config.movie_library);
+            }            
+            updateLibraryPickers();
+
             document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids;
             document.getElementById("save_to_kometa").checked = data.config.save_to_kometa;
             document.getElementById("stage_assets").checked = data.config.stage_assets;

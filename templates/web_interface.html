@@ -13,7 +13,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/web_interface.css">
 
     <!-- Optional: You can also use a custom stylesheet to override default styles -->
@@ -205,17 +205,12 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="tv_library" class="form-label"><i class="bi bi-tv"></i>&ensp;TV libraries</label>
-                                    <input type="text" id="tv_library" name="tv_library" class="form-control" required>
-                                    <div class="invalid-feedback">
-                                        Please provide your TV library name. If more than one, separate using commas.
-                                    </div>
+                                    <select id="tv_library" name="tv_library" multiple placeholder="Click to add..."></select>
                                 </div>
+
                                 <div class="mb-3">
-                                    <label for="movie_library" class="form-label"><i class="bi bi-camera-reels"></i>&ensp;Movie libraries</label>
-                                    <input type="text" id="movie_library" name="movie_library" class="form-control" required>
-                                    <div class="invalid-feedback">
-                                        Please provide your Movie library name. If more than one, separate using commas.
-                                    </div>
+                                    <label for="movie_library" class="form-label"><i class="bi bi-film"></i>&ensp;Movie libraries</label>
+                                    <select id="movie_library" name="movie_library" multiple placeholder="Click to add..."></select>
                                 </div>
                                 <div class="row">
                                     <div class="col">
@@ -917,5 +912,6 @@
     integrity="sha384-0pUGZvbkm6XF6gxjEnlmuGrJXVbNuzT9qBBavbLwCsOGabYfZo0T0to5eqruptLy" crossorigin="anonymous"></script>
     <script src="/static/web_interface.js"></script>
     <script src="/static/dark_mode.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 </body>
 </html>

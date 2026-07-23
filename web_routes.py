@@ -373,6 +373,34 @@ def setup_socket_handlers(
         elif data.get("level") == "log":
             update_log(instance, data.get("message"))
 
+    @globals.web_socket.on("get_plex_libraries")
+    def get_plex_libraries(data):
+        """Get a list of the available Plex libraries"""
+
+        instance = Instance(data.get("instance_id", "web"))
+
+        debug_me(data)
+        url = data.get("url", "")
+        token = data.get("token", "")
+
+        try:
+            plex_server = PlexServer(url, token, timeout=5)
+            debug_me(f"Successfully connected to Plex server at '{url}' with token `{token}'")
+        except Exception as e:
+            debug_me(f"Failed to connect to Plex server at '{url}' with token '{token}'")
+            notify_web(instance, f"get_plex_libraries", { "tv_libraries": [], "movie_libraries": [] })
+            return
+
+        try:
+            all_libraries = plex_server.library.sections()
+            tv_libs = [lib.title for lib in all_libraries if lib.type == "show"]
+            movie_libs = [lib.title for lib in all_libraries if lib.type == "movie"]
+            debug_me(f"Obtained tv_libraries: {tv_libs}")
+            debug_me(f"Obtained movie_libraries: {movie_libs}")
+            notify_web(instance, "get_plex_libraries", { "tv_libraries": tv_libs, "movie_libraries": movie_libs })
+        except AttributeError as e:
+            notify_web(instance, f"get_plex_libraries", { "tv_libraries": [], "movie_libraries": [] })
+
     @globals.web_socket.on("test_plex_connect")
     def test_plex_connect(data):
         """Test connectivity to Plex server"""
@@ -381,7 +409,7 @@ def setup_socket_handlers(
             if saving_config:
                 log = f"Configuration not saved ({log})"
                 status = f"Configuration not saved ({status})"
-            update_log(instance, log)
+            update_log(instance, f"❌ {log}")
             update_status(instance, status, "danger", False, False, "x-circle")
             notify_web(instance, "test_plex_connect", { "success": False })
             notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
@@ -402,7 +430,13 @@ def setup_socket_handlers(
         debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}")
         movie_libs = data.get("movie_libs", "")
         debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}")
+
+        total_libs = len(tv_libs) + len(movie_libs)
         saving_config = data.get("saving_config")
+        if total_libs == 0:
+            fail("Select at least one show or movie library", "Select at least one show or movie library")
+            return
+        
         if saving_config:
             debug_me(f"Testing Plex connectivity before saving configuration")
         else:
@@ -412,10 +446,10 @@ def setup_socket_handlers(
         url_pattern = r"^https?:\/\/([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?$"
         token_pattern = r"^[A-Za-z0-9_-]{20,}$"
         if not re.fullmatch(url_pattern, url):
-            fail("Invalid Plex URL", f"❌ Invalid Plex URL")
+            fail("Invalid Plex URL", f"Invalid Plex URL")
             return
         if not re.fullmatch(token_pattern, token):
-            fail("Invalid Plex token", f"❌ Invalid Plex token")
+            fail("Invalid Plex token", f"Invalid Plex token")
             return
         
         # Check connectivity to server
@@ -423,17 +457,17 @@ def setup_socket_handlers(
             plex_server = PlexServer(url, token, timeout=5)
         except Exception as e:
             if "NewConnectionError" in str(e):
-                log = f"❌ Error connecting to Plex (Connection refused)"
+                log = f"Error connecting to Plex (Connection refused)"
             elif "ConnectTimeoutError" in str(e) or "timed out" in str(e):
-                log = f"❌ Error connecting to Plex (Timed out)"
+                log = f"Error connecting to Plex (Timed out)"
             elif "unauthorized" in str(e):
-                log = f"❌ Error connecting to Plex (Invalid token)"
+                log = f"Error connecting to Plex (Invalid token)"
             elif "NameResolutionError" in str(e):
-                log = f"❌ Error connecting to Plex (Cannot resolve server name)"
+                log = f"Error connecting to Plex (Cannot resolve server name)"
             elif "SSLError" in str(e):
-                log = f"❌ Error connecting to Plex (SSL certificate validation failed)"
+                log = f"Error connecting to Plex (SSL certificate validation failed)"
             else:
-                log = f"❌ Unknown error connecting to Plex: {str(e)}"
+                log = f"Unknown error connecting to Plex: {str(e)}"
             fail ("Error connecting to Plex, check log for details", log)
             debug_me(f"Error connecting to Plex: {str(e)}")
             return
@@ -447,7 +481,7 @@ def setup_socket_handlers(
             except Exception:
                 invalid_libs.append(lib)
         if invalid_libs:
-            fail("Some libraries not found, check log for details.", f"❌ The following libraries could not be found: {", ".join (invalid_libs)}")
+            fail("Some libraries not found, check log for details.", f"The following libraries could not be found: {", ".join (invalid_libs)}")
             return
         
         update_log(instance, "✅ Successfully connected to Plex server")
