@@ -54,7 +54,7 @@ def test_collection_without_word_collection_in_name_does_not_crash():
     scraper._process_set(_collection_poster_set("James Bond"))
     assert len(scraper.collection_artwork) == 1
     assert scraper.collection_artwork[0]["title"] == "James Bond"
-    assert scraper.collection_artwork[0]["type"] == "collection_poster"
+    assert scraper.collection_artwork[0]["file_type"] == "collection_poster"
 
 
 @pytest.mark.unit
