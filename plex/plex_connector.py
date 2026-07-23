@@ -219,24 +219,52 @@ class PlexConnector:
                 debug_me(f"PlexConnectorException raised: {str(e)}")
                 return "Error", None, None, None
 
+        def normalize(text: Optional[str]) -> str:
+            """Normalizes strings for accent/punctuation insensitive comparison."""
+            if not text:
+                return ""
+            import unicodedata
+            text = unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode('utf-8')
+            for c in [":", "-", ",", ".", "'", '"', "(", ")"]:
+                text = text.replace(c, "")
+            return " ".join(text.lower().split())
+
         # First check movie libraries
         libraries_with_type = (
             [(lib, "Movie") for lib in self.movie_libraries] +
             [(lib, "TV Show") for lib in self.tv_libraries]
         )
+        target_years = [int(year)] if year is not None else []
+        if year is not None:
+            target_years.extend([int(year) - 1, int(year) + 1])
+
+        normalized_title = normalize(title)
+
         for library, media_type in libraries_with_type:
             try:
                 search_kwargs = {'title': title}
                 if year is not None:
                     search_kwargs['year'] = year
                 search_results = library.search(**search_kwargs)
+
                 if not search_results and year is not None:
+                    debug_me(f"Title not found as '{title} ({year})' in library '{library.title}', trying previous and next year")
                     # Retry with +1/-1 year if no results found
                     for adjusted_year in (int(year) - 1, int(year) + 1):
                         search_kwargs['year'] = adjusted_year
                         search_results = library.search(**search_kwargs)
                         if search_results:
                             break
+
+                if not search_results:
+                    debug_me(f"Title still not found. Searching across all items{f' of {year}' if year else ''} in library '{library.title}' and normalizing '{title}' as '{normalized_title}'")
+                    candidates = library.search(year=year) if year else library.all()
+                    for item in candidates:
+                        orig = getattr(item, "originalTitle", None)
+                        if orig and normalize(orig) == normalized_title:
+                            search_results = [item]
+                            break
+
                 if search_results:
                     tmdb_id: Optional[int] = None
                     result = search_results[0]
@@ -250,9 +278,9 @@ class PlexConnector:
                                pass
                            break
                     if tmdb_id is not None:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} with TMDb ID: {tmdb_id}")
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} in library '{library.title}' with TMDb ID {tmdb_id}")
                     else:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} but TMDb ID not found")
+                        debug_me(f"Item '{title} ({year})' identified as {media_type} in library '{library.title}', but TMDb ID not found")
                     return media_type, tmdb_id, found_title, found_year
             except TimeoutError as e:
                 debug_me(f"Error searching in library '{library.title}' (Timed out) {str(e)}")

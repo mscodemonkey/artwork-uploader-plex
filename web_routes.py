@@ -986,10 +986,11 @@ def extract_and_list_zip(
                 # Determine media type via Plex lookup if not a collection, find TMDb ID, title
                 # and year in the process for better matching later when processing artwork items
                 if artwork["media"] != "Collection":
+                    # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
+                    artwork["title"] = re.sub(r'- ', ': ', artwork.get('title')).replace('...', '').strip()
                     media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
                     if media_type == "unavailable" or "Error" in media_type:
-                        # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
-                        artwork["title"] = re.sub(r'-', '', artwork.get('title')).replace('...', '').strip()
+                        artwork["title"] = re.sub(r': ', ' ', artwork.get('title')).replace('...', '').strip()
                         media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
                         if media_type == "DNSError":
                             update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Cannot resolve server name")
