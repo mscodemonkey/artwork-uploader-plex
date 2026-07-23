@@ -78,12 +78,21 @@ class ThePosterDBScraper:
                     if globals.cancel_scrape:
                         break
                     self.callbacks.progress(user_page + 1, self.user_pages, f"Collecting assets from TPDb user {self.author} • {user_page + 1} of {self.user_pages} pages • {collected} assets collected of {self.user_uploads}")
-                    self.scrape_user_page(user_page)
+                    assets_before = self.total
+                    page_scraped = self.scrape_user_page(user_page)
                     movies = len(self.movie_artwork)
                     collections = len(self.collection_artwork)
                     shows = len(self.tv_artwork)
                     collected = movies + shows + collections
                     self.callbacks.debug(f"Processed {user_page + 1} out of {self.user_pages} user pages. Collected {movies} movie, {collections} collection and {shows} TV show assets so far, skipped {self.skipped}")
+
+                    # The uploads counter can be higher than the number of assets actually listed,
+                    # so the page count derived from it can overshoot. A page that scraped cleanly
+                    # but held nothing is the end of the user's uploads. A page that failed also
+                    # adds nothing, so only stop when the page itself was fine.
+                    if page_scraped and self.total == assets_before:
+                        self.callbacks.debug(f"No assets on page {user_page + 1}, the user's uploads end here")
+                        break
                 self.callbacks.debug(f"Total assets collected: {collected} of {self.user_uploads}")
 
                 return
@@ -174,8 +183,11 @@ class ThePosterDBScraper:
             self.errored += child_scraper.errored
             self.total += child_scraper.total
 
+            return True
+
         except Exception as e:
             self.callbacks.debug(f"Failed to scrape user asset page {page}: {str(e)}")
+            return False
 
     def get_set_title(self, soup: Any) -> None:
         try:
@@ -216,7 +228,13 @@ class ThePosterDBScraper:
         """
         cache_buster = f"&_cb={int(time.time())}"
 
-        posters = poster_div.find_all('div', class_='col-6 col-lg-2 p-1')
+        # The uploads counter can be higher than the number of assets actually listed, so a user
+        # crawl can request a page past the last one. Such a page has no poster grid - treat it as
+        # empty rather than an error.
+        posters = poster_div.find_all('div', class_='col-6 col-lg-2 p-1') if poster_div else []
+
+        if not posters:
+            return
 
         if posters[-1].find('a', class_='rounded view_all'):
             posters.pop()
