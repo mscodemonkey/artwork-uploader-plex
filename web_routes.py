@@ -256,23 +256,6 @@ def setup_socket_handlers(
                 url = url + " " + " ".join(options)
             if filters and len(filters) < 6:
                 url = url + " --filters " + " ".join(filters)
-            notify_web(
-                instance=instance,
-                event="element_disable",
-                data_to_include={
-                    "element": ["scrape_url", "scrape_button", "bulk_button"],
-                    "mode":
-                    True
-                }
-            )
-            notify_web(
-                instance=instance,
-                event="add_spinner",
-                data_to_include={
-                    "element": "scrape_button",
-                    "mode": True
-                }
-            )
             process_scrape_url_from_web(instance, url)
 
     @globals.web_socket.on("stop_scrape")
@@ -690,6 +673,8 @@ def setup_socket_handlers(
         if chunk_index == 0:
             globals.cancel_scrape = False
             globals.scrapes_running += 1
+            notify_web(instance, "scrape_state", { "running": True, "type": "upload" })
+            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
 
         if globals.cancel_scrape:
             debug_me(f"File upload canceled by user")
@@ -707,6 +692,8 @@ def setup_socket_handlers(
             if globals.scrapes_running <= 0:
                 globals.scrapes_running = 0
                 globals.cancel_scrape = False
+                notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
+                notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
             return "abort"
 
         if file_name not in upload_chunks:
@@ -732,6 +719,8 @@ def setup_socket_handlers(
             if globals.scrapes_running <= 0:
                 globals.scrapes_running = 0
                 globals.cancel_scrape = False
+                notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
+                notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
             return "error"
 
     @globals.web_socket.on("upload_complete")
@@ -745,11 +734,6 @@ def setup_socket_handlers(
         debug_me(f"Obtained filters from web form: {filters}")
         debug_me(f"Obtained options from web form: {options}")
 
-        globals.scrapes_running -= 1
-        if globals.scrapes_running <= 0:
-            globals.scrapes_running = 0
-            globals.cancel_scrape = False
-        
         instance = Instance(data.get("instance_id"), "web")
 
         if file_name in upload_chunks and upload_chunks[file_name]["chunks_received"] == int(
@@ -843,7 +827,7 @@ def save_uploaded_file(
     debug_me(f"Saved ZIP file: {temp_zip_path}")
 
     update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file and parsing files...")
-    globals.scrapes_running += 1
+    # globals.scrapes_running += 1
     extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
         instance,
         temp_zip_path,
@@ -862,12 +846,9 @@ def save_uploaded_file(
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
+            notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
+            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
         return
-
-    globals.scrapes_running -= 1
-    if globals.scrapes_running <= 0:
-        globals.scrapes_running = 0
-        globals.cancel_scrape = False
 
     # Delete the ZIP file after extraction
     try:
@@ -877,7 +858,7 @@ def save_uploaded_file(
     except Exception as e:
         debug_me(f"Error deleting temporary ZIP file: {e}")
 
-    globals.scrapes_running += 1
+    # globals.scrapes_running += 1
     process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
     
     if globals.cancel_scrape:
@@ -889,6 +870,8 @@ def save_uploaded_file(
     if globals.scrapes_running <= 0:
         globals.scrapes_running = 0
         globals.cancel_scrape = False
+        notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
+        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
 
 
 
@@ -1003,10 +986,11 @@ def extract_and_list_zip(
                 # Determine media type via Plex lookup if not a collection, find TMDb ID, title
                 # and year in the process for better matching later when processing artwork items
                 if artwork["media"] != "Collection":
+                    # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
+                    artwork["title"] = re.sub(r'- ', ': ', artwork.get('title')).replace('...', '').strip()
                     media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
                     if media_type == "unavailable" or "Error" in media_type:
-                        # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
-                        artwork["title"] = re.sub(r'-', '', artwork.get('title')).replace('...', '').strip()
+                        artwork["title"] = re.sub(r': ', ' ', artwork.get('title')).replace('...', '').strip()
                         media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
                         if media_type == "DNSError":
                             update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Cannot resolve server name")
