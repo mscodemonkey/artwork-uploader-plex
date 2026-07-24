@@ -37,18 +37,27 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
     tvPicker = new TomSelect('#tv_library', {
-        plugins: ['remove_button'],
-        create: false,
-        persist: false
+        plugins: {
+        'clear_button': {
+            html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-square"></i></div>`
+        },
+        'remove_button': {}
+    },
+        onChange: () => updatePickerLabel(tvPicker)
     });
     moviePicker = new TomSelect('#movie_library', {
-        plugins: ['remove_button'],
-        create: false,
-        persist: false
+        plugins: {
+        'clear_button': {
+            html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-square"></i></div>`
+        },
+        'remove_button': {}
+    },
+        onChange: () => updatePickerLabel(moviePicker)
     });
     loadConfig();
     toggleThePosterDBElements();
     detectEnvironment();
+
 });
 
 // Specific event listeners
@@ -79,6 +88,23 @@ function setPickerPlaceholder(instance, text) {
     instance.input.setAttribute('placeholder', text);
 }
 
+function updatePickerLabel(picker) {
+    if (!picker) return;
+
+    const totalOptions = Object.keys(picker.options).length;
+    const selectedCount = picker.getValue().length;
+    if (totalOptions == 0) {
+        setPickerPlaceholder(picker, "No libraries available");
+    } else if (selectedCount === 0) {
+        setPickerPlaceholder(picker, `(${totalOptions} available)`);
+    } else if (selectedCount < totalOptions) {
+        const remaining = totalOptions - selectedCount;
+        setPickerPlaceholder(picker, `(${remaining} left)`);
+    } else {
+        setPickerPlaceholder(picker, "");
+    }
+}
+
 function updateLibraryPickers() {
     const baseUrl = document.getElementById("plex_base_url").value;
     const token = document.getElementById("plex_token").value;
@@ -93,27 +119,27 @@ function updateLibraryPickers() {
             if (data.tv_libraries && data.tv_libraries.length > 0) {
                 data.tv_libraries.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
                 tvPicker.enable();
-                setPickerPlaceholder(tvPicker, "Click to add...");
             } else {
                 tvPicker.clear();
                 tvPicker.clearOptions();
                 tvPicker.disable();
-                setPickerPlaceholder(tvPicker, "No libraries available");
             }
+            updatePickerLabel(tvPicker);
             tvPicker.wrapper.classList.remove("loading");
+
             if (data.movie_libraries && data.movie_libraries.length > 0) {
                 data.movie_libraries.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
                 moviePicker.enable();
-                setPickerPlaceholder(moviePicker, "Click to add...");
             } else {
                 moviePicker.clear();
                 moviePicker.clearOptions();
                 moviePicker.disable();
-                setPickerPlaceholder(moviePicker, "No libraries available");
             }
+            updatePickerLabel(moviePicker);
             moviePicker.wrapper.classList.remove("loading");
         }
     });
+
     if (baseUrl && token) {
         tvPicker.disable();
         moviePicker.disable();

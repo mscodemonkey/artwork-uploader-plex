@@ -188,6 +188,53 @@
             padding-right: 2.25rem !important; /* Make room for spinner */
         }
 
+        /* 1. Container padding so chips don't overlap icon */
+        .ts-wrapper.plugin-clear_button .ts-control {
+            padding-right: 2.25rem !important;
+        }
+
+        /* 2. Hide by default when empty */
+        .ts-wrapper.plugin-clear_button .clear-button {
+            display: none !important;
+        }
+
+        /* 3. Show & style the icon ONLY when chips exist */
+        .ts-wrapper.plugin-clear_button.has-items .clear-button {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            
+            position: absolute;
+            right: 0.6rem;
+            top: 50%;
+            transform: translateY(-50%);
+            
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            
+            /* Icon styling */
+            color: var(--bs-danger, #dc3545) !important; /* Switch to var(--bs-primary) if you want blue */
+            font-size: 1.15rem; /* Tweak size easily here */
+            line-height: 1;
+            
+            cursor: pointer;
+            opacity: 0.75;
+            transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+        }
+
+        .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
+            opacity: 1;
+            transform: translateY(-50%) scale(1.15);
+        }
+        
+        /* Hide clear button while loading options (takes precedence over .has-items) */
+        .ts-wrapper.loading .clear-button,
+        .ts-wrapper.plugin-clear_button.has-items.loading .clear-button {
+            display: none !important;
+        }
+        
         /* Create the spinning loader ring */
         .ts-wrapper.loading .ts-control::after {
             content: "";
