@@ -45,8 +45,8 @@ class Config:
         self.base_url: str = ""
         self.token: str = ""
         self.bulk_txt: str = "bulk_import.txt"
-        self.tv_library: List[str] = ["TV Shows"]
-        self.movie_library: List[str] = ["Movies"]
+        self.tv_library: List[str] = []
+        self.movie_library: List[str] = []
         self.mediux_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"]
         self.tpdb_filters: List[str] = ["season_cover", "show_cover", "movie_poster", "collection_poster"]
         self.kometa_base: str = ""
@@ -110,8 +110,8 @@ class Config:
             "base_url": "",
             "token": "",
             "bulk_txt": "bulk_import.txt",
-            "tv_library": ["TV Shows"],
-            "movie_library": ["Movies"],
+            "tv_library": [],
+            "movie_library": [],
             "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster", "square_art"],
             "tpdb_filters": ["season_cover", "show_cover", "movie_poster", "collection_poster"],
             "kometa_base": "",

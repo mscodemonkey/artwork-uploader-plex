@@ -38,12 +38,12 @@ document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
     tvPicker = new TomSelect('#tv_library', {
         plugins: ['remove_button'],
-        create: true,
+        create: false,
         persist: false
     });
     moviePicker = new TomSelect('#movie_library', {
         plugins: ['remove_button'],
-        create: true,
+        create: false,
         persist: false
     });
     loadConfig();
@@ -83,32 +83,44 @@ function updateLibraryPickers() {
     const baseUrl = document.getElementById("plex_base_url").value;
     const token = document.getElementById("plex_token").value;
     
+    tvPicker.disable();
+    setPickerPlaceholder(tvPicker, "No libraries available");
+    moviePicker.disable();
+    setPickerPlaceholder(moviePicker, "No libraries available");
+        
+    socket.once("get_plex_libraries", (data) => {
+        if (validResponse(data)) {
+            if (data.tv_libraries && data.tv_libraries.length > 0) {
+                data.tv_libraries.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
+                tvPicker.enable();
+                setPickerPlaceholder(tvPicker, "Click to add...");
+            } else {
+                tvPicker.clear();
+                tvPicker.clearOptions();
+                tvPicker.disable();
+                setPickerPlaceholder(tvPicker, "No libraries available");
+            }
+            tvPicker.wrapper.classList.remove("loading");
+            if (data.movie_libraries && data.movie_libraries.length > 0) {
+                data.movie_libraries.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
+                moviePicker.enable();
+                setPickerPlaceholder(moviePicker, "Click to add...");
+            } else {
+                moviePicker.clear();
+                moviePicker.clearOptions();
+                moviePicker.disable();
+                setPickerPlaceholder(moviePicker, "No libraries available");
+            }
+            moviePicker.wrapper.classList.remove("loading");
+        }
+    });
     if (baseUrl && token) {
         tvPicker.disable();
         moviePicker.disable();
         setPickerPlaceholder(tvPicker, "Loading libraries...");
         setPickerPlaceholder(moviePicker, "Loading libraries...");
-        
-        socket.once("get_plex_libraries", (data) => {
-            if (validResponse(data)) {
-                if (data.tv_libraries && data.tv_libraries.length > 0) {
-                    data.tv_libraries.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
-                } else {
-                    tvPicker.clear();
-                    tvPicker.clearOptions();
-                }
-                if (data.movie_libraries && data.movie_libraries.length > 0) {
-                    data.movie_libraries.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
-                } else {
-                    moviePicker.clear();
-                    moviePicker.clearOptions();
-                }
-            }
-            tvPicker.enable();
-            moviePicker.enable();
-            setPickerPlaceholder(tvPicker, "Click to add...");
-            setPickerPlaceholder(moviePicker, "Click to add...");
-        });
+        tvPicker.wrapper.classList.add("loading");
+        moviePicker.wrapper.classList.add("loading");        
         socket.emit("get_plex_libraries", { instance_id: instanceId, url: baseUrl, token: token });
     }
 }
