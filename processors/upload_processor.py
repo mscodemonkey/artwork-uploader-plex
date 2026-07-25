@@ -8,6 +8,7 @@ from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP, ARTWORK_FILENAME_MA
 from models.options import Options
 from plex.plex_connector import PlexConnector
 from plex.plex_uploader import PlexUploader
+from plex.library_index import PlexLibraryIndex
 from plexapi.exceptions import NotFound
 from kometa.kometa_saver import KometaSaver
 from utils import soup_utils
@@ -24,12 +25,90 @@ class UploadProcessor:
         self.options: Options = Options()
         self.config: Config = Config()
         self.config.load()
+        self._media_index: Optional[PlexLibraryIndex] = None
+        self._match_confirm_cache: dict = {}
 
 
     def set_options(self, options: Options) -> None:
         self.options = options
         self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
         self.skip_locked: bool = self.options.skip_locked or globals.config.skip_locked_artwork
+
+    def _resolve_tmdb_id(self, artwork, description: str, kind: str) -> bool:
+        """
+        Resolve the TMDb ID for a TPDb artwork item before matching it to the library.
+
+        With local_library_matching enabled (the default), the title and year from the scrape are
+        matched against an in-memory index of the Plex libraries first, so items that aren't in the
+        library are skipped without any web request, and items that are get their TMDb ID from
+        Plex's own guids. Only an ambiguous local match falls back to fetching the poster page.
+
+        Returns True when the artwork was matched locally - the caller then attaches a
+        confirm_match hook so the poster page is still checked before anything is written.
+        """
+        if artwork.get("tmdb_id") or artwork.get("source") != ScraperSource.THEPOSTERDB.value or artwork.get("id") == "Upload":
+            return False
+
+        if self.config.local_library_matching and artwork.get("title"):
+            if self._media_index is None:
+                self._media_index = PlexLibraryIndex(self.plex.movie_libraries, self.plex.tv_libraries)
+            status, tmdb_id = self._media_index.lookup(kind, artwork.get("title"), artwork.get("year"))
+            if status == "not_found":
+                if kind == "movie":
+                    raise MovieNotFound(f'{description} | Movie not available on Plex')
+                raise ShowNotFound(f'{description} | Show not available on Plex')
+            if status == "matched":
+                debug_me(f"Matched '{artwork.get('title')} ({artwork.get('year')})' locally as TMDb ID '{tmdb_id}'", "UploadProcessor/_resolve_tmdb_id")
+                artwork["tmdb_id"] = tmdb_id
+                return True
+            debug_me(f"'{artwork.get('title')} ({artwork.get('year')})' is ambiguous locally, fetching the poster page", "UploadProcessor/_resolve_tmdb_id")
+
+        self._fetch_tmdb_id_from_tpdb(artwork, description)
+        return False
+
+    def _fetch_tmdb_id_from_tpdb(self, artwork, description: str) -> None:
+        """Fetch the poster page from ThePosterDB to read its TMDb ID (data-media-id), falling back
+           to a local Plex title/year search if the page doesn't expose one."""
+        poster_id = artwork.get("id", None)
+        poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
+        debug_me(f"Fetching TMDb ID from '{poster_page_url}'", "UploadProcessor/_fetch_tmdb_id_from_tpdb")
+        try:
+            poster_page_soup = soup_utils.cook_soup(poster_page_url)
+        except ScraperException as e:
+            debug_me(f"Unable to fetch TMDb ID due to error: {str(e)}", "UploadProcessor/_fetch_tmdb_id_from_tpdb")
+            raise ScraperException(f"{description} | {str(e)}") from None
+        try:
+            artwork["tmdb_id"] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
+        except (KeyError, TypeError, ValueError) as e:
+            debug_me(f"Failed to extract TMDb ID from poster page, trying another way. Error was: {e}", "UploadProcessor/_fetch_tmdb_id_from_tpdb")
+            _, artwork["tmdb_id"], _, _ = self.plex.movie_or_show(artwork.get("title"), artwork.get("year"))
+            debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.", "UploadProcessor/_fetch_tmdb_id_from_tpdb")
+
+    def _artwork_matches_item(self, artwork, plex_item, kind: str) -> bool:
+        """
+        Called by the uploader/saver just before artwork is actually written, and only for
+        locally-matched items: fetches the poster page once (cached per title) and checks the
+        TPDb media id against the matched Plex item's guids, so a title-and-year match can never
+        write another title's artwork. Skips, locked items and items not in the library never
+        trigger this request.
+        """
+        cache_key = (kind, artwork.get("title"), artwork.get("year"), artwork.get("tmdb_id"))
+        cached = self._match_confirm_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        poster_page_url = f"https://theposterdb.com/poster/{artwork.get('id')}"
+        debug_me(f"Confirming local match for '{artwork.get('title')}' from '{poster_page_url}'", "UploadProcessor/_artwork_matches_item")
+        try:
+            poster_page_soup = soup_utils.cook_soup(poster_page_url)
+        except ScraperException:
+            raise
+        try:
+            tpdb_tmdb_id = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
+            matches = any(guid.id == f"tmdb://{tpdb_tmdb_id}" for guid in plex_item.guids)
+        except (KeyError, TypeError, ValueError):
+            matches = True  # No media id on the page - trust the local title and year match, same as the existing Plex-search fallback
+        self._match_confirm_cache[cache_key] = matches
+        return matches
 
     def process_collection_artwork(self, artwork: CollectionArtwork) -> Optional[str]:
 
@@ -88,22 +167,8 @@ class UploadProcessor:
         artwork_type = ARTWORK_TYPE_MAP.get(artwork.get('file_type'))
         artwork_id = ARTWORK_ID_MAP.get(artwork.get('file_type'))
 
-        # Since the TBDb scraper doesn't fetch the TMDb ID up front for each poster, we need to get it here
-        if not artwork.get('tmdb_id') and artwork.get("source") == ScraperSource.THEPOSTERDB.value and artwork.get('id') != ScraperSource.UPLOAD.value:
-            poster_id=artwork.get('id', None)
-            poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
-            debug_me(f"Fetching TMDb ID from '{poster_page_url}'")
-            try:
-                poster_page_soup = soup_utils.cook_soup(poster_page_url)
-            except ScraperException as e:
-                debug_me(f"Unable to fetch TMDb ID due to error: {str(e)}", "UploadProcesser/process_tv_artwork")
-                raise ScraperException(f"{description} | {str(e)}") from None
-            try:
-                artwork['tmdb_id'] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
-            except (KeyError, TypeError, ValueError) as e:
-                debug_me(f"Failed to extract TMDb ID from poster page, trying another way. Error was: {e}")
-                _, artwork['tmdb_id'], _, _= self.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-                debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.")
+        # Since the TPDb scraper doesn't fetch the TMDb ID up front for each poster, we resolve it here
+        locally_matched = self._resolve_tmdb_id(artwork, description, "movie")
 
         try:
             movie_items, libraries = self.plex.find_in_library("movie", artwork)
@@ -131,6 +196,8 @@ class UploadProcessor:
                     saver.dest_file_ext = ".jpg"
                     saver.set_description(desc)
                     saver.set_options(self.options)
+                    if locally_matched:
+                        saver.confirm_match = lambda a=artwork, item=movie_item: self._artwork_matches_item(a, item, "movie")
                     result = saver.save_to_kometa()
                     results.append(result)
                 else:
@@ -139,6 +206,8 @@ class UploadProcessor:
                     uploader.track_artwork_ids = self.config.track_artwork_ids
                     uploader.reset_overlay = self.config.reset_overlay
                     uploader.skip_locked = self.skip_locked
+                    if locally_matched:
+                        uploader.confirm_match = lambda a=artwork, item=movie_item: self._artwork_matches_item(a, item, "movie")
                     uploader.set_description(desc)
                     uploader.set_options(self.options)
                     result = uploader.upload_to_plex()
@@ -176,23 +245,8 @@ class UploadProcessor:
         artwork['year'] = self.options.year if self.options.year else artwork['year']
         artwork_type = ARTWORK_TYPE_MAP.get(artwork.get('file_type'))
         
-        # Since the TBDb scraper doesn't fetch the TMDb ID up front for each poster, we need to get it here
-        if not artwork.get('tmdb_id') and artwork.get('source') == ScraperSource.THEPOSTERDB.value and artwork.get('id') != ScraperSource.UPLOAD.value:
-            poster_id=artwork.get('id', None)
-            poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
-            debug_me(f"Fetching TMDb ID from '{poster_page_url}'")
-            try:
-                poster_page_soup = soup_utils.cook_soup(poster_page_url)
-            except ScraperException as e:
-                debug_me(f"Unable to fetch TMDb ID due to error: {str(e)}", "UploadProcesser/process_tv_artwork")
-                raise ScraperException(f"{description} | {str(e)}") from None
-            try:
-                artwork['tmdb_id'] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
-            except (KeyError, TypeError, ValueError) as e:
-                debug_me(f"Failed to extract TMDb ID from poster page, trying another way. Error was: {e}")
-                _, artwork['tmdb_id'], _, _= self.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-                debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.")
-
+        # Since the TPDb scraper doesn't fetch the TMDb ID up front for each poster, we resolve it here
+        locally_matched = self._resolve_tmdb_id(artwork, description, "tv")
 
         try:
             tv_show_items, libraries = self.plex.find_in_library("tv", artwork)
@@ -277,6 +331,8 @@ class UploadProcessor:
                         saver.dest_file_ext = ".jpg"
                         saver.set_description(desc)
                         saver.set_options(self.options)
+                        if locally_matched:
+                            saver.confirm_match = lambda a=artwork, item=tv_show: self._artwork_matches_item(a, item, "tv")
                         result = saver.save_to_kometa()
                         results.append(result)
                     elif upload_target:
@@ -286,6 +342,8 @@ class UploadProcessor:
                         uploader.track_artwork_ids = self.config.track_artwork_ids
                         uploader.reset_overlay = self.config.reset_overlay
                         uploader.skip_locked = self.skip_locked
+                        if locally_matched:
+                            uploader.confirm_match = lambda a=artwork, item=tv_show: self._artwork_matches_item(a, item, "tv")
                         uploader.set_description(desc)
                         uploader.set_options(self.options)
                         result = uploader.upload_to_plex()

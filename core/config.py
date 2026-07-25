@@ -31,6 +31,7 @@ class Config:
         stage_assets: Whether to download assets for seasons and episodes that are not in Plex yet (except Specials)
         track_artwork_ids: Whether to track artwork IDs using Plex labels
         skip_locked_artwork: Whether to skip artwork whose target field is locked in Plex (already set)
+        local_library_matching: Whether to match scraped artwork against the local libraries before fetching poster pages
         auto_manage_bulk_files: Whether to auto-organize bulk files
         reset_overlay: Whether to reset Kometa overlay labels on upload
         schedules: List of scheduled bulk import jobs
@@ -55,6 +56,7 @@ class Config:
         self.stage_assets: bool = False
         self.track_artwork_ids: bool = True
         self.skip_locked_artwork: bool = False
+        self.local_library_matching: bool = True
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
         self.schedules: List[Dict[str, Any]] = []
@@ -93,6 +95,7 @@ class Config:
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.skip_locked_artwork = config.get("skip_locked_artwork", False)
+            self.local_library_matching = config.get("local_library_matching", True)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
             self.reset_overlay = config.get("reset_overlay", False)
             self.schedules = config.get("schedules", [])
@@ -120,6 +123,7 @@ class Config:
             "stage_assets": False,
             "track_artwork_ids": True,
             "skip_locked_artwork": False,
+            "local_library_matching": True,
             "auto_manage_bulk_files": True,
             "reset_overlay": True,
             "schedules": [],
@@ -161,6 +165,7 @@ class Config:
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,
             "skip_locked_artwork": self.skip_locked_artwork,
+            "local_library_matching": self.local_library_matching,
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
             "reset_overlay": self.reset_overlay,
             "schedules": self.schedules,
