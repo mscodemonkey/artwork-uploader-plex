@@ -1,6 +1,5 @@
 import requests
 from bs4 import BeautifulSoup
-
 from core.exceptions import ScraperException
 from utils.utils import is_valid_url
 

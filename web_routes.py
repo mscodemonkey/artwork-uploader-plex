@@ -10,23 +10,12 @@ The routes are organized into:
 - Helper functions for file uploads and processing
 """
 
-import os
-import logging
-import flask.cli
-import sys
-import re
-import base64
-import tempfile
-import zipfile
-import subprocess
-
+import os, logging, flask.cli, sys, re, base64, tempfile, zipfile, subprocess
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
-
 from flask import render_template, send_from_directory, request, redirect, url_for, session
 from functools import wraps
-
 from core import globals
 from services.notify_service import NotifyService
 from utils import utils

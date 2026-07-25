@@ -11,9 +11,7 @@ Usage:
     python bump_version.py 0.6.0   # Set specific version
 """
 
-import re
-import sys
-import subprocess
+import re, sys, subprocess
 from pathlib import Path
 
 

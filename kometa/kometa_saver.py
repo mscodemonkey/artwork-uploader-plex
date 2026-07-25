@@ -1,14 +1,10 @@
-from typing import Union, Optional
-import time
-
+import os, requests, mimetypes
+from typing import Optional
 from utils.notifications import debug_me
 from models.options import Options
 from core.enums import ScraperSource
-from core.constants import IMAGE_EXTENSIONS, TPDB_RATE_LIMIT_DELAY
+from core.constants import IMAGE_EXTENSIONS
 from models.artwork_types import AnyArtwork
-import os
-import requests
-import mimetypes
 
 class KometaSaver:
 

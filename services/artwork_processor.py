@@ -5,10 +5,8 @@ This service handles the business logic of scraping artwork and processing
 it for upload to Plex, separating it from UI/notification concerns.
 """
 
-import os
-import time
+import os, time
 from typing import Optional, Callable, Tuple
-
 from scrapers.scraper import Scraper
 from processors.upload_processor import UploadProcessor
 from plex.plex_connector import PlexConnector

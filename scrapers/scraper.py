@@ -1,6 +1,5 @@
 from typing import Optional
 from urllib.parse import urlparse
-
 from models.options import Options
 from models.callbacks import ProcessingCallbacks
 from core.exceptions import ScraperException

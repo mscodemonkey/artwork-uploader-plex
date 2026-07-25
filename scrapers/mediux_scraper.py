@@ -1,3 +1,4 @@
+import time
 from typing import Optional, Any
 from core.config import Config
 from core import globals
@@ -9,7 +10,6 @@ from core.exceptions import ScraperException
 from core.enums import ScraperSource, FileType
 from core.constants import MEDIUX_API_BASE_URL, MEDIUX_QUALITY_SUFFIX
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
-import time
 
 class MediuxScraper:
 

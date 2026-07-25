@@ -1,9 +1,4 @@
-import hashlib
-import json
-import re
-
-import validators
-
+import hashlib, json, re, validators
 from utils.notifications import debug_me
 from models.options import Options
 from models.url_item import URLItem

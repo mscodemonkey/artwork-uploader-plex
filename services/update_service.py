@@ -5,14 +5,9 @@ Extracted from artwork_uploader.py to reduce file size and improve
 maintainability.
 """
 
-import os
+import os, uuid, threading, time, requests
 from typing import Optional, Callable
-import uuid
 from packaging import version
-import threading
-import time
-import requests
-
 from models.instance import Instance
 from utils.notifications import debug_me
 

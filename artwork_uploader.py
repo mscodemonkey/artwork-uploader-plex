@@ -1,10 +1,5 @@
-import uuid
-import os
-import re
+import uuid, os, re, threading, sys, time
 from core import globals
-import threading
-import sys
-import time
 
 # plexapi builds its X-Plex-Client-Identifier from uuid.getnode(), which can be
 # random on every process start (commonly in Docker, where no MAC is readable).

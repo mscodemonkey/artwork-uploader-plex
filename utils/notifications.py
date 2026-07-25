@@ -1,10 +1,10 @@
+import threading, inspect, os
 from datetime import datetime
 from core import globals
 from pprint import pprint
 from models.instance import Instance
 from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
 from services.notify_service import NotifyService
-import threading, inspect, os
 
 # For backwards compatibility
 bootstrap_colors = BOOTSTRAP_COLORS

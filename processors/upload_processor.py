@@ -1,5 +1,5 @@
+import os
 from typing import Optional
-
 from core.config import Config
 from core.exceptions import CollectionNotFound, MovieNotFound, ShowNotFound, PlexConnectorException
 from core.enums import ScraperSource
@@ -13,7 +13,6 @@ from kometa.kometa_saver import KometaSaver
 from utils import soup_utils
 from utils.utils import is_numeric, get_path_parts
 from models.artwork_types import MovieArtwork, TVArtwork, CollectionArtwork
-import os
 from core import globals
 from utils.notifications import debug_me
 

@@ -1,9 +1,7 @@
-from typing import Union, Optional
 import time
-
+from typing import Union, Optional
 from plexapi.video import Movie, Show, Season, Episode
 from plexapi.collection import Collection
-
 from utils import utils
 from models.options import Options
 from core.enums import ScraperSource, ArtworkIDPrefix

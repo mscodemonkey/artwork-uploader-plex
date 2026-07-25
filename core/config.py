@@ -2,11 +2,9 @@
 Application configuration management.
 """
 
-import json
-import os
+import json, os
 from core import globals
 from typing import List, Dict, Any
-
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 from utils.notifications import debug_me
 from utils.utils import get_host_path

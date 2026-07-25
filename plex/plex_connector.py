@@ -1,12 +1,11 @@
-from typing import Optional, List, Tuple, Union
 import requests
+import plexapi.exceptions
+import xml.etree.ElementTree
+from typing import Optional, List, Tuple, Union
 from plexapi.server import PlexServer
 from plexapi.library import MovieSection, ShowSection
 from plexapi.video import Movie, Show
 from plexapi.collection import Collection
-import plexapi.exceptions
-import xml.etree.ElementTree
-
 from core.exceptions import PlexConnectorException, LibraryNotFound
 from models.artwork_types import AnyArtwork
 from models.options import Options

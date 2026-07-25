@@ -5,8 +5,7 @@ Extracted from artwork_uploader.py to reduce file size and improve
 maintainability.
 """
 
-import sys
-import os
+import sys, os
 from typing import Any, Tuple
 
 

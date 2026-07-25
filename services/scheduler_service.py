@@ -5,11 +5,8 @@ Extracted from artwork_uploader.py to reduce file size and improve
 maintainability.
 """
 
+import threading, schedule, time, uuid
 from typing import Dict, Callable, Optional
-import threading
-import schedule
-import time
-import uuid
 
 
 class SchedulerService:

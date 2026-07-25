@@ -1,16 +1,14 @@
-import math
+import math, time
 from typing import Optional, Any
-
 from processors import media_metadata
 from utils import soup_utils
-import time
 from models.options import Options
 from models.callbacks import ProcessingCallbacks
 from core.exceptions import ScraperException
 from core.config import Config
 from core import globals
 from core.enums import MediaType, ScraperSource
-from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
+from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 
