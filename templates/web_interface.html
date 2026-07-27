@@ -402,7 +402,10 @@
                                         </div>
                                         <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" value="local_library_matching" id="local_library_matching"/>
-                                            <label for="local_library_matching" class="form-check-label">Match artwork against your libraries locally before fetching poster pages (faster scrapes)</label>
+                                            <label for="local_library_matching" class="form-check-label">Local library matching</label>
+                                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="ThePosterDB only: Tries to match artwork by title against local libraries for faster 
+                                            scrapes of very large user pages. Skips fetching individual poster pages from TPDb to get the TMDB ID of each item for the most accurate
+                                            matching so it is much faster but it can reduce match accuracy."></i>
                                         </div>
                                     </div>
                                 </div>
