@@ -1,9 +1,10 @@
-import re
-import time
-import unicodedata
-from typing import List, Optional, Tuple
+import re, time, unicodedata
+from typing import List, Optional, Tuple, Literal, Dict
+from core.enums import MediaType
+from core.constants import PLEX_LIBRARY_INDEX_TIMEOUT
 
 from utils.notifications import debug_me
+from utils.utils import elapsed_time
 
 
 def normalize_title(title: str) -> str:
@@ -26,19 +27,44 @@ class PlexLibraryIndex:
     """
 
     def __init__(self, movie_libraries: List, tv_libraries: List) -> None:
-        self.movie_index: dict = {}
-        self.tv_index: dict = {}
-        start_time = time.time()
-        for library in movie_libraries:
-            self._add_library(self.movie_index, library)
-        for library in tv_libraries:
-            self._add_library(self.tv_index, library)
-        debug_me(f"Indexed {sum(len(v) for v in self.movie_index.values())} movie and "
-                 f"{sum(len(v) for v in self.tv_index.values())} TV index entries "
-                 f"in {time.time() - start_time:.1f}s", "PlexLibraryIndex/__init__")
+        self.movie_libraries: List = []
+        self.tv_libraries: List = []
+        self.last_refresh: float = time.time()
+        self.index: dict = {}
+        self._initialize_index(movie_libraries, tv_libraries)
+
+    def _initialize_index(self, movie_libraries:List, tv_libraries: List) -> None:
+        if not movie_libraries and not tv_libraries:
+            return
+        
+        now = time.time()
+        index_timed_out = (now - self.last_refresh) > PLEX_LIBRARY_INDEX_TIMEOUT
+        changed_libraries = set([lib.title for lib in self.movie_libraries]) != set([lib.title for lib in movie_libraries]) or set([lib.title for lib in self.tv_libraries]) != set([lib.title for lib in tv_libraries])
+
+        if not self.index or changed_libraries or index_timed_out:
+            self.index = {}
+            debug_me(f"Initializing Plex library index")
+            start_time = time.time()
+            for library in movie_libraries + tv_libraries:
+                self._add_library(self.index, library)
+
+            movies = sum(len(v) for v in self.index.values() if any(movie["type"] == MediaType.MOVIE.value for movie in v))
+            shows = sum(len(v) for v in self.index.values() if any(show["type"] == MediaType.TV_SHOW.value for show in v))
+            debug_me(f"Indexed {movies} movie and "
+                        f"{shows} TV index entries "
+                        f"across {len(self.movie_libraries) + len(self.tv_libraries)} libraries "
+                        f"in {time.time() - start_time:.1f}s")
+            self.last_refresh = time.time()
+            self.movie_libraries = movie_libraries
+            self.tv_libraries = tv_libraries
+        else:
+            debug_me(f"Index is still fresh ({elapsed_time(now - self.last_refresh)}), skipping re-indexing")
+            
 
     def _add_library(self, index: dict, library) -> None:
+        n = 0
         for item in library.all():
+            n += 1
             # Index values come from the listing response only - without this, reading an attribute
             # the item doesn't have (e.g. originalTitle on most items) makes plexapi reload the
             # item, which would be one extra request per library item
@@ -51,9 +77,16 @@ class PlexLibraryIndex:
                     except ValueError:
                         pass
                     break
-            entry = (item.year, tmdb_id)
+            entry = {
+                "title": item.title,
+                "year": item.year,
+                "tmdb_id": tmdb_id,
+                "library": library.title,
+                "type": MediaType.TV_SHOW.value if library.type == "show" else MediaType.MOVIE.value
+            }
             for key in self._title_keys(item.title, getattr(item, "originalTitle", None)):
                 index.setdefault(key, []).append(entry)
+        debug_me(f"Added {n} {MediaType.TV_SHOW.value if library.type == "show" else MediaType.MOVIE.value} items from library {library.title} to index")
 
     def _title_keys(self, title: str, original_title: Optional[str]) -> set:
         """All the normalized keys an item should be findable under."""
@@ -67,7 +100,7 @@ class PlexLibraryIndex:
         keys.discard("")
         return keys
 
-    def lookup(self, kind: str, title: str, year: Optional[int]) -> Tuple[str, Optional[int]]:
+    def lookup(self, title: str, year: Optional[int] = None, kind: Optional[Literal[MediaType.TV_SHOW, MediaType.MOVIE]] = None) -> Tuple[Literal['matched', 'ambiguous', 'not_found'], Optional[Dict]]:
         """
         Look up a title/year in the index.
 
@@ -75,19 +108,25 @@ class PlexLibraryIndex:
         - status (str): "matched", "ambiguous" or "not_found"
         - tmdb_id (int | None): the TMDb ID when status is "matched"
         """
-        index = self.movie_index if kind == "movie" else self.tv_index
-        candidates = index.get(normalize_title(title), [])
+        _kind = [kind] if kind is not None else [MediaType.TV_SHOW, MediaType.MOVIE]
+        candidates = [c for c in self.index.get(normalize_title(title), []) if c["type"] in _kind]
         if candidates and year is not None:
-            # Same retry pattern as PlexConnector.movie_or_show: exact year, then -1, then +1
             for candidate_year in (year, int(year) - 1, int(year) + 1):
-                matched = [c for c in candidates if c[0] == candidate_year]
+                matched = [c for c in candidates if c["year"] == candidate_year]
                 if matched:
                     break
         else:
             matched = candidates
-        tmdb_ids = {tmdb_id for _, tmdb_id in matched if tmdb_id is not None}
-        if len(tmdb_ids) == 1:
-            return "matched", tmdb_ids.pop()
+        tmdb_ids = {c.get("tmdb_id", None) for c in matched if c.get("tmdb_id", None) is not None}
+
+        # If multiple items have been found by title/year but they all have the same TMDb ID (same item across multiple libraries),
+        # or if a single item has been matched by title/year, even if it has no TMDb ID, then we have a match
+        if len(tmdb_ids) == 1 or len(matched) == 1:
+            match = next(item for item in matched)
+            return "matched", match
+
+        # If multiple items have been returned with differing TMDb IDs then we have an ambiguous match
         if len(tmdb_ids) > 1:
             return "ambiguous", None
+        
         return "not_found", None

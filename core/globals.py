@@ -1,3 +1,4 @@
+from typing import Literal
 # Application globals
 config = None  # Config object
 web_app = None  # Flask app
@@ -14,3 +15,6 @@ update_service = None
 # Scrape cancellation (user-initiated "Stop" from the web UI)
 cancel_scrape: bool = False   # Set when the user asks to stop; long loops check it and stop cleanly
 scrapes_running: int = 0      # How many scrapes are in flight; the flag clears when the last one ends
+scrape_type: Literal['scrape', 'bulk', 'upload', 'stopped'] = 'stopped'
+main_bar: dict = {}
+bulk_bar: dict = {}

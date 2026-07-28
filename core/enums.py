@@ -21,6 +21,9 @@ class MediaType(str, Enum):
     TV_SHOW = "TV Show"
     MOVIE = "Movie"
     COLLECTION = "Collection"
+    PERSON = "Person"
+    CATEGORY = "Category"
+    COMPANY = "Company"
     UNKNOWN = "Unknown"
 
 

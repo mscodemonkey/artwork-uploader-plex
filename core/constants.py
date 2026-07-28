@@ -3,7 +3,7 @@ Application-wide constants.
 """
 
 from core.__version__ import __version__, __url__
-from core.enums import ArtworkIDPrefix, FileType
+from core.enums import ArtworkIDPrefix, FileType, MediaType
 
 # Application metadata
 APP_NAME = "Artwork Uploader for Plex"
@@ -26,6 +26,9 @@ DEFAULT_BULK_IMPORT_FILE = "bulk_import.txt"
 # Plex library defaults
 DEFAULT_TV_LIBRARY = ["TV Shows"]
 DEFAULT_MOVIE_LIBRARY = ["Movies"]
+
+# Plex library index refresh timeout (seconds)
+PLEX_LIBRARY_INDEX_TIMEOUT = 900 # Default 15 minutes
 
 # Filter types - valid artwork types that can be filtered
 FILTER_TITLE_CARD = "title_card"
@@ -101,6 +104,12 @@ TPDB_BASE_URL = "https://theposterdb.com"
 TPDB_API_ASSETS_URL = "https://theposterdb.com/api/assets"
 TPDB_RATE_LIMIT_DELAY = 6  # seconds between requests
 TPDB_USER_UPLOADS_PER_PAGE = 24
+TPDB_COLLECTION_MEDIA_TYPES = [
+    MediaType.COLLECTION,
+    MediaType.PERSON,
+    MediaType.CATEGORY,
+    MediaType.COMPANY
+]
 
 # MediUX configuration
 MEDIUX_BASE_URL = "https://mediux.pro"
@@ -124,7 +133,7 @@ UPDATE_CHECK_INTERVAL = 1800  # 30 minutes
 SCHEDULER_CHECK_INTERVAL = 60  # 1 minute
 
 # File upload
-UPLOAD_CHUNK_SIZE = 8192  # bytes
+UPLOAD_CHUNK_SIZE = 1024 * 512  # bytes
 
 # Web UI colors (Bootstrap)
 BOOTSTRAP_COLORS = {

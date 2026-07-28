@@ -129,7 +129,7 @@ def parse_title(title: str):
         artwork = {
             "media": "Unknown",
             "title": background_match.group('title').strip(),
-            "year": background_match.group('year'),
+            "year": int(background_match.group('year')),
             "season": "Backdrop",
             "episode": None,
             "file_type": FileType.BACKGROUND.value,
@@ -144,7 +144,7 @@ def parse_title(title: str):
         artwork = {
             "media": MediaType.TV_SHOW.value,
             "title": tv_sq_art_match.group('title').strip(),
-            "year": tv_sq_art_match.group('year'),
+            "year": int(tv_sq_art_match.group('year')),
             "season": "SquareArt",
             # "season": int(tv_sq_art_match.group('season')),
             "episode": None,
@@ -160,7 +160,7 @@ def parse_title(title: str):
         artwork = {
             "media": MediaType.MOVIE.value,
             "title": movie_sq_art_match.group('title').strip(),
-            "year": movie_sq_art_match.group('year'),
+            "year": int(movie_sq_art_match.group('year')),
             "season": None,
             "episode": None,
             "file_type": FileType.SQUARE_ART.value,
@@ -169,14 +169,14 @@ def parse_title(title: str):
         debug_me(f"Matched '{title}' as square art for Movie '{artwork['title']} ({artwork['year']})'")
         return artwork
 
-    # If we got to this point and it doesn't contain "Backdrop", it could still be a background or a movie ot tv show poster
+    # If we got to this point and it doesn't contain "Backdrop", it could still be a background or a movie or tv show poster
     # We'll assume initially it's a movie poster if it matches the movie/show pattern (because it has a year in parentheses)
     movie_or_show_match = re.match(movie_or_show_pattern, title, re.IGNORECASE)
     if movie_or_show_match:
         artwork = {
             "media": "Unknown",
             "title": movie_or_show_match.group('title').strip(),
-            "year": movie_or_show_match.group('year'),
+            "year": int(movie_or_show_match.group('year')),
             "season": None,
             "episode": None,
             "file_type": FileType.POSTER.value,

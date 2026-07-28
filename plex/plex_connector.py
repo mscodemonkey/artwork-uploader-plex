@@ -1,7 +1,6 @@
-import requests
-import plexapi.exceptions
-import xml.etree.ElementTree
-from typing import Optional, List, Tuple, Union
+import requests, plexapi.exceptions, xml.etree.ElementTree, re
+from typing import Optional, List, Tuple, Union, Literal
+from core.enums import MediaType
 from plexapi.server import PlexServer
 from plexapi.library import MovieSection, ShowSection
 from plexapi.video import Movie, Show
@@ -11,6 +10,7 @@ from models.artwork_types import AnyArtwork
 from models.options import Options
 from utils.notifications import debug_me
 from core.config import Config
+from plex.library_index import PlexLibraryIndex, normalize_title
 
 class PlexConnector:
 
@@ -21,9 +21,13 @@ class PlexConnector:
         self.tv_libraries: List[ShowSection] = []
         self.movie_libraries: List[MovieSection] = []
         self.options: Options = Options()
+        self._index: PlexLibraryIndex = PlexLibraryIndex(self.movie_libraries, self.tv_libraries)
 
     def set_options(self, options: Options) -> None:
         self.options = options
+
+    def _initialize_index(self):
+        self._index._initialize_index(self.movie_libraries, self.tv_libraries)
 
     def reconnect(self, updated_config: Config) -> None:
         self.plex = None
@@ -123,7 +127,7 @@ class PlexConnector:
 
 
     # Find a specific collection in the movies library
-    def find_collection(self, collection_title: str) -> Optional[List[Collection]]:
+    def find_collection(self, collection_title: str, fuzzy: bool = False) -> Optional[List[Collection]]:
 
         if not self.plex:
             self.connect()
@@ -131,14 +135,23 @@ class PlexConnector:
         collections = []
         libraries = []
 
-        for movie_library in self.movie_libraries:
+        for library in self.movie_libraries + self.tv_libraries:
             try:
-                plex_collections = movie_library.collections()
+                plex_collections = library.collections()
                 for collection in plex_collections:
-                    if collection.title == collection_title:
-                        debug_me(f"Found '{collection_title}' in '{movie_library.title}'")
+                    # Removes "Collection" from the title (if present) and anything between parenthesis, 
+                    # like 'Alfred Hitchcock (Directing)' or 'Tom Cruise (Acting)'
+                    fuzzy_match_str = re.sub(r"\s*\(.*?\)", "", collection_title.replace(" Collection", "")).strip()
+                    exact_match = collection_title.lower() == collection.title.lower()
+                    fuzzy_match = fuzzy and collection.title.lower().startswith(fuzzy_match_str.lower())
+
+                    if exact_match or fuzzy_match:
+                        if fuzzy:
+                            debug_me(f"Fuzzy-matched '{collection_title}' to '{collection.title}' in '{library.title}'")
+                        else:
+                            debug_me(f"Found collection '{collection_title} in '{library.title}'")
                         collections.append(collection)
-                        libraries.append(movie_library.title)
+                        libraries.append(library.title)
             except Exception as e:
                 # Continue checking other libraries if one fails
                 debug_me(f"Error searching collection in library: {e}")
@@ -147,10 +160,11 @@ class PlexConnector:
         if collections:
             return collections, libraries
 
+        debug_me(f"Collection '{collection_title}' not found in Plex")
         return None, None
 
     # Find a specific movie or TV show in the given library
-    def find_in_library(self, item_type: str, artwork: AnyArtwork) -> Tuple[Optional[List[Union[Movie, Show]]], Optional[List[str]]]:
+    def find_in_library(self, media_type: Literal[MediaType.MOVIE, MediaType.TV_SHOW], artwork: AnyArtwork) -> Tuple[Optional[List[Union[Movie, Show]]], Optional[List[str]]]:
         """
         Finds a specific movie or TV show in the appropriate library based on the provided artwork information.
 
@@ -169,7 +183,7 @@ class PlexConnector:
         items = []
         lib_names = []
 
-        libraries = self.tv_libraries if item_type == "tv" else self.movie_libraries
+        libraries = self.tv_libraries if media_type == MediaType.TV_SHOW else self.movie_libraries
         for library in libraries:
             library_item = None
             try:
@@ -215,86 +229,27 @@ class PlexConnector:
             try:
                 self.connect()
             except PlexConnectorException as e:
-                debug_me(f"PlexConnectorException raised: {str(e)}")
+                debug_me(f"PlexConnectorException raised when connecting to Plex: {str(e)}")
                 return "Error", None, None, None
 
-        def normalize(text: Optional[str]) -> str:
-            """Normalizes strings for accent/punctuation insensitive comparison."""
-            if not text:
-                return ""
-            import unicodedata
-            text = unicodedata.normalize('NFD', text).encode('ascii', 'ignore').decode('utf-8')
-            for c in [":", "-", ",", ".", "'", '"', "(", ")"]:
-                text = text.replace(c, "")
-            return " ".join(text.lower().split())
+        try:
+            self._initialize_index()
+        except Exception as e:
+            debug_me(f"Error building Plex lookup index: {str(e)}")
+            return "Error", None, None, None
 
-        # First check movie libraries
-        libraries_with_type = (
-            [(lib, "Movie") for lib in self.movie_libraries] +
-            [(lib, "TV Show") for lib in self.tv_libraries]
-        )
-        target_years = [int(year)] if year is not None else []
-        if year is not None:
-            target_years.extend([int(year) - 1, int(year) + 1])
-
-        normalized_title = normalize(title)
-
-        for library, media_type in libraries_with_type:
-            try:
-                search_kwargs = {'title': title}
-                if year is not None:
-                    search_kwargs['year'] = year
-                search_results = library.search(**search_kwargs)
-
-                if not search_results and year is not None:
-                    debug_me(f"Title not found as '{title} ({year})' in library '{library.title}', trying previous and next year")
-                    # Retry with +1/-1 year if no results found
-                    for adjusted_year in (int(year) - 1, int(year) + 1):
-                        search_kwargs['year'] = adjusted_year
-                        search_results = library.search(**search_kwargs)
-                        if search_results:
-                            break
-
-                if not search_results:
-                    debug_me(f"Title still not found. Searching across all items{f' of {year}' if year else ''} in library '{library.title}' and normalizing '{title}' as '{normalized_title}'")
-                    candidates = library.search(year=year) if year else library.all()
-                    for item in candidates:
-                        orig = getattr(item, "originalTitle", None)
-                        if orig and normalize(orig) == normalized_title:
-                            search_results = [item]
-                            break
-
-                if search_results:
-                    tmdb_id: Optional[int] = None
-                    result = search_results[0]
-                    found_title = result.title
-                    found_year = result.year
-                    for guid in result.guids:
-                       if "tmdb://" in guid.id:
-                           try:
-                               tmdb_id = int(guid.id.split("tmdb://", 1)[-1])
-                           except ValueError:
-                               pass
-                           break
-                    if tmdb_id is not None:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} in library '{library.title}' with TMDb ID {tmdb_id}")
-                    else:
-                        debug_me(f"Item '{title} ({year})' identified as {media_type} in library '{library.title}', but TMDb ID not found")
-                    return media_type, tmdb_id, found_title, found_year
-            except TimeoutError as e:
-                debug_me(f"Error searching in library '{library.title}' (Timed out) {str(e)}")
-                return "TimeoutError", None, None, None
-            except ConnectionError as e:
-                debug_me(f"Error searching in library '{library.title}' (Connection error) {str(e)}")
-                return "ConnectionError", None, None, None
-            except Exception as e:
-                if "NameResolutionError" in {str(e)}:
-                    debug_me(f"Error searching in library '{library.title}' (Cannot resolve server)' {str(e)}")
-                    return "DNSError", None, None, None
-                else:
-                    debug_me(f"Error searching in library '{library.title}' ({e.__class__.__name__})' {str(e)}")
-                    return "Error", None, None, None
-                pass
+        status, match = self._index.lookup(title, year)
+        if status == "matched":
+            media_type = match.get("type")
+            tmdb_id = match.get("tmdb_id")
+            found_title = match.get("title")
+            found_year = match.get("year")
+            library = match.get("library")
+            if tmdb_id is not None:
+                debug_me(f"Item '{title} ({year})' identified as '{found_title} ({found_year})' ({media_type}) in library '{library}' with TMDb ID {tmdb_id}")
+            else:
+                debug_me(f"Item '{title} ({year})' identified as '{found_title} ({found_year})' ({media_type}) in library '{library}', but TMDb ID not found")
+            return media_type, tmdb_id, found_title, found_year
 
         debug_me(f"'{title} ({year})' not found in any library")
         return "unavailable", None, None, None

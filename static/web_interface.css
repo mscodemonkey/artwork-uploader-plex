@@ -163,6 +163,7 @@
             margin-left: auto;
             margin-right: auto;
         }
+
         /* Style Tom Select chips with Bootstrap Primary color */
         .ts-control .item {
             background-color: var(--bs-primary, #0d6efd) !important;
@@ -215,15 +216,19 @@
             margin: 0 !important;
             
             /* Icon styling */
-            color: var(--bs-danger, #dc3545) !important; /* Switch to var(--bs-primary) if you want blue */
-            font-size: 1.15rem; /* Tweak size easily here */
+            color: var(--bs-primary, #0d6efd) !important; /* Switch to var(--bs-primary) if you want blue
+            font-size: 1rem; /* Tweak size easily here */
             line-height: 1;
             
             cursor: pointer;
             opacity: 0.75;
             transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
         }
-
+        /* Dark mode override */
+        [data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button {
+            color: #ffffff !important; 
+        }
+        
         .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
             opacity: 1;
             transform: translateY(-50%) scale(1.15);
@@ -254,9 +259,35 @@
             to {
                 transform: rotate(360deg);
             }
-        }        
+        }
 
-  #time_select_box {
+        /* Visual disabled state for the drop area */
+        #drop-area.disabled {
+            opacity: 0.4;                     /* Dims the element */
+            filter: grayscale(100%);          /* Removes color for a greyed-out look */
+            cursor: not-allowed !important;   /* Shows a prohibited cursor on hover */
+            pointer-events: none;             /* Prevents native hover/click highlights */
+            transition: all 0.3s ease;       /* Smooth transition when toggling */
+        }
+        
+        /* Fix Tom-Select dropdown text and background in dark mode */
+        [data-bs-theme="dark"] .ts-dropdown {
+            background-color: #2b3035 !important; /* Matches Bootstrap dark dropdowns */
+            border-color: #495057 !important;
+        }
+
+        [data-bs-theme="dark"] .ts-dropdown .option {
+            color: #777777 !important; /* Bright white text for readable contrast */
+        }
+
+        /* Hover and active selection state */
+        [data-bs-theme="dark"] .ts-dropdown .option:hover,
+        [data-bs-theme="dark"] .ts-dropdown .active {
+            background-color: #0d6efd !important; /* Bootstrap primary blue */
+            color: #ffffff !important;
+        }
+
+#time_select_box {
     position: absolute;
     top: 0;
     right: 55px; /* Move the tooltip 20px to the right */

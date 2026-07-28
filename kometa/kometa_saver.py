@@ -1,4 +1,4 @@
-import os, requests, mimetypes
+import os, requests, mimetypes, time
 from typing import Optional
 from utils.notifications import debug_me
 from models.options import Options
@@ -128,6 +128,8 @@ class KometaSaver:
             if replaced_file and existing_file != dest_file:
                 os.remove(existing_file)
             os.replace(temp_file, dest_file)
+            if self.artwork['source'] == ScraperSource.THEPOSTERDB:
+                time.sleep(1)
             if replaced_file:
                 return f"♻️ {self.description} | {self.artwork_type} replaced at '{dest_file}' in {self.library}"
             else:

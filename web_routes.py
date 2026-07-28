@@ -25,7 +25,7 @@ from core.enums import FileType, MediaType, ScraperSource, StatusColor
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService
-
+from core.constants import UPLOAD_CHUNK_SIZE
 
 def login_required(f):
     """Decorator to require authentication for routes."""
@@ -159,23 +159,22 @@ def setup_socket_handlers(
             update_log(instance, f"🐞 Debug mode is {'Off' if globals.debug else 'On'}")
             debug_me(f"Turning debug mode {'Off' if globals.debug else 'On'}")
             notify_web(instance, "debug_mode", { "debug": not globals.debug })
-            if globals.debug:
-                globals.debug = False
-            else:
-                globals.debug = True
+            globals.debug = not globals.debug
 
     @globals.web_socket.on("check_for_update")
     def check_for_update(data):
         """Check for updates when requested by the frontend."""
-        instance = Instance(data.get("instance_id"), "web", broadcast=True)
+        instance = Instance(data.get("instance_id"), "web")
         debug_me(f"Checking for update by request from the frontend")
         latest_version = get_latest_version()
         if latest_version and version.parse(latest_version.lstrip('v')) > version.parse(current_version.lstrip('v')):
             update_log(instance, f"🚨 Update available: {latest_version} (current: {current_version})")
-            notify_web(instance, "version_check", { "new_version": latest_version, "current_version": current_version, "docker": "true" if globals.docker else "false" })
+            instance.broadcast = True
+            notify_web(instance, "version_check", { "new_version": latest_version, "current_version": current_version, "docker": globals.docker })
         else:
             update_log(instance, f"🏷️ You are running the latest version: {current_version}")
-            notify_web(instance, "version_check", { "new_version": None, "current_version": current_version, "docker": "true" if globals.docker else "false" })
+            instance.broadcast = True
+            notify_web(instance, "version_check", { "new_version": None, "current_version": current_version, "docker": globals.docker })
 
     @globals.web_socket.on("update_app")
     def update_app(data):
@@ -232,7 +231,7 @@ def setup_socket_handlers(
     @globals.web_socket.on("start_scrape")
     def handle_scrape_from_web(data):
         """Handle scraping request from web UI."""
-        instance = Instance(data.get("instance_id"), "web")
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
         url = data.get("url").lower()
         options = data.get("options")
         filters = data.get("filters")
@@ -250,14 +249,14 @@ def setup_socket_handlers(
     @globals.web_socket.on("stop_scrape")
     def handle_stop_scrape(data):
         """Flag any in-flight scrape to stop cleanly (user pressed Stop in the web UI)."""
-        instance = Instance(data.get("instance_id"), "web")
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
         if not request_scrape_stop():
             update_log(instance, "ℹ️ Nothing to stop - no scrape is running")
 
     @globals.web_socket.on("start_bulk_import")
     def handle_bulk_import_from_web(data):
         """Handle bulk import request from web UI."""
-        instance = Instance(data.get("instance_id"), "web")
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
         bulk_list = data.get("bulk_list").lower()
         filename = data.get("filename", "bulk_import.txt")
         run_bulk_import_scrape_in_thread(instance, bulk_list, filename)
@@ -355,12 +354,14 @@ def setup_socket_handlers(
     @globals.web_socket.on("display_message")
     def display_message(data):
         """Log a debug message from the frontend."""
-        instance = Instance(data.get("instance_id"), "web")
+        instance = Instance(data.get("instance_id"), "web", broadcast=data.get("broadcast", False))
         debug_me(f"Received message from fronted: '{data.get('message')}' • Log level: '{data.get('level')}'")
         if data.get("level") == "debug":
             debug_me(data.get("message"), data.get("title", "web_message"))
         elif data.get("level") == "log":
             update_log(instance, data.get("message"))
+        elif data.get("level") == "status":
+            update_status(instance, data.get("message"), data.get("color", "primary"), data.get("sticky", False), data.get("spinner", False), data.get("icon", None))
 
     @globals.web_socket.on("get_plex_libraries")
     def get_plex_libraries(data):
@@ -368,16 +369,15 @@ def setup_socket_handlers(
 
         instance = Instance(data.get("instance_id", "web"))
 
-        debug_me(data)
         url = data.get("url", "")
         token = data.get("token", "")
 
         try:
             plex_server = PlexServer(url, token, timeout=5)
-            debug_me(f"Successfully connected to Plex server at '{url}' with token `{token}'")
+            debug_me(f"Successfully connected to Plex server at '{url}'")
         except Exception as e:
-            debug_me(f"Failed to connect to Plex server at '{url}' with token '{token}'")
-            notify_web(instance, f"get_plex_libraries", { "tv_libraries": [], "movie_libraries": [] })
+            debug_me(f"Failed to connect to Plex server at '{url}'")
+            notify_web(instance, f"get_plex_libraries", { "tv_libraries": [], "movie_libraries": [], "message": "Unable to connect to Plex" })
             return
 
         try:
@@ -388,7 +388,7 @@ def setup_socket_handlers(
             debug_me(f"Obtained movie_libraries: {movie_libs}")
             notify_web(instance, "get_plex_libraries", { "tv_libraries": tv_libs, "movie_libraries": movie_libs })
         except AttributeError as e:
-            notify_web(instance, f"get_plex_libraries", { "tv_libraries": [], "movie_libraries": [] })
+            notify_web(instance, f"get_plex_libraries", { "tv_libraries": [], "movie_libraries": [], "message": "Unable to connect to Plex" })
 
     @globals.web_socket.on("test_plex_connect")
     def test_plex_connect(data):
@@ -404,7 +404,6 @@ def setup_socket_handlers(
             notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
 
         instance = Instance(data.get("instance_id"), "web")
-        instance.broadcast = True
         update_status(instance, "Testing connection to Plex server", "info", True, True)
 
         # Disable the test button to prevent multiple clicks
@@ -482,7 +481,6 @@ def setup_socket_handlers(
     def test_notifications(data):
         """Send a test notification."""
         instance = Instance(data.get("instance_id"), "web")
-        instance.broadcast = True
         # Disable the test button to prevent multiple clicks
         notify_web(instance, "element_disable", {"element": ["test_notif_btn"], "mode": True})
         urls = data.get("urls", [])
@@ -577,9 +575,11 @@ def setup_socket_handlers(
             globals.config = config
 
             # Reconnect to Plex because the Plex server or token might have changed
+            instance.broadcast = True
             update_log(instance, "💾 Configuration saved")
             globals.plex.reconnect(config)
             notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
+            notify_web(instance, "update_ui", {"config": vars(config)})
         except Exception as config_error:
             update_status(instance, str(config_error), color=StatusColor.WARNING.value)
 
@@ -683,21 +683,38 @@ def setup_socket_handlers(
         else:
             notify_web(instance, "docker_detected", { "docker": "false" })
 
+    @globals.web_socket.on("get_scrape_state")
+    def get_scrape_state(data):
+        instance = Instance(data.get("instance_id"), "web")
+
+        scrape_state = {
+            "running": globals.scrapes_running > 0,
+            "type": globals.scrape_type,
+            "main_bar": globals.main_bar,
+            "bulk_bar": globals.bulk_bar
+        }
+        notify_web(instance, "get_scrape_state", scrape_state)
+
     @globals.web_socket.on("upload_artwork_chunk")
     def handle_upload_chunk(data):
         """Handle chunked file upload - writes directly to temp file for memory efficiency."""
         
-        instance = Instance(data.get("instance_id"), "web")
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
         file_name = data["fileName"]
         chunk_data = data["chunkData"]
         chunk_index = data["chunkIndex"]
         total_chunks = data["totalChunks"]
+        total_size = data["totalSize"].__round__(2)
+        bar_speed = "fast" if total_size < 80 else "fast"
+        progress_MB = ((chunk_index * UPLOAD_CHUNK_SIZE ) / 1000000).__round__(2)
+        start_time = data["startTime"]
+        current_time = data["currentTime"]
 
         if chunk_index == 0:
             globals.cancel_scrape = False
             globals.scrapes_running += 1
-            notify_web(instance, "scrape_state", { "running": True, "type": "upload" })
-            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
+            globals.scrape_type = "upload"
+            notify_web(instance, "scrape_state", { "running": True, "type": globals.scrape_type })
 
         if globals.cancel_scrape:
             debug_me(f"File upload canceled by user")
@@ -715,8 +732,11 @@ def setup_socket_handlers(
             if globals.scrapes_running <= 0:
                 globals.scrapes_running = 0
                 globals.cancel_scrape = False
-                notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
-                notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
+                notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
+                globals.scrape_type = "stopped"
+                globals.main_bar["active"] = False
+                notify_web(instance, "progress_bar", { "percent": 100, "message": f"{file_name} • Upload canceled by user", "bar_speed": "smooth" })
+                globals.last_emit_time = 0
             return "abort"
 
         if file_name not in upload_chunks:
@@ -735,6 +755,16 @@ def setup_socket_handlers(
             decoded_chunk = base64.b64decode(chunk_data)
             upload_chunks[file_name]["temp_file"].write(decoded_chunk)
             upload_chunks[file_name]["chunks_received"] += 1
+            percent = (progress_MB * 100 / total_size).__round__(2)
+            current_rate = ((progress_MB * 1000) / (current_time - start_time)).__round__(2)
+            message = f"{file_name} • {progress_MB} MB of {total_size} MB • {current_rate} MB/s"
+            notify_web(instance, "progress_bar", { "percent": percent, "message": message, "bar_speed": bar_speed})
+                
+            globals.main_bar["active"] = True
+            globals.main_bar["percent"] = percent
+            globals.main_bar["speed"] = bar_speed
+            globals.main_bar["message"] = message
+
             return "ok"
         except Exception as e:
             debug_me(f"Error decoding chunk {chunk_index + 1}: {str(e)}")
@@ -742,14 +772,20 @@ def setup_socket_handlers(
             if globals.scrapes_running <= 0:
                 globals.scrapes_running = 0
                 globals.cancel_scrape = False
-                notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
-                notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
+                notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
+                globals.scrape_type = "stopped"
+                globals.main_bar["active"] = False
+                notify_web(instance, "progress_bar", { "percent": 100, "message": f"{file_name} • Error uploading file", "bar_speed": "fast"} )
             return "error"
 
     @globals.web_socket.on("upload_complete")
     def handle_upload_complete(data):
         """Finalize the upload once all chunks are received."""
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
         file_name = data.get("fileName")
+
+        notify_web(instance, "progress_bar", { "percent": 100, "message": f"{file_name} • Upload complete!", "bar_speed": "fast"} )
+
         filters = data.get("filters")
         plex_year = data.get("plex_year")
         plex_title = data.get("plex_title")
@@ -757,7 +793,6 @@ def setup_socket_handlers(
         debug_me(f"Obtained filters from web form: {filters}")
         debug_me(f"Obtained options from web form: {options}")
 
-        instance = Instance(data.get("instance_id"), "web")
 
         if file_name in upload_chunks and upload_chunks[file_name]["chunks_received"] == int(
             upload_chunks[file_name]["total_chunks"]
@@ -850,7 +885,6 @@ def save_uploaded_file(
     debug_me(f"Saved ZIP file: {temp_zip_path}")
 
     update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file and parsing files...")
-    # globals.scrapes_running += 1
     extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
         instance,
         temp_zip_path,
@@ -862,15 +896,16 @@ def save_uploaded_file(
         sort_key_func
     )
     if globals.cancel_scrape:
-        notify_web(instance, "progress_bar", {"message": "Parsing aborted by user...", "percent": 100})#, "bar_type": bar_type, "bar_speed": bar_speed})
-        update_log(instance, f"🛑 {os.path.basename(temp_zip_path)} • ZIP file parsing aborted by user")
-        update_status(instance, f"ZIP file parsing aborted by user", color=StatusColor.WARNING.value)
+        notify_web(instance, "progress_bar", {"message": "Parsing canceled by user...", "percent": 100})#, "bar_type": bar_type, "bar_speed": bar_speed})
+        globals.main_bar["active"] = False
+        update_log(instance, f"🛑 {os.path.basename(temp_zip_path)} • ZIP file parsing canceled by user")
+        update_status(instance, f"ZIP file parsing canceled by user", color=StatusColor.WARNING.value)
         globals.scrapes_running -= 1
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
-            notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
-            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
+            notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
+            globals.scrape_type = "stopped"
         return
 
     # Delete the ZIP file after extraction
@@ -881,7 +916,6 @@ def save_uploaded_file(
     except Exception as e:
         debug_me(f"Error deleting temporary ZIP file: {e}")
 
-    # globals.scrapes_running += 1
     process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
     
     if globals.cancel_scrape:
@@ -893,10 +927,8 @@ def save_uploaded_file(
     if globals.scrapes_running <= 0:
         globals.scrapes_running = 0
         globals.cancel_scrape = False
-        notify_web(instance, "scrape_state", { "running": False, "type": "upload" })
-        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
-
-
+        notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
+        globals.scrape_type = "stopped"
 
 def extract_and_list_zip(
     instance: Instance,
@@ -946,8 +978,8 @@ def extract_and_list_zip(
         zip_infos = [zip_info for zip_info in zip_ref.infolist() if os.path.basename(zip_info.filename) and not os.path.basename(zip_info.filename).startswith(".") and os.path.basename(zip_info.filename) not in {"ds_store", "__macosx"}]
         total_files_in_zip = len(zip_infos)
         
-        update_status(instance, "Extracting ZIP file...", "info", sticky=True, spinner=True)
         notify_web(instance, "progress_bar", { "percent": 0, "message": "Parsing...", "bar_type": "main", "bar_speed": "fast" })
+        globals.main_bar["active"] = False
        
         identified_media_map = {}
 
@@ -957,7 +989,12 @@ def extract_and_list_zip(
             filename = os.path.basename(zip_info.filename)  # Get filename only (ignore paths)
             debug_me(f"{n} / {total_files_in_zip} • Processing '{filename}'")
             percent = (n/total_files_in_zip)*100 if total_files_in_zip > 0 else 0
-            notify_web(instance, "progress_bar", { "percent": percent, "message": f"Parsing {n} of {total_files_in_zip} • {filename}", "bar_type": "main", "bar_speed": "fast" })
+            message = f"Parsing {n} of {total_files_in_zip} • {filename}"
+            notify_web(instance, "progress_bar", { "percent": percent, "message": message, "bar_type": "main", "bar_speed": "fast" })
+            globals.main_bar["active"] = True
+            globals.main_bar["percent"] = percent
+            globals.main_bar["message"] = message
+            globals.main_bar["speed"] = "fast"
 
             # Mediux ZIP files contain a source.txt file with metadata, we obtain title and author from there
             if filename == "source.txt":
@@ -989,7 +1026,7 @@ def extract_and_list_zip(
                 artwork = parse_title(os.path.splitext(filename)[0])
 
                 if artwork["media"] == "unable_to_parse":
-                    update_log(instance, f"❌ {filename} • {zip_author} | Unable to parse file, formate unrecognized")
+                    update_log(instance, f"❌ {filename} • {zip_author} | Unable to parse file name, format unrecognized")
                     errored_files += 1
                     continue
                 
@@ -1009,28 +1046,11 @@ def extract_and_list_zip(
                 # Determine media type via Plex lookup if not a collection, find TMDb ID, title
                 # and year in the process for better matching later when processing artwork items
                 if artwork["media"] != "Collection":
-                    # Mediux and TPDB replace colons with hyphens in titles, so revert that for lookup, and also remove ellipses
-                    artwork["title"] = re.sub(r'- ', ': ', artwork.get('title')).replace('...', '').strip()
                     media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-                    if media_type == "unavailable" or "Error" in media_type:
-                        artwork["title"] = re.sub(r': ', ' ', artwork.get('title')).replace('...', '').strip()
-                        media_type, tmdb_id, title, year = globals.plex.movie_or_show(artwork.get('title'), artwork.get('year'))
-                        if media_type == "DNSError":
-                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Cannot resolve server name")
-                            errored_files += 1
-                            continue
-                        elif media_type == "ConnectionError":
-                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Connection error")
-                            errored_files += 1
-                            continue
-                        elif media_type == "TimeoutError":
-                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex: Timed out")
-                            errored_files += 1
-                            continue
-                        elif media_type == "Error":
-                            update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex")
-                            errored_files += 1
-                            continue
+                    if "Error" in media_type:
+                        update_log(instance, f"❌ {filename} • {zip_author} | Error searching Plex")
+                        errored_files += 1
+                        continue
 
                     # If we got a result from movie_or_show, we use that media type and we update the identified media map because the movie_or_show method is more accurate
                     if media_type != "unavailable":
@@ -1079,7 +1099,8 @@ def extract_and_list_zip(
                         artwork['media'] = "TV Show"
                     else:
                         # If we get to this point, there is no way to determine if it's a TV show or Movie, so default to poster
-                        # However this won't pass any filters (becuase it's either "movie_poster" or "show_cover"), so this artwork won't be processed further
+                        # However this won't pass any filters (becuase it's either "movie_poster" or "show_cover"), so this artwork won't be 
+                        # processed further if any filters are specified. It will only be processed if no filters are set.
                         artwork['file_type'] = "poster"  
 
                 # Check for filters and exclusions

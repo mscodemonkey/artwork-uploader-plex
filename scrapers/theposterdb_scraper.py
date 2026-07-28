@@ -8,7 +8,7 @@ from core.exceptions import ScraperException
 from core.config import Config
 from core import globals
 from core.enums import MediaType, ScraperSource
-from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE
+from core.constants import TPDB_API_ASSETS_URL, TPDB_USER_UPLOADS_PER_PAGE, TPDB_COLLECTION_MEDIA_TYPES
 from models.artwork_types import MovieArtworkList, TVArtworkList, CollectionArtworkList
 
 
@@ -67,7 +67,7 @@ class ThePosterDBScraper:
 
                 # Find out how many total assets and pages there are for this user
                 self.scrape_user_info()
-                self.callbacks.log(f"🔄 TPDb user • {self.author} | Processing {self.user_pages} asset pages with {self.user_uploads} assets")
+                self.callbacks.log(f"🔄 TPDb portfolio • {self.author} | Processing {self.user_pages} asset pages with {self.user_uploads} assets")
                 self.callbacks.debug(f"There are {self.user_uploads} assets and {self.user_pages} pages for user {self.author}")
                 self.callbacks.progress(0, 0, f"Collecting assets from TPDb user {self.author}")
 
@@ -308,7 +308,8 @@ class ThePosterDBScraper:
                 else:
                     self.filtered += 1
                     self.callbacks.debug(f"{i+1}. ⏩ Skipping movie poster for '{title} ({year})' based on filters.")
-            elif media_type == MediaType.COLLECTION.value:
+
+            elif media_type in TPDB_COLLECTION_MEDIA_TYPES:
                 if (self.options.has_no_filters() and "collection_poster" in self.config.tpdb_filters) or self.options.has_filter("collection_poster"):
                     if not self.options.is_excluded(poster_id):
                         self.callbacks.debug(f"{i+1}. ✅ Including collection poster for '{title_p}'.")
@@ -330,7 +331,7 @@ class ThePosterDBScraper:
             else:
                 self.errored += 1
                 self.callbacks.debug(f"⏩ Skipping artwork item - unknown media type: {title_p} | {poster_url}")
-                self.callbacks.log(f"{f'⚠️ {self.title} • ' if self.title is not None else '⚠️ '}{self.author} | Skipping asset (unknown media type): {title_p}")
+                self.callbacks.log(f"{f'⚠️ {self.title} • ' if self.title is not None else '⚠️ TPDb portfolio • '}{self.author} | {title_p} • Skipping asset (unknown media type)")
 
     def scrape_additional_posters(self) -> None:
 

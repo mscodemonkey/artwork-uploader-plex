@@ -75,7 +75,7 @@ def debug_me(message: str, title: str=None):
             else:
                 print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('light').get('ansi')}[{timestamp}] [{source}] {ANSI_RESET}{message}")
 
-def update_log(instance: Instance, update_text: str, artwork_title: str = None, force_print: bool = False) -> None:
+def update_log(instance: Instance, update_text: str, broadcast: bool = False) -> None:
 
     """
     Updates the session log in the GUI.  The session log only exists while the app is running.
@@ -91,7 +91,9 @@ def update_log(instance: Instance, update_text: str, artwork_title: str = None, 
         with print_lock:
             print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{timestamp}]{ANSI_RESET} {update_text}")
         if instance.mode == "web":
-            notify_web(instance, "log_update", {"message": update_text, "artwork_title": artwork_title})
+            if not instance.broadcast and broadcast:
+                instance.broadcast = broadcast
+            notify_web(instance, "log_update", {"message": update_text})
     except Exception as e:
         # Fail silently for logging errors to avoid cascading failures
         if globals.debug:

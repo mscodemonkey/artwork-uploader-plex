@@ -10,7 +10,6 @@ let currentBulkImport = '';     // Current bulk import file
 let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
-let scrapeActive = false;       // Track whether a scrape is running
 let tvPicker, moviePicker;
 
 const socket = io();
@@ -37,27 +36,39 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
     tvPicker = new TomSelect('#tv_library', {
+        inputTypes: [],
+        controlInput: '<input readonly>',
         plugins: {
         'clear_button': {
-            html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-square"></i></div>`
+            html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
         },
         'remove_button': {}
     },
         onChange: () => updatePickerLabel(tvPicker)
     });
+    tvPicker.on('clear', () => {
+        tvPicker.refreshOptions(false); // Refreshes the dropdown list without closing it
+        updatePickerLabel(tvPicker);     // Updates your "(X available)" placeholder label
+    });        
     moviePicker = new TomSelect('#movie_library', {
+        inputTypes: [],
+        controlInput: '<input readonly>',
         plugins: {
-        'clear_button': {
-            html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-square"></i></div>`
+            'clear_button': {
+                html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
+            },
+            'remove_button': {}
         },
-        'remove_button': {}
-    },
         onChange: () => updatePickerLabel(moviePicker)
     });
+    moviePicker.on('clear', () => {
+        moviePicker.refreshOptions(false); // Refreshes the dropdown list without closing it
+        updatePickerLabel(moviePicker);     // Updates your "(X available)" placeholder label
+    });        
     loadConfig();
     toggleThePosterDBElements();
     detectEnvironment();
-
+    getScrapeState();
 });
 
 // Specific event listeners
@@ -79,6 +90,19 @@ document.getElementById("plex_base_url").addEventListener("change", updateLibrar
 // General helper functions
 // ==================================================
 
+function getScrapeState() {
+    socket.on("get_scrape_state", (data) => {
+        if (data.type == "stopped") return;
+
+        scrapeState(data.running, data.type)
+        if (data.type == "bulk") {
+            progressBar(data.bulk_bar.percent, data.bulk_bar.message, "bulk", data.bulk_bar.speed);
+        }
+        progressBar(data.main_bar.percent, data.main_bar.message, "main", data.main_bar.speed);
+    });
+    socket.emit("get_scrape_state", { instance_id: instanceId })
+}
+
 function setPickerPlaceholder(instance, text) {
     if (!instance) return;
     instance.settings.placeholder = text;
@@ -88,13 +112,13 @@ function setPickerPlaceholder(instance, text) {
     instance.input.setAttribute('placeholder', text);
 }
 
-function updatePickerLabel(picker) {
+function updatePickerLabel(picker, message = '') {
     if (!picker) return;
 
     const totalOptions = Object.keys(picker.options).length;
     const selectedCount = picker.getValue().length;
     if (totalOptions == 0) {
-        setPickerPlaceholder(picker, "No libraries available");
+        message ? setPickerPlaceholder(picker, message) : setPickerPlaceholder(picker, "No libraries available");
     } else if (selectedCount === 0) {
         setPickerPlaceholder(picker, `(${totalOptions} available)`);
     } else if (selectedCount < totalOptions) {
@@ -114,7 +138,7 @@ function updateLibraryPickers() {
     moviePicker.disable();
     setPickerPlaceholder(moviePicker, "No libraries available");
         
-    socket.once("get_plex_libraries", (data) => {
+    socket.on("get_plex_libraries", (data) => {
         if (validResponse(data)) {
             if (data.tv_libraries && data.tv_libraries.length > 0) {
                 data.tv_libraries.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
@@ -124,7 +148,7 @@ function updateLibraryPickers() {
                 tvPicker.clearOptions();
                 tvPicker.disable();
             }
-            updatePickerLabel(tvPicker);
+            data.message ? updatePickerLabel(tvPicker, data.message) : updatePickerLabel(tvPicker);
             tvPicker.wrapper.classList.remove("loading");
 
             if (data.movie_libraries && data.movie_libraries.length > 0) {
@@ -135,7 +159,7 @@ function updateLibraryPickers() {
                 moviePicker.clearOptions();
                 moviePicker.disable();
             }
-            updatePickerLabel(moviePicker);
+            data.message ? updatePickerLabel(moviePicker, data.message) : updatePickerLabel(moviePicker);
             moviePicker.wrapper.classList.remove("loading");
         }
     });
@@ -168,7 +192,7 @@ socket.on("version_check", function(data) {
         // Display current version in the About tab
         document.getElementById("app_version").innerText = data.current_version;
         // If running in Docker, show message about self-update being disabled and hide update button
-        if (data.docker == "true") {
+        if (data.docker) {
             document.getElementById("docker_update_message").innerText = "Self-update is disabled in Docker. Please pull the lastet image manually.";
         } else {
             document.getElementById("docker_update_message").innerText = "";
@@ -270,8 +294,8 @@ function testNotifications() {
 }
 
 // Check incoming socket message is for this instance
-function validResponse(data, broadcast = false) {
-    return data.instance_id === instanceId || (broadcast && data.broadcast);
+function validResponse(data, allow_broadcast = false) {
+    return data.instance_id === instanceId || (allow_broadcast && data.broadcast);
 }
 
 
@@ -404,19 +428,22 @@ socket.on("status_update", (data) => {
     }
 });
 
-socket.on("scrape_state", (data) => {
+function scrapeState(running, type) {
+
+    // if (type == "stopped") return;
+
     let cancelBtnId = ""
     let tabId = ""
     let btnId = ""
-    if (data.type == "bulk") {
+    if (type == "bulk") {
         cancelBtnId = "bulk-import-cancel";
         tabId = "bulk-import-tab";
         btnId = "bulk_button";
-    } else if (data.type == "scrape") {
+    } else if (type == "scrape") {
         cancelBtnId = "scrape-cancel";
         tabId = "scraper-tab";
         btnId = "scrape_button";
-    } else if (data.type == "upload") {
+    } else if (type == "upload") {
         cancelBtnId = "upload-cancel";
         tabId = "uploader-tab";
     }
@@ -424,39 +451,43 @@ socket.on("scrape_state", (data) => {
     const tabElement = document.getElementById(tabId).querySelector("i");
     const btnElement = document.getElementById(btnId);
 
-    if (validResponse(data)) {
-        // Shows or hides the cancel button on the appropriate tab
-        cancelBtnElement.classList.toggle("d-none", !data.running);
+    // Shows or hides the cancel button on the appropriate tab
+    cancelBtnElement.classList.toggle("d-none", !running);
 
-        // Shows or hides the spinner on the appropriate tab
-        // and disables or enables the file drop area by toggling scrapeActive
-        if (data.running) {
-            scrapeActive = true;
-            dropArea.classList.add("highlight");
+    // Shows or hides the spinner on the appropriate tab
+    // and disables or enables the file drop area
+    if (running) {
+        disableElement(["scrape_url", "scrape_button", "bulk_button"], true);
+        dropArea.classList.add("disabled");
 
-            if (!tabElement.dataset.originalIcon) {
-                tabElement.dataset.originalIcon = tabElement.className;
+        if (!tabElement.dataset.originalIcon) {
+            tabElement.dataset.originalIcon = tabElement.className;
+        }
+        tabElement.className = "spinner-border spinner-border-sm";
+        if (btnElement) {
+            if (!btnElement.querySelector("i").dataset.originalIcon) {
+                btnElement.querySelector("i").dataset.originalIcon = btnElement.querySelector("i").className;
             }
-            tabElement.className = "spinner-border spinner-border-sm";
-            if (btnElement) {
-                if (!btnElement.querySelector("i").dataset.originalIcon) {
-                    btnElement.querySelector("i").dataset.originalIcon = btnElement.querySelector("i").className;
-                }
-                btnElement.querySelector("i").className = "spinner-border spinner-border-sm";
-            }
-        } else {
-            scrapeActive = false;
-            dropArea.classList.remove("highlight")
-            tabElement.className = tabElement.dataset.originalIcon || "bi bi-gear";
-            if (btnElement) {
-                btnElement.querySelector("i").className = btnElement.querySelector("i").dataset.originalIcon || "bi bi-gear";
-            }
+            btnElement.querySelector("i").className = "spinner-border spinner-border-sm";
+        }
+    } else {
+        disableElement(["scrape_url", "scrape_button", "bulk_button"], false);
+        dropArea.classList.remove("disabled");
+
+        tabElement.className = tabElement.dataset.originalIcon || "bi bi-gear";
+        if (btnElement) {
+            btnElement.querySelector("i").className = btnElement.querySelector("i").dataset.originalIcon || "bi bi-gear";
         }
     }
+}
+
+
+socket.on("scrape_state", (data) => {
+    scrapeState(data.running, data.type)
 });
 
 // Update the log page
-function updateLog(message, color = null, artwork_title = null) {
+function updateLog(message, color = null) {
     let statusElement = document.getElementById("scraping_log");
 
     // Match [00:00:00.000] to [23:59:59] at the start
@@ -485,8 +516,8 @@ function updateLog(message, color = null, artwork_title = null) {
     }
 }
 socket.on("log_update", (data) => {
-    if (validResponse(data,true)) {
-        updateLog(data.message, data.artwork_title);
+    if (validResponse(data, true)) {
+        updateLog(data.message);
     }
 });
 
@@ -540,7 +571,7 @@ function progressBar(percent, message = "", barType = "main", speed = "smooth") 
     }
 }
 socket.on("progress_bar", (data) => {
-    if (validResponse(data)) {
+    if (validResponse(data, true)) {
         progressBar(data.percent, data.message, data.bar_type, data.bar_speed)
     }
 })
@@ -783,10 +814,18 @@ function saveConfig() {
 
     // Prevent duplicate event listeners
     socket.once("save_config", (data) => {
-        if (validResponse(data)) {
+        if (validResponse(data, true)) {
             if (data.saved) {
                 config = data.config;
-                updateStatus("Configuration saved", "success", false, false, "check2-circle");
+                socket.emit("display_message", {
+                    level: "status",
+                    instance_id: instanceId,
+                    message: "Configuration updated",
+                    color: "success",
+                    icon: "check2-circle",
+                    broadcast: true
+                    
+                });
                 configureTabs(true);
             } else {
                 updateStatus("Configuration could not be saved", "danger", false, false, "x-circle");
@@ -796,6 +835,96 @@ function saveConfig() {
     });
 }
 
+socket.on("update_ui", (data) => {
+    if (validResponse(data, true)) {
+        updateConfigUI(data.config);
+    }
+});
+
+
+function updateConfigUI(config) {
+
+    document.getElementById("plex_base_url").value = config.base_url;
+    document.getElementById("plex_token").value = config.token;
+    document.getElementById("bulk_import_file").value = config.bulk_txt;
+    
+    // Load TV libraries
+    if (Array.isArray(config.tv_library)) {
+        // Add options first so Tom Select knows about them
+        config.tv_library.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
+        // Set active values (chips)
+        tvPicker.setValue(config.tv_library);
+    }
+    // Load Movie Libraries
+    if (Array.isArray(config.movie_library)) {
+        // Add options first
+        config.movie_library.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
+        // Set active values (chips)
+        moviePicker.setValue(config.movie_library);
+    }            
+    updateLibraryPickers();
+    
+    document.getElementById("track_artwork_ids").checked = config.track_artwork_ids;
+    document.getElementById("save_to_kometa").checked = config.save_to_kometa;
+    document.getElementById("stage_assets").checked = config.stage_assets;
+    document.getElementById("kometa_base").value = config.kometa_base;
+    document.getElementById("temp_dir").value = config.temp_dir || "";
+    document.getElementById("auto_manage_bulk_files").checked = config.auto_manage_bulk_files;
+    document.getElementById("reset_overlay").checked = config.reset_overlay;
+    document.getElementById("skip_locked_artwork").checked = config.skip_locked_artwork;
+    document.getElementById("local_library_matching").checked = config.local_library_matching;
+    document.getElementById("option-add-to-bulk").checked = config.auto_manage_bulk_files;
+    document.getElementById("apprise_urls").value = config.apprise_urls.join(", ");
+    
+    // Load authentication settings
+    document.getElementById("auth_enabled").checked = config.auth_enabled || false;
+    document.getElementById("auth_username").value = config.auth_username || "";
+    
+    // Toggle Kometa settings visibility
+    toggleKometaSettings();
+    
+    // Toggle Add to Bulk checkbox visibility
+    toggleAddToBulkCheckbox();
+    
+    // Toggle auth settings visibility
+    toggleAuthSettings();
+    
+    // Make sure Plex options visibility is set correctly on load
+    togglePlexOptions();
+    
+    // Make sure temp option visibility is set correctly on load
+    toggleTempCheckbox();
+    
+    // Make sure scraper stage option visibility is set correctly on load
+    toggleScraperStageCheckbox();
+    
+    // Make sure skip locked artwork option visibility is set correctly on load
+    toggleSkipLockedCheckbox();
+    
+    // Show/hide logout button based on auth enabled
+    if (config.auth_enabled) {
+        document.getElementById("logout-link").style.display = "block";
+    } else {
+        document.getElementById("logout-link").style.display = "none";
+    }
+    
+    if (Array.isArray(config.mediux_filters)) {
+        document.querySelectorAll('[id^="m_filter-"]').forEach(checkbox => {
+            checkbox.checked = config.mediux_filters.includes(checkbox.value);
+        });
+    }
+    
+    if (Array.isArray(config.tpdb_filters)) {
+        document.querySelectorAll('[id^="p_filter-"]').forEach(checkbox => {
+            checkbox.checked = config.tpdb_filters.includes(checkbox.value);
+        });
+    }
+    
+    schedules = config.schedules;
+    console.log(schedules);
+    
+    loadBulkFileList(); // For the switcher
+};
 
 // Load configuration
 function loadConfig() {
@@ -804,86 +933,7 @@ function loadConfig() {
     socket.once("load_config", (data) => { // Use 'once' to prevent duplicate listeners
         if (validResponse(data) && data.config) {
             config = data.config;
-            document.getElementById("plex_base_url").value = data.config.base_url;
-            document.getElementById("plex_token").value = data.config.token;
-            document.getElementById("bulk_import_file").value = data.config.bulk_txt;
-
-            // Load TV libraries
-            if (Array.isArray(data.config.tv_library)) {
-                // Add options first so Tom Select knows about them
-                data.config.tv_library.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
-                // Set active values (chips)
-                tvPicker.setValue(data.config.tv_library);
-            }
-            // Load Movie Libraries
-            if (Array.isArray(data.config.movie_library)) {
-                // Add options first
-                data.config.movie_library.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
-                // Set active values (chips)
-                moviePicker.setValue(data.config.movie_library);
-            }            
-            updateLibraryPickers();
-
-            document.getElementById("track_artwork_ids").checked = data.config.track_artwork_ids;
-            document.getElementById("save_to_kometa").checked = data.config.save_to_kometa;
-            document.getElementById("stage_assets").checked = data.config.stage_assets;
-            document.getElementById("kometa_base").value = data.config.kometa_base;
-            document.getElementById("temp_dir").value = data.config.temp_dir || "";
-            document.getElementById("auto_manage_bulk_files").checked = data.config.auto_manage_bulk_files;
-            document.getElementById("reset_overlay").checked = data.config.reset_overlay;
-            document.getElementById("skip_locked_artwork").checked = data.config.skip_locked_artwork;
-            document.getElementById("local_library_matching").checked = data.config.local_library_matching;
-            document.getElementById("option-add-to-bulk").checked = data.config.auto_manage_bulk_files;
-            document.getElementById("apprise_urls").value = data.config.apprise_urls.join(", ");
-
-            // Load authentication settings
-            document.getElementById("auth_enabled").checked = data.config.auth_enabled || false;
-            document.getElementById("auth_username").value = data.config.auth_username || "";
-            
-            // Toggle Kometa settings visibility
-            toggleKometaSettings();
-
-            // Toggle Add to Bulk checkbox visibility
-            toggleAddToBulkCheckbox();
-
-            // Toggle auth settings visibility
-            toggleAuthSettings();
-            
-            // Make sure Plex options visibility is set correctly on load
-            togglePlexOptions();
-
-            // Make sure temp option visibility is set correctly on load
-            toggleTempCheckbox();
-
-            // Make sure scraper stage option visibility is set correctly on load
-            toggleScraperStageCheckbox();
-
-            // Make sure skip locked artwork option visibility is set correctly on load
-            toggleSkipLockedCheckbox();
-
-            // Show/hide logout button based on auth enabled
-            if (data.config.auth_enabled) {
-                document.getElementById("logout-link").style.display = "block";
-            } else {
-                document.getElementById("logout-link").style.display = "none";
-            }
-
-            if (Array.isArray(data.config.mediux_filters)) {
-                document.querySelectorAll('[id^="m_filter-"]').forEach(checkbox => {
-                    checkbox.checked = data.config.mediux_filters.includes(checkbox.value);
-                });
-            }
-
-            if (Array.isArray(data.config.tpdb_filters)) {
-                document.querySelectorAll('[id^="p_filter-"]').forEach(checkbox => {
-                    checkbox.checked = data.config.tpdb_filters.includes(checkbox.value);
-                });
-            }
-
-            schedules = data.config.schedules;
-            console.log(schedules);
-
-            loadBulkFileList(); // For the switcher
+            updateConfigUI(config)
             configureTabs();
         }
     });
@@ -965,6 +1015,15 @@ function startScrape() {
 function stopScrape() {
     const logTab = document.querySelector('#scraping-log-tab');
     bootstrap.Tab.getOrCreateInstance(logTab).show();
+    socket.emit("display_message", {
+        instance_id: instanceId,
+        message: "Cancelation requested by user, please wait...",
+        color: "danger",
+        sticky: true,
+        spinner: true,
+        level: "status",
+        broadcast: true
+    });
     socket.emit("stop_scrape", { instance_id: instanceId });
 }
 
@@ -1476,8 +1535,8 @@ document.getElementById("download_icon").addEventListener("click", function () {
     const filename = currentBulkImport || document.getElementById("switch_bulk_file").value;
     if (filename) {
         downloadBulkImportFile(filename)
-    socket.emit("display_message", { "instance_id": instanceId, "message": `📥 ${filename} • File successfully downloaded`, "level": "log" });
-    updateStatus(filename + " successfully downloaded", "success", false, false, "check2-circle");
+        socket.emit("display_message", { "instance_id": instanceId, "message": `📥 ${filename} • File successfully downloaded`, "level": "log" });
+        updateStatus(filename + " successfully downloaded", "success", false, false, "check2-circle");
     }
 });
 
@@ -1597,54 +1656,46 @@ document.getElementById("default_bulk_file_icon").addEventListener("click", func
 
 dropArea.addEventListener("dragover", (e) => {
     e.preventDefault();
-    if (!scrapeActive) { // Ignore event if a scrape is running
-        dropArea.classList.add("highlight");
-    }
+    dropArea.classList.add("highlight");
 });
 
 dropArea.addEventListener("dragleave", () => {
-    if (!scrapeActive) { // Ignore event if a scrape is running
-        dropArea.classList.remove("highlight");
-    } 
+    dropArea.classList.remove("highlight");
 });
 
 dropArea.addEventListener("drop", (e) => {
     e.preventDefault();
-    if (!scrapeActive) { // Ignore event if a scrape is running
-        dropArea.classList.remove("highlight");
+    dropArea.classList.remove("highlight");
 
-        const file = e.dataTransfer.files[0];
-        const form = document.getElementById("upload_form");
+    const file = e.dataTransfer.files[0];
+    const form = document.getElementById("upload_form");
 
-        if (!form.checkValidity()) {
-            form.classList.add('was-validated');
-            return;
-        }
-        if (file && file.name.endsWith(".zip")) {
-            uploadFile(file);
-        } else {
-            alert("Please drop a valid ZIP file.");
-        }
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+    }
+    if (file && file.name.endsWith(".zip")) {
+        uploadFile(file);
+    } else {
+        alert("Please drop a valid ZIP file.");
     }
 });
 
 dropArea.addEventListener("click", () => {
-    if (!scrapeActive) { // Ignore event if a scrape is running
-        const form = document.getElementById("upload_form");
-        
-        if (!form.checkValidity()) {
-            form.classList.add('was-validated');
-            return;
-        }
-        let input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".zip";
-        input.onchange = (e) => {
-            let file = e.target.files[0];
-            if (file) uploadFile(file);
-        };
-        input.click();
+    const form = document.getElementById("upload_form");
+    
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
     }
+    let input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".zip";
+    input.onchange = (e) => {
+        let file = e.target.files[0];
+        if (file) uploadFile(file);
+    };
+    input.click();
 });
 
 function uploadFile(file) {
@@ -1652,8 +1703,18 @@ function uploadFile(file) {
     const logTab = document.querySelector('#scraping-log-tab');
     bootstrap.Tab.getOrCreateInstance(logTab).show();
 
-    socket.emit("display_message", { "instance_id": instanceId, "message": `Uploading '${file.name}'...`, "title": "uploadFile", "level": "debug" });
-    socket.emit("display_message", { "instance_id": instanceId, "message": `📤 ${file.name} • Upload initiated`, "level": "log" });
+    socket.emit("display_message", {
+        "instance_id": instanceId,
+        "message": `Uploading '${file.name}'...`,
+        "title": "uploadFile",
+        "level": "debug"
+    });
+    socket.emit("display_message", {
+        "instance_id": instanceId,
+        "message": `📤 ${file.name} • Upload initiated`,
+        "level": "log",
+        "broadcast": true
+    });
 
     const reader = new FileReader();
 
@@ -1700,9 +1761,14 @@ function uploadFile(file) {
                 const plex_year = document.getElementById("plex_year").value;
                 const plex_title = document.getElementById("plex_title").value;
 
-                socket.emit("upload_complete", {instance_id: instanceId, fileName: file.name, options: options, filters: filters, plex_title: plex_title, plex_year: plex_year });
-                let totalSize = Math.round(arrayBuffer.byteLength / 1000000);
-                progressBar(100, `Uploading ${file.name} • ${totalSize} of ${totalSize} MB`);
+                socket.emit("upload_complete", {
+                    instance_id: instanceId,
+                    fileName: file.name,
+                    options: options,
+                    filters: filters,
+                    plex_title: plex_title,
+                    plex_year: plex_year
+                });
 
                 return; // Ensure no further execution in this function
             }
@@ -1711,30 +1777,33 @@ function uploadFile(file) {
 
             arrayBufferToBase64(chunk).then(base64Chunk => {
                 if (isAborted) return;
-
+                
+                let currentTime = performance.now();
+                let totalSize = arrayBuffer.byteLength / 1000000;
                 socket.emit("upload_artwork_chunk", {
                     instance_id: instanceId,
                     fileName: file.name,
                     chunkData: base64Chunk,
                     chunkIndex: offset / CHUNK_SIZE,
-                    totalChunks: totalChunks
+                    totalChunks: totalChunks,
+                    totalSize: totalSize,
+                    startTime: startTime,
+                    currentTime: currentTime
                 }, (ack) => {
                     if (ack === "ok") {
                         if (isAborted) return;
 
                         offset += CHUNK_SIZE; // Offset is in bytes
-                        let progress = Math.round((offset / arrayBuffer.byteLength) * 100);
-                        updateStatus(`Uploading '${file.name}'...`, "info", false, false, "cloud-upload");
-                        let progressMBytes = Math.round(offset / 1000000); // Divide by 1M to get MB
-                        let currentTime = performance.now();
-                        let currentRate = (progressMBytes * 1000 / (currentTime - startTime)).toFixed(2); // Times are in ms, hence multiply by 1000
-                        let totalSize = Math.round(arrayBuffer.byteLength / 1000000);
-                        if (totalSize < 80) barSpeed = "fast"; else barSpeed = "smooth";
-                        progressBar(progress, `${file.name} • ${progressMBytes} MB of ${totalSize} MB • ${currentRate} MB/s`, "main", barSpeed);
+                        socket.emit("display_message", {
+                            instance_id: instanceId,
+                            message: `Uploading '${file.name}'...`,
+                            color: "info",
+                            icon: "cloud-upload",
+                            level: "status"
+                        })
                         sendChunk();
                     } else if (ack === "abort") {
                         isAborted = true;
-                        progressBar(100, `${file.name} • Upload aborted`, "main", "fast");
                         return;
                     } else {
                         console.error("Backend failed to acknowledge chunk.")
@@ -1881,19 +1950,21 @@ socket.on("update_failed", function(data) {
 
 socket.on("backend_restarting", function() {
     console.log("Backend restarting, refreshing frontend too...");
+    updateStatus("Backend restarting, refreshing frontend too...", "warning", true, true, "arrow-counterclockwise")
     setTimeout(() => {
         location.reload();  // Reload the page
-    }, 3000);  // Delay for 2 seconds to ensure restart
+    }, 3000);  // Delay for 3 seconds to ensure restart
 });
 
 // Detect when the WebSocket connection is lost
-    socket.on("disconnect", function() {
-        console.log("WebSocket disconnected, attempting to reconnect...");
-        // Refresh the page to reconnect to the WebSocket
-        setTimeout(() => {
-            location.reload();  // Reload to attempt reconnection
-        }, 3000);  // Delay for 3 seconds before refresh to allow connection retry
-    });
+socket.on("disconnect", function() {
+    console.log("WebSocket disconnected, attempting to reconnect...");
+    updateStatus("WebSocket disconnected, attempting to reconnect...", "warning", true, true, "arrow-counterclockwise")
+    // Refresh the page to reconnect to the WebSocket
+    setTimeout(() => {
+        location.reload();  // Reload to attempt reconnection
+    }, 3000);  // Delay for 3 seconds before refresh to allow connection retry
+});
 
 // ==================================================
 // Authentication Settings Toggle

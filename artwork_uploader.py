@@ -183,18 +183,18 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
     title = None
 
     try:
-        if instance.mode == "web":
-            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
-        globals.scrapes_running += 1
-        notify_web(instance, "scrape_state", { "running": True, "type": "scrape" })
         # Check if the Plex TV and movie libraries are configured
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please configure your settings.", color=StatusColor.WARNING.value)
-            globals.scrapes_running -= 1
             return
+
+        globals.scrapes_running += 1
+        globals.scrape_type = "scrape"
+        notify_web(instance, "scrape_state", { "running": True, "type": globals.scrape_type })
 
         # Process the URL and options passed from the GUI or website
         parsed_line = parse_url_and_options(url)
+        update_status(instance, f"Scraping URL '{parsed_line.url}'", color=StatusColor.INFO.value, sticky=True, spinner=True)
 
         success_counter = [0]
         title, author = scrape_and_upload(instance, parsed_line.url, parsed_line.options, False, success_counter)
@@ -211,17 +211,12 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
-            notify_web(instance, "scrape_state", { "running": False, "type": "scrape" })
-        if instance.mode == "web":
-            notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
-
+            notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
+            globals.scrape_type = "stopped"
 
 def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, scheduled: bool = False) -> None:
 
     """Run the bulk import scrape in a separate thread."""
-
-    if instance.mode == "web":
-        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": True })
 
     parsed_urls = []
 
@@ -245,7 +240,6 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
                 continue                
     if len(parsed_urls) == 0:
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
-        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
         return
 
     # Pass the processing of the parsed URLs off to a thread
@@ -274,21 +268,27 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     errors = 0
 
     try:
-        globals.scrapes_running += 1
-        notify_web(instance, "scrape_state", {"running": True, "type": "bulk"})
 
         # Check if plex setup returned valid values
         if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
             update_status(instance, "Plex setup incomplete. Please check the settings.", color=StatusColor.DANGER.value)
-            globals.scrapes_running -= 1
             return
+
+        globals.scrapes_running += 1
+        globals.scrape_type = "bulk"
+        notify_web(instance, "scrape_state", {"running": True, "type": globals.scrape_type})
 
         start_time = time.time()
         # Log the start of the bulk import process
         display_filename = filename if filename else "bulk_import.txt"
 
         # Show the progress bar on the web UI
-        notify_web(instance, "progress_bar", {"percent" : 0, "message": f"{display_filename} • 0 of {len(parsed_urls)}", "bar_type": "bulk"})
+        message = f"{display_filename} • 0 of {len(parsed_urls)}"
+        notify_web(instance, "progress_bar", {"percent" : 0, "message": message, "bar_type": "bulk"})
+        globals.bulk_bar["active"] = True
+        globals.bulk_bar["percent"] = 0
+        globals.bulk_bar["message"] = message
+        globals.bulk_bar["speed"] = "smooth"
 
         # Loop through the bulk list
         for i, parsed_line in enumerate(parsed_urls, 1):
@@ -304,7 +304,12 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 pass
 
             percent = (i / len(parsed_urls)) * 100
-            notify_web(instance, "progress_bar", {"message": f"{display_filename} • {i} of {len(parsed_urls)}", "percent" : percent, "bar_type": "bulk"})
+            message = f"{display_filename} • {i} of {len(parsed_urls)}"
+            notify_web(instance, "progress_bar", {"message": message, "percent" : percent, "bar_type": "bulk"})
+            globals.bulk_bar["active"] = True
+            globals.bulk_bar["percent"] = percent
+            globals.bulk_bar["message"] = message
+            globals.bulk_bar["speed"] = "smooth"
 
         # Log the completion of the bulk import process
         end_time = time.time()
@@ -344,8 +349,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
-            notify_web(instance, "scrape_state", {"running": False, "type": "bulk"})
-        notify_web(instance, "element_disable", { "element": ["scrape_url", "scrape_button", "bulk_button"], "mode": False })
+            notify_web(instance, "scrape_state", {"running": False, "type": globals.scrape_type})
+            globals.scrape_type = "stopped"
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
 def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None):
@@ -368,6 +373,17 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, success_coun
     def progress_callback(current: int, total: int, title: str, bar_type:str = "main", bar_speed:str = "smooth"):
         percent = (current / total * 100) if total > 0 else 0
         notify_web(instance, "progress_bar", {"message": title, "percent": percent, "bar_type": bar_type, "bar_speed": bar_speed})
+        if bar_type == "main":
+            globals.main_bar["active"] = True
+            globals.main_bar["percent"] = percent
+            globals.main_bar["message"] = title
+            globals.main_bar["speed"] = bar_speed
+        elif bar_type == "bulk":
+            globals.bulk_bar["active"] = True
+            globals.bulk_bar["percent"] = percent
+            globals.bulk_bar["message"] = title
+            globals.bulk_bar["speed"] = bar_speed
+            
 
     callbacks = ProcessingCallbacks(
         on_status_update=status_callback,
@@ -412,6 +428,16 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
     def progress_callback(current: int, total: int, title: str, bar_type:str = "main", bar_speed:str = "smooth"):
         percent = (current / total * 100) if total > 0 else 0
         notify_web(instance, "progress_bar", {"message": title, "percent": percent, "bar_type": bar_type, "bar_speed": bar_speed})
+        if bar_type == "main":
+            globals.main_bar["active"] = True
+            globals.main_bar["percent"] = percent
+            globals.main_bar["message"] = title
+            globals.main_bar["speed"] = bar_speed
+        elif bar_type == "bulk":
+            globals.bulk_bar["active"] = True
+            globals.bulk_bar["percent"] = percent
+            globals.bulk_bar["message"] = title
+            globals.bulk_bar["speed"] = bar_speed
 
     def debug_callback(message: str, context: str = None):
         debug_me(message, context)
@@ -554,7 +580,6 @@ def setup_web_sockets():
     # Start the web server
     web_routes.start_web_server(web_app, DEFAULT_WEB_HOST, DEFAULT_WEB_PORT, globals.debug)
 
-
 def check_image_orientation(image_path):
     """Check image orientation using ImageService."""
     return ImageService.check_orientation(image_path)
@@ -569,19 +594,9 @@ def get_latest_version():
     """Fetch the latest release version from GitHub."""
     return globals.update_service.get_latest_version() if globals.update_service else None
 
-def check_for_updates_periodically():
-    """Background task to check for updates periodically - now handled by UpdateService."""
-    # This function is kept for backwards compatibility but is no longer used
-    # The UpdateService handles periodic checks automatically
-    pass
-
-
-
-
 def add_file_to_schedule_thread(instance: Instance, filename):
     if instance:
         threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
-
 
 def process_bulk_file_on_schedule(instance: Instance, filename):
 
@@ -720,6 +735,10 @@ if __name__ == "__main__":
 
     # Create a connector for Plex
     globals.plex = PlexConnector(config.base_url, config.token)
+    # Initialize the library index object (it will not create the index if there are no libraries defined yet)
+    # The actual index will be created the first time it's needed, and will not be recreated unless it expires
+    # or the defined libraries have changed. This is controlled by the _initialize_index method in PlexLibraryIndex
+    globals.plex._initialize_index()
 
     # Check for CLI arguments regardless of interactive_cli flag
     if cli_command:
