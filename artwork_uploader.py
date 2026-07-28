@@ -810,7 +810,7 @@ if __name__ == "__main__":
         if not interactive_cli:
             update_log(cli_instance, f"🚀 Starting Artwork Uploader {CURRENT_VERSION} in web mode")
             if globals.docker:
-                update_log(cli_instance, "🐳 Running in Docker environment", force_print=True)
+                update_log(cli_instance, "🐳 Running in Docker environment")
             # Setup scheduler only in the main process to avoid duplication
             if os.getenv("WERKZEUG_RUN_MAIN") == "true" or not globals.debug:
                 update_log(cli_instance, "🗓️ Setting up scheduler for scheduled tasks")
