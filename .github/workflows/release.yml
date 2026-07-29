@@ -9,6 +9,7 @@ permissions:
   contents: write
   packages: write
   id-token: write
+  pull-requests: read  # Required for --generate-notes to read PR metadata
 
 jobs:
   create-release:
@@ -42,7 +43,7 @@ jobs:
           fi
 
       # ----------------------------
-      # Docker setup
+      # Docker setup & push
       # ----------------------------
 
       - name: Set up QEMU
@@ -77,7 +78,7 @@ jobs:
           labels: ${{ steps.docker_meta.outputs.labels }}
 
       # ----------------------------
-      # Create release artifacts
+      # Create release artifacts & GitHub Release
       # ----------------------------
 
       - name: Create source distribution
@@ -92,5 +93,6 @@ jobs:
         run: |
           gh release create "${{ steps.get_version.outputs.TAG }}" \
             --title "Release ${{ steps.get_version.outputs.TAG }}" \
+            --notes-from-tag \
             --generate-notes \
             dist/*.zip dist/*.tar.gz

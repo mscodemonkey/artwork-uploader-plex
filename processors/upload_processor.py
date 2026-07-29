@@ -24,7 +24,6 @@ class UploadProcessor:
         self.options: Options = Options()
         self.config: Config = Config()
         self.config.load()
-        # self._media_index: Optional[PlexLibraryIndex] = None
         self._match_confirm_cache: dict = {}
 
 

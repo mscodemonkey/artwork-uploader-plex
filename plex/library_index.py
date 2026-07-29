@@ -84,18 +84,21 @@ class PlexLibraryIndex:
                 "library": library.title,
                 "type": MediaType.TV_SHOW.value if library.type == "show" else MediaType.MOVIE.value
             }
-            for key in self._title_keys(item.title, getattr(item, "originalTitle", None)):
+            for key in self._title_keys(item):
                 index.setdefault(key, []).append(entry)
         debug_me(f"Added {n} {MediaType.TV_SHOW.value if library.type == "show" else MediaType.MOVIE.value} items from library {library.title} to index")
 
-    def _title_keys(self, title: str, original_title: Optional[str]) -> set:
+    def _title_keys(self, item) -> set:
         """All the normalized keys an item should be findable under."""
-        keys = {normalize_title(title)}
-        if original_title:
-            keys.add(normalize_title(original_title))
+        keys = {normalize_title(item.title)}
+        slug_without_year = item.slug.split(f"-{item.year}")[0].strip()
+        keys.add(normalize_title(slug_without_year))
+        if item.originalTitle:
+            keys.add(normalize_title(item.originalTitle))
+        
         # Also index without a trailing parenthetical, so "The Office (US)" is findable as "The Office"
-        stripped = re.sub(r"\s*\([^)]*\)\s*$", "", title)
-        if stripped and stripped != title:
+        stripped = re.sub(r"\s*\([^)]*\)\s*$", "", item.title)
+        if stripped and stripped != item.title:
             keys.add(normalize_title(stripped))
         keys.discard("")
         return keys
@@ -109,7 +112,8 @@ class PlexLibraryIndex:
         - tmdb_id (int | None): the TMDb ID when status is "matched"
         """
         _kind = [kind] if kind is not None else [MediaType.TV_SHOW, MediaType.MOVIE]
-        candidates = [c for c in self.index.get(normalize_title(title), []) if c["type"] in _kind]
+        lookup_string = normalize_title(title)
+        candidates = [c for c in self.index.get(lookup_string, []) if c["type"] in _kind]
         if candidates and year is not None:
             for candidate_year in (year, int(year) - 1, int(year) + 1):
                 matched = [c for c in candidates if c["year"] == candidate_year]
