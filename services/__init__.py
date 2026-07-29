@@ -11,6 +11,7 @@ from .scheduler_service import SchedulerService
 from .utility_service import UtilityService
 from .authentication_service import AuthenticationService
 from .notify_service import NotifyService
+from .asset_index import AssetIndex
 
 __all__ = [
     'BulkFileService',
@@ -18,5 +19,6 @@ __all__ = [
     'SchedulerService',
     'UtilityService',
     'AuthenticationService',
-    'NotifyService'
+    'NotifyService',
+    'AssetIndex'
 ]

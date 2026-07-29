@@ -20,6 +20,7 @@ DEFAULT_WEB_HOST = "0.0.0.0"
 
 # File paths
 DEFAULT_CONFIG_PATH = "config.json"
+ASSET_INDEX_PATH = "config/asset_index.db"
 DEFAULT_BULK_IMPORTS_DIR = "bulk_imports"
 DEFAULT_BULK_IMPORT_FILE = "bulk_import.txt"
 
@@ -110,6 +111,10 @@ TPDB_COLLECTION_MEDIA_TYPES = [
     MediaType.CATEGORY,
     MediaType.COMPANY
 ]
+# A full crawl only tombstones assets it didn't see if it reached at least this share of the
+# user's reported uploads. ThePosterDB's counter runs a little high, so this is below 1.0, but a
+# crawl cut short by a bad page must never be mistaken for a catalogue that shrank.
+RECONCILE_MIN_COVERAGE = 0.9
 
 # MediUX configuration
 MEDIUX_BASE_URL = "https://mediux.pro"

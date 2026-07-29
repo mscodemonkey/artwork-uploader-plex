@@ -15,6 +15,7 @@ import argparse
 # --kometa          Saves artwork to Kometa asset directory (specified in config file) instead of uploading to Plex.
 # --stage           Downloads artwork for seasons and episodes that are not in Plex yet (except Specials).
 # --temp            Uses a temporary directory (specified in config file) instead of the Kometa asset directory.
+# --no-cache        Ignore the cached ThePosterDB user uploads index for this run and crawl every page.
 # ---------------------------------------------------------
 
 def parse_arguments():
@@ -35,5 +36,6 @@ def parse_arguments():
     parser.add_argument("--kometa", action='store_true', help="Saves artwork to Kometa asset directory (specified in config file) instead of uploading to Plex.")
     parser.add_argument("--stage", action='store_true', help="Downloads artwork for seasons and episodes that are not in Plex yet (except Specials).")
     parser.add_argument("--temp", action='store_true', help="Uses a temporary directory (specified in config file) instead of the Kometa asset directory.")
+    parser.add_argument("--no-cache", action='store_true', help="Ignore the cached ThePosterDB user uploads index for this run and crawl every page (the run still refreshes the index).")
 
     return parser.parse_args()
