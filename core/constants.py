@@ -28,7 +28,7 @@ DEFAULT_TV_LIBRARY = ["TV Shows"]
 DEFAULT_MOVIE_LIBRARY = ["Movies"]
 
 # Plex library index refresh timeout (seconds)
-PLEX_LIBRARY_INDEX_TIMEOUT = 900 # Default 15 minutes
+PLEX_LIBRARY_INDEX_TIMEOUT = 6 * 60 * 60 # Default 6 hours
 
 # Filter types - valid artwork types that can be filtered
 FILTER_TITLE_CARD = "title_card"
