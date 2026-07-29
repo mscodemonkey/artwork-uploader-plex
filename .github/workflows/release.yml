@@ -93,6 +93,5 @@ jobs:
         run: |
           gh release create "${{ steps.get_version.outputs.TAG }}" \
             --title "Release ${{ steps.get_version.outputs.TAG }}" \
-            --notes-from-tag \
             --generate-notes \
             dist/*.zip dist/*.tar.gz
