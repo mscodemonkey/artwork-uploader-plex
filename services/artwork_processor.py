@@ -73,6 +73,11 @@ class ArtworkProcessor:
         # Process the scraped artwork
         processor = UploadProcessor(self.plex)
         processor.set_options(options)
+        # allow_artist_updates needs to know which posters belong to the artist being processed.
+        # The cached scrape builds that from the index (tombstones included); otherwise derive it
+        # from what this scrape collected.
+        processor.artist_assets = scraper.artist_assets if getattr(scraper, "artist_assets", None) is not None \
+            else self._artist_assets_from_scrape(scraper)
 
         description = f"TBDb portfolio • {scraper.author}" if "/user" in url else f"{scraper.title} • {scraper.author}"
 
@@ -135,6 +140,20 @@ class ArtworkProcessor:
             if not bulk:
                 self.callbacks.status(f"Process completed {f'{title} by {scraper.author}' if title else f"for {scraper.author}'s TPDb portfolio"}", "success")
         return scraper.title, scraper.author
+
+    @staticmethod
+    def _artist_assets_from_scrape(scraper) -> dict:
+        """Fallback ownership map when there's no cached index: md5(url) -> asset id for every
+           poster this scrape collected. Enough to recognise artwork we applied from the same
+           run's artist; an asset the artist has since removed just falls back to protected."""
+        from utils.utils import calculate_md5
+        mapping = {}
+        for artwork in (scraper.movie_artwork + scraper.tv_artwork + scraper.collection_artwork):
+            url = artwork.get("url")
+            asset_id = artwork.get("id")
+            if url and str(asset_id).isdigit():
+                mapping[calculate_md5(url.split("&_cb=")[0])] = int(asset_id)
+        return mapping
 
     def _process_single_artwork(
         self,

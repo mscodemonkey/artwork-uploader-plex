@@ -710,6 +710,7 @@ if __name__ == "__main__":
                           add_sets=args.add_sets,
                           force=args.force,
                           skip_locked=args.skip_locked,
+                          allow_artist_updates=args.allow_artist_updates,
                           filters=args.filters,
                           exclude=args.exclude,
                           year=args.year,

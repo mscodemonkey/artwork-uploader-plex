@@ -163,6 +163,8 @@ It's there for when we have API access (and works for scrapers in the meantime) 
 
 If you enable ```skip_locked_artwork```, a scheduled user or bulk scrape will only fill items that are still on their default artwork and leave anything you've set by hand untouched, so it's safe to leave running against a curated library.
 
+If you also enable ```allow_artist_updates```, a scheduled scrape may additionally replace artwork it applied earlier when the same artist has posted a newer version of it. It still never touches artwork you set by hand (anything without one of this tool's artwork-ID labels) or artwork from a different artist, and it only ever moves forward to a newer upload, so runs settle on each artist's latest rather than flip-flopping. It needs both ```skip_locked_artwork``` and ```track_artwork_ids``` on. Because this writes over artwork the tool previously chose, take a note of your current posters before the first run if you want to be able to revert.
+
 With ```local_library_matching``` enabled (the default), a user-catalog scrape skips everything that isn't in your libraries without any web requests, so full-catalog runs take minutes rather than hours.
 
 Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the ```apprise_urls``` variable in the ```config.json```file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
@@ -234,6 +236,12 @@ This is optional - if you don't do this, a new config.json will be created when 
 ```"skip_locked_artwork"```
 - Setting this to ```true``` will skip any artwork whose target field (poster, background or square art) is locked in Plex, unless ```--force``` is used.  Plex locks a field whenever artwork is deliberately set - manually or by an upload - so this makes scheduled bulk imports and user scrapes fill items still on default artwork while leaving anything you've already set alone.
 - Setting to ```false``` (the default) keeps the existing behaviour where artwork is applied regardless of locks.
+
+```"allow_artist_updates"```
+- Setting this to ```true``` lets a run replace artwork it applied earlier when the same artist has posted a newer version, even though the field is locked.  Artwork you set by hand (anything without one of this tool's artwork-ID labels) and artwork from a different artist are still left alone, and it only moves forward to a newer upload.
+- Requires ```skip_locked_artwork``` and ```track_artwork_ids``` to both be ```true```.  Has no effect otherwise.
+- Setting to ```false``` (the default) keeps the existing behaviour where a locked field is never updated by a scrape.
+
 ```"cache_user_scrapes"```
 - Setting this to ```true``` keeps a local index of each ThePosterDB user's uploads (a small SQLite file in your config directory), so scraping a user page again only fetches pages until it reaches uploads it has already seen - full-catalogue re-runs drop from hundreds of page requests to a couple, which is also much kinder to ThePosterDB.  Every ```user_cache_refresh_days``` days the next scrape of that user re-crawls every page to pick up edited or deleted uploads.
 - Setting to ```false``` (the default) crawls every page on every user scrape, exactly as before.
@@ -371,6 +379,8 @@ The script supports various command-line arguments for flexible use.
 ```--force``` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
     
 ```--skip-locked``` will skip any artwork whose target field is locked in Plex (i.e. it's been deliberately set, manually or by a previous upload), unless ```--force``` is also used.  This is the same as setting ```skip_locked_artwork``` to ```true``` in ```config.json```, but per URL.
+
+```--allow-artist-updates``` lets a run replace artwork it applied earlier when the same artist has posted a newer version, while still leaving hand-set artwork and other artists' artwork alone.  This is the same as setting ```allow_artist_updates``` to ```true``` in ```config.json```, but per URL.  It needs ```--skip-locked``` (or ```skip_locked_artwork```) and ```track_artwork_ids``` to take effect.
     
 ```--exclude <id1> [<id2> <id3> ...]``` will exclude the poster or artwork with the specified ID from being uploaded.  Grab the ID from the session log...
 - ThePosterDB is a number

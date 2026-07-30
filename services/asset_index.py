@@ -187,6 +187,19 @@ class AssetIndex:
         finally:
             conn.close()
 
+    def owned_asset_urls(self, user_key: str) -> List[sqlite3.Row]:
+        """(asset_id, url) for every asset ever recorded for the user, tombstoned ones included,
+           so artwork we applied stays recognisable as this artist's even after they delete or
+           replace the upload. Used to decide allow_artist_updates ownership."""
+        conn = self._connect()
+        try:
+            return conn.execute(
+                "SELECT asset_id, url FROM user_assets WHERE user_key = ? AND url IS NOT NULL",
+                (user_key,),
+            ).fetchall()
+        finally:
+            conn.close()
+
     def reconcile(self, user_key: str, seen_ids: Set[int], crawl_started_at: str) -> int:
         """After a clean full crawl, tombstone assets that weren't seen (deleted from the
            user's uploads), sparing any row inserted since the crawl began so an overlapping

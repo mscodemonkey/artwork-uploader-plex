@@ -27,6 +27,8 @@ class PlexUploader:
         self.track_artwork_ids: bool = True
         self.reset_overlay: bool = False
         self.skip_locked: bool = False
+        self.allow_artist_updates: bool = False
+        self.artist_assets: Optional[dict] = None  # {md5(asset url): asset id} for the artist being processed
         self.confirm_match = None
         self.stale_labels: list = []
 
@@ -56,7 +58,12 @@ class PlexUploader:
     def upload_to_plex(self) -> str:
         try:
             if self.skip_locked and not self.options.force and self.artwork_field_is_locked():
-                return f'🔒 {self.description} | {self.artwork_type} locked, skipped in {self.upload_target.librarySectionTitle}'
+                # A locked field is normally left alone. But if we applied its current artwork
+                # from this same artist and the artist has since posted a newer version,
+                # allow_artist_updates lets that one update flow through - a hand-set custom (no
+                # matching label) or another artist's poster is still protected.
+                if not (self.allow_artist_updates and self.candidate_supersedes_current()):
+                    return f'🔒 {self.description} | {self.artwork_type} locked, skipped in {self.upload_target.librarySectionTitle}'
             if self.artwork_exists_on_plex() is False or self.options.force:
 
                 if self.confirm_match is not None and not self.confirm_match():
@@ -131,3 +138,23 @@ class PlexUploader:
             self.upload_target.reload()
         self.stale_labels = []
 
+    def current_artwork_id(self) -> Optional[int]:
+        """The asset id of the artwork currently on this item of our type, if we applied it from
+           the artist being processed. None if it was set by hand or by a different artist."""
+        if not self.artist_assets:
+            return None
+        for label in self.upload_target.labels:
+            existing_label = str(label)
+            if existing_label.startswith(self.artwork_id):
+                return self.artist_assets.get(existing_label[len(self.artwork_id):])
+        return None
+
+    def candidate_supersedes_current(self) -> bool:
+        """True when the artwork we're about to apply is a same-or-newer asset from the same
+           artist that applied the current artwork. Only ever moves forward to a newer asset id,
+           so the nightly run converges on the artist's latest instead of flip-flopping."""
+        candidate = self.artwork.get("id") if self.artwork else None
+        if not (isinstance(candidate, (int, str)) and str(candidate).isdigit()):
+            return False  # file uploads and non-numeric ids can't be compared by asset id
+        current_id = self.current_artwork_id()
+        return current_id is not None and int(candidate) >= current_id

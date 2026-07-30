@@ -35,6 +35,7 @@ class Scraper:
         self.source: Optional[str] = None
         self.title: Optional[str] = None
         self.author: Optional[str] = None
+        self.artist_assets: Optional[dict] = None
         self.skipped: int = 0
         self.exclusions: int = 0
         self.filtered: int = 0
@@ -86,6 +87,7 @@ class Scraper:
 
             self.title = theposterdb_scraper.title
             self.author = theposterdb_scraper.author
+            self.artist_assets = theposterdb_scraper.artist_assets
             self.movie_artwork = theposterdb_scraper.movie_artwork
             self.tv_artwork = theposterdb_scraper.tv_artwork
             self.collection_artwork = theposterdb_scraper.collection_artwork
