@@ -774,6 +774,10 @@ function saveConfig() {
     
     // Checkbox for caching ThePosterDB user scrapes
     save_config.cache_user_scrapes = document.getElementById("cache_user_scrapes").checked;
+    toggleUserCacheExpiryField();
+
+    // ThePosterDB user cache expiration threshold
+    save_config.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value);
 
     // Get selected mediux filters
     save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
@@ -828,7 +832,6 @@ function saveConfig() {
                     color: "success",
                     icon: "check2-circle",
                     broadcast: true
-                    
                 });
                 configureTabs(true);
             } else {
@@ -878,6 +881,7 @@ function updateConfigUI(config) {
     document.getElementById("skip_locked_artwork").checked = config.skip_locked_artwork;
     document.getElementById("local_library_matching").checked = config.local_library_matching;
     document.getElementById("cache_user_scrapes").checked = config.cache_user_scrapes;
+    document.getElementById("user_cache_refresh_days").value = config.user_cache_refresh_days;
     document.getElementById("option-add-to-bulk").checked = config.auto_manage_bulk_files;
     document.getElementById("apprise_urls").value = config.apprise_urls.join(", ");
     
@@ -905,6 +909,9 @@ function updateConfigUI(config) {
     
     // Make sure skip locked artwork option visibility is set correctly on load
     toggleSkipLockedCheckbox();
+
+    // Make sure user asset cache expiry field visibility is seet correctly on load
+    toggleUserCacheExpiryField();
     
     // Show/hide logout button based on auth enabled
     if (config.auth_enabled) {
@@ -2166,3 +2173,16 @@ document.getElementById("temp_dir").addEventListener("input", toggleTempCheckbox
 
 // Add event listener for stage_assets checkbox
 document.getElementById("stage_assets").addEventListener("change", toggleScraperStageCheckbox);
+
+document.getElementById("cache_user_scrapes").addEventListener("change", toggleUserCacheExpiryField);
+
+function toggleUserCacheExpiryField() {
+    const userCacheToggle = document.getElementById("cache_user_scrapes");
+    const cacheExpiryContainer = document.getElementById("cache_expiry_container");
+
+    if (userCacheToggle.checked) {
+        cacheExpiryContainer.classList.remove("d-none");
+    } else {
+        cacheExpiryContainer.classList.add("d-none");
+    }
+}
