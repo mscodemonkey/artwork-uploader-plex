@@ -501,6 +501,13 @@ class ThePosterDBScraper:
         clean = True
         collected = 0
         for user_page in range(self.user_pages):
+            # A Stop during a cached crawl must also mark the crawl unclean. The `if clean:` block in
+            # _scrape_user_cached gates both reconcile() and record_crawl(), so breaking out without
+            # this would tombstone every asset the crawl never reached and advance last_full_crawl
+            # over a partial pass.
+            if globals.cancel_scrape:
+                clean = False
+                break
             self.callbacks.progress(user_page + 1, self.user_pages, f"Collecting assets from TPDb user {self.author} • {user_page + 1} of {self.user_pages} pages • {collected} assets collected of {self.user_uploads}")
             page_catalog = []
             ok = self.scrape_user_page(user_page, catalog=page_catalog)
