@@ -88,6 +88,33 @@ def test_a_failed_page_still_marks_the_crawl_unclean(tmp_path, monkeypatch):
     assert clean is False                        # a real failure must still block reconcile
 
 
+def test_a_cancelled_crawl_is_unclean_and_stops(tmp_path, monkeypatch):
+    scraper = _scraper()
+    scraper.user_uploads = 240
+    scraper.user_pages = 10
+    index = AssetIndex(str(tmp_path / "idx.db"))
+
+    pages_fetched = []
+
+    def fake(page, catalog=None):
+        pages_fetched.append(page)
+        for asset_id in range(page * 1000, page * 1000 + 24):
+            catalog.append(_asset(asset_id))
+        if page == 2:
+            tpdb.globals.cancel_scrape = True    # user presses Stop partway through
+        return True
+
+    monkeypatch.setattr(scraper, "scrape_user_page", fake)
+    try:
+        new_rows, seen_ids, clean = scraper._crawl_user_pages(index, "someone", full=True)
+    finally:
+        tpdb.globals.cancel_scrape = False
+
+    assert pages_fetched == [0, 1, 2]            # it stops rather than crawling all ten
+    assert clean is False                        # and blocks reconcile, or the seven unreached
+                                                 # pages of assets would all be tombstoned
+
+
 # --- reconcile guard: never tombstone from a crawl that was cut short --------------------------
 
 def _seed(tmp_path, n):
