@@ -409,8 +409,23 @@
                                         </div>
                                         <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" value="cache_user_scrapes" id="cache_user_scrapes"/>
-                                            <label for="cache_user_scrapes" class="form-check-label">Remember each ThePosterDB user's uploads between scrapes, so repeat scrapes only fetch new uploads</label>
+                                            <label for="cache_user_scrapes" class="form-check-label">Cache ThePosterDB user pages</label>
+                                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="ThePosterDB only: Keeps a persistent cache in a SQLite database of TPDb user 
+                                            page scrapes so that periodic scrapes of large user portfolios are much faster"></i>
                                         </div>
+                                        <div id="cache_expiry_container" class="mt-2 mb-3 d-flex align-items-center" style="display: d-none;">
+                                            <label for="user_cache_refresh_days" class="form-label me-2 mb-0">Refresh user cache every</label>
+                                            <input type="number" 
+                                                class="form-control form-control-sm text-center d-inline-block me-2" 
+                                                id="user_cache_refresh_days" 
+                                                name="user_cache_refresh_days"
+                                                min="1" 
+                                                max="365" 
+                                                value="30" 
+                                                style="width: 60px;" 
+                                                required />
+                                            <span class="text-body">days</span>
+                                        </div>                                        
                                     </div>
                                 </div>
                             </div>

@@ -116,3 +116,4 @@ DEVELOPER_GUIDE.md
 .gitignore
 docker-compose.yml
 config/.plex_client_id
+config/asset_index.db*
