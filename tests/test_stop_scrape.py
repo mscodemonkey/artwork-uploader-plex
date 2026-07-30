@@ -213,7 +213,8 @@ def test_single_url_cancel_emits_stopped_status():
 
         assert statuses, "a cancelled single-URL scrape must emit a status toast"
         message, color = statuses[-1]
-        assert "Stopped" in message
+        assert "Process canceled" in message
+        assert "for for" not in message
         assert "Processed all artwork" not in message
         assert color == "warning"
     finally:

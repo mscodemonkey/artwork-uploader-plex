@@ -128,12 +128,12 @@ class ArtworkProcessor:
             self.callbacks.progress(1, 1, "", "main")  # nudge to 100% so the frontend clears the bar (it only hides at 100%)
             self.callbacks.log(f"🛑 {description} | Canceled by user • {self.callbacks.success_counter[0]} asset(s) updated before stopping")
             if not bulk:
-                self.callbacks.status(f"Process canceled for {f'{title} by {scraper.author}' if title else f"{scraper.author}'s TPDb portfolio"}", "warning")
+                self.callbacks.status(f"Process canceled {f'{title} by {scraper.author}' if title else f"for {scraper.author}'s TPDb portfolio"}", "warning")
         else:
             self.callbacks.assets(count=(scraper.total - scraper.skipped))
             self.callbacks.log(f"✔️ {description} | {scraper.total - scraper.skipped} asset(s) processed in {elapsed} • {self.callbacks.success_counter[0]} asset(s) updated")
             if not bulk:
-                self.callbacks.status(f"Process completed for {f'{title} by {scraper.author}' if title else f"{scraper.author}'s TPDb portfolio"}", "success")
+                self.callbacks.status(f"Process completed {f'{title} by {scraper.author}' if title else f"for {scraper.author}'s TPDb portfolio"}", "success")
         return scraper.title, scraper.author
 
     def _process_single_artwork(
