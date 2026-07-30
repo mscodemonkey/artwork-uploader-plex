@@ -2059,33 +2059,48 @@ function toggleKometaSettings() {
 
 function toggleSkipLockedCheckbox() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
-    const globalSetting = document.getElementById("skip_locked_artwork").checked;
-    const skipLockedCheckbox = document.getElementById("option-skip-locked");
-    const skipLockedCheckboxUpload = document.getElementById("upload-option-skip-locked");
-
+    const globalSkipLocked = document.getElementById("skip_locked_artwork");
+    const skipLockedScraperOption = document.getElementById("option-skip-locked");
+    const skipLockedUploadOption = document.getElementById("upload-option-skip-locked");
+    const globalAllowArtistUpdates = document.getElementById("allow_artist_updates");
+    const allowArtistUpdatesScrapeOption = document.getElementById("option-allow-artist-updates");
+    const trackArtworkIDs = document.getElementById("track_artwork_ids").checked;
+    
     // Hide and uncheck the skip locked option if Kometa is enabled
     if (saveToKometa) {
-        skipLockedCheckbox.parentElement.style.display = "none";
-        skipLockedCheckbox.checked = false;
-        skipLockedCheckboxUpload.parentElement.style.display = "none";
-        skipLockedCheckboxUpload.checked = false;
+        skipLockedScraperOption.parentElement.style.display = "none";
+        skipLockedScraperOption.checked = false;
+        skipLockedUploadOption.parentElement.style.display = "none";
+        skipLockedUploadOption.checked = false;
+        globalAllowArtistUpdates.parentElement.style.display = "none";
+        globalAllowArtistUpdates.checked = false;
+        allowArtistUpdatesScrapeOption.parentElement.style.display = "none";
+        allowArtistUpdatesScrapeOption.checked = false;
     } else {
-        if (globalSetting) {
-            skipLockedCheckbox.parentElement.style.display = "none";
-            skipLockedCheckbox.checked = true;
-            skipLockedCheckboxUpload.parentElement.style.display = "none";
-            skipLockedCheckboxUpload.checked = true;
+        if (globalSkipLocked.checked) {
+            skipLockedScraperOption.parentElement.style.display = "none";
+            skipLockedScraperOption.checked = true;
+            skipLockedUploadOption.parentElement.style.display = "none";
+            skipLockedUploadOption.checked = true;
+            globalAllowArtistUpdates.parentElement.style.display = trackArtworkIDs ? "block" : "none";
+            allowArtistUpdatesScrapeOption.parentElement.style.display = globalAllowArtistUpdates.checked ? "none" : "block";
         } else {
-            skipLockedCheckbox.parentElement.style.display = "block";
-            skipLockedCheckbox.checked = false;
-            skipLockedCheckboxUpload.parentElement.style.display = "block";
-            skipLockedCheckboxUpload.checked = false;
+            skipLockedScraperOption.parentElement.style.display = "block";
+            skipLockedScraperOption.checked = false;
+            skipLockedUploadOption.parentElement.style.display = "block";
+            skipLockedUploadOption.checked = false;
+            globalAllowArtistUpdates.parentElement.style.display = "none";
+            globalAllowArtistUpdates.checked = false;
+            allowArtistUpdatesScrapeOption.parentElement.style.display = "none";
+            allowArtistUpdatesScrapeOption.checked = false;
         }
     }
 }
 
 // Add event listener for global skip locked artwork checkbox
 document.getElementById("skip_locked_artwork").addEventListener("change", toggleSkipLockedCheckbox);
+document.getElementById("track_artwork_ids").addEventListener("change", toggleSkipLockedCheckbox);
+document.getElementById("allow_artist_updates").addEventListener("change", toggleSkipLockedCheckbox);
 
 function toggleScraperStageCheckbox() {
     const globalStageSetting = document.getElementById("stage_assets").checked;
@@ -2135,6 +2150,7 @@ function togglePlexOptions() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const trackArtworkIDs = document.getElementById("track_artwork_ids").parentElement;
     const skipLocked = document.getElementById("skip_locked_artwork").parentElement;
+    // const allowArtistUpdates = document.getElementById("allow_artist_updates").parentElement;
     const resetOverlay = document.getElementById("reset_overlay").parentElement;
 
     // Ony show the Track Artwork IDs and Reset Overlay options if Kometa is disabled
@@ -2142,10 +2158,12 @@ function togglePlexOptions() {
         trackArtworkIDs.style.display = "block";
         resetOverlay.style.display = "block";
         skipLocked.style.display = "block";
+        // allowArtistUpdates.style.display = "block";
     } else {
         trackArtworkIDs.style.display = "none";
         resetOverlay.style.display = "none";
         skipLocked.style.display = "none";
+        // allowArtistUpdates.style.display = "none";
         document.getElementById("skip_locked_artwork").checked = false; // Uncheck the skip locked option if Kometa is enabled
         document.getElementById("track_artwork_ids").checked = true;
     }
