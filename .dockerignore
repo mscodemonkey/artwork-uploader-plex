@@ -2,3 +2,8 @@ __pycache__
 Dockerfile
 docker-compose.yml
 bulk_imports/*
+
+# Local runtime state. Both are gitignored, but COPY . . reads the build
+# context rather than git, so a build after a first run bakes them into the image.
+config/config.json
+config/.plex_client_id
