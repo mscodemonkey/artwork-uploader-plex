@@ -8,7 +8,6 @@ from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP, ARTWORK_FILENAME_MA
 from models.options import Options
 from plex.plex_connector import PlexConnector
 from plex.plex_uploader import PlexUploader
-from plex.library_index import PlexLibraryIndex
 from plexapi.exceptions import NotFound
 from kometa.kometa_saver import KometaSaver
 from utils import soup_utils

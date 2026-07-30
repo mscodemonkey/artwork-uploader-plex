@@ -403,9 +403,9 @@
                                         <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" value="allow_artist_updates" id="allow_artist_updates"/>
                                             <label for="allow_artist_updates" class="form-check-label">Allow artist updates</label>
-                                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Lets a run replace artwork it applied earlier when the same artist has posted a newer
+                                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="ThePosterDB only: Lets a run replace artwork it applied earlier when the same artist has posted a newer
                                             version of it. Artwork you set by hand and artwork from a different artist are left alone, and it only ever moves forward to a newer upload. Needs
-                                            skip locked artwork and track artwork IDs enabled."></i>
+                                            skip locked artwork and track artwork IDs enabled. (NOTE: Does not apply to uploaded ZIP files.)"></i>
                                         </div>
                                         <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" value="local_library_matching" id="local_library_matching"/>
@@ -421,7 +421,7 @@
                                             page scrapes so that periodic scrapes of large user portfolios are much faster"></i>
                                         </div>
                                         <div id="cache_expiry_container" class="mt-2 mb-3 d-flex align-items-center" style="display: d-none;">
-                                            <label for="user_cache_refresh_days" class="form-label me-2 mb-0">Refresh user cache every</label>
+                                            <label for="user_cache_refresh_days" class="form-label me-2 mb-0"><i class="bi bi-recycle""></i>&ensp; Refresh user cache every</label>
                                             <input type="number" 
                                                 class="form-control form-control-sm text-center d-inline-block me-2" 
                                                 id="user_cache_refresh_days" 
