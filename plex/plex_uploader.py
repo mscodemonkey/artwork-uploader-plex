@@ -61,7 +61,6 @@ class PlexUploader:
 
                 if self.confirm_match is not None and not self.confirm_match():
                     return f'⚠️ {self.description} | {self.artwork_type} skipped in {self.upload_target.librarySectionTitle} - artwork is for a different title'
-                self.remove_stale_labels()
                 self.process_overlay_label()
 
                 if self.artwork_id == ArtworkIDPrefix.BACKGROUND.value:
@@ -87,6 +86,10 @@ class PlexUploader:
                         self.upload_target.uploadPoster(url = self.artwork["url"])
                     if self.track_artwork_ids:
                         self.upload_target.addLabel(self.label)
+                # Remove the labels for the artwork we just replaced only AFTER the new one is on
+                # the item, so a failed upload leaves the old label in place and the item stays
+                # recognisable as ours, rather than looking like artwork set by hand
+                self.remove_stale_labels()
                 if self.artwork["source"] == ScraperSource.THEPOSTERDB.value and self.type == "url":
                     time.sleep(TPDB_RATE_LIMIT_DELAY)
                 return f'{"♻️" if self.options.force else "✅"} {self.description} | {self.artwork_type} {"forced update" if self.options.force else "updated"} in {self.upload_target.librarySectionTitle}'
@@ -108,7 +111,7 @@ class PlexUploader:
                         self.upload_target.removeLabel(existing_label, False)  # Remove the existing label as we're no longer tracking the artwork IDs
                         self.upload_target.reload()
                 else:
-                    self.stale_labels.append(existing_label)  # Defer removal until we're about to replace the artwork (see remove_stale_labels)
+                    self.stale_labels.append(existing_label)  # Defer removal until the replacement is on the item (see remove_stale_labels)
 
         return existing_artwork
 
@@ -121,8 +124,8 @@ class PlexUploader:
         return False
 
     def remove_stale_labels(self) -> None:
-        # Remove same-type labels for artwork we're replacing, just before the upload, so a
-        # declined confirmation or a failed upload doesn't leave the item without its label
+        # Remove same-type labels for artwork we've now replaced. Called after the new artwork and
+        # its label are on the item, so a failed upload never strips the old label.
         for existing_label in self.stale_labels:
             self.upload_target.removeLabel(existing_label, False)
             self.upload_target.reload()
