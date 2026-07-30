@@ -266,6 +266,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     success_counter = [0]
     assets_processed = [0]
     cached_counter = [0]
+    locked_counter = [0]
     errors = 0
 
     try:
@@ -297,7 +298,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 break
 
             try:
-                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed, cached_counter=cached_counter)
+                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed, cached_counter=cached_counter, locked_counter=locked_counter)
                 #time.sleep(1)
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
@@ -325,6 +326,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 + f"{assets_processed[0]} asset(s) processed • "
                 + (f"{cached_counter[0]} new in cache • " if cached_counter[0] else "")
                 + f"{success_counter[0]} asset(s) updated"
+                + (f" • {locked_counter[0]} asset(s) locked (skipped)" if locked_counter[0] else "")
             )
             update_status(instance, message[2:], color=StatusColor.WARNING.value, sticky=False, spinner=False)
             notify_web(instance, "progress_bar", {"percent": 100, "bar_type": "bulk"})
@@ -337,6 +339,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 + f"{assets_processed[0]} asset(s) processed • "
                 + (f"{cached_counter[0]} new in cache • " if cached_counter[0] else "")
                 + f"{success_counter[0]} asset(s) updated"
+                + (f" • {locked_counter[0]} asset(s) locked (skipped)" if locked_counter[0] else "")
             )
             update_status(instance, message[2:], color=StatusColor.SUCCESS.value if errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
         update_log(instance, message)
@@ -357,7 +360,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             globals.scrape_type = "stopped"
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
-def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None, cached_counter=None):
+def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None, cached_counter=None, locked_counter=None):
     """
     Scrape artwork from a URL and upload to Plex.
 
@@ -396,7 +399,8 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, success_coun
         on_progress_update=progress_callback,
         success_counter=success_counter,
         assets_processed=assets_processed,
-        cached_counter=cached_counter
+        cached_counter=cached_counter,
+        locked_counter=locked_counter
     )
 
     # Use the service to do the actual work
