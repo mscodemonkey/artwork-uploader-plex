@@ -31,8 +31,12 @@ class UploadProcessor:
         self.options = options
         self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
         self.skip_locked: bool = self.options.skip_locked or globals.config.skip_locked_artwork
-        self.allow_artist_updates: bool = self.options.allow_artist_updates or globals.config.allow_artist_updates
-        if self.allow_artist_updates and not self.config.track_artwork_ids:
+        requested_artist_updates: bool = self.options.allow_artist_updates or globals.config.allow_artist_updates
+        # Artist updates read the artwork ID labels to tell our own artwork from a hand-set custom.
+        # Without track_artwork_ids there are no fresh labels to read, and labels left behind by an
+        # earlier tracked run would let a locked field be replaced on stale information.
+        self.allow_artist_updates: bool = requested_artist_updates and self.config.track_artwork_ids
+        if requested_artist_updates and not self.config.track_artwork_ids:
             debug_me("allow_artist_updates has no effect while track_artwork_ids is off - without "
                      "artwork IDs there's no way to tell artwork we applied from artwork set by "
                      "hand, so locked items are all left alone.", "UploadProcessor/set_options")
