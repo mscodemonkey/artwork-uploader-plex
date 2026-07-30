@@ -10,7 +10,7 @@ let currentBulkImport = '';     // Current bulk import file
 let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
-let tvPicker, moviePicker;
+let tvPicker, moviePicker, tpdbUserPicker;
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -35,6 +35,18 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 // Event listeners
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
+    tpdbUserPicker = new TomSelect('#webhook_tpdb_users', {
+            create: true,
+            createOnBlur: true,
+            delimiter: ',',
+            persist: false,
+            plugins: {
+                'clear_button': {
+                    html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
+                },
+                'remove_button': {}
+            }
+        });    
     tvPicker = new TomSelect('#tv_library', {
         inputTypes: [],
         controlInput: '<input readonly>',
@@ -67,6 +79,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });        
     loadConfig();
     toggleThePosterDBElements();
+    toggleWebhookSettings();
     detectEnvironment();
     getScrapeState();
 });
@@ -801,7 +814,7 @@ function saveConfig() {
     // Webhook settings
     save_config.enable_webhooks = document.getElementById("enable_webhooks").checked;
     save_config.webhook_token = document.getElementById("webhook_token").value.trim();
-    save_config.webhook_tpdb_users = document.getElementById("webhook_tpdb_users").value.split(",").map(u => u.trim()).filter(u => u);
+    save_config.webhook_tpdb_users = tpdbUserPicker ? tpdbUserPicker.getValue() : [];
     save_config.webhook_apply_delay = parseInt(document.getElementById("webhook_apply_delay").value, 10) || 0;
 
     // Process every possible condition of auth enable/disable and same/different username and password/no password provided
@@ -902,7 +915,14 @@ function updateConfigUI(config) {
     // Load webhook settings
     document.getElementById("enable_webhooks").checked = config.enable_webhooks || false;
     document.getElementById("webhook_token").value = config.webhook_token || "";
-    document.getElementById("webhook_tpdb_users").value = (config.webhook_tpdb_users || []).join(", ");
+    if (Array.isArray(config.webhook_tpdb_users) && tpdbUserPicker) {
+        // Clear existing options
+        tpdbUserPicker.clearOptions();
+        // Add options first
+        config.webhook_tpdb_users.forEach(user => tpdbUserPicker.addOption({ value: user, text: user }));
+        // Set active values (chips)
+        tpdbUserPicker.setValue(config.webhook_tpdb_users, true);
+    };
     document.getElementById("webhook_apply_delay").value = config.webhook_apply_delay ?? 30;
     
     // Toggle Kometa settings visibility

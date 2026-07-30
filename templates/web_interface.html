@@ -251,7 +251,7 @@
                                     </div>
                                 </div>
                                 <div id="docker_warning" class="alert alert-info mt-3 mb-0 alert-dismissible fade show" role="alert" style="display: block;">
-                                    <i class="bi bi-info-circle"></i>&ensp; When running in Docker the Kometa asset and temp directories are hardcoded 
+                                    <i class="bi bi-info-circle"></i>&ensp;When running in Docker the Kometa asset and temp directories are hardcoded 
                                     inside the container to <code>/assets</code> and <code>/temp</code> respectively. The host paths displayed here are the ones 
                                     mapped to these container paths via bind mounts in the <span class="text-nowrap"><code>docker-compose.yml</code></span> file.
                                     To change them you must edit your compose file and restart the container.
@@ -285,27 +285,42 @@
                                 <h5 class="mb-3"><i class="bi bi-broadcast-pin"></i>&ensp;Webhook settings</h5>
                                 <div class="form-check form-switch mb-3">
                                     <input class="form-check-input" type="checkbox" id="enable_webhooks"/>
-                                    <label for="enable_webhooks" class="form-check-label">Enable the Sonarr/Radarr import webhook, so newly imported items get cached artwork applied straight away</label>
+                                    <label for="enable_webhooks" class="form-check-label">Enable Sonarr/Radarr webhook</label>
+                                    <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Allows TPDb artwork from cached user pages to be applied to items 
+                                    or downloaded to the Kometa asset directory immediately after they are imported in Sonarr or Radarr"></i>
                                 </div>
                                 <div id="webhook_settings" style="display: none;">
                                     <div class="mb-3">
                                         <label for="webhook_token" class="form-label"><i class="bi bi-key"></i>&ensp;Webhook token</label>
                                         <input type="text" id="webhook_token" name="webhook_token" class="form-control" placeholder="required">
                                     </div>
-                                    <div class="alert alert-info" role="alert">
-                                        <i class="bi bi-info-circle"></i> In Sonarr/Radarr go to Settings &rarr; Connect &rarr; + &rarr; Webhook. Set the URL to <code>/webhook/sonarr</code> or <code>/webhook/radarr</code> on this server, method POST, and tick only the "On File Import" trigger. Send this token either as the connection's Password, or as a header: click the <strong>Advanced</strong> (cog) button on the webhook connection and add a Header with Key <code>X-Webhook-Token</code> and Value set to this token.
+                                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                        <i class="bi bi-info-circle"></i>&ensp;In Sonarr/Radarr go to Settings &rarr; Connect &rarr; + &rarr; Webhook. Set the URL to 
+                                        <code>/webhook/sonarr</code> or <code>/webhook/radarr</code> on this server, method POST, and tick only the "On File Import" 
+                                        trigger. Send this token either as the connection's Password, or as a header: click the <strong>Advanced</strong> (cog) button 
+                                        on the webhook connection and add a Header with Key <code>X-Webhook-Token</code> and Value set to this token.
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="webhook_tpdb_users" class="form-label"><i class="bi bi-people"></i>&ensp;ThePosterDB users to apply from, in order of preference</label>
-                                        <input type="text" id="webhook_tpdb_users" name="webhook_tpdb_users" class="form-control" placeholder="preferreduser, filleruser" title="Comma-separated ThePosterDB user names whose cached uploads are searched, first match wins.">
-                                    </div>
-                                    <div class="alert alert-info" role="alert">
-                                        <i class="bi bi-info-circle"></i> Comma-separated ThePosterDB user names, searched in this order (first match wins). Requires "Remember each ThePosterDB user's uploads" to be enabled, and a scrape of these users to have run at least once, so their artwork is cached and can be looked up.
+                                        <label for="webhook_tpdb_users" class="form-label"><i class="bi bi-people"></i>&ensp;ThePosterDB users</label>
+                                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="List of TPDb users, searched in this order (first 
+                                        match wins). Requires 'Cache ThePosterDB user pages' enabled, and a scrape of these users needs to have run at least once,
+                                        so their artwork is cacehd and ca be looked up.)"></i>
+                                        <select id="webhook_tpdb_users" name="webhook_tpdb_users" multiple placeholder="Enter usernames"></select>
                                     </div>
                                     <div class="mb-3">
-                                        <label for="webhook_apply_delay" class="form-label"><i class="bi bi-clock"></i>&ensp;Delay before applying (seconds)</label>
-                                        <input type="number" min="0" id="webhook_apply_delay" name="webhook_apply_delay" class="form-control" placeholder="30">
-                                        <small class="form-text text-muted">How long to wait after an import before applying artwork, giving Plex time to scan the new item. If it is still not ready, the apply retries for a few minutes.</small>
+                                        <label for="webhook_apply_delay" class="form-label me-2 mb-0"><i class="bi bi-clock""></i>&ensp;Delay</label>
+                                        <input type="number" 
+                                            class="form-control form-control-sm text-center d-inline-block me-2" 
+                                            id="webhook_apply_delay" 
+                                            name="webhook_apply_delay"
+                                            min="0" 
+                                            placeholder="30" 
+                                            style="width: 60px;" 
+                                            required />
+                                        <span class="text-body">seconds before applying</span>
+                                        <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="How long to wait after an import before applying artwork, 
+                                        giving Plex time to scan the new item. If it is still not ready, the apply retries for a few minutes."></i>
                                     </div>
                                 </div>
                             </div>

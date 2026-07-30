@@ -159,7 +159,7 @@ With ```cache_user_scrapes``` enabled, the app already knows every poster your f
 
 - **Radarr / Sonarr:** Settings -> Connect -> + -> Webhook.  URL ```http://<artwork-uploader host>:4567/webhook/radarr``` (or ```/webhook/sonarr```), Method POST.  Tick only the "On File Import" trigger.  Send the token as the connection's Password, or as a header: click the **Advanced** (cog) button and add a Header with Key ```X-Webhook-Token``` and Value set to the token.  The Test button is acknowledged so you can save the connection.
 
-On an import the title is looked up in the cached index; if one of the configured users covers it, that single poster (plus season covers for the imported seasons, on TV) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same.  Imports usually reach the webhook before Plex has scanned the new file, so the apply retries quietly for a few minutes, then gives up and leaves it to the next scheduled run.  Ambiguous title matches (for example same-name remakes) are skipped rather than guessed, and nothing is applied when no configured user has the title.  The endpoints return 404 while ```enable_webhooks``` is off.
+On an import the title is looked up in the cached index; if one of the configured users covers it, that single poster (plus season covers for the imported seasons, on TV) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same.  Imports usually reach the webhook before Plex has scanned the new file, so the apply retries quietly for a few minutes, then gives up and leaves it to the next scheduled run.  Ambiguous title matches (for example same-name remakes) are skipped rather than guessed, and nothing is applied when no configured user has the title.  The endpoints return 404 if ```enable_webhooks``` is disabled.
 
 ### Scheduler with Apprise notifications
 Basic scheduler, so that you can leave this running and update all your artwork every day. 
@@ -175,9 +175,6 @@ If you also enable ```allow_artist_updates```, a scheduled scrape may additional
 With ```local_library_matching``` enabled (the default), a user-catalog scrape skips everything that isn't in your libraries without any web requests, so full-catalog runs take minutes rather than hours.
 
 Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the ```apprise_urls``` variable in the ```config.json```file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
-
-## Coming soon
-- API integration with MediUX so we don't need to scrape any more.  I've been in contact with them to get access to the API as soon as it's launched.
 
 ## Thanks
 Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!  I really hope you don't mind me taking your work and running with it, please get in touch if you'd like to merge the two projects!
