@@ -144,6 +144,13 @@ class WebhookService:
             globals.plex.connect()
             processor = UploadProcessor(globals.plex)
             processor.set_options(Options())
+            # allow_artist_updates is a scheduled-scrape concern and must never apply here.
+            # set_options resolves it from the global config, so a bare Options() still inherits it.
+            # Radarr and Sonarr send "Download" on an upgrade as well as a first import, so the item
+            # this runs against may already carry artwork the user locked. The webhook also picks its
+            # artists from its own configured list rather than from the scrape, so letting it replace
+            # a locked field would re-sort artwork nobody asked it to touch.
+            processor.allow_artist_updates = False
             pending = []
             for item in artwork:
                 try:

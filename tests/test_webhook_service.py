@@ -160,3 +160,47 @@ def test_artwork_dict_carries_the_file_type_key_the_processor_reads(artwork_type
     uploader = PlexUploader(MagicMock(), artwork_type_str, artwork_id)
     uploader.set_artwork(artwork)
     assert isinstance(uploader.label, str) and uploader.label
+
+
+# --------------------------- allow_artist_updates ---------------------------
+
+@pytest.mark.unit
+def test_attempt_forces_allow_artist_updates_off(monkeypatch):
+    """The webhook must never inherit allow_artist_updates from the global config.
+
+    set_options resolves the flag as `self.options.allow_artist_updates or
+    globals.config.allow_artist_updates`, so handing it a bare Options() is not enough: a user with
+    the option on globally would have it on here too. Radarr and Sonarr send "Download" on an upgrade
+    as well as a first import, so the item may already carry artwork the user locked, and the webhook
+    picks its artists from its own configured list rather than from the scrape.
+
+    This drives _attempt itself rather than re-stating the assignment, so deleting the guard from
+    services/webhook_service.py fails the test.
+    """
+    import processors.upload_processor as upload_processor_module
+    from core import globals as app_globals
+
+    seen = {}
+
+    class _FakeProcessor:
+        def __init__(self, _plex):
+            # Whatever set_options would have resolved from the global config.
+            self.allow_artist_updates = True
+
+        def set_options(self, _options):
+            self.allow_artist_updates = True      # the inheritance the guard has to undo
+
+        def process_movie_artwork(self, _item):
+            seen["at_upload"] = self.allow_artist_updates
+            return ["done"]
+
+    monkeypatch.setattr(upload_processor_module, "UploadProcessor", _FakeProcessor)
+    monkeypatch.setattr(app_globals, "plex", MagicMock())
+
+    service = WebhookService()
+    event = parse_event({"eventType": "Download",
+                         "movie": {"title": "Dune", "year": 2021, "tmdbId": 438631}})
+    service._attempt(event, ("movie", 438631), artwork=[{"id": 1, "file_type": "movie_poster"}])
+
+    assert seen.get("at_upload") is False, \
+        "the webhook reached the uploader with allow_artist_updates still on"
