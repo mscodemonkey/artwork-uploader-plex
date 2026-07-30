@@ -193,7 +193,7 @@ socket.on("version_check", function(data) {
         document.getElementById("app_version").innerText = data.current_version;
         // If running in Docker, show message about self-update being disabled and hide update button
         if (data.docker) {
-            document.getElementById("docker_update_message").innerText = "Self-update is disabled in Docker. Please pull the lastet image manually.";
+            document.getElementById("docker_update_message").innerText = "Self-update is disabled in Docker. Please pull the latest image manually.";
         } else {
             document.getElementById("docker_update_message").innerText = "";
             document.getElementById("btnUpdate").classList.remove("d-none");
