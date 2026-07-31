@@ -402,16 +402,12 @@ socket.on("docker_detected", (data) => {
             
             // Disables path input fields, sets values to those detected by backend
             // and removes the in-line browse button
-            const input_id_value_map = {
-                "kometa_base": data.kometa_base,
-                "temp_dir": data.temp_dir
-            }
             const pathInputIds = ["kometa_base", "temp_dir"];
             pathInputIds.forEach(id => {
                 const input = document.getElementById(id);
                 if (input) {
                     input.disabled = true;
-                    input.value = input_id_value_map.id;
+                    input.value = id === "kometa_base" ? data.kometa_base : data.temp_dir;
                     input.classList.remove("has-inline-btn", "pe-5");
                     const browseBtn = input.parentElement.querySelector(".browse-folder-btn");
                     if (browseBtn) {
