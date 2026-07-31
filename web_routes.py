@@ -582,17 +582,18 @@ def setup_socket_handlers(
             for key, value in data.get("config").items():
                 new_config_dict[key] = value
 
-            # Ensure a simple change in the order of a list isn't detected as a change
-            for key in new_config_dict:
-                if isinstance(new_config_dict[key], list):
-                    new_config_dict[key] = list(set(new_config_dict[key]))
-                if isinstance(current_config_dict, list):
-                    current_config_dict[key] = list(set(current_config_dict[key]))
 
             # Prepare configurations to be compared
             new_config_dict.pop("auth_password")
             new_config_dict.pop("auth_password_hash")
             current_config_dict.pop("auth_password_hash")
+
+            # Ensure a simple change in the order of a list isn't detected as a change
+            for key in new_config_dict:
+                if isinstance(new_config_dict[key], list) and len(new_config_dict[key]) > 0 and isinstance(new_config_dict[key][0], str):
+                    new_config_dict[key] = list(set(new_config_dict[key]))
+                if isinstance(current_config_dict[key], list) and len(current_config_dict[key]) > 0 and isinstance(current_config_dict[key][0], str):
+                    current_config_dict[key] = list(set(current_config_dict[key]))
 
             # If the new configuration is the same, return
             if new_config_dict == current_config_dict and not password_change:
