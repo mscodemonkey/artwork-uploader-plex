@@ -382,7 +382,7 @@ socket.on("docker_detected", (data) => {
     const saveToKometaCheckbox = document.getElementById("save_to_kometa");
     const optionTemp = document.getElementById("option-temp");
     const uploadOptionTemp = document.getElementById("upload-option-temp");
-
+    
     if (validResponse(data)) {
         if (data.docker == "true") {
             docker = true;
@@ -399,11 +399,26 @@ socket.on("docker_detected", (data) => {
             if (saveToKometaCheckbox.checked && !saveToKometaCheckbox.disabled) {
                 dockerWarning.classList.remove("d-none");
             }
-            kometaBase.disabled = true; // Disable the Kometa base path input field
-            kometaBase.value = data.kometa_base; // Set to host path detected by backend
-            tempDir.disabled = true; // Disable the Temp directory input field
-            tempDir.value = data.temp_dir; // Set to host path detected by backend
-            // If no host path ha been bound to the container /temp path, disable the ability to use a temp dir
+            
+            // Disables path input fields, sets values to those detected by backend
+            // and removes the in-line browse button
+            const input_id_value_map = {
+                "kometa_base": data.kometa_base,
+                "temp_dir": data.temp_dir
+            }
+            const pathInputIds = ["kometa_base", "temp_dir"];
+            pathInputIds.forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.disabled = true;
+                    input.value = input_id_value_map.id;
+                    input.classList.remove("has-inline-btn", "pe-5");
+                    const browseBtn = input.parentElement.querySelector(".browse-folder-btn");
+                    if (browseBtn) {
+                        browseBtn.classList.add("d-none");
+                    }
+                }
+            });
             if (data.temp_dir == "(not defined)") {
                 optionTemp.checked = false;
                 optionTemp.parentElement.classList.add("d-none");
@@ -695,9 +710,6 @@ function progressBar(percent, message = "", barType = "main", speed = "smooth") 
         bar.style.width = percent + "%";
     }
 
-    //bar.offsetHeight;
-    //bar.style.width = percent + "%";
-    
     if (percent === 100) {
         barTimer = setTimeout(() => {
             // Hide both containers
@@ -2110,7 +2122,6 @@ socket.on("upload_complete", function (data) {
 
     function updateSchedulerIcon(){
         let details = getScheduleDetails(currentBulkImport);
-        // console.log(schedules)
         if (details && details['time']) {
             scheduleIcon.classList.remove("bi-clock");
             scheduleIcon.classList.add("bi-clock-fill"); // Change to filled icon
