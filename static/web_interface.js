@@ -11,6 +11,7 @@ let bulkTextAsLoaded = '';      // File contents when loaded, to determine chang
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
 let tvPicker, moviePicker, tpdbUserPicker;
+let validationTimeout
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -39,7 +40,7 @@ document.addEventListener("DOMContentLoaded", function () {
             create: true,
             createOnBlur: true,
             delimiter: ',',
-            persist: false,
+            persist: true,
             plugins: {
                 'clear_button': {
                     html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
@@ -726,7 +727,22 @@ function processAndSortUrls(inputText, newTitle, newAuthor, newUrl) {
 // Button handler for save configuration
 document.getElementById("save_config_button").addEventListener("click", async function(event) {
     event.preventDefault(); // Prevent actual form submission
-    let success = await testPlexConnect(true);
+    const form = document.getElementById("config_form");
+    if (!form.checkValidity()) {
+        form.classList.add("was-validated");
+        // Clear any previous running timer
+        if (validationTimeout) clearTimeout(validationTimeout);
+
+        // Remove the validation highlights after 3 seconds (3000 ms)
+        validationTimeout = setTimeout(() => {
+            form.classList.remove("was-validated");
+        }, 3000);        
+        return; // Prevent further execution if form is invalid
+    }
+    // Form is valid: make sure highlights are cleared if user successfully saves
+    form.classList.remove("was-validated");
+    if (validationTimeout) clearTimeout(validationTimeout);
+        let success = await testPlexConnect(true);
     if (success == true) {
         saveConfig();
     };
@@ -734,14 +750,6 @@ document.getElementById("save_config_button").addEventListener("click", async fu
 
 // Save configuration
 function saveConfig() {
-    const form = document.getElementById("config_form");
-
-    if (!form.checkValidity()) {
-        form.classList.add("was-validated");
-        return; // Prevent further execution if form is invalid
-    }
-
-    // Form is valid, proceed with saving config
     const save_config = {};
 
     save_config.base_url = document.getElementById("plex_base_url").value.trim();
@@ -790,7 +798,7 @@ function saveConfig() {
     toggleUserCacheExpiryField();
 
     // ThePosterDB user cache expiration threshold
-    save_config.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value);
+    save_config.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value) || 0;
 
     // Checkbox for taking an artist's newer artwork for posters we applied
     save_config.allow_artist_updates = document.getElementById("allow_artist_updates").checked;
@@ -903,7 +911,7 @@ function updateConfigUI(config) {
     document.getElementById("skip_locked_artwork").checked = config.skip_locked_artwork;
     document.getElementById("local_library_matching").checked = config.local_library_matching;
     document.getElementById("cache_user_scrapes").checked = config.cache_user_scrapes;
-    document.getElementById("user_cache_refresh_days").value = config.user_cache_refresh_days;
+    document.getElementById("user_cache_refresh_days").value = config.user_cache_refresh_days ?? 7;
     document.getElementById("allow_artist_updates").checked = config.allow_artist_updates;
     document.getElementById("option-add-to-bulk").checked = config.auto_manage_bulk_files;
     document.getElementById("apprise_urls").value = config.apprise_urls.join(", ");
@@ -2044,11 +2052,26 @@ function toggleWebhookSettings() {
     // When enabling with an empty token, pre-fill a random one. getRandomValues works in
     // insecure (plain http) contexts, unlike crypto.randomUUID.
     const tokenField = document.getElementById("webhook_token");
-    if (enabled && !tokenField.value) {
-        tokenField.value = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-            .map(b => b.toString(16).padStart(2, "0")).join("");
+    if (enabled) {
+        tokenField.setAttribute("required", "");
+    } else {
+        tokenField.removeAttribute("required");
+        tokenField.classList.remove("is-invalid", "is-valid");
     }
+    // if (enabled && !tokenField.value) {
+    //     tokenField.value = generateRandomToken();
+    // }
 }
+
+function generateRandomToken() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+}
+
+document.getElementById("generate_webhook_token").addEventListener("click", function () {
+    document.getElementById("webhook_token").value = generateRandomToken();
+})
 
 document.getElementById("enable_webhooks").addEventListener("change", toggleWebhookSettings);
 

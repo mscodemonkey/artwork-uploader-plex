@@ -1,292 +1,180 @@
+/* ==========================================================================
+   Base & Layout Styles
+   ========================================================================== */
+
+* {
+    font-family: "Noto Sans", serif;
+    font-optical-sizing: auto;
+    font-weight: 400;
+    font-style: normal;
+    font-variation-settings: "wdth" 100;
+}
+
+.tab-content {
+    margin-top: 1rem;
+}
+
+h1 {
+    font-weight: 400;
+    letter-spacing: -1px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.app-logo {
+    flex-shrink: 0;
+    transition: transform 0.3s ease;
+}
+
+.app-logo:hover {
+    transform: scale(1.1);
+}
+
+.app-title {
+    line-height: 1.2;
+}
+
+.log_message {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #000; /* Black text */
+    background-color: #EEEEEE;
+    padding: 5px;
+    border-radius: 4px;
+    display: block;
+    margin-bottom: 4px;
+}
+
+#bulk_import_text {
+    font-size: 0.9rem;
+}
+
+.bg-light {opacity: 0.85}
+
+/* ==========================================================================
+   Custom Components & Overlays
+   ========================================================================== */
 
 
-        /* body {
-            background-image: url(/static/bg.jpg);
-            background-repeat: no-repeat;
-            background-position-x: right;
-            background-size: cover
-        }
+/* Drop Area */
+#drop-area {
+    width: 100%;
+    margin: auto;
+    padding: 40px;
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: 0.3s;
+}
 
-        html, body {
-            height: 100%;
-            margin: 0;
-        } */
+#drop-area.highlight {
+    border-color: #00bfff;
+    background: #f0f8ff;
+}
 
-        * {
-            font-family: "Noto Sans", serif;
-            font-optical-sizing: auto;
-            font-weight: 400;
-            font-style: normal;
-            font-variation-settings: "wdth" 100;
-        }
+/* Visual disabled state for the drop area */
+#drop-area.disabled {
+    opacity: 0.4;                     /* Dims the element */
+    filter: grayscale(100%);          /* Removes color for a greyed-out look */
+    cursor: not-allowed !important;   /* Shows a prohibited cursor on hover */
+    pointer-events: none;             /* Prevents native hover/click highlights */
+    transition: all 0.3s ease;       /* Smooth transition when toggling */
+}
 
-        .tab-content {
-            margin-top: 1rem;
-        }
+/* Progress Bars */
+/* The container that handles the sliding animation */
+.progress-wrapper {
+    /* Force it to take zero vertical space */
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    margin: 0 !important;
+    padding: 0 !important;
+    
+    /* Smooth transition for all properties */
+    transition: 
+        max-height 0.4s ease-out, 
+        opacity 0.4s ease, 
+        margin 0.4s ease-out;
+}
 
-        h1 {
-            font-weight: 400;
-            letter-spacing: -1px;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
+.progress-wrapper.show {
+    /* Allow it to grow to its natural content size */
+    max-height: 100px; /* Needs to be larger than your bar's height */
+    opacity: 1;
+    margin-top: 1rem !important;
+    margin-bottom: 0.5rem !important;
+}
 
-        .app-logo {
-            flex-shrink: 0;
-            transition: transform 0.3s ease;
-        }
+/* Force the internal Bootstrap progress bar to have no margins */
+.progress-wrapper .progress {
+    margin: 0 !important;
+}
 
-        .app-logo:hover {
-            transform: scale(1.1);
-        }
+.progress.position-relative {
+    position: relative; /* This is the anchor for the absolute text */
+}
 
-        .app-title {
-            line-height: 1.2;
-        }
+.progress-text-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* Responsive Font Styling */
+    font-weight: 600;
+    font-size: 0.75rem; /* Slightly smaller to feel less "crammed" */
+    line-height: 1;
+    pointer-events: none;
+    z-index: 10;
 
-        .log_message {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            color: #000; /* Black text */
-            background-color: #EEEEEE;
-            padding: 5px;
-            border-radius: 4px;
-            display: block;
-            margin-bottom: 4px;
-        }
+    /* Light/Dark Mode Color Logic */
+    /* This uses the standard Bootstrap text color variable */
+    color: var(--bs-body-color); 
+    
+    /* Adds a slight glow/shadow so it's readable over the blue bar */
+    text-shadow: 0 0 3px var(--bs-body-bg);
+}
 
-        #bulk_import_text {
-            font-size: 0.9rem;
-        }
+/* Custom progress bar background colors */
+.bg-custom {
+    background-color: #14abfd !important;
+}
+.bg-custom2 {
+    background-color: #59e179 !important;
+}
+.bg-custom3 {
+    background-color: #9e7fdc !important;
+}
 
-        .bg-light {opacity: 0.85}
+#progress-container {
+    width: 80%;
+    margin: auto;
+    display: block;
+    display: block;
+}
 
-        #drop-area {
-            width: 100%;
-            margin: auto;
-            padding: 40px;
-            border: 2px dashed #ccc;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-        #drop-area.highlight {
-            border-color: #00bfff;
-            background: #f0f8ff;
-        }
+#progress-bar {
+    width: 0%;
+    height: 20px;
+    background: #00bfff;
+    border-radius: 5px;
+}
 
-        /* The container that handles the sliding animation */
-        .progress-wrapper {
-            /* Step 1: Force it to take zero vertical space */
-            max-height: 0;
-            opacity: 0;
-            overflow: hidden;
-            margin: 0 !important;
-            padding: 0 !important;
-            
-            /* Step 2: Smooth transition for all properties */
-            transition: 
-                max-height 0.4s ease-out, 
-                opacity 0.4s ease, 
-                margin 0.4s ease-out;
-        }
+#file-list {
+    margin-top: 20px;
+    text-align: left;
+    max-width: 80%;
+    margin-left: auto;
+    margin-right: auto;
+}
 
-        .progress-wrapper.show {
-            /* Step 3: Allow it to grow to its natural content size */
-            max-height: 100px; /* Needs to be larger than your bar's height */
-            opacity: 1;
-            margin-top: 1rem !important;
-            margin-bottom: 0.5rem !important;
-        }
-
-        /* Force the internal Bootstrap progress bar to have no margins */
-        .progress-wrapper .progress {
-            margin: 0 !important;
-        }
-
-        .progress.position-relative {
-            position: relative; /* This is the anchor for the absolute text */
-        }
-
-        .progress-text-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            
-            /* Responsive Font Styling */
-            font-weight: 600;
-            font-size: 0.75rem; /* Slightly smaller to feel less "crammed" */
-            line-height: 1;
-            pointer-events: none;
-            z-index: 10;
-
-            /* Light/Dark Mode Color Logic */
-            /* This uses the standard Bootstrap text color variable */
-            color: var(--bs-body-color); 
-            
-            /* Adds a slight glow/shadow so it's readable over the blue bar */
-            text-shadow: 0 0 3px var(--bs-body-bg);
-        }
-
-        /* Custom "Purple" bar */
-        .bg-custom {
-            background-color: #14abfd !important;
-        }
-        .bg-custom2 {
-            background-color: #59e179 !important;
-        }
-        .bg-custom3 {
-            background-color: #9e7fdc !important;
-        }        
-        #progress-container {
-            width: 80%;
-            margin: auto;
-            display: block;
-            display: block;
-        }
-        #progress-bar {
-            width: 0%;
-            height: 20px;
-            background: #00bfff;
-            border-radius: 5px;
-        }
-        #file-list {
-            margin-top: 20px;
-            text-align: left;
-            max-width: 80%;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        /* Style Tom Select chips with Bootstrap Primary color */
-        .ts-control .item {
-            background-color: var(--bs-primary, #0d6efd) !important;
-            color: #ffffff !important;
-            border-color: var(--bs-primary, #0d6efd) !important;
-            border-radius: 0.375rem; /* Matches Bootstrap default rounded corners */
-            padding: 2px 8px;
-        }
-        /* Style the 'x' remove button inside the chip */
-        .ts-control .item .remove {
-            color: #ffffff !important;
-            border-left-color: rgba(255, 255, 255, 0.3) !important;
-            opacity: 0.8;
-        }
-        .ts-control .item .remove:hover {
-            background-color: rgba(0, 0, 0, 0.15) !important;
-            color: #ffffff !important;
-            opacity: 1;
-        }
-        /* Position wrapper relative so we can anchor the spinner inside it */
-        .ts-wrapper.loading .ts-control {
-            position: relative;
-            padding-right: 2.25rem !important; /* Make room for spinner */
-        }
-
-        /* 1. Container padding so chips don't overlap icon */
-        .ts-wrapper.plugin-clear_button .ts-control {
-            padding-right: 2.25rem !important;
-        }
-
-        /* 2. Hide by default when empty */
-        .ts-wrapper.plugin-clear_button .clear-button {
-            display: none !important;
-        }
-
-        /* 3. Show & style the icon ONLY when chips exist */
-        .ts-wrapper.plugin-clear_button.has-items .clear-button {
-            display: flex !important;
-            align-items: center;
-            justify-content: center;
-            
-            position: absolute;
-            right: 0.6rem;
-            top: 50%;
-            transform: translateY(-50%);
-            
-            background: transparent !important;
-            border: none !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            
-            /* Icon styling */
-            color: var(--bs-primary, #0d6efd) !important; /* Switch to var(--bs-primary) if you want blue
-            font-size: 1rem; /* Tweak size easily here */
-            line-height: 1;
-            
-            cursor: pointer;
-            opacity: 0.75;
-            transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
-        }
-        /* Dark mode override */
-        [data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button {
-            color: #ffffff !important; 
-        }
-        
-        .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
-            opacity: 1;
-            transform: translateY(-50%) scale(1.15);
-        }
-        
-        /* Hide clear button while loading options (takes precedence over .has-items) */
-        .ts-wrapper.loading .clear-button,
-        .ts-wrapper.plugin-clear_button.has-items.loading .clear-button {
-            display: none !important;
-        }
-        
-        /* Create the spinning loader ring */
-        .ts-wrapper.loading .ts-control::after {
-            content: "";
-            position: absolute;
-            right: 0.75rem;
-            top: calc(50% - 7px);
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(255, 255, 255, 0.25);
-            border-top-color: var(--bs-primary, #0d6efd); /* Uses Bootstrap primary blue */
-            border-radius: 50%;
-            animation: ts-spinner 0.6s linear infinite;
-            pointer-events: none;
-        }
-
-        @keyframes ts-spinner {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Visual disabled state for the drop area */
-        #drop-area.disabled {
-            opacity: 0.4;                     /* Dims the element */
-            filter: grayscale(100%);          /* Removes color for a greyed-out look */
-            cursor: not-allowed !important;   /* Shows a prohibited cursor on hover */
-            pointer-events: none;             /* Prevents native hover/click highlights */
-            transition: all 0.3s ease;       /* Smooth transition when toggling */
-        }
-        
-        /* Fix Tom-Select dropdown text and background in dark mode */
-        [data-bs-theme="dark"] .ts-dropdown {
-            background-color: #2b3035 !important; /* Matches Bootstrap dark dropdowns */
-            border-color: #495057 !important;
-        }
-
-        [data-bs-theme="dark"] .ts-dropdown .option {
-            color: #777777 !important; /* Bright white text for readable contrast */
-        }
-
-        /* Hover and active selection state */
-        [data-bs-theme="dark"] .ts-dropdown .option:hover,
-        [data-bs-theme="dark"] .ts-dropdown .active {
-            background-color: #0d6efd !important; /* Bootstrap primary blue */
-            color: #ffffff !important;
-        }
-
+/* Time Select tooltip box */
 #time_select_box {
     position: absolute;
     top: 0;
@@ -327,13 +215,215 @@
     border-bottom: 9px solid #f8f9fa; /* Matches tooltip background */
 }
 
+/* Class to show tooltip */
+.show-tooltip {
+    display: block !important;
+}
+
+/* Monospace font for token input fields */
+#plex_token,
+#webhook_token,
+#plex_token::placeholder,
+#webhook_token::placeholder,
+#webhook_apply_delay,
+#user_cache_refresh_days {
+    font-family: 'JetBrains Mono', "Courier New", "Liberation Mono", Consolas, Monaco, Menlo, SFMono-Regular, monospace !important;
+    /* font-size: 0.875rem; Slightly smaller font size often looks cleaner for long token strings */
+}
+
+/* Remove Bootstrap's validation checkmark icon on small numeric inputs */
+.was-validated #user_cache_refresh_days.form-control:valid,
+.was-validated #user_cache_refresh_days.form-control:invalid,
+.was-validated #webhook_apply_delay.form-control:valid,
+.was-validated #webhook_apply_delay.form-control:invalid {
+    background-image: none !important;
+    padding-right: 0.5rem !important; /* Prevents text clipping */
+}
+
+/* Offset Bootstrap validation icon so it doesn't overlap inline field buttons */
+.was-validated #webhook_token.form-control:invalid,
+.was-validated #webhook_token.form-control:valid {
+    background-position: right 2.25rem center !important;
+    padding-right: 4rem !important; /* Ensures long tokens don't overlap either icon */
+}
+/* Inline Generate Webhook Token Button (Matches TomSelect clear button feel) */
+.btn-inline-icon {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: var(--bs-primary, #0d6efd) !important;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.btn-inline-icon:hover {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.15);
+}
+
+/* Dark mode color override */
+[data-bs-theme="dark"] .btn-inline-icon {
+    color: #ffffff !important;
+}
 
 
 
-        /* Class to show tooltip */
-        .show-tooltip {
-            display: block !important;
-        }
 
+/* ==========================================================================
+   TomSelect Controls (Base Styles)
+   ========================================================================== */
 
+/* Style Tom Select chips with Bootstrap Primary color */
+.ts-control .item {
+    background-color: var(--bs-primary, #0d6efd) !important;
+    color: #ffffff !important;
+    border-color: var(--bs-primary, #0d6efd) !important;
+    border-radius: 0.375rem; /* Matches Bootstrap default rounded corners */
+    padding: 2px 8px;
+}
 
+/* Style the 'x' remove button inside the chip */
+.ts-control .item .remove {
+    color: #ffffff !important;
+    border-left-color: rgba(255, 255, 255, 0.3) !important;
+    opacity: 0.8;
+}
+
+.ts-control .item .remove:hover {
+    background-color: rgba(0, 0, 0, 0.15) !important;
+    color: #ffffff !important;
+    opacity: 1;
+}
+
+/* Loading state spinner */
+/* Position wrapper relative so we can anchor the spinner inside it */
+.ts-wrapper.loading .ts-control {
+    position: relative;
+    padding-right: 2.25rem !important; /* Make room for spinner */
+}
+
+/* Create the spinning loader ring */
+.ts-wrapper.loading .ts-control::after {
+    content: "";
+    position: absolute;
+    right: 0.75rem;
+    top: calc(50% - 7px);
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: var(--bs-primary, #0d6efd); /* Uses Bootstrap primary blue */
+    border-radius: 50%;
+    animation: ts-spinner 0.6s linear infinite;
+    pointer-events: none;
+}
+
+@keyframes ts-spinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Clear button plugin */
+/* Container padding so chips don't overlap icon */
+.ts-wrapper.plugin-clear_button .ts-control {
+    padding-right: 2.25rem !important;
+}
+
+/* Hide by default when empty */
+.ts-wrapper.plugin-clear_button .clear-button {
+    display: none !important;
+}
+
+/* Show & style the icon ONLY when chips exist */
+.ts-wrapper.plugin-clear_button.has-items .clear-button {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    transform: translateY(-50%);
+    
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    
+    /* Icon styling */
+    color: var(--bs-primary, #0d6efd) !important; /* Switch to var(--bs-primary) if you want blue
+    font-size: 1rem; /* Tweak size easily here */
+    line-height: 1;
+    
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
+    opacity: 1;
+    transform: translateY(-50%) scale(1.15);
+}
+
+/* Hide clear button while loading options (takes precedence over .has-items) */
+.ts-wrapper.loading .clear-button,
+.ts-wrapper.plugin-clear_button.has-items.loading .clear-button {
+    display: none !important;
+}
+
+/* ==========================================================================
+   Dark Mode Specific Overrides ([data-bs-theme="dark"])
+   ========================================================================== */
+
+/* Fix Tom-Select dropdown text and background in dark mode */
+[data-bs-theme="dark"] .ts-dropdown {
+    background-color: #2b3035 !important; /* Matches Bootstrap dark dropdowns */
+    border-color: #495057 !important;
+    color: #f8f9fa !important;
+}
+
+/* TomSelect Dropdown Items, Prompts & Empty State */
+[data-bs-theme="dark"] .ts-dropdown .option,
+[data-bs-theme="dark"] .ts-dropdown .create,
+[data-bs-theme="dark"] .ts-dropdown .no-results {
+    color: #777777 !important; /* Crisp readable light text */
+}
+
+/* Hover and active selection state */
+[data-bs-theme="dark"] .ts-dropdown .option:hover,
+[data-bs-theme="dark"] .ts-dropdown .active {
+    background-color: #0d6efd !important; /* Bootstrap primary blue */
+    color: #ffffff !important;
+}
+
+/* TomSelect Clear Button in Dark Mode */
+[data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button {
+    color: #ffffff !important; 
+}    
+
+/* --------------------------------------------------------------------------
+   Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
+   -------------------------------------------------------------------------- */
+[data-bs-theme="dark"] #bd-theme + .dropdown-menu svg,
+[data-bs-theme="dark"] #bd-theme svg {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+}
+
+/* Active item state in Theme Switcher dropdown */
+[data-bs-theme="dark"] #bd-theme + .dropdown-menu .dropdown-item.active svg {
+    fill: #ffffff !important;
+}
+
+/* Active typing text inside TomSelect control in Dark Mode */
+[data-bs-theme="dark"] .ts-control > input {
+    color: #f8f9fa !important; /* Crisp white text while typing */
+}

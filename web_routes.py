@@ -582,6 +582,13 @@ def setup_socket_handlers(
             for key, value in data.get("config").items():
                 new_config_dict[key] = value
 
+            # Ensure a simple change in the order of a list isn't detected as a change
+            for key in new_config_dict:
+                if isinstance(new_config_dict[key], list):
+                    new_config_dict[key] = list(set(new_config_dict[key]))
+                if isinstance(current_config_dict, list):
+                    current_config_dict[key] = list(set(current_config_dict[key]))
+
             # Prepare configurations to be compared
             new_config_dict.pop("auth_password")
             new_config_dict.pop("auth_password_hash")
