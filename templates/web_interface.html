@@ -195,7 +195,7 @@
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="plex_token" class="form-label"><i class="bi bi-key"></i>&ensp;Authentication Token</label>
+                                    <label for="plex_token" class="form-label"><i class="bi bi-key"></i>&ensp;Authentication token</label>
                                     &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-delay='{"hide": 500}' data-bs-html="true" data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i>
                                     <input type="text" id="plex_token" name="plex_token" class="form-control" required pattern="[A-Za-z0-9_\-]{20,40}"
                                         title="Plex token should be a 20+ character string with letters, digits, dashes or underscores.">
@@ -292,7 +292,13 @@
                                 <div id="webhook_settings" style="display: none;">
                                     <div class="mb-3">
                                         <label for="webhook_token" class="form-label"><i class="bi bi-key"></i>&ensp;Webhook token</label>
-                                        <input type="text" id="webhook_token" name="webhook_token" class="form-control" placeholder="required">
+                                        <div class="position-relative">
+                                            <input type="text" id="webhook_token" name="webhook_token" class="form-control pe-5" placeholder="enter token or click to generate"
+                                            spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" required>
+                                            <button type="button" id="generate_webhook_token" class="btn-inline-icon" title="Generate new random token">
+                                                <i class="bi bi-arrow-clockwise"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="alert alert-info alert-dismissible fade show" role="alert">
                                         <i class="bi bi-info-circle"></i>&ensp;In Sonarr/Radarr go to Settings &rarr; Connect &rarr; + &rarr; Webhook. Set the URL to 
@@ -316,6 +322,7 @@
                                             name="webhook_apply_delay"
                                             min="0" 
                                             placeholder="30" 
+                                            value="30"
                                             style="width: 60px;" 
                                             required />
                                         <span class="text-body">seconds before applying</span>
