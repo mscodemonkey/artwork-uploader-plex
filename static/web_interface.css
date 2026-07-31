@@ -221,12 +221,8 @@ h1 {
 }
 
 /* Monospace font for token input fields */
-#plex_token,
-#webhook_token,
-#plex_token::placeholder,
-#webhook_token::placeholder,
-#webhook_apply_delay,
-#user_cache_refresh_days {
+.input-monospace,
+.input-monospace::placeholder {
     font-family: 'JetBrains Mono', "Courier New", "Liberation Mono", Consolas, Monaco, Menlo, SFMono-Regular, monospace !important;
     /* font-size: 0.875rem; Slightly smaller font size often looks cleaner for long token strings */
 }
@@ -274,7 +270,179 @@ h1 {
     color: #ffffff !important;
 }
 
+/* Generic container for multiple inline input action buttons */
+.input-inline-actions {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    z-index: 4;
+}
 
+/* Reset absolute positioning on individual buttons when inside a action wrapper */
+.input-inline-actions .btn-inline-icon {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    transform: none !important;
+}
+
+/* Input with 2 trailing action buttons (Eye + Generate) */
+.form-control.has-two-inline-btns {
+    padding-right: 4rem !important;
+}
+
+/* Folder Browse Icon Hover Styling */
+.browse-folder-btn:hover {
+    color: var(--bs-primary, #0d6efd) !important;
+}
+
+[data-bs-theme="dark"] .browse-folder-btn:hover {
+    color: #3d8bfd !important;
+}
+
+/* Offset Bootstrap validation icons for fields with inline folder browse buttons */
+/* .was-validated #kometa_asset_directory.form-control:invalid,
+.was-validated #kometa_asset_directory.form-control:valid {
+    background-position: right 2.25rem center !important;
+    padding-right: 4rem !important; /* Prevents long folder paths from clipping into the icons 
+} */
+/* Generic validation icon offset for inputs with inline trailing buttons */
+.was-validated .form-control[required].has-inline-btn:invalid,
+.was-validated .form-control[required].has-inline-btn:valid {
+    background-position: right 2.25rem center !important;
+    padding-right: 4rem !important;
+}
+
+/* Offset validation icons when required & invalid/valid for 2 inline buttons */
+.was-validated .form-control[required].has-two-inline-btns:invalid,
+.was-validated .form-control[required].has-two-inline-btns:valid,
+.was-validated #webhook_token[required]:invalid,
+.was-validated #webhook_token[required]:valid {
+    background-position: right 3.25rem center !important;
+    padding-right: 5rem !important;
+}
+
+/* Display invalid feedback when input inside wrapper is invalid */
+.was-validated .position-relative:has(.form-control:invalid) ~ .invalid-feedback,
+.was-validated .position-relative .form-control:invalid ~ .invalid-feedback {
+    display: block !important;
+}
+
+/* ==========================================================================
+   Strip ALL validation styling from non-required form controls
+   ========================================================================== */
+
+/* 1. Standard Inputs & Selects (Text, Numbers, Dropdowns) */
+.was-validated .form-control:not([required]):valid,
+.was-validated .form-select:not([required]):valid {
+    background-image: none !important;
+    border-color: var(--bs-border-color) !important;
+    box-shadow: none !important;
+}
+
+/* Reset focus state on non-required inputs */
+.was-validated .form-control:not([required]):valid:focus,
+.was-validated .form-select:not([required]):valid:focus {
+    border-color: #86b7fe !important;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+}
+
+/* 2. Checkboxes, Radios, and Form Switches (Toggles) */
+.was-validated .form-check-input:not([required]):valid {
+    border-color: var(--bs-border-color) !important;
+    box-shadow: none !important;
+}
+
+/* Keep checked toggles/checkboxes using standard primary color (blue) instead of green */
+.was-validated .form-check-input:not([required]):valid:checked {
+    background-color: var(--bs-primary, #0d6efd) !important;
+    border-color: var(--bs-primary, #0d6efd) !important;
+}
+
+/* Reset label text colors next to non-required toggles */
+.was-validated .form-check-input:not([required]):valid ~ .form-check-label {
+    color: inherit !important;
+}
+
+/* ==========================================================================
+   Apprise URL Repeater Inline Icons
+   ========================================================================== */
+
+/* The floating flex container holding the action buttons */
+.apprise-row-actions {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%); /* Handles vertical centering for BOTH icons */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem; /* Keeps + and X side-by-side with clean spacing */
+    z-index: 5;
+}
+
+/* Reset button positioning inside the flex container so they don't stack */
+.apprise-row-actions .btn-inline-icon {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    transform: none !important; /* Prevents transform inheritance conflicts */
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: var(--bs-primary, #0d6efd) !important;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.75;
+    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+
+/* Hover effect: Scale without breaking vertical alignment */
+.apprise-row-actions .btn-inline-icon:hover {
+    opacity: 1;
+    transform: scale(1.15) !important;
+}
+
+/* Hide PLUS button on all rows by default */
+.apprise-url-row .add-apprise-url-btn {
+    display: none !important;
+}
+
+/* ONLY show PLUS button on the last row */
+.apprise-url-row:last-child .add-apprise-url-btn {
+    display: inline-flex !important;
+}
+
+/* Right padding management for inputs */
+.apprise-url-row:last-child .apprise-url-input {
+    padding-right: 4rem !important; /* Space for both icons */
+}
+
+.apprise-url-row:not(:last-child) .apprise-url-input {
+    padding-right: 2.25rem !important; /* Space for X icon only */
+}
+
+/* Hover color for delete icon */
+.apprise-row-actions .remove-apprise-url-btn:hover {
+    color: #dc3545 !important;
+}
+
+/* Dark mode overrides */
+[data-bs-theme="dark"] .apprise-row-actions .btn-inline-icon {
+    color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover {
+    color: #ea868f !important;
+}
 
 
 /* ==========================================================================
@@ -331,6 +499,11 @@ h1 {
     }
 }
 
+/* Red border highlight for TomSelect when Plex libraries fail to fetch */
+.ts-wrapper.is-invalid .ts-control {
+    border-color: #dc3545 !important;
+}
+
 /* Clear button plugin */
 /* Container padding so chips don't overlap icon */
 .ts-wrapper.plugin-clear_button .ts-control {
@@ -359,7 +532,7 @@ h1 {
     margin: 0 !important;
     
     /* Icon styling */
-    color: var(--bs-primary, #0d6efd) !important; /* Switch to var(--bs-primary) if you want blue
+    color: var(--bs-primary, #0d6efd) !important; /* Switch to var(--bs-primary) if you want blue */
     font-size: 1rem; /* Tweak size easily here */
     line-height: 1;
     
@@ -371,6 +544,7 @@ h1 {
 .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
     opacity: 1;
     transform: translateY(-50%) scale(1.15);
+    color: #dc3545 !important;
 }
 
 /* Hide clear button while loading options (takes precedence over .has-items) */
@@ -426,4 +600,43 @@ h1 {
 /* Active typing text inside TomSelect control in Dark Mode */
 [data-bs-theme="dark"] .ts-control > input {
     color: #f8f9fa !important; /* Crisp white text while typing */
+}
+
+/* --------------------------------------------------------------------------
+   Save Config button
+   -------------------------------------------------------------------------- */
+
+/* Prevent floating button from covering content at the bottom of the page */
+#settings {
+    padding-bottom: 4rem;
+}
+
+/* Floating Save Button Styling & Animations */
+#save_config_button.rounded-pill {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#save_config_button.rounded-pill:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25) !important;
+}
+
+#save_config_button.rounded-pill:active {
+    transform: translateY(0);
+}
+
+
+
+/* Column and Row Spacing for Filter Toggles */
+/* .gap-x-4 {
+    column-gap: 3.5rem !important; */
+/* } */
+.gap-y-2 {
+    row-gap: 0.5rem !important;
+}
+
+/* Fixed minimum column width for toggle alignment */
+.filter-toggle-item {
+    min-width: 11rem; /* ~176px - keeps switches perfectly aligned in columns */
+    flex-shrink: 0;
 }

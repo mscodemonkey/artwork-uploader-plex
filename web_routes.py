@@ -14,7 +14,7 @@ import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subproc
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
-from flask import render_template, send_from_directory, request, redirect, url_for, session
+from flask import render_template, send_from_directory, request, redirect, url_for, session, jsonify
 from functools import wraps
 from core import globals
 from services.notify_service import NotifyService
@@ -111,6 +111,31 @@ def setup_routes(web_app, config: Config):
         """Serve files from the uploads directory."""
         uploads_path = os.path.join(UtilityService.get_exe_dir(), 'uploads')
         return send_from_directory(uploads_path, filename)
+
+    @web_app.route('/api/browse', methods=['GET'])
+    def browse_directory():
+        req_path = request.args.get('path', '.')
+        abs_path = os.path.abspath(req_path)
+        
+        if not os.path.exists(abs_path) or not os.path.isdir(abs_path):
+            abs_path = os.path.abspath('.')
+
+        folders = []
+        try:
+            for entry in os.scandir(abs_path):
+                if entry.is_dir() and not entry.name.startswith('.'):
+                    folders.append({
+                        "name": entry.name,
+                        "path": entry.path
+                    })
+            folders.sort(key=lambda x: x['name'].lower())
+        except PermissionError:
+            pass
+
+        return jsonify({
+            "current_path": abs_path,
+            "folders": folders
+        })
 
     def webhook_token_ok():
         """A webhook request is authorised when it carries the configured token, sent as the
@@ -430,99 +455,12 @@ def setup_socket_handlers(
         except AttributeError as e:
             notify_web(instance, f"get_plex_libraries", { "tv_libraries": [], "movie_libraries": [], "message": "Unable to connect to Plex" })
 
-    @globals.web_socket.on("test_plex_connect")
-    def test_plex_connect(data):
-        """Test connectivity to Plex server"""
-
-        def fail(status, log):
-            if saving_config:
-                log = f"Configuration not saved ({log})"
-                status = f"Configuration not saved ({status})"
-            update_log(instance, f"❌ {log}")
-            update_status(instance, status, "danger", False, False, "x-circle")
-            notify_web(instance, "test_plex_connect", { "success": False })
-            notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
-
-        instance = Instance(data.get("instance_id"), "web")
-        update_status(instance, "Testing connection to Plex server", "info", True, True)
-
-        # Disable the test button to prevent multiple clicks
-        notify_web(instance, "element_disable", {"element": ["test_plex_btn"], "mode": True})
-        
-        # Capture Plex settings form parameters
-        url = data.get("url", "")
-        debug_me(f"Obtained Plex URL: {url}")
-        token = data.get("token", "")
-        debug_me(f"Obtained Plex token: {token}")
-        tv_libs = data.get("tv_libs", "")
-        debug_me(f"Obtained {len(tv_libs)} TV libraries: {tv_libs}")
-        movie_libs = data.get("movie_libs", "")
-        debug_me(f"Obtained {len(movie_libs)} Movie libraries: {movie_libs}")
-
-        total_libs = len(tv_libs) + len(movie_libs)
-        saving_config = data.get("saving_config")
-        if total_libs == 0:
-            fail("Select at least one show or movie library", "Select at least one show or movie library")
-            return
-        
-        if saving_config:
-            debug_me(f"Testing Plex connectivity before saving configuration")
-        else:
-            debug_me(f"Testing Plex connectivity")
-        
-        # Check for a valid Plex server URL and token
-        url_pattern = r"^https?:\/\/([a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?$"
-        token_pattern = r"^[A-Za-z0-9_-]{20,}$"
-        if not re.fullmatch(url_pattern, url):
-            fail("Invalid Plex URL", f"Invalid Plex URL")
-            return
-        if not re.fullmatch(token_pattern, token):
-            fail("Invalid Plex token", f"Invalid Plex token")
-            return
-        
-        # Check connectivity to server
-        try:
-            plex_server = PlexServer(url, token, timeout=5)
-        except Exception as e:
-            if "NewConnectionError" in str(e):
-                log = f"Error connecting to Plex (Connection refused)"
-            elif "ConnectTimeoutError" in str(e) or "timed out" in str(e):
-                log = f"Error connecting to Plex (Timed out)"
-            elif "unauthorized" in str(e):
-                log = f"Error connecting to Plex (Invalid token)"
-            elif "NameResolutionError" in str(e):
-                log = f"Error connecting to Plex (Cannot resolve server name)"
-            elif "SSLError" in str(e):
-                log = f"Error connecting to Plex (SSL certificate validation failed)"
-            else:
-                log = f"Unknown error connecting to Plex: {str(e)}"
-            fail ("Error connecting to Plex, check log for details", log)
-            debug_me(f"Error connecting to Plex: {str(e)}")
-            return
-
-        # Check that the provided libraries exist in the server        
-        all_libs = list(tv_libs) + list(movie_libs)
-        invalid_libs = []
-        for lib in all_libs:
-            try:
-                plex_server.library.section(lib)
-            except Exception:
-                invalid_libs.append(lib)
-        if invalid_libs:
-            fail("Some libraries not found, check log for details.", f"The following libraries could not be found: {", ".join (invalid_libs)}")
-            return
-        
-        update_log(instance, "✅ Successfully connected to Plex server")
-        update_status(instance, "Successfully connected to Plex server", "success", False, False, "check2-circle")
-        notify_web(instance, "element_disable", { "element": ["test_plex_btn"], "mode": False })
-        notify_web(instance, "test_plex_connect", { "success": True })
-
     @globals.web_socket.on("test_notifications")
     def test_notifications(data):
         """Send a test notification."""
         instance = Instance(data.get("instance_id"), "web")
         # Disable the test button to prevent multiple clicks
-        notify_web(instance, "element_disable", {"element": ["test_notif_btn"], "mode": True})
+        notify_web(instance, "add_spinner", { "element": "test_notif_btn", "mode": True })
         urls = data.get("urls", [])
         notification_title = "Test Notification from Artwork Uploader"
         notification_message = "This is a test notification to verify your notification settings are working correctly."
@@ -559,7 +497,7 @@ def setup_socket_handlers(
                 debug_me("All test notifications failed to send")
                 update_log(instance, "❌ All test notifications failed to send")
                 update_status(instance, "All test notifications failed to send", "danger", False, False, "x-circle")
-        notify_web(instance, "element_disable", { "element": ["test_notif_btn"], "mode": False })
+        notify_web(instance, "add_spinner", { "element": "test_notif_btn", "mode": False })
 
     @globals.web_socket.on("save_config")
     def save_config_web(data):
@@ -591,9 +529,9 @@ def setup_socket_handlers(
             # Ensure a simple change in the order of a list isn't detected as a change
             for key in new_config_dict:
                 if isinstance(new_config_dict[key], list) and len(new_config_dict[key]) > 0 and isinstance(new_config_dict[key][0], str):
-                    new_config_dict[key] = list(set(new_config_dict[key]))
+                    new_config_dict[key].sort()
                 if isinstance(current_config_dict[key], list) and len(current_config_dict[key]) > 0 and isinstance(current_config_dict[key][0], str):
-                    current_config_dict[key] = list(set(current_config_dict[key]))
+                    current_config_dict[key].sort()
 
             # If the new configuration is the same, return
             if new_config_dict == current_config_dict and not password_change:

@@ -12,6 +12,8 @@ let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
 let tvPicker, moviePicker, tpdbUserPicker;
 let validationTimeout
+let currentBrowseTargetInput = null;
+let currentDirectoryPath = "/";
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -35,6 +37,76 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 
 // Event listeners
 document.addEventListener("DOMContentLoaded", function () {
+    const folderModalElement = document.getElementById("folderBrowserModal");
+    if (!folderModalElement) return;
+
+    // Prevent 'aria-hidden on focused element' warning on close (Cancel, X, or Confirm)
+    folderModalElement.addEventListener("hide.bs.modal", () => {
+        // 1. Clear focus from whatever element currently has focus inside the modal
+        if (folderModalElement.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+
+        // 2. Safely return focus to the input or button that opened the modal
+        if (currentBrowseTargetInput) {
+            currentBrowseTargetInput.focus();
+        }
+    });
+        
+    const folderModal = new bootstrap.Modal(folderModalElement, {
+        focus: false
+    });
+
+    document.querySelectorAll(".toggle-password-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const targetId = btn.getAttribute("data-target");
+            const targetInput = document.getElementById(targetId);
+            const icon = btn.querySelector("i");
+
+            if (!targetInput || !icon) return;
+
+            if (targetInput.type === "password") {
+                targetInput.type = "text";
+                icon.className = "bi bi-eye-slash";
+                btn.setAttribute("title", "Hide token");
+            } else {
+                targetInput.type = "password";
+                icon.className = "bi bi-eye";
+                btn.setAttribute("title", "Show token");
+            }
+        });
+    });
+
+    // Attach click event to all browse buttons
+    document.querySelectorAll(".browse-folder-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const targetId = btn.getAttribute("data-target");
+            currentBrowseTargetInput = document.getElementById(targetId);
+
+            // Start browsing at current field value if present, or root
+            const initialPath = currentBrowseTargetInput.value.trim() || "/";
+            loadDirectory(initialPath);
+            folderModal.show();
+        });
+    });
+
+    // Up directory navigation button
+    document.getElementById("folder_nav_up").addEventListener("click", () => {
+        const parts = currentDirectoryPath.split("/").filter(Boolean);
+        parts.pop();
+        const parentPath = "/" + parts.join("/");
+        loadDirectory(parentPath || "/");
+    });
+
+    // Confirm selection button
+    document.getElementById("select_folder_confirm").addEventListener("click", () => {
+        if (currentBrowseTargetInput) {
+            currentBrowseTargetInput.value = currentDirectoryPath;
+        }
+        document.getElementById("select_folder_confirm").blur(); // Remove focus from the confirm button
+        folderModal.hide();
+    });
+
     updateLog("📍 New session started with ID: " + instanceId)
     tpdbUserPicker = new TomSelect('#webhook_tpdb_users', {
             create: true,
@@ -93,7 +165,6 @@ document.getElementById("scraper-filters-global").addEventListener("change", inh
 document.getElementById("upload-filters-global").addEventListener("change", inheritGlobalFiltersForUploads);
 document.getElementById("btnUpdate").addEventListener("click", updateApp);
 document.getElementById("test_notif_btn").addEventListener("click", testNotifications);
-document.getElementById("test_plex_btn").addEventListener("click", () => { testPlexConnect(false); });
 document.getElementById("debug-mode").addEventListener("change", function() {
     socket.emit("debug_mode", { instance_id: instanceId, action: "toggle" });
 });
@@ -103,6 +174,79 @@ document.getElementById("plex_base_url").addEventListener("change", updateLibrar
 // ==================================================
 // General helper functions
 // ==================================================
+
+// Function to fetch and render directory contents from backend
+async function loadDirectory(path = "/") {
+    const folderList = document.getElementById("folder_list");
+    const currentPathSpan = document.getElementById("folder_current_path");
+    
+    folderList.innerHTML = `<div class="p-3 text-center text-muted"><span class="spinner-border spinner-border-sm"></span> Loading...</div>`;
+
+    try {
+        // Call your backend directory browsing endpoint
+        const response = await fetch(`/api/browse?path=${encodeURIComponent(path)}`);
+        const data = await response.json();
+
+        currentDirectoryPath = data.current_path;
+        currentPathSpan.textContent = currentDirectoryPath;
+        folderList.innerHTML = "";
+
+        if (data.folders.length === 0) {
+            folderList.innerHTML = `<div class="p-3 text-center text-muted small">No subdirectories found</div>`;
+            return;
+        }
+
+        data.folders.forEach(folder => {
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 input-monospace small";
+            item.innerHTML = `<i class="bi bi-folder text-primary"></i> <span>${folder.name}</span>`;
+            
+            item.addEventListener("click", () => {
+                loadDirectory(folder.path);
+            });
+            folderList.appendChild(item);
+        });
+    } catch (err) {
+        folderList.innerHTML = `<div class="p-3 text-center text-danger small">Failed to load directory</div>`;
+    }
+}
+
+function addSpinner(elementId, mode = true) {
+    if (!elementId) return;  // Exit if no element_ids provided
+
+    const element = document.getElementById(elementId);
+
+    if (!element) {
+        console.warn(`Element ID with ${id} not found.`);
+        return;
+    }
+    const icon = element.querySelector("i");
+
+    if (mode === true) {
+        if (icon) {
+            if (!icon.dataset.originalClass) {
+                icon.dataset.originalClass = icon.className;
+            }
+            icon.className = "spinner-border spinner-border-sm";
+            icon.setAttribute("role", "status");
+            icon.setAttribute("aria-hidden", "true");
+        }
+        element.disabled = true;
+    } else {
+        if (icon && icon.dataset.originalClass) {
+            icon.className = icon.dataset.originalClass;
+            icon.removeAttribute("role");
+            icon.removeAttribute("aria-hidden");
+        }
+        element.disabled = false;
+    }
+}
+socket.on("add_spinner", (data) => {
+    if (validResponse(data)) {
+        addSpinner(data.element, data.mode);
+    }
+});
 
 function getScrapeState() {
     socket.on("get_scrape_state", (data) => {
@@ -146,7 +290,7 @@ function updatePickerLabel(picker, message = '') {
 function updateLibraryPickers() {
     const baseUrl = document.getElementById("plex_base_url").value;
     const token = document.getElementById("plex_token").value;
-    
+
     tvPicker.disable();
     setPickerPlaceholder(tvPicker, "No libraries available");
     moviePicker.disable();
@@ -157,21 +301,25 @@ function updateLibraryPickers() {
             if (data.tv_libraries && data.tv_libraries.length > 0) {
                 data.tv_libraries.forEach(lib => tvPicker.addOption({ value: lib, text: lib }));
                 tvPicker.enable();
+                tvPicker.wrapper.classList.remove("is-invalid");
             } else {
                 tvPicker.clear();
                 tvPicker.clearOptions();
                 tvPicker.disable();
+                tvPicker.wrapper.classList.add("is-invalid");
             }
             data.message ? updatePickerLabel(tvPicker, data.message) : updatePickerLabel(tvPicker);
             tvPicker.wrapper.classList.remove("loading");
-
+            
             if (data.movie_libraries && data.movie_libraries.length > 0) {
                 data.movie_libraries.forEach(lib => moviePicker.addOption({ value: lib, text: lib }));
                 moviePicker.enable();
+                moviePicker.wrapper.classList.remove("is-invalid");
             } else {
                 moviePicker.clear();
                 moviePicker.clearOptions();
                 moviePicker.disable();
+                moviePicker.wrapper.classList.add("is-invalid");
             }
             data.message ? updatePickerLabel(moviePicker, data.message) : updatePickerLabel(moviePicker);
             moviePicker.wrapper.classList.remove("loading");
@@ -181,6 +329,8 @@ function updateLibraryPickers() {
     if (baseUrl && token) {
         tvPicker.disable();
         moviePicker.disable();
+        tvPicker.wrapper.classList.remove("is-invalid");
+        moviePicker.wrapper.classList.remove("is-invalid");
         setPickerPlaceholder(tvPicker, "Loading libraries...");
         setPickerPlaceholder(moviePicker, "Loading libraries...");
         tvPicker.wrapper.classList.add("loading");
@@ -267,39 +417,13 @@ socket.on("docker_detected", (data) => {
     }
 });
 
-// Test connection to Plex server
-function testPlexConnect(savingConfig) {
-    const baseUrl = document.getElementById("plex_base_url").value;
-    const token = document.getElementById("plex_token").value;
-    const tvLibraries = tvPicker ? tvPicker.getValue() : [];
-    const movieLibraries = moviePicker ? moviePicker.getValue() : [];
-    
-    return new Promise((resolve) => {
-        socket.emit("test_plex_connect", { 
-            instance_id: instanceId, 
-            url: baseUrl, 
-            token: token, 
-            tv_libs: tvLibraries, 
-            movie_libs: movieLibraries, 
-            saving_config: savingConfig 
-        });
-
-        socket.once("test_plex_connect", function(data) {
-            if (validResponse(data)) {
-                resolve(data.success); // This "returns" the value to the awaiter
-            } else {
-                resolve(false); // Handle bad responses
-            }
-        });
-    });
-}
-
 // Send test notification
 function testNotifications() {
-    const urls = document.getElementById("apprise_urls").value
-        .split(",")
-        .map(item => item.trim())
-        .filter(item => item !== ""); // Remove empty values    
+
+    const urls = Array.from(document.querySelectorAll(".apprise-url-input"))
+        .map(input => input.value.trim())
+        .filter(url => url !== "");
+
     if (urls.length == 0) {
         updateStatus("Set at least one notification URL", "warning", false, false, "exclamation-triangle")
     } else {
@@ -431,7 +555,7 @@ function updateStatus(message, color = "info", sticky = false, spinner = false, 
     // Set a new timeout to hide the status element after 3 seconds
     if (!sticky) {
         statusTimeout = setTimeout(() => {
-            statusEl.classList.remove('show'); // Fade out the status after 3 seconds
+            statusEl.classList.remove('show'); // Fade out the status after 5 seconds
         }, 5000);
     }
 
@@ -730,22 +854,18 @@ document.getElementById("save_config_button").addEventListener("click", async fu
     const form = document.getElementById("config_form");
     if (!form.checkValidity()) {
         form.classList.add("was-validated");
-        // Clear any previous running timer
-        if (validationTimeout) clearTimeout(validationTimeout);
-
-        // Remove the validation highlights after 3 seconds (3000 ms)
-        validationTimeout = setTimeout(() => {
-            form.classList.remove("was-validated");
-        }, 3000);        
         return; // Prevent further execution if form is invalid
     }
     // Form is valid: make sure highlights are cleared if user successfully saves
-    form.classList.remove("was-validated");
-    if (validationTimeout) clearTimeout(validationTimeout);
-        let success = await testPlexConnect(true);
-    if (success == true) {
+    const tvLibraries = tvPicker ? tvPicker.getValue() : [];
+    const movieLibraries = moviePicker ? moviePicker.getValue() : [];
+
+    if (tvLibraries.length + movieLibraries.length > 0) {
+        form.classList.remove("was-validated");
         saveConfig();
-    };
+    } else {
+        updateStatus("Select at least one show or movie library", "danger", false, false, "x-circle");
+    }
 });
 
 // Save configuration
@@ -759,15 +879,14 @@ function saveConfig() {
     toggleTempCheckbox();
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
     
-    // Convert comma-separated Apprise URLs to array
-    save_config.apprise_urls = document.getElementById("apprise_urls").value
-        .split(",")
-        .map(item => item.trim())
-        .filter(item => item !== ""); // Remove empty values
+    // Save the Apprise URLs
+    // Collect all non-empty Apprise URLs from the dynamic inputs
+    save_config.apprise_urls = Array.from(document.querySelectorAll(".apprise-url-input"))
+        .map(input => input.value.trim())
+        .filter(url => url !== "");
 
-    // Convert comma-separated library inputs to arrays
+    // Collect movie and TV library lists from TomSelect pickers
     save_config.tv_library = tvPicker ? tvPicker.getValue() : [];
-
     save_config.movie_library = moviePicker ? moviePicker.getValue() : [];
 
     // Checkbox for tracking artwork IDs
@@ -914,7 +1033,27 @@ function updateConfigUI(config) {
     document.getElementById("user_cache_refresh_days").value = config.user_cache_refresh_days ?? 7;
     document.getElementById("allow_artist_updates").checked = config.allow_artist_updates;
     document.getElementById("option-add-to-bulk").checked = config.auto_manage_bulk_files;
-    document.getElementById("apprise_urls").value = config.apprise_urls.join(", ");
+    
+    // Populate Apprise URLs
+    const container = document.getElementById("apprise_urls_container");
+    if (container) {
+        container.innerHTML = "";
+        
+        if (Array.isArray(config.apprise_urls) && config.apprise_urls.length > 0) {
+            const numUrls = config.apprise_urls.length
+            let thisUrl = 0
+            config.apprise_urls.forEach(url => {
+                thisUrl += 1
+                if (thisUrl < numUrls) {
+                    createAppriseUrlRow(url);
+                } else {
+                    createAppriseUrlRow(url, last=true);
+                }
+            });
+        } else {
+            createAppriseUrlRow();
+        }
+    }
     
     // Load authentication settings
     document.getElementById("auth_enabled").checked = config.auth_enabled || false;
@@ -1044,6 +1183,7 @@ function startScrape() {
 
     // Check if the form is valid
     if (form.checkValidity()) {
+        form.classList.remove('was-validated');
         // Proceed with scraping if form is valid
 
         // Collect checked input fields with ids starting with "option-"
@@ -1609,7 +1749,6 @@ function downloadBulkImportFile(filename) {
     document.body.removeChild(a);
 }
 
-
 // Function to handle uploading a bulk file
 document.getElementById("upload_icon").addEventListener("click", function () {
     document.getElementById("bulk_import_upload").value = "";
@@ -2054,9 +2193,16 @@ function toggleWebhookSettings() {
     const tokenField = document.getElementById("webhook_token");
     if (enabled) {
         tokenField.setAttribute("required", "");
+        if (tokenField.dataset.originalValue) {
+            tokenField.value = tokenField.dataset.originalValue;
+        }
     } else {
         tokenField.removeAttribute("required");
         tokenField.classList.remove("is-invalid", "is-valid");
+        if (!tokenField.dataset.originalValue) {
+            tokenField.dataset.originalValue = tokenField.value;
+        }
+        tokenField.value='';
     }
     // if (enabled && !tokenField.value) {
     //     tokenField.value = generateRandomToken();
@@ -2283,4 +2429,49 @@ function toggleUserCacheExpiryField() {
     } else {
         cacheExpiryContainer.classList.add("d-none");
     }
+}
+
+// Creates a single Apprise URL input row with a delete button
+function createAppriseUrlRow(value = "", last = false) {
+    const container = document.getElementById("apprise_urls_container");
+
+    const row = document.createElement("div");
+    row.className = "position-relative apprise-url-row";
+
+    row.innerHTML = `
+        <input type="text" 
+               class="form-control input-monospace apprise-url-input ${last ? 'has-two-inline-btns' : 'has-inline-btn'}" 
+               placeholder="discord://{botname}@{WebhookID}/{WebhookToken}" 
+               value="${value}"
+               spellcheck="false"
+               autocomplete="off"
+               autocorrect="off"
+               autocapitalize="off">
+        <div class="apprise-row-actions">
+            <button type="button" class="btn-inline-icon add-apprise-url-btn" title="Add another URL">
+                <i class="bi bi-plus-circle"></i>
+            </button>
+            <button type="button" class="btn-inline-icon remove-apprise-url-btn" title="Remove URL">
+                <i class="bi bi-x-circle"></i>
+            </button>
+        </div>
+    `;
+
+    // Event listener to add a row
+    row.querySelector(".add-apprise-url-btn").addEventListener("click", () => {
+        createAppriseUrlRow();
+        const inputs = document.querySelectorAll(".apprise-url-input");
+        inputs[inputs.length - 1].focus();
+    });
+
+    // Event listener to remove this row
+    row.querySelector(".remove-apprise-url-btn").addEventListener("click", () => {
+        row.remove();
+        // Keep at least one empty row if all are deleted
+        if (container.children.length === 0) {
+            createAppriseUrlRow();
+        }
+    });
+
+    container.appendChild(row);
 }
