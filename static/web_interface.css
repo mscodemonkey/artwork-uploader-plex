@@ -28,7 +28,7 @@ h1 {
 }
 
 .app-logo:hover {
-    transform: scale(1.1);
+    transform: scale(1.15);
 }
 
 .app-title {
@@ -55,7 +55,6 @@ h1 {
 /* ==========================================================================
    Custom Components & Overlays
    ========================================================================== */
-
 
 /* Drop Area */
 #drop-area {
@@ -242,7 +241,8 @@ h1 {
     background-position: right 2.25rem center !important;
     padding-right: 4rem !important; /* Ensures long tokens don't overlap either icon */
 }
-/* Inline Generate Webhook Token Button (Matches TomSelect clear button feel) */
+
+/* Standalone Inline Button (e.g., single eye icon on Plex Auth) */
 .btn-inline-icon {
     position: absolute;
     right: 0.75rem;
@@ -252,17 +252,34 @@ h1 {
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: var(--bs-primary, #0d6efd) !important;
+    color: var(--bs-primary, #0d6efd);
     font-size: 1.1rem;
     line-height: 1;
     cursor: pointer;
     opacity: 0.75;
-    transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
+    transition: opacity 0.15s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 4;
 }
 
+/* Base transition for the inner <i> icon */
+.btn-inline-icon i {
+    display: inline-block;
+    transition: transform 0.15s ease-in-out;
+}
+[data-bs-theme="dark"] .btn-inline-icon:hover i {
+    color: #0d6efe;
+}
+
+/* Hover effects */
 .btn-inline-icon:hover {
     opacity: 1;
-    transform: translateY(-50%) scale(1.15);
+}
+
+.btn-inline-icon:hover i {
+    transform: scale(1.15); /* Scales the icon cleanly without affecting position */
 }
 
 /* Dark mode color override */
@@ -304,12 +321,31 @@ h1 {
     color: #3d8bfd !important;
 }
 
-/* Offset Bootstrap validation icons for fields with inline folder browse buttons */
-/* .was-validated #kometa_asset_directory.form-control:invalid,
-.was-validated #kometa_asset_directory.form-control:valid {
-    background-position: right 2.25rem center !important;
-    padding-right: 4rem !important; /* Prevents long folder paths from clipping into the icons 
-} */
+
+/* ==========================================================================
+   Bulk Import tab button styling
+   ========================================================================== */
+
+/* Base state on the anchor wrapper */
+.bulk-btn {
+    transition: transform 0.2s ease-in-out;
+    text-decoration: none;
+    line-height: 1;
+    color: inherit;
+}
+
+/* Hover scale and color effect */
+.bulk-btn:hover {
+    transform: scale(1.18);
+    color: var(--bs-primary);
+}
+/* Color override for the delete button */
+.bulk-btn:hover #delete_icon {
+    color: #dc3545 !important;
+}
+
+
+
 /* Generic validation icon offset for inputs with inline trailing buttons */
 .was-validated .form-control[required].has-inline-btn:invalid,
 .was-validated .form-control[required].has-inline-btn:valid {
@@ -330,42 +366,6 @@ h1 {
 .was-validated .position-relative:has(.form-control:invalid) ~ .invalid-feedback,
 .was-validated .position-relative .form-control:invalid ~ .invalid-feedback {
     display: block !important;
-}
-
-/* ==========================================================================
-   Strip ALL validation styling from non-required form controls
-   ========================================================================== */
-
-/* 1. Standard Inputs & Selects (Text, Numbers, Dropdowns) */
-.was-validated .form-control:not([required]):valid,
-.was-validated .form-select:not([required]):valid {
-    background-image: none !important;
-    border-color: var(--bs-border-color) !important;
-    box-shadow: none !important;
-}
-
-/* Reset focus state on non-required inputs */
-.was-validated .form-control:not([required]):valid:focus,
-.was-validated .form-select:not([required]):valid:focus {
-    border-color: #86b7fe !important;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
-}
-
-/* 2. Checkboxes, Radios, and Form Switches (Toggles) */
-.was-validated .form-check-input:not([required]):valid {
-    border-color: var(--bs-border-color) !important;
-    box-shadow: none !important;
-}
-
-/* Keep checked toggles/checkboxes using standard primary color (blue) instead of green */
-.was-validated .form-check-input:not([required]):valid:checked {
-    background-color: var(--bs-primary, #0d6efd) !important;
-    border-color: var(--bs-primary, #0d6efd) !important;
-}
-
-/* Reset label text colors next to non-required toggles */
-.was-validated .form-check-input:not([required]):valid ~ .form-check-label {
-    color: inherit !important;
 }
 
 /* ==========================================================================
@@ -397,7 +397,7 @@ h1 {
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: var(--bs-primary, #0d6efd) !important;
+    color: var(--bs-primary, #0d6efd);
     font-size: 1rem;
     line-height: 1;
     cursor: pointer;
@@ -408,7 +408,14 @@ h1 {
 /* Hover effect: Scale without breaking vertical alignment */
 .apprise-row-actions .btn-inline-icon:hover {
     opacity: 1;
+}
+
+.apprise-row-actions .btn-inline-icon:hover i {
     transform: scale(1.15) !important;
+}
+
+[data-bs-theme="dark"] .apprise-row-actions .btn-inline-icon:hover {
+    color: #3d8bfd;
 }
 
 /* Hide PLUS button on all rows by default */
@@ -430,18 +437,21 @@ h1 {
     padding-right: 2.25rem !important; /* Space for X icon only */
 }
 
-/* Hover color for delete icon */
-.apprise-row-actions .remove-apprise-url-btn:hover {
-    color: #dc3545 !important;
+/* Hover color for delete icon (HIGH SPECIFICITY to beat dark mode defaults) */
+.btn-inline-icon.remove-apprise-url-btn:hover,
+.btn-inline-icon.remove-apprise-url-btn:hover i,
+[data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:hover,
+[data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:hover i,
+.apprise-row-actions .remove-apprise-url-btn:hover,
+.apprise-row-actions .remove-apprise-url-btn:hover i,
+[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover,
+[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover i {
+    color: #dc3545 !important; /* Bootstrap Danger Red */
 }
 
-/* Dark mode overrides */
-[data-bs-theme="dark"] .apprise-row-actions .btn-inline-icon {
+/* Dark mode default color for Apprise buttons (when NOT hovered) */
+[data-bs-theme="dark"] .apprise-row-actions .btn-inline-icon:not(:hover) {
     color: #ffffff !important;
-}
-
-[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover {
-    color: #ea868f !important;
 }
 
 
@@ -581,7 +591,16 @@ h1 {
 /* TomSelect Clear Button in Dark Mode */
 [data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button {
     color: #ffffff !important; 
-}    
+}
+
+[data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
+    color: #dc3545 !important; 
+}
+
+.theme-icon-active {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+}
 
 /* --------------------------------------------------------------------------
    Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
@@ -612,20 +631,18 @@ h1 {
 }
 
 /* Floating Save Button Styling & Animations */
-#save_config_button.rounded-pill {
+.rounded-pill {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-#save_config_button.rounded-pill:hover {
+.rounded-pill:hover {
     transform: translateY(-2px);
     box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25) !important;
 }
 
-#save_config_button.rounded-pill:active {
+.rounded-pill:active {
     transform: translateY(0);
 }
-
-
 
 /* Column and Row Spacing for Filter Toggles */
 /* .gap-x-4 {

@@ -39,41 +39,6 @@
     </svg>
 
 
-    <div class="dropdown position-fixed bottom-0 end-0 mb-3 me-3 bd-mode-toggle z-5 position-absolute">
-        <button class="btn btn-bd-primary py-2 dropdown-toggle d-flex align-items-center"
-                id="bd-theme"
-                type="button"
-                aria-expanded="false"
-                data-bs-toggle="dropdown"
-                aria-label="Toggle theme (auto)">
-            <svg class="bi my-1 theme-icon-active" width="1em" height="1em"><use href="#circle-half"></use></svg>
-            <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
-        </button>
-        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
-            <li>
-            <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
-                Light
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-            </button>
-            </li>
-            <li>
-            <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
-                Dark
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-            </button>
-            </li>
-            <li>
-            <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
-                <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
-                Auto
-                <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
-            </button>
-            </li>
-        </ul>
-    </div>
-
     <div class="container mt-4">
         <div class="mb-4 row">
             <div class="col">
@@ -129,7 +94,6 @@
 
 
         <!-- Bootstrap Tabs -->
-
         <nav class="nav nav-tabs" id="myTab">
             <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
             role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&ensp;Scraper
@@ -196,7 +160,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="plex_token" class="form-label"><i class="bi bi-key"></i>&ensp;Authentication token</label>
-                                    &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-delay='{"hide": 500}' data-bs-html="true" data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i>
+                                    &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true" data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i>
                                     <div class="position-relative">
                                         <input type="password" id="plex_token" name="plex_token" class="form-control input-monospace pe-5 has-inline-btn" required pattern="[A-Za-z0-9_\-]{20,40}"
                                             title="Plex token should be a 20+ character string with letters, digits, dashes or underscores."
@@ -220,7 +184,7 @@
                                     <select id="movie_library" name="movie_library" multiple placeholder="Click to add..."></select>
                                 </div>
                             </div>
-                            <!-- Kometa settings -->                           
+                            <!-- Kometa settings -->
                             <div class="p-3 border mt-3 rounded-3 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-download"></i>&ensp;Kometa settings</h5>
                                 <div class="form-check form-switch mb-3">
@@ -236,7 +200,6 @@
                                         <input class="form-check-input" type="checkbox" value="stage_assets" id="stage_assets"/>
                                         <label for="stage_assets" class="form-check-label">Stage assets</label>&nbsp;
                                         <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Saves assets for seasons and episodes not yet in Plex (excluding specials)"></i>
-                                        <!-- <br><small class="form-text text-muted">(Excluding Specials)</small> -->
                                     </div>
                                     <div class="mb-3">
                                         <label for="kometa_base" class="form-label"><i class="bi bi-folder"></i>&ensp;Kometa Asset Directory</label>
@@ -535,13 +498,13 @@
                                                 <label class="form-label">
                                                     <i class="bi bi-link-45deg"></i>&ensp;Apprise URLs to notify
                                                 </label>
-                                                &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-delay='{"hide": 500}' data-bs-html="true" data-bs-title='Enter Apprise URLs. See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.'></i>
+                                                &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true" data-bs-title='Enter Apprise URLs. See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.'></i>
                                                 
                                                 <!-- Dynamic URL Rows Container -->
                                                 <div id="apprise_urls_container" class="d-flex flex-column gap-2"></div>
                                                 <div class="row">
                                                     <div class="col">
-                                                        <button class="btn btn-primary mt-3" type="button" id="test_notif_btn">
+                                                        <button class="btn btn-primary mt-3 rounded-pill" type="button" id="test_notif_btn">
                                                             <i class="bi bi-send"></i>&ensp;Test Notifications
                                                         </button>
                                                     </div>
@@ -549,53 +512,89 @@
                                             </div>
                                         </div>  
                                     </div>
-                                    <!-- <button class="btn btn-primary mt-3" id="save_config_button"><i class="bi bi-floppy2"></i>&ensp;Save Config</button> -->
                                 </div>
                             </div>
                         </div>
                     </div>
                     <!-- Floating Save Button Container -->
-                    <div class="position-fixed bottom-0 p-3 p-md-4 z-3">
-                        <button type="submit" id="save_config_button" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill px-4">
+                    <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
+                        <button type="submit" id="save_config_button" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill">
                             <i class="bi bi-floppy2"></i>
-                            <span>Save Settings</span>
+                            <span>Save</span>
                         </button>
-                    </div>                    
+                        <div class="dropdown">
+                            <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                                    id="bd-theme"
+                                    type="button"
+                                    aria-expanded="false"
+                                    data-bs-toggle="dropdown"
+                                    aria-label="Toggle theme (auto)">
+                                <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                        <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                                        Light
+                                        <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                        <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                                        Dark
+                                        <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                        <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                        Auto
+                                        <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
                 </form>
             </div>
 
 
             <!-- Bulk Import Tab -->
             <div class="tab-pane fade" id="bulk-import" role="tabpanel" aria-labelledby="bulk-import-tab" tabindex="0">
-                <!--                <form id="bulk_form" class="needs-validation" novalidate> -->
-
-
                 <div class="row mb-3">
                     <div class="col">
-                        <div class="p-3 border rounded-3 shadow-sm d-flex align-items-center">
-                            <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select" required>
-                                <option selected disabled>Loading file list...</option>
-                            </select>
-                            <div class="invalid-feedback">
-                                Please provide a bulk import file path.
-                            </div>
-                            <!-- Default bulk file checkbox -->
-                            <div class="d-flex align-items-center">
-                                <input type="hidden" id="bulk_import_file" name="bulk_import_file" class="bulk_import_file">
-                                <div class="form-check mb-0 d-flex align-items-center">
-                                    <!-- Default bulk file checkbox using Bootstrap icons -->
-                                    <input type="checkbox" id="default_bulk_file" class="d-none">
-                                    <a title="Default file will be loaded when Artwork Uploader starts"><i id="default_bulk_file_icon" class="bi bi-check-circle h4" role="button"></i></a>
-                                    <label class="d-none d-sm-block form-check-label mb-0 ms-2" for="default_bulk_file">Default</label>
+                        <!-- Container for the file selector field -->
+                        <div class="p-3 border rounded-3 shadow-sm d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 gap-md-3">
+                            <div class="flex-grow-1 w-md-auto">
+                                <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select" required>
+                                    <option selected disabled>Loading file list...</option>
+                                </select>
+                                <div class="invalid-feedback">
+                                    Please provide a bulk import file path.
                                 </div>
                             </div>
-                            <!-- Icons at the end -->
-                            <a title="Delete this file"><i id="delete_icon" class="bi bi-trash3 h4 ms-3" role="button"></i></a>
-                            <a title="Rename this file"><i id="rename_icon" class="bi bi-pencil-square h4 ms-3" role="button"></i></a>
-                            <a title="Schedule bulk file run"><i id="schedule_icon" class="bi bi-clock h4 ms-3" role="button"></i></a>
-                            <a title="Create a new bulk file"><i id="create_icon" class="bi bi-file-earmark-plus h4 ms-3" role="button"></i></a>
-                            <a title="Upload a new bulk file"><i id="upload_icon" class="bi bi-upload h4 ms-3" role="button"></i></a>
-                            <a title="Download current bulk file"><i id="download_icon" class="bi bi-download h4 ms-3" role="button"></i></a>
+                            <!-- Action Toolbar: Wraps cleanly under select on mobile -->
+                            <div class="d-flex align-items-center justify-content-center justify-content-between ps-2 pe-2 gap-3">
+                                <!-- Default bulk file checkbox -->
+                                <div class="d-flex align-items-center me-md-1">
+                                    <input type="hidden" id="bulk_import_file" name="bulk_import_file" class="bulk_import_file">
+                                    <div class="form-check mb-0 ps-0 d-flex align-items-center">
+                                        <!-- Default bulk file checkbox using Bootstrap icons -->
+                                        <input type="checkbox" id="default_bulk_file" class="d-none">
+                                        <a title="Default file will be loaded when Artwork Uploader starts" class="bulk-btn d-flex align-items-center"><i id="default_bulk_file_icon" class="bi bi-check-circle h4 mb-0" role="button"></i></a>
+                                        <label class="d-none d-sm-block form-check-label mb-0 ms-2" for="default_bulk_file">Default</label>
+                                    </div>
+                                </div>
+                                <!-- Icons at the end -->
+                                <a title="Delete this file" class="bulk-btn d-flex align-items-center"><i id="delete_icon" class="bi bi-trash3 h4 mb-0" role="button"></i></a>
+                                <a title="Rename this file" class="bulk-btn d-flex align-items-center"><i id="rename_icon" class="bi bi-pencil-square h4 mb-0" role="button"></i></a>
+                                <a title="Schedule bulk file run" class="bulk-btn d-flex align-items-center"><i id="schedule_icon" class="bi bi-clock h4 mb-0" role="button"></i></a>
+                                <a title="Create a new bulk file" class="bulk-btn d-flex align-items-center"><i id="create_icon" class="bi bi-file-earmark-plus h4 mb-0" role="button"></i></a>
+                                <a title="Upload a new bulk file" class="bulk-btn d-flex align-items-center""><i id="upload_icon" class="bi bi-upload h4 mb-0" role="button"></i></a>
+                                <a title="Download current bulk file" class="bulk-btn d-flex align-items-center"><i id="download_icon" class="bi bi-download h4 mb-0" role="button"></i></a>
+                            </div>
                         </div>
                     </div>
 
@@ -627,9 +626,7 @@
                     </div>
                 </div>
 
-
-
-
+                <!-- Bulk import text field -->
                 <div class="row mb-3">
                     <div class="col">
                         <div class="p-3 border rounded-3 shadow-sm">
@@ -637,13 +634,54 @@
                         </div>
                     </div>
                 </div>
-                <div class="row mb-3">
-                    <div class="col">
-                        <button class="btn btn-secondary me-3" id="save_bulk_button" onclick="checkBulkImportFileToSave()"><i class="bi bi-floppy2"></i>&ensp;Save Bulk File</button>
-                        <button class="btn btn-primary me-3" id="bulk_button" onclick="runBulkImport()"><i class="bi bi-play-circle"></i>&ensp;Run Bulk Import</button>
+
+                <!-- Floating Button Container -->
+                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" id="save_bulk_button" onclick="checkBulkImportFileToSave()" class="btn shadow d-flex align-items-center gap-2 rounded-pill">
+                            <i class="bi bi-floppy2"></i>
+                            <span>Save</span>
+                        </button>
+                        <button type="button" id="bulk_button" onclick="runBulkImport()" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill">
+                            <i class="bi bi-play-circle"></i>
+                            <span>Run</span>
+                        </button>
                     </div>
-                </div>
-                <!--                </form> -->
+                    <div class="dropdown">
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                                id="bd-theme"
+                                type="button"
+                                aria-expanded="false"
+                                data-bs-toggle="dropdown"
+                                aria-label="Toggle theme (auto)">
+                            <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                                    Light
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                                    Dark
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                    Auto
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>                        
+                </div>                    
             </div>
 
 
@@ -800,13 +838,46 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col">
-                            <button type="button" class="btn btn-primary" id="scrape_button" onclick="startScrape()"><i class="bi bi-play-circle"></i>&ensp;Start
-                                Scrape
+                    <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
+                        <button type="button" id="scrape_button" onclick="startScrape()" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill">
+                            <i class="bi bi-play-circle"></i>
+                            <span>Scrape</span>
+                        </button>
+                        <div class="dropdown">
+                            <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                                    id="bd-theme"
+                                    type="button"
+                                    aria-expanded="false"
+                                    data-bs-toggle="dropdown"
+                                    aria-label="Toggle theme (auto)">
+                                <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
                             </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                        <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                                        Light
+                                        <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                        <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                                        Dark
+                                        <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                        <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                        Auto
+                                        <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                    </button>
+                                </li>
+                            </ul>
                         </div>
-                    </div>
+                    </div>  
                 </form>
 
             </div>
@@ -947,12 +1018,83 @@
                         </div>
                     </div>
                 </div>
-
+                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                    <div class="dropdown">
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                                id="bd-theme"
+                                type="button"
+                                aria-expanded="false"
+                                data-bs-toggle="dropdown"
+                                aria-label="Toggle theme (auto)">
+                            <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                                    Light
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                                    Dark
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                    Auto
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             <!-- Scraping Log Tab -->
             <div class="tab-pane fade" id="scraping-log" role="tabpanel" aria-labelledby="scraping-log-tab" tabindex="0">
                 <div class="mt-3" id="scraping_log"><!-- --></div>
+                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                    <div class="dropdown">
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                                id="bd-theme"
+                                type="button"
+                                aria-expanded="false"
+                                data-bs-toggle="dropdown"
+                                aria-label="Toggle theme (auto)">
+                            <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                                    Light
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                                    Dark
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                    Auto
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             <!-- About Tab -->
@@ -977,44 +1119,41 @@
                         </div>
                     </div>
                 </div>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- Save Confirmation Modal -->
-    <div class="modal fade" id="saveBulkImportModal" tabindex="-1" aria-labelledby="saveBulkImportModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="saveBulkImportModalLabel">Save Bulk Import File</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="saveModalMessage"></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="saveAsCurrent">Save as <span id="currentFileName"></span></button>
-                    <button type="button" class="btn btn-secondary" id="useDefault">Use default (<span id="defaultFileName"></span>)</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Load Yes No Modal -->
-    <div class="modal fade" id="loadBulkImportModal" tabindex="-1" aria-labelledby="yesNoModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="yesNoModalLabel">Please choose</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p id="loadModalMessage"></p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="yes_Button">Yes</button>
-                    <button type="button" class="btn btn-secondary" id="no_Button" data-bs-dismiss="modal">No</button>
+                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                    <div class="dropdown">
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                                id="bd-theme"
+                                type="button"
+                                aria-expanded="false"
+                                data-bs-toggle="dropdown"
+                                aria-label="Toggle theme (auto)">
+                            <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                                    Light
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                                    Dark
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                    Auto
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1032,9 +1171,9 @@
                     <p id="yesNoCancelModalMessage"></p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" id="yesButton">Yes</button>
-                    <button type="button" class="btn btn-secondary" id="noButton">No</button>
-                    <button type="button" class="btn btn-secondary" id="cancelButton" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill" id="yesButton"><i class="bi bi-floppy2"></i>&ensp;Save&ensp;</button>
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill" id="noButton"><i class="bi bi-trash3"></i>&ensp;Discard&ensp;</button>
+                    <button type="button" class="btn btn-danger btn-sm rounded-pill" id="cancelButton" data-bs-dismiss="modal"><i class="bi bi-x-circle"></i>&ensp;Cancel&ensp;</button>
                 </div>
             </div>
         </div>
@@ -1072,8 +1211,10 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary btn-sm" id="select_folder_confirm">Select This Directory</button>
+                    <button type="button" class="btn btn-danger btn-sm rounded-pill" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i>&ensp;Cancel&nbsp;</button>
+                    <button type="button" class="btn btn-primary btn-sm rounded-pill" id="select_folder_confirm">
+                        <i class="bi bi-check2-circle"></i>&ensp;Select This Directory&nbsp;</button>
                 </div>
             </div>
         </div>
