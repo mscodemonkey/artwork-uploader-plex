@@ -21,7 +21,43 @@ const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning',
 const CHUNK_SIZE = 1024 * 512; // 512 KB per chunk for uploads
 
 const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
-const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+// const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+tooltipTriggerList.forEach(tooltipTriggerEl => {
+    let hideTimeout = null;
+
+    const tooltip = new bootstrap.Tooltip(tooltipTriggerEl, {
+        html: true,
+        sanitize: false,
+        delay: { show: 100, hide: 250 } // 250ms buffer to cross the gap
+    });
+
+    // When the mouse enters the (i) icon, clear any pending hide timers
+    tooltipTriggerEl.addEventListener('mouseenter', () => {
+        if (hideTimeout) clearTimeout(hideTimeout);
+    });
+
+    // Listen for when Bootstrap actually renders the tooltip box in the DOM
+    tooltipTriggerEl.addEventListener('inserted.bs.tooltip', () => {
+        const tooltipElement = document.getElementById(tooltipTriggerEl.getAttribute('aria-describedby'));
+        if (!tooltipElement) return;
+
+        // When mouse enters the tooltip box itself, stop Bootstrap from hiding it
+        tooltipElement.addEventListener('mouseenter', () => {
+            // Intercept Bootstrap's internal hide timer
+            const instance = bootstrap.Tooltip.getInstance(tooltipTriggerEl);
+            if (instance && instance._timeout) {
+                clearTimeout(instance._timeout);
+                instance._timeout = 0;
+            }
+        });
+
+        // Hide smoothly when mouse leaves the tooltip box
+        tooltipElement.addEventListener('mouseleave', () => {
+            const instance = bootstrap.Tooltip.getInstance(tooltipTriggerEl);
+            if (instance) instance.hide();
+        });
+    });
+});
 
 // UI References
 const scrapeUrlInput = document.getElementById("scrape_url");
@@ -37,6 +73,9 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 
 // Event listeners
 document.addEventListener("DOMContentLoaded", function () {
+    updateLog("📍 New session started with ID: " + instanceId)
+
+    // Initialize the folder browser modal for Kometa asset and temp directory selection (non-docker)
     const folderModalElement = document.getElementById("folderBrowserModal");
     if (!folderModalElement) return;
 
@@ -55,26 +94,6 @@ document.addEventListener("DOMContentLoaded", function () {
         
     const folderModal = new bootstrap.Modal(folderModalElement, {
         focus: false
-    });
-
-    document.querySelectorAll(".toggle-password-btn").forEach(btn => {
-        btn.addEventListener("click", () => {
-            const targetId = btn.getAttribute("data-target");
-            const targetInput = document.getElementById(targetId);
-            const icon = btn.querySelector("i");
-
-            if (!targetInput || !icon) return;
-
-            if (targetInput.type === "password") {
-                targetInput.type = "text";
-                icon.className = "bi bi-eye-slash";
-                btn.setAttribute("title", "Hide token");
-            } else {
-                targetInput.type = "password";
-                icon.className = "bi bi-eye";
-                btn.setAttribute("title", "Show token");
-            }
-        });
     });
 
     // Attach click event to all browse buttons
@@ -107,7 +126,29 @@ document.addEventListener("DOMContentLoaded", function () {
         folderModal.hide();
     });
 
-    updateLog("📍 New session started with ID: " + instanceId)
+    // Initialize the 'eye' icons to toggle between masked and non-masked view
+    // for Plex and webhook token input fields
+    document.querySelectorAll(".toggle-password-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const targetId = btn.getAttribute("data-target");
+            const targetInput = document.getElementById(targetId);
+            const icon = btn.querySelector("i");
+
+            if (!targetInput || !icon) return;
+
+            if (targetInput.type === "password") {
+                targetInput.type = "text";
+                icon.className = "bi bi-eye-slash";
+                btn.setAttribute("title", "Hide token");
+            } else {
+                targetInput.type = "password";
+                icon.className = "bi bi-eye";
+                btn.setAttribute("title", "Show token");
+            }
+        });
+    });
+
+    // Initialize TomSelect Pickers
     tpdbUserPicker = new TomSelect('#webhook_tpdb_users', {
             create: true,
             createOnBlur: true,
@@ -119,7 +160,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
                 'remove_button': {}
             }
-        });    
+        });
+    
     tvPicker = new TomSelect('#tv_library', {
         inputTypes: [],
         controlInput: '<input readonly>',
@@ -134,7 +176,8 @@ document.addEventListener("DOMContentLoaded", function () {
     tvPicker.on('clear', () => {
         tvPicker.refreshOptions(false); // Refreshes the dropdown list without closing it
         updatePickerLabel(tvPicker);     // Updates your "(X available)" placeholder label
-    });        
+    });
+    
     moviePicker = new TomSelect('#movie_library', {
         inputTypes: [],
         controlInput: '<input readonly>',
@@ -149,7 +192,8 @@ document.addEventListener("DOMContentLoaded", function () {
     moviePicker.on('clear', () => {
         moviePicker.refreshOptions(false); // Refreshes the dropdown list without closing it
         updatePickerLabel(moviePicker);     // Updates your "(X available)" placeholder label
-    });        
+    });
+
     loadConfig();
     toggleThePosterDBElements();
     toggleWebhookSettings();
@@ -212,42 +256,8 @@ async function loadDirectory(path = "/") {
     }
 }
 
-function addSpinner(elementId, mode = true) {
-    if (!elementId) return;  // Exit if no element_ids provided
-
-    const element = document.getElementById(elementId);
-
-    if (!element) {
-        console.warn(`Element ID with ${id} not found.`);
-        return;
-    }
-    const icon = element.querySelector("i");
-
-    if (mode === true) {
-        if (icon) {
-            if (!icon.dataset.originalClass) {
-                icon.dataset.originalClass = icon.className;
-            }
-            icon.className = "spinner-border spinner-border-sm";
-            icon.setAttribute("role", "status");
-            icon.setAttribute("aria-hidden", "true");
-        }
-        element.disabled = true;
-    } else {
-        if (icon && icon.dataset.originalClass) {
-            icon.className = icon.dataset.originalClass;
-            icon.removeAttribute("role");
-            icon.removeAttribute("aria-hidden");
-        }
-        element.disabled = false;
-    }
-}
-socket.on("add_spinner", (data) => {
-    if (validResponse(data)) {
-        addSpinner(data.element, data.mode);
-    }
-});
-
+// Functions and listeners to query the scrape state from the backend and update the UI to reflect
+// any ongoing process, including disabling buttons, adding scrapers, updating progress bars...
 function getScrapeState() {
     socket.on("get_scrape_state", (data) => {
         if (data.type == "stopped") return;
@@ -260,32 +270,63 @@ function getScrapeState() {
     });
     socket.emit("get_scrape_state", { instance_id: instanceId })
 }
+function scrapeState(running, type) {
 
-function setPickerPlaceholder(instance, text) {
-    if (!instance) return;
-    instance.settings.placeholder = text;
-    if (instance.control_input) {
-        instance.control_input.placeholder = text;
+    // if (type == "stopped") return;
+
+    let cancelBtnId = ""
+    let tabId = ""
+    let btnId = ""
+    if (type == "bulk") {
+        cancelBtnId = "bulk-import-cancel";
+        tabId = "bulk-import-tab";
+        btnId = "bulk_button";
+    } else if (type == "scrape") {
+        cancelBtnId = "scrape-cancel";
+        tabId = "scraper-tab";
+        btnId = "scrape_button";
+    } else if (type == "upload") {
+        cancelBtnId = "upload-cancel";
+        tabId = "uploader-tab";
     }
-    instance.input.setAttribute('placeholder', text);
-}
+    const cancelBtnElement = document.getElementById(cancelBtnId);
+    const tabElement = document.getElementById(tabId).querySelector("i");
+    const btnElement = document.getElementById(btnId);
 
-function updatePickerLabel(picker, message = '') {
-    if (!picker) return;
+    // Shows or hides the cancel button on the appropriate tab
+    cancelBtnElement.classList.toggle("d-none", !running);
 
-    const totalOptions = Object.keys(picker.options).length;
-    const selectedCount = picker.getValue().length;
-    if (totalOptions == 0) {
-        message ? setPickerPlaceholder(picker, message) : setPickerPlaceholder(picker, "No libraries available");
-    } else if (selectedCount === 0) {
-        setPickerPlaceholder(picker, `(${totalOptions} available)`);
-    } else if (selectedCount < totalOptions) {
-        const remaining = totalOptions - selectedCount;
-        setPickerPlaceholder(picker, `(${remaining} left)`);
+    // Shows or hides the spinner on the appropriate tab
+    // and disables or enables the file drop area
+    if (running) {
+        disableElement(["scrape_url", "scrape_button", "bulk_button"], true);
+        dropArea.classList.add("disabled");
+
+        if (!tabElement.dataset.originalIcon) {
+            tabElement.dataset.originalIcon = tabElement.className;
+        }
+        tabElement.className = "spinner-border spinner-border-sm";
+        if (btnElement) {
+            if (!btnElement.querySelector("i").dataset.originalIcon) {
+                btnElement.querySelector("i").dataset.originalIcon = btnElement.querySelector("i").className;
+            }
+            btnElement.querySelector("i").className = "spinner-border spinner-border-sm";
+        }
     } else {
-        setPickerPlaceholder(picker, "");
+        disableElement(["scrape_url", "scrape_button", "bulk_button"], false);
+        dropArea.classList.remove("disabled");
+
+        tabElement.className = tabElement.dataset.originalIcon || "bi bi-gear";
+        if (btnElement) {
+            btnElement.querySelector("i").className = btnElement.querySelector("i").dataset.originalIcon || "bi bi-gear";
+        }
     }
 }
+socket.on("scrape_state", (data) => {
+    scrapeState(data.running, data.type)
+});
+
+
 
 function updateLibraryPickers() {
     const baseUrl = document.getElementById("plex_base_url").value;
@@ -470,6 +511,32 @@ function getInstanceId() {
 // UI-specific helper functions
 // ==================================================
 
+function setPickerPlaceholder(instance, text) {
+    if (!instance) return;
+    instance.settings.placeholder = text;
+    if (instance.control_input) {
+        instance.control_input.placeholder = text;
+    }
+    instance.input.setAttribute('placeholder', text);
+}
+
+function updatePickerLabel(picker, message = '') {
+    if (!picker) return;
+
+    const totalOptions = Object.keys(picker.options).length;
+    const selectedCount = picker.getValue().length;
+    if (totalOptions == 0) {
+        message ? setPickerPlaceholder(picker, message) : setPickerPlaceholder(picker, "No libraries available");
+    } else if (selectedCount === 0) {
+        setPickerPlaceholder(picker, `(${totalOptions} available)`);
+    } else if (selectedCount < totalOptions) {
+        const remaining = totalOptions - selectedCount;
+        setPickerPlaceholder(picker, `(${remaining} left)`);
+    } else {
+        setPickerPlaceholder(picker, "");
+    }
+}
+
 // Disable frontend elements from backend
 function disableElement(element_ids, mode = true) {
     if (!element_ids) return;  // Exit if no element_ids provided
@@ -490,6 +557,43 @@ function disableElement(element_ids, mode = true) {
 socket.on("element_disable", (data) => {
     if (validResponse(data)) {
         disableElement(data.element, data.mode);
+    }
+});
+
+// Adds a spinner to a button
+function addSpinner(elementId, mode = true) {
+    if (!elementId) return;  // Exit if no element_ids provided
+
+    const element = document.getElementById(elementId);
+
+    if (!element) {
+        console.warn(`Element ID with ${id} not found.`);
+        return;
+    }
+    const icon = element.querySelector("i");
+
+    if (mode === true) {
+        if (icon) {
+            if (!icon.dataset.originalClass) {
+                icon.dataset.originalClass = icon.className;
+            }
+            icon.className = "spinner-border spinner-border-sm";
+            icon.setAttribute("role", "status");
+            icon.setAttribute("aria-hidden", "true");
+        }
+        element.disabled = true;
+    } else {
+        if (icon && icon.dataset.originalClass) {
+            icon.className = icon.dataset.originalClass;
+            icon.removeAttribute("role");
+            icon.removeAttribute("aria-hidden");
+        }
+        element.disabled = false;
+    }
+}
+socket.on("add_spinner", (data) => {
+    if (validResponse(data)) {
+        addSpinner(data.element, data.mode);
     }
 });
 
@@ -575,64 +679,6 @@ socket.on("status_update", (data) => {
     if (validResponse(data, true)) {
         updateStatus(data.message, data.color, data.sticky, data.spinner, data.icon);
     }
-});
-
-function scrapeState(running, type) {
-
-    // if (type == "stopped") return;
-
-    let cancelBtnId = ""
-    let tabId = ""
-    let btnId = ""
-    if (type == "bulk") {
-        cancelBtnId = "bulk-import-cancel";
-        tabId = "bulk-import-tab";
-        btnId = "bulk_button";
-    } else if (type == "scrape") {
-        cancelBtnId = "scrape-cancel";
-        tabId = "scraper-tab";
-        btnId = "scrape_button";
-    } else if (type == "upload") {
-        cancelBtnId = "upload-cancel";
-        tabId = "uploader-tab";
-    }
-    const cancelBtnElement = document.getElementById(cancelBtnId);
-    const tabElement = document.getElementById(tabId).querySelector("i");
-    const btnElement = document.getElementById(btnId);
-
-    // Shows or hides the cancel button on the appropriate tab
-    cancelBtnElement.classList.toggle("d-none", !running);
-
-    // Shows or hides the spinner on the appropriate tab
-    // and disables or enables the file drop area
-    if (running) {
-        disableElement(["scrape_url", "scrape_button", "bulk_button"], true);
-        dropArea.classList.add("disabled");
-
-        if (!tabElement.dataset.originalIcon) {
-            tabElement.dataset.originalIcon = tabElement.className;
-        }
-        tabElement.className = "spinner-border spinner-border-sm";
-        if (btnElement) {
-            if (!btnElement.querySelector("i").dataset.originalIcon) {
-                btnElement.querySelector("i").dataset.originalIcon = btnElement.querySelector("i").className;
-            }
-            btnElement.querySelector("i").className = "spinner-border spinner-border-sm";
-        }
-    } else {
-        disableElement(["scrape_url", "scrape_button", "bulk_button"], false);
-        dropArea.classList.remove("disabled");
-
-        tabElement.className = tabElement.dataset.originalIcon || "bi bi-gear";
-        if (btnElement) {
-            btnElement.querySelector("i").className = btnElement.querySelector("i").dataset.originalIcon || "bi bi-gear";
-        }
-    }
-}
-
-
-socket.on("scrape_state", (data) => {
-    scrapeState(data.running, data.type)
 });
 
 // Update the log page
@@ -884,7 +930,7 @@ function saveConfig() {
     save_config.token = document.getElementById("plex_token").value.trim();
     save_config.kometa_base = document.getElementById("kometa_base").value.trim();
     save_config.temp_dir = document.getElementById("temp_dir").value.trim();
-    toggleTempCheckbox();
+    // toggleTempCheckbox();
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
     
     // Save the Apprise URLs
@@ -905,7 +951,7 @@ function saveConfig() {
 
     // Checkbox for staging assets
     save_config.stage_assets = document.getElementById("stage_assets").checked;
-    toggleScraperStageCheckbox();
+    // toggleScraperStageCheckbox();
 
     // Checkbox for managing bulk files
     save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
@@ -915,14 +961,14 @@ function saveConfig() {
 
     // Checkbox for skipping artwork with locked fields in Plex
     save_config.skip_locked_artwork = document.getElementById("skip_locked_artwork").checked;
-    toggleSkipLockedCheckbox();
+    // toggleSkipLockedCheckbox();
 
     // Checkbox for matching artwork against the local libraries before fetching poster pages
     save_config.local_library_matching = document.getElementById("local_library_matching").checked;
     
     // Checkbox for caching ThePosterDB user scrapes
     save_config.cache_user_scrapes = document.getElementById("cache_user_scrapes").checked;
-    toggleUserCacheExpiryField();
+    // toggleUserCacheExpiryField();
 
     // ThePosterDB user cache expiration threshold
     save_config.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value) || 0;
@@ -1158,9 +1204,9 @@ function saveBulkChangesModal(filename) {
         document.getElementById("yesNoCancelModalMessage").innerText = "Do you want to save changes to " + currentBulkImport + " first?";
 
         // Update buttons with choices
-        document.getElementById("yesButton").innerText = "Yes, save changes"
-        document.getElementById("noButton").innerText = "No, lose changes"
-        document.getElementById("cancelButton").innerText = "Cancel"
+        document.getElementById("yesButton").innerHTML = '<i class="bi bi-floppy2"></i>&ensp;Save&nbsp;'
+        document.getElementById("noButton").innerHTML = '<i class="bi bi-trash3"></i>&ensp;Discard&nbsp;'
+        document.getElementById("cancelButton").innerHTML = '<i class="bi bi-x-circle"></i>&ensp;Cancel&nbsp;'
 
         // Show modal
         const modal = new bootstrap.Modal(modalElement);
@@ -1187,7 +1233,6 @@ function saveBulkChangesModal(filename) {
 
 function startScrape() {
     var form = document.getElementById('scraperForm');
-    const logTab = document.querySelector('#scraping-log-tab');
 
     // Check if the form is valid
     if (form.checkValidity()) {
@@ -1211,8 +1256,6 @@ function startScrape() {
         const year = document.getElementById("year").value;
         const url = document.getElementById("scrape_url").value;
         socket.emit("start_scrape", { url: url, year: year, options: options, filters: filters, instance_id: instanceId });
-        // Switch to the log tab
-        bootstrap.Tab.getOrCreateInstance(logTab).show();
     } else {
         // Trigger Bootstrap validation styles
         form.classList.add('was-validated');
@@ -1220,8 +1263,6 @@ function startScrape() {
 }
 
 function stopScrape() {
-    const logTab = document.querySelector('#scraping-log-tab');
-    bootstrap.Tab.getOrCreateInstance(logTab).show();
     socket.emit("display_message", {
         instance_id: instanceId,
         message: "Cancelation requested by user, please wait...",
@@ -1242,8 +1283,12 @@ function updateBulkSaveButtonState() {
 
     if (bulkTextArea.value !== bulkTextAsLoaded) {
         saveButton.disabled = false; // Enable button if text has changed
+        saveButton.classList.add("btn-success");
+        saveButton.classList.remove("btn-secondary");
     } else {
         saveButton.disabled = true;  // Disable button if no changes
+        saveButton.classList.remove("btn-success");
+        saveButton.classList.add("btn-secondary");
     }
 }
 
@@ -1440,10 +1485,6 @@ function saveBulkImport(filename, nowLoad = null) {
 }
 
 function runBulkImport() {
-    const logTab = document.querySelector('#scraping-log-tab');
-    // Switch to the log tab
-    bootstrap.Tab.getOrCreateInstance(logTab).show();
-
     socket.emit("start_bulk_import",{
         instance_id: instanceId,
         bulk_list: document.getElementById("bulk_import_text").value,
