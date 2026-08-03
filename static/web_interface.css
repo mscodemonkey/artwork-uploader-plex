@@ -27,8 +27,15 @@ h1 {
     transition: transform 0.3s ease;
 }
 
-.app-logo:hover {
-    transform: scale(1.15);
+@media (hover: hover) {
+    .app-logo:hover {
+        transform: scale(1.15);
+    }
+}
+
+.app-logo:active {
+    transform: scale(0.92);
+    transition: transform 0.1s ease;
 }
 
 .app-title {
@@ -51,6 +58,16 @@ h1 {
 }
 
 .bg-light {opacity: 0.85}
+
+/* Keeps the invisible outer overlay from blocking clicks on the UI behind it */
+#status_container {
+    pointer-events: none; /* Block clicks BY DEFAULT */
+}
+
+/* Enable pointer events on the CONTAINER only when the STATUS IS SHOWN */
+#status_container:has(#status.show) {
+    pointer-events: auto; /* Re-enable clicks for the whole bar area */
+}
 
 /* ==========================================================================
    Custom Components & Overlays
@@ -269,17 +286,35 @@ h1 {
     display: inline-block;
     transition: transform 0.15s ease-in-out;
 }
-[data-bs-theme="dark"] .btn-inline-icon:hover i {
+
+@media (hover: hover) {
+    [data-bs-theme="dark"] .btn-inline-icon:hover i {
+        color: #0d6efe;
+    }
+}
+
+[data-bs-theme="dark"] .btn-inline-icon:active i {
     color: #0d6efe;
 }
 
 /* Hover effects */
-.btn-inline-icon:hover {
+@media (hover: hover) {
+    .btn-inline-icon:hover {
+        opacity: 1;
+    }
+
+    .btn-inline-icon:hover i {
+        transform: scale(1.15); /* Scales the icon cleanly without affecting position */
+    }
+}
+
+.btn-inline-icon:active {
     opacity: 1;
 }
 
-.btn-inline-icon:hover i {
-    transform: scale(1.15); /* Scales the icon cleanly without affecting position */
+.btn-inline-icon:active i {
+    transform: scale(0.90) !important;
+    transition: transform 0.1s ease, opacity 0.1s ease;
 }
 
 /* Dark mode color override */
@@ -312,13 +347,27 @@ h1 {
     padding-right: 4rem !important;
 }
 
-/* Folder Browse Icon Hover Styling */
-.browse-folder-btn:hover {
-    color: var(--bs-primary, #0d6efd) !important;
+/* Folder Browse Icon Hover Styling (FIXED: Preserved translateY centering) */
+@media (hover: hover) {
+    .browse-folder-btn:hover {
+        color: var(--bs-primary, #0d6efd) !important;
+    }
+
+    [data-bs-theme="dark"] .browse-folder-btn:hover {
+        color: #3d8bfd !important;
+    }
 }
 
-[data-bs-theme="dark"] .browse-folder-btn:hover {
+.browse-folder-btn:active {
+    color: var(--bs-primary, #0d6efd) !important;
+    transform: translateY(-50%) scale(0.90) !important; /* Keeps icon vertically centered */
+    transition: transform 0.1s ease, color 0.1s ease;
+}
+
+[data-bs-theme="dark"] .browse-folder-btn:active {
     color: #3d8bfd !important;
+    transform: translateY(-50%) scale(0.90) !important; /* Keeps icon vertically centered */
+    transition: transform 0.1s ease, color 0.1s ease;
 }
 
 
@@ -335,15 +384,41 @@ h1 {
 }
 
 /* Hover scale and color effect */
-.bulk-btn:hover {
-    transform: scale(1.18);
-    color: var(--bs-primary);
+@media (hover: hover) {
+    .bulk-btn:hover {
+        transform: scale(1.18);
+        color: var(--bs-primary);
+    }
+    /* Color override for the delete button */
+    .bulk-btn:hover #delete_icon {
+        color: #dc3545 !important;
+    }
 }
-/* Color override for the delete button */
-.bulk-btn:hover #delete_icon {
+
+/* FIXED: Replicating blue color change on active for bulk buttons */
+.bulk-btn:active {
+    transform: scale(0.90) !important; /* Shrinks slightly on touch */
+    color: var(--bs-primary) !important; /* Turns blue on tap */
+    opacity: 0.8;
+    transition: transform 0.1s ease, opacity 0.1s ease, color 0.1s ease;
+}
+
+/* Specific red override for the delete button on active */
+.bulk-btn:active #delete_icon {
     color: #dc3545 !important;
 }
 
+
+/* TEST */
+.btn-inline-icon:active #generate_webhook_token i {
+    animation: generate_token_animation 0.6s linear;
+}
+
+@keyframes generate_token_animation {
+    to {
+        transform: rotate(360deg);
+    }
+}
 
 
 /* Generic validation icon offset for inputs with inline trailing buttons */
@@ -381,7 +456,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 0.5rem; /* Keeps + and X side-by-side with clean spacing */
-    z-index: 5;
+    z-index: 2; /* FIXED: Lowered z-index so dropdowns stay on top */
 }
 
 /* Reset button positioning inside the flex container so they don't stack */
@@ -406,15 +481,30 @@ h1 {
 }
 
 /* Hover effect: Scale without breaking vertical alignment */
-.apprise-row-actions .btn-inline-icon:hover {
+@media (hover: hover) {
+    .apprise-row-actions .btn-inline-icon:hover {
+        opacity: 1;
+    }
+
+    .apprise-row-actions .btn-inline-icon:hover i {
+        transform: scale(1.15) !important;
+    }
+
+    [data-bs-theme="dark"] .apprise-row-actions .btn-inline-icon:hover {
+        color: #3d8bfd;
+    }
+}
+
+.apprise-row-actions .btn-inline-icon:active {
     opacity: 1;
 }
 
-.apprise-row-actions .btn-inline-icon:hover i {
-    transform: scale(1.15) !important;
+.apprise-row-actions .btn-inline-icon:active i {
+    transform: scale(0.90) !important;
+    transition: transform 0.1s ease, opacity 0.1s ease;
 }
 
-[data-bs-theme="dark"] .apprise-row-actions .btn-inline-icon:hover {
+[data-bs-theme="dark"] .apprise-row-actions .btn-inline-icon:active {
     color: #3d8bfd;
 }
 
@@ -438,15 +528,30 @@ h1 {
 }
 
 /* Hover color for delete icon (HIGH SPECIFICITY to beat dark mode defaults) */
-.btn-inline-icon.remove-apprise-url-btn:hover,
-.btn-inline-icon.remove-apprise-url-btn:hover i,
-[data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:hover,
-[data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:hover i,
-.apprise-row-actions .remove-apprise-url-btn:hover,
-.apprise-row-actions .remove-apprise-url-btn:hover i,
-[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover,
-[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover i {
-    color: #dc3545 !important; /* Bootstrap Danger Red */
+@media (hover: hover) {
+    .btn-inline-icon.remove-apprise-url-btn:hover,
+    .btn-inline-icon.remove-apprise-url-btn:hover i,
+    [data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:hover,
+    [data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:hover i,
+    .apprise-row-actions .remove-apprise-url-btn:hover,
+    .apprise-row-actions .remove-apprise-url-btn:hover i,
+    [data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover,
+    [data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:hover i {
+        color: #dc3545 !important; /* Bootstrap Danger Red */
+    }
+}
+
+.btn-inline-icon.remove-apprise-url-btn:active,
+.btn-inline-icon.remove-apprise-url-btn:active i,
+[data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:active,
+[data-bs-theme="dark"] .btn-inline-icon.remove-apprise-url-btn:active i,
+.apprise-row-actions .remove-apprise-url-btn:active,
+.apprise-row-actions .remove-apprise-url-btn:active i,
+[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:active,
+[data-bs-theme="dark"] .apprise-row-actions .remove-apprise-url-btn:active i {
+    color: #dc3545 !important;
+    transform: scale(0.90) !important;
+    transition: transform 0.1s ease, color 0.1s ease;
 }
 
 /* Dark mode default color for Apprise buttons (when NOT hovered) */
@@ -475,8 +580,16 @@ h1 {
     opacity: 0.8;
 }
 
-.ts-control .item .remove:hover {
-    background-color: rgba(0, 0, 0, 0.15) !important;
+@media (hover: hover) {
+    .ts-control .item .remove:hover {
+        background-color: rgba(0, 0, 0, 0.15) !important;
+        color: #ffffff !important;
+        opacity: 1;
+    }
+}
+
+.ts-control .item .remove:active {
+    background-color: rgba(0, 0, 0, 0.25) !important;
     color: #ffffff !important;
     opacity: 1;
 }
@@ -551,10 +664,19 @@ h1 {
     transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out;
 }
 
-.ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
+@media (hover: hover) {
+    .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
+        opacity: 1;
+        transform: translateY(-50%) scale(1.15);
+        color: #dc3545 !important;
+    }
+}
+
+.ts-wrapper.plugin-clear_button.has-items .clear-button:active {
     opacity: 1;
-    transform: translateY(-50%) scale(1.15);
+    transform: translateY(-50%) scale(0.90) !important;
     color: #dc3545 !important;
+    transition: transform 0.1s ease, color 0.1s ease;
 }
 
 /* Hide clear button while loading options (takes precedence over .has-items) */
@@ -581,10 +703,23 @@ h1 {
     color: #777777 !important; /* Crisp readable light text */
 }
 
-/* Hover and active selection state */
-[data-bs-theme="dark"] .ts-dropdown .option:hover,
-[data-bs-theme="dark"] .ts-dropdown .active {
-    background-color: #0d6efd !important; /* Bootstrap primary blue */
+/* FIXED: TomSelect selection state logic restored for touch & desktop */
+@media (hover: hover) {
+    [data-bs-theme="dark"] .ts-dropdown .option:hover {
+        background-color: #0d6efd !important; /* Bootstrap primary blue */
+        color: #ffffff !important;
+    }
+}
+
+.ts-dropdown .option.active,
+.ts-dropdown .option:active {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .ts-dropdown .option.active,
+[data-bs-theme="dark"] .ts-dropdown .option:active {
+    background-color: #0d6efd !important;
     color: #ffffff !important;
 }
 
@@ -593,18 +728,30 @@ h1 {
     color: #ffffff !important; 
 }
 
-[data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
-    color: #dc3545 !important; 
+.ts-dropdown {
+    z-index: 1050 !important;
 }
 
-.theme-icon-active {
-    fill: #ffffff !important;
-    color: #ffffff !important;
+@media (hover: hover) {
+    [data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button:hover {
+        color: #dc3545 !important; 
+    }
+}
+
+[data-bs-theme="dark"] .ts-wrapper.plugin-clear_button.has-items .clear-button:active {
+    color: #dc3545 !important;
+    transform: translateY(-50%) scale(0.90) !important;
+    transition: transform 0.1s ease, color 0.1s ease;
+}
+
+/* Active typing text inside TomSelect control in Dark Mode */
+[data-bs-theme="dark"] .ts-control > input {
+    color: #f8f9fa !important; /* Crisp white text while typing */
 }
 
 /* --------------------------------------------------------------------------
-   Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
-   -------------------------------------------------------------------------- */
+Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
+-------------------------------------------------------------------------- */
 [data-bs-theme="dark"] #bd-theme + .dropdown-menu svg,
 [data-bs-theme="dark"] #bd-theme svg {
     fill: #ffffff !important;
@@ -616,9 +763,9 @@ h1 {
     fill: #ffffff !important;
 }
 
-/* Active typing text inside TomSelect control in Dark Mode */
-[data-bs-theme="dark"] .ts-control > input {
-    color: #f8f9fa !important; /* Crisp white text while typing */
+.theme-icon-active {
+    fill: #ffffff !important;
+    color: #ffffff !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -635,19 +782,18 @@ h1 {
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.rounded-pill:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25) !important;
+@media (hover: hover) {
+    .rounded-pill:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25) !important;
+    }
 }
 
 .rounded-pill:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.96);
 }
 
 /* Column and Row Spacing for Filter Toggles */
-/* .gap-x-4 {
-    column-gap: 3.5rem !important; */
-/* } */
 .gap-y-2 {
     row-gap: 0.5rem !important;
 }

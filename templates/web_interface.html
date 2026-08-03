@@ -72,26 +72,28 @@
             </div>
         </div>
 
-        <div class="alert alert-info d-flex align-items-center d-none" id="version_notifier">
+        <div class="alert alert-info rounded-4 d-flex align-items-center d-none" id="version_notifier">
             <div class="flex-grow-1 flex-shrink-1 pe-3">
                 <i class="bi bi-megaphone-fill"></i>&ensp;A new version is now available: <span id="latest_version"></span>.
                 <br><span id="docker_update_message"></span>
             </div>
-            <button class="btn btn-info btn-sm text-nowrap d-none" id="btnUpdate">
-                <i class="bi bi-shift"></i>&nbsp;Update Now
+            <button class="btn btn-danger btn-sm rounded-pill text-nowrap d-none" id="btnUpdate">
+                <i class="bi bi-shift"></i>&nbsp;Update Now&nbsp;
             </button>
         </div>
-        <div class="row m-3 rounded fade fixed-top" id="status">
-            <div class="col">
-                <div class="p-3">
-                    <span id="status_spinner" class="spinner-border spinner-border-sm collapse" aria-hidden="true"></span>
-                    <i id="status_icon" class="bi-alarm"></i>
-                    <span id="status_message">Welcome to Artwork Uploader for Plex!</span>
+        <div class="fixed-top w-100 mt-3" id="status_container">
+            <div class="container">
+                <div class="row m-1 rounded-4 fade shadow-sm" id="status">
+                    <div class="col-12">
+                        <div class="p-3 d-flex align-items-center gap-2">
+                            <span id="status_spinner" class="spinner-border spinner-border-sm collapse" aria-hidden="true"></span>
+                            <i id="status_icon" class="bi-alarm"></i>
+                            <span id="status_message">Welcome to Artwork Uploader for Plex!</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
-
 
         <!-- Bootstrap Tabs -->
         <nav class="nav nav-tabs" id="myTab">
@@ -145,7 +147,7 @@
                 <form id="config_form" class="needs-validation" novalidate>
                     <div class="row">
                         <div class="col-lg-5 mb-3">
-                            <div class="p-3 border rounded-3 shadow-sm">
+                            <div class="p-3 border rounded-4 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-film"></i>&ensp;Plex server settings</h5>
                                 <div class="mb-3">
                                     <label for="plex_base_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Base URL</label>
@@ -185,7 +187,7 @@
                                 </div>
                             </div>
                             <!-- Kometa settings -->
-                            <div class="p-3 border mt-3 rounded-3 shadow-sm">
+                            <div class="p-3 border mt-3 rounded-4 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-download"></i>&ensp;Kometa settings</h5>
                                 <div class="form-check form-switch mb-3">
                                     <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
@@ -254,7 +256,7 @@
                                 </div>
                             </div>
                             <!-- Authentication settings -->
-                            <div class="p-3 border mt-3 rounded-3 shadow-sm">
+                            <div class="p-3 border mt-3 rounded-4 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-shield-check"></i>&ensp;Authentication settings</h5>
                                 <div class="form-check form-switch mb-3">
                                     <input class="form-check-input" type="checkbox" id="auth_enabled"/>
@@ -276,7 +278,7 @@
                                 </div>
                             </div>
                             <!-- Webhook settings -->
-                            <div class="p-3 border mt-3 rounded-3 shadow-sm">
+                            <div class="p-3 border mt-3 rounded-4 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-broadcast-pin"></i>&ensp;Webhook settings</h5>
                                 <div class="form-check form-switch mb-3">
                                     <input class="form-check-input" type="checkbox" id="enable_webhooks"/>
@@ -340,7 +342,7 @@
                             <!-- ThePosterDB Card -->
                             <div class="row mb-3">
                                 <div class="col">
-                                    <div class="p-3 border rounded-3 shadow-sm">
+                                    <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3">
                                             <i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB&thinsp;
                                             <a href="https://theposterdb.com" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a>
@@ -382,7 +384,7 @@
                             <!-- MediUX Card -->
                             <div class="row mb-3">
                                 <div class="col">
-                                    <div class="p-3 border rounded-3 shadow-sm">
+                                    <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3">
                                             <i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX&thinsp;
                                             <a href="https://mediux.pro" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a>
@@ -436,7 +438,7 @@
                             <!-- Additional settings -->
                             <div class="row mb-3">
                                 <div class="col">
-                                    <div class="p-3 border rounded-3 shadow-sm">
+                                    <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Additional settings</h5>
                                         <div class="form-check form-switch mb-3">
                                             <input class="form-check-input" type="checkbox" value="auto_manage" id="auto_manage_bulk_files"/>
@@ -491,7 +493,7 @@
                             <!-- Notifications settings -->
                             <div class="row mb-3">
                                 <div class="col">
-                                    <div class="p-3 border rounded-3 shadow-sm">
+                                    <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3"><i class="bi bi-app-indicator"></i>&ensp;Notifications settings</h5>
                                         <div id="notifications_settings" style="display: block;">
                                             <div class="mb-3">
@@ -566,7 +568,7 @@
                 <div class="row mb-3">
                     <div class="col">
                         <!-- Container for the file selector field -->
-                        <div class="p-3 border rounded-3 shadow-sm d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 gap-md-3">
+                        <div class="p-3 border rounded-4 shadow-sm d-flex flex-column flex-md-row align-items-stretch align-items-md-center gap-2 gap-md-3">
                             <div class="flex-grow-1 w-md-auto">
                                 <select id="switch_bulk_file" name="switch_bulk_file" class="bulk_import_file form-select" required>
                                     <option selected disabled>Loading file list...</option>
@@ -629,7 +631,7 @@
                 <!-- Bulk import text field -->
                 <div class="row mb-3">
                     <div class="col">
-                        <div class="p-3 border rounded-3 shadow-sm">
+                        <div class="p-3 border rounded-4 shadow-sm">
                             <textarea id="bulk_import_text" class="form-control w-100 font-monospace" rows="15"></textarea>
                         </div>
                     </div>
@@ -690,7 +692,7 @@
                 <form id="scraperForm" class="needs-validation" novalidate>
                     <div class="row">
                         <div class="col mb-3">
-                            <div class="p-3 border rounded-3 shadow-sm">
+                            <div class="p-3 border rounded-4 shadow-sm">
                                 <label for="scrape_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;URL to scrape</label>
                                 <input type="text" id="scrape_url" name="scrape_url" class="form-control"
                                     value="" required
@@ -701,7 +703,7 @@
                             </div>
                         </div>
                         <div class="mb-3 col-md-4 col-lg-3">
-                            <div class="p-3 border rounded-3 shadow-sm">
+                            <div class="p-3 border rounded-4 shadow-sm">
                                 <label for="scrape_url" class="form-label"><i class="bi bi-calendar3"></i>&ensp;Plex year</label>
                                 &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Use this if the year in Plex is different to that on MediUX or TPDb"></i>
                                 <input type="text" id="year" name="year" class="form-control"
@@ -715,7 +717,7 @@
                     </div>
                     <div class="row mb-3">
                         <div class="col">
-                            <div class="p-3 border rounded-3 shadow-sm">
+                            <div class="p-3 border rounded-4 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Options</h5>
                                 <div class="form-check form-switch mb-2">
                                     <input class="form-check-input" type="checkbox" value="--force" id="option-force"/>
@@ -771,7 +773,7 @@
                     </div>
                     <div class="row mb-3">
                         <div class="col">
-                            <div class="p-3 border rounded-3 shadow-sm">
+                            <div class="p-3 border rounded-4 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork to include</h5>
                                 <div id="scraper-filters-inherit" class="collapse show row mb-1">
                                     <div class="col-6 col-md-4 col-lg-3">
@@ -884,7 +886,7 @@
 
             <!-- Uploader Tab -->
             <div class="tab-pane fade" id="uploader" role="tabpanel" aria-labelledby="uploader-tab" tabindex="0">
-                <div class="row mb-3 shadow-sm" id="drop-area">
+                <div class="row mb-3 shadow-sm rounded-4" id="drop-area">
                     <div class="col">
                         <p><i class="bi bi-1-square"></i>&ensp;Check any options or customize filters.</p>
                         <p><i class="bi bi-2-square"></i>&ensp;Drop a ZIP file from ThePosterDB.com or MediUX.pro here - or click to select one.</p>
@@ -902,7 +904,7 @@
                 <form id="upload_form" class="needs-validation" novalidate>
                     <div class="row">
                         <div class="col mb-3">
-                            <div class="p-3 border mt-3 rounded-3 shadow-sm">
+                            <div class="p-3 border mt-3 rounded-4 shadow-sm">
                                 <label for="plex_title" class="form-label"><i class="bi bi-textarea-t"></i>&ensp;Plex title</label>
                                 <input type="text" id="plex_title" name="plex_title" class="form-control"
                                     value=""
@@ -911,7 +913,7 @@
                             </div>
                         </div>
                         <div class="mb-3 col-md-4 col-lg-3">
-                            <div class="p-3 border mt-3 rounded-3 shadow-sm">
+                            <div class="p-3 border mt-3 rounded-4 shadow-sm">
                                     <label for="plex_year" class="form-label"><i class="bi bi-calendar3"></i>&ensp;Plex year</label>
                                     &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Use this if the year in Plex is different to that on MediUX or TPDb"></i>
                                     <input type="text" id="plex_year" name="plex_year" class="form-control"
@@ -926,7 +928,7 @@
                 </form>
                 <div class="row mb-3">
                     <div class="col">
-                        <div class="p-3 border rounded-3 shadow-sm">
+                        <div class="p-3 border rounded-4 shadow-sm">
                             <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Options</h5>
                             <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" value="force" id="upload-option-force"/>
@@ -954,7 +956,7 @@
                 </div>
                 <div class="row mb-3">
                     <div class="col">
-                        <div class="p-3 border rounded-3 shadow-sm">
+                        <div class="p-3 border rounded-4 shadow-sm">
                             <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork to include</h5>
                             <div id="upload-filters-inherit" class="collapse show row mb-1">
                                 <div class="col-6 col-md-4 col-lg-3">
@@ -1101,7 +1103,7 @@
             <div class="tab-pane fade" id="about" role="tabpanel" aria-labelledby="about-tab" tabindex="0">
                 <div class="row">
                     <div class="col mb-3">
-                        <div class="p-3 border rounded-3 shadow-sm">
+                        <div class="p-3 border rounded-4 shadow-sm">
                             <h5 class="mb-3"><i class="bi bi-code-slash"></i>&ensp;About Artwork Uploader for Plex</h5>
                             <div class="col">
                                 <p>Version: <span id="app_version"></span></p> <!-- &ensp;<span class="badge rounded-pill text-bg-primary" id="check-update-btn" role="button">CHECK FOR UPDATES</span></p> -->
