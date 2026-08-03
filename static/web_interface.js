@@ -21,7 +21,6 @@ const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning',
 const CHUNK_SIZE = 1024 * 512; // 512 KB per chunk for uploads
 
 const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
-// const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
 tooltipTriggerList.forEach(tooltipTriggerEl => {
     let hideTimeout = null;
 
@@ -215,6 +214,26 @@ document.getElementById("debug-mode").addEventListener("change", function() {
 document.getElementById("plex_token").addEventListener("change", updateLibraryPickers);
 document.getElementById("plex_base_url").addEventListener("change", updateLibraryPickers);
 
+
+// Automatically clear sticky hover/focus states on mobile touch devices
+document.addEventListener('touchend', (e) => {
+    // Don't blur if the touch target or active element is part of TomSelect
+    if (e.target.closest('.ts-wrapper, .ts-dropdown')) {
+        return;
+    }
+
+    const activeEl = document.activeElement;
+
+    // Don't blur active text inputs, select dropdowns, or textareas while typing/interacting
+    if (activeEl && activeEl.matches('input, textarea, select')) {
+        return;
+    }
+
+    // For buttons, links, and icons: blur on touch release so :active state resets smoothly
+    if (activeEl && activeEl !== document.body) {
+        activeEl.blur();
+    }
+}, { passive: true });
 // ==================================================
 // General helper functions
 // ==================================================
@@ -271,8 +290,6 @@ function getScrapeState() {
     socket.emit("get_scrape_state", { instance_id: instanceId })
 }
 function scrapeState(running, type) {
-
-    // if (type == "stopped") return;
 
     let cancelBtnId = ""
     let tabId = ""
@@ -930,7 +947,6 @@ function saveConfig() {
     save_config.token = document.getElementById("plex_token").value.trim();
     save_config.kometa_base = document.getElementById("kometa_base").value.trim();
     save_config.temp_dir = document.getElementById("temp_dir").value.trim();
-    // toggleTempCheckbox();
     save_config.bulk_txt = document.getElementById("bulk_import_file").value;
     
     // Save the Apprise URLs
@@ -951,7 +967,6 @@ function saveConfig() {
 
     // Checkbox for staging assets
     save_config.stage_assets = document.getElementById("stage_assets").checked;
-    // toggleScraperStageCheckbox();
 
     // Checkbox for managing bulk files
     save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
@@ -961,14 +976,12 @@ function saveConfig() {
 
     // Checkbox for skipping artwork with locked fields in Plex
     save_config.skip_locked_artwork = document.getElementById("skip_locked_artwork").checked;
-    // toggleSkipLockedCheckbox();
 
     // Checkbox for matching artwork against the local libraries before fetching poster pages
     save_config.local_library_matching = document.getElementById("local_library_matching").checked;
     
     // Checkbox for caching ThePosterDB user scrapes
     save_config.cache_user_scrapes = document.getElementById("cache_user_scrapes").checked;
-    // toggleUserCacheExpiryField();
 
     // ThePosterDB user cache expiration threshold
     save_config.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value) || 0;
@@ -1649,7 +1662,6 @@ document.getElementById("rename_icon").addEventListener("click", function () {
 
         renameInput.addEventListener("blur", function () {
 
-            //console.log("Blur event triggered"); // Debugging line
             const newFilename = renameInput.value + ".txt"; // Ensure .txt is appended
             if (newFilename && newFilename !== filename) {
                 // Emit rename event
@@ -1833,7 +1845,6 @@ function uploadBulkImportFile(event) {
         if (fileExists) {
             const confirmOverwrite = confirm("File '" + file.name + "' already exists. Would you like to overwrite it?");
             if (!confirmOverwrite) {
-                //console.log("User chose not to overwrite the file.");
                 return;
             }
         }
@@ -1946,10 +1957,6 @@ dropArea.addEventListener("click", () => {
 });
 
 function uploadFile(file) {
-    // Switch to the log tab
-    const logTab = document.querySelector('#scraping-log-tab');
-    bootstrap.Tab.getOrCreateInstance(logTab).show();
-
     socket.emit("display_message", {
         "instance_id": instanceId,
         "message": `Uploading '${file.name}'...`,
@@ -1971,7 +1978,7 @@ function uploadFile(file) {
     reader.onload = function (event) {
         const arrayBuffer = event.target.result;
         const totalChunks = Math.ceil(arrayBuffer.byteLength / CHUNK_SIZE);
-        let startTime = performance.now()
+        let startTime = performance.now();
 
         function arrayBufferToBase64(buffer) {
             return new Promise((resolve) => {
@@ -2041,13 +2048,6 @@ function uploadFile(file) {
                         if (isAborted) return;
 
                         offset += CHUNK_SIZE; // Offset is in bytes
-                        socket.emit("display_message", {
-                            instance_id: instanceId,
-                            message: `Uploading '${file.name}'...`,
-                            color: "info",
-                            icon: "cloud-upload",
-                            level: "status"
-                        })
                         sendChunk();
                     } else if (ack === "abort") {
                         isAborted = true;
@@ -2205,7 +2205,7 @@ socket.on("backend_restarting", function() {
 // Detect when the WebSocket connection is lost
 socket.on("disconnect", function() {
     console.log("WebSocket disconnected, attempting to reconnect...");
-    updateStatus("WebSocket disconnected, attempting to reconnect...", "warning", true, true, "arrow-counterclockwise")
+    updateStatus("Connection to server lost, reconnecting...", "warning", true, true, "arrow-counterclockwise")
     // Refresh the page to reconnect to the WebSocket
     setTimeout(() => {
         location.reload();  // Reload to attempt reconnection
@@ -2252,9 +2252,6 @@ function toggleWebhookSettings() {
         }
         tokenField.value='';
     }
-    // if (enabled && !tokenField.value) {
-    //     tokenField.value = generateRandomToken();
-    // }
 }
 
 function generateRandomToken() {
@@ -2420,7 +2417,6 @@ function togglePlexOptions() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
     const trackArtworkIDs = document.getElementById("track_artwork_ids").parentElement;
     const skipLocked = document.getElementById("skip_locked_artwork").parentElement;
-    // const allowArtistUpdates = document.getElementById("allow_artist_updates").parentElement;
     const resetOverlay = document.getElementById("reset_overlay").parentElement;
 
     // Ony show the Track Artwork IDs and Reset Overlay options if Kometa is disabled
@@ -2428,12 +2424,10 @@ function togglePlexOptions() {
         trackArtworkIDs.style.display = "block";
         resetOverlay.style.display = "block";
         skipLocked.style.display = "block";
-        // allowArtistUpdates.style.display = "block";
     } else {
         trackArtworkIDs.style.display = "none";
         resetOverlay.style.display = "none";
         skipLocked.style.display = "none";
-        // allowArtistUpdates.style.display = "none";
         document.getElementById("skip_locked_artwork").checked = false; // Uncheck the skip locked option if Kometa is enabled
         document.getElementById("track_artwork_ids").checked = true;
     }

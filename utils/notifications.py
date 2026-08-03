@@ -100,13 +100,14 @@ def update_log(instance: Instance, update_text: str, broadcast: bool = False) ->
             with print_lock:
                 print(f"[{timestamp}] Error in update_log: {e}")
 
-def notify_web(instance: Instance, event, data_to_include = None):
+def notify_web(instance: Instance, event, data_to_include = None, silent=False):
 
     if instance.mode == "web":
         instance_data = {"instance_id": instance.id, "instance_mode": instance.mode, "broadcast": instance.broadcast}
         payload = data_to_include or {}
         merged_arguments = payload | instance_data
-        debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('secondary').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}")
+        if not silent:
+            debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('secondary').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}")
         globals.web_socket.emit(event, merged_arguments)
 
 def send_notification(instance: Instance, message: str) -> None:

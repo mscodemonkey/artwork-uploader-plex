@@ -10,7 +10,7 @@ The routes are organized into:
 - Helper functions for file uploads and processing
 """
 
-import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess
+import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
@@ -26,7 +26,7 @@ from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService
 from services.webhook_service import parse_event
-from core.constants import UPLOAD_CHUNK_SIZE, WEBHOOK_TOKEN_HEADER
+from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER
 
 def login_required(f):
     """Decorator to require authentication for routes."""
@@ -681,6 +681,59 @@ def setup_socket_handlers(
         }
         notify_web(instance, "get_scrape_state", scrape_state)
 
+    def abort_stale_upload(file_name):
+        """ Watchdog function that gets executed during a file upload if for some reason the next chunk
+        is not received within the timeout window determined by UPLOAD_CHUNK_TIMEOUT"""
+        debug_me(f"Upload timed out for {file_name}, cleaning up...")
+
+        if file_name not in upload_chunks:
+            return
+
+        upload_info = upload_chunks.pop(file_name)
+        instance = upload_info.get("instance")
+
+        try:
+            upload_info["temp_file"].close()
+            debug_me(f"Temp file successfully closed")
+            if os.path.exists(upload_info["temp_path"]):
+                os.remove(upload_info["temp_path"])
+                debug_me(f"Successfully deleted temp file at {upload_info["temp_path"]}")
+        except Exception as e:
+            debug_me(f"Error removing temp upload file: {str(e)}")
+
+        debug_me(f"CLEANING UP SCRAPE STATE. globals.scrapes_running is currently {globals.scrapes_running} | {globals.scrape_type}")
+        globals.scrapes_running -= 1
+        if globals.scrapes_running <= 0:
+            debug_me(f"Cleanup!")
+            globals.scrapes_running = 0
+            globals.cancel_scrape = False
+            globals.scrape_type = "stopped"
+            globals.main_bar["active"] = False
+
+            if instance:
+                update_log(instance, f"⚠️ {file_name} • Upload timed out after {UPLOAD_CHUNK_TIMEOUT} seconds (connection lost)")
+                update_status(instance, "Upload timed out", color=StatusColor.DANGER.value)
+                notify_web(instance, "scrape_state", {
+                    "running": False,
+                    "type": "upload"
+                })
+                notify_web(instance, "progress_bar", {
+                    "percent": 100,
+                    "message": f"{file_name} • Upload timed out after {UPLOAD_CHUNK_TIMEOUT} seconds",
+                    "bar_speed": "smooth"
+                })
+
+    @globals.web_socket.on("disconnect")
+    def handle_disconnect():
+        # If a socket disconnects mid-upload, abort all active chunks
+        stale_files = list(upload_chunks.keys())
+        for file_name in stale_files:
+            debug_me(f"Client disconnected during upload of '{file_name}'. Aborting immediately.")
+            if upload_chunks[file_name].get("watchdog"):
+                upload_chunks[file_name]["watchdog"].cancel()
+            
+            abort_stale_upload(file_name)
+            
     @globals.web_socket.on("upload_artwork_chunk")
     def handle_upload_chunk(data):
         """Handle chunked file upload - writes directly to temp file for memory efficiency."""
@@ -691,7 +744,7 @@ def setup_socket_handlers(
         chunk_index = data["chunkIndex"]
         total_chunks = data["totalChunks"]
         total_size = data["totalSize"].__round__(2)
-        bar_speed = "fast" if total_size < 80 else "fast"
+        bar_speed = "fast"
         progress_MB = ((chunk_index * UPLOAD_CHUNK_SIZE ) / 1000000).__round__(2)
         start_time = data["startTime"]
         current_time = data["currentTime"]
@@ -733,8 +786,23 @@ def setup_socket_handlers(
                 "temp_path": temp_file.name,
                 "chunks_received": 0,
                 "total_chunks": total_chunks,
-                "instance": instance
+                "instance": instance,
+                "watchdog": None
             }
+
+        # When a chunk is processed, we reset the watchdog
+        if upload_chunks[file_name].get("watchdog"):
+            upload_chunks[file_name]["watchdog"].cancel()
+
+        # And we re-start it immediately
+        timer = threading.Timer(
+            interval=UPLOAD_CHUNK_TIMEOUT,
+            function=abort_stale_upload,
+            args=[file_name]
+        )
+        timer.daemon = True
+        timer.start()
+        upload_chunks[file_name]["watchdog"] = timer
 
         # Decode and write chunks directly to disk
         try:
@@ -744,7 +812,7 @@ def setup_socket_handlers(
             percent = (progress_MB * 100 / total_size).__round__(2)
             current_rate = ((progress_MB * 1000) / (current_time - start_time)).__round__(2)
             message = f"{file_name} • {progress_MB} MB of {total_size} MB • {current_rate} MB/s"
-            notify_web(instance, "progress_bar", { "percent": percent, "message": message, "bar_speed": bar_speed})
+            notify_web(instance, "progress_bar", { "percent": percent, "message": message, "bar_speed": bar_speed}, silent=True )
                 
             globals.main_bar["active"] = True
             globals.main_bar["percent"] = percent
@@ -780,52 +848,58 @@ def setup_socket_handlers(
         debug_me(f"Obtained options from web form: {options}")
 
 
-        if file_name in upload_chunks and upload_chunks[file_name]["chunks_received"] == int(
-            upload_chunks[file_name]["total_chunks"]
-        ):
-            temp_path = upload_chunks[file_name]["temp_path"]
-            debug_me(f"Uploaded {file_name} to {temp_path}, processing file...")
-            upload_chunks[file_name]["temp_file"].close()
-            update_log(instance, f"✔️ {file_name} • Upload completed successfully")
-            save_uploaded_file(
-                instance,
-                file_name,
-                options,
-                filters,
-                plex_title,
-                plex_year,
-                upload_chunks,
-                filename_pattern,
-                check_image_orientation,
-                sort_key
-            )
+        if file_name in upload_chunks:
+            if upload_chunks[file_name].get("watchdog"):
+                upload_chunks[file_name]["watchdog"].cancel()
+            try:
+                upload_chunks[file_name]["temp_file"].close()
+            except Exception as e:
+                debug_me(f"Unable to close temp file: {str(e)}")
 
-            # Cleanup after saving the file
-            try:
+            if upload_chunks[file_name]["chunks_received"] == int(upload_chunks[file_name]["total_chunks"]):
                 temp_path = upload_chunks[file_name]["temp_path"]
-                # Delete the temp file if it still exists
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-                # Delete the metadata for the file
-                del upload_chunks[file_name]
-            except OSError as e:
-                debug_me(f"Error during cleanup: {str(e)}")
-        else:
-            chunks_received = upload_chunks[file_name]["chunks_received"] if file_name in upload_chunks else 0
-            expected_chunks = upload_chunks[file_name]["total_chunks"] if file_name in upload_chunks else 0
-            debug_me(
-                f'Upload complete event received for {file_name}, but with '
-                f'{chunks_received} of {expected_chunks}, some chunks are missing.'
-            )
-            try:
-                # Clean up temp file
-                if file_name in upload_chunks:
-                    upload_chunks[file_name]["temp_file"].close()
+                debug_me(f"Uploaded {file_name} to {temp_path}, processing file...")
+                upload_chunks[file_name]["temp_file"].close()
+                update_log(instance, f"✔️ {file_name} • Upload completed successfully")
+                save_uploaded_file(
+                    instance,
+                    file_name,
+                    options,
+                    filters,
+                    plex_title,
+                    plex_year,
+                    upload_chunks,
+                    filename_pattern,
+                    check_image_orientation,
+                    sort_key
+                )
+
+                # Cleanup after saving the file
+                try:
                     temp_path = upload_chunks[file_name]["temp_path"]
+                    # Delete the temp file if it still exists
                     if os.path.exists(temp_path):
                         os.remove(temp_path)
-            except OSError as e:
-                debug_me(f"Error during cleanup: {str(e)}")
+                    # Delete the metadata for the file
+                    del upload_chunks[file_name]
+                except OSError as e:
+                    debug_me(f"Error during cleanup: {str(e)}")
+            else:
+                chunks_received = upload_chunks[file_name]["chunks_received"] if file_name in upload_chunks else 0
+                expected_chunks = upload_chunks[file_name]["total_chunks"] if file_name in upload_chunks else 0
+                debug_me(
+                    f'Upload complete event received for {file_name}, but with '
+                    f'{chunks_received} of {expected_chunks}, some chunks are missing.'
+                )
+                try:
+                    # Clean up temp file
+                    if file_name in upload_chunks:
+                        upload_chunks[file_name]["temp_file"].close()
+                        temp_path = upload_chunks[file_name]["temp_path"]
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                except OSError as e:
+                    debug_me(f"Error during cleanup: {str(e)}")
 
 
 def save_uploaded_file(

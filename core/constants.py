@@ -143,6 +143,7 @@ SCHEDULER_CHECK_INTERVAL = 60  # 1 minute
 
 # File upload
 UPLOAD_CHUNK_SIZE = 1024 * 512  # bytes
+UPLOAD_CHUNK_TIMEOUT = 10 # seconds
 
 # Web UI colors (Bootstrap)
 BOOTSTRAP_COLORS = {
