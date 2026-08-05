@@ -14,6 +14,7 @@ let tvPicker, moviePicker, tpdbUserPicker;
 let validationTimeout
 let currentBrowseTargetInput = null;
 let currentDirectoryPath = "/";
+let initialConfig = ''
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -74,6 +75,46 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
 
+
+    const stickyContainers = document.querySelectorAll(".sticky-bottom");
+
+    stickyContainers.forEach(container => {
+        // Find collapsible FABs inside this specific container
+        const fabBtns = container.querySelectorAll(".fab-collapse");
+        if (!fabBtns.length) return;
+
+        // Create or find a sentinel right above this container
+        let sentinel = container.previousElementSibling;
+        if (!sentinel || !sentinel.classList.contains("fab-sentinel")) {
+            sentinel = document.createElement("div");
+            sentinel.className = "fab-sentinel";
+            sentinel.style.height = "1px";
+            sentinel.style.marginTop = "1rem";
+            container.parentNode.insertBefore(sentinel, container);
+        }
+
+        // Set up observer for this container's sentinel
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                fabBtns.forEach(btn => {
+                    if (entry.isIntersecting) {
+                        btn.classList.remove("collapsed"); // Expand at bottom
+                        btn.classList.add("gap-2");
+                    } else {
+                        btn.classList.add("collapsed");    // Collapse over content
+                        btn.classList.remove("gap-2");
+                    }
+                });
+            });
+        }, {
+            root: null,
+            rootMargin: "0px 0px 20px 0px",
+            threshold: 0
+        });
+
+        observer.observe(sentinel);
+    });
+
     // Initialize the folder browser modal for Kometa asset and temp directory selection (non-docker)
     const folderModalElement = document.getElementById("folderBrowserModal");
     if (!folderModalElement) return;
@@ -89,6 +130,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (currentBrowseTargetInput) {
             currentBrowseTargetInput.focus();
         }
+        // Clear folder name field
+        document.getElementById("new_folder_name").value = '';
+        toggleConfigButtons();
     });
         
     const folderModal = new bootstrap.Modal(folderModalElement, {
@@ -124,6 +168,51 @@ document.addEventListener("DOMContentLoaded", function () {
         document.getElementById("select_folder_confirm").blur(); // Remove focus from the confirm button
         folderModal.hide();
     });
+
+    // Enable or disabled add folder button
+    document.getElementById("new_folder_name").addEventListener("input", () => {
+
+        const newFolderField = document.getElementById("new_folder_name");
+        const newFolderName = newFolderField.value;
+        const newFolderButton = document.getElementById("add_folder");
+        
+        if (newFolderName) {
+            newFolderButton.classList.remove("btn-secondary");
+            newFolderButton.classList.add("btn-success");
+            newFolderButton.disabled = false;
+        } else {
+            newFolderButton.disabled = true;
+            newFolderButton.classList.add("btn-secondary");
+            newFolderButton.classList.remove("btn-success");
+        }
+    });
+
+    // Add folder button listener
+    document.getElementById("add_folder").addEventListener("click", () => {
+        const newFolderField = document.getElementById("new_folder_name");
+        const newFolderName = newFolderField.value;
+        const currentPath = document.getElementById("folder_current_path").textContent;
+        const newFolderButton = document.getElementById("add_folder");
+        
+        socket.on("folder_created", (data) => {
+            if (validResponse(data)) {
+                if (data.success) {
+                    newFolderField.value = '';
+                    newFolderButton.disabled = true
+                    newFolderButton.classList.add("btn-secondary");
+                    newFolderButton.classList.remove("btn-success");
+                    loadDirectory(data.path)
+                }
+            }
+        })
+        
+        socket.emit("create_directory", {
+            instance_id: instanceId,
+            parent_path: currentPath,
+            folder_name: newFolderName
+        });
+    });
+
 
     // Initialize the 'eye' icons to toggle between masked and non-masked view
     // for Plex and webhook token input fields
@@ -615,14 +704,24 @@ socket.on("add_spinner", (data) => {
 });
 
 // Update the status bar
-function updateStatus(message, color = "info", sticky = false, spinner = false, icon = false) {
-
+function updateStatus(message, color = "info", sticky = false, spinner = false, icon = false, width=null) {
     const statusEl = document.getElementById("status");
+    const statusContainer = document.getElementById("status_container");
     const spinnerEl = document.getElementById("status_spinner"); // Get the spinner element
     const messageEl = document.getElementById("status_message");
     const iconEl = document.getElementById("status_icon");
 
     if (!statusEl) return;
+
+    if (statusContainer) {
+        if (width === "modal") {
+            statusContainer.style.maxWidth = "500px";
+        } else if (typeof width === "string" && width.endsWith("px")) {
+            statusContainer.style.maxWidth = width;
+        } else {
+            statusContainer.style.maxWidth = "";
+        }
+    }
 
     // Check if message has timestamp with milliseconds [00:00:00.000] to [23:59:59.999]
     const hasTimestamp = /^\[(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d\.\d{3}\]/.test(message);
@@ -688,13 +787,15 @@ function updateStatus(message, color = "info", sticky = false, spinner = false, 
     if (!sticky) {
         statusTimeout = setTimeout(() => {
             statusEl.classList.remove('show'); // Fade out the status after 5 seconds
+            setTimeout(() => {
+                if (statusContainer) statusContainer.style.maxWidth = "";
+            }, 150); // Reset width
         }, 5000);
     }
-
 }
 socket.on("status_update", (data) => {
     if (validResponse(data, true)) {
-        updateStatus(data.message, data.color, data.sticky, data.spinner, data.icon);
+        updateStatus(data.message, data.color, data.sticky, data.spinner, data.icon, data.width);
     }
 });
 
@@ -939,77 +1040,104 @@ document.getElementById("save_config_button").addEventListener("click", async fu
     }
 });
 
-// Save configuration
-function saveConfig() {
-    const save_config = {};
 
-    save_config.base_url = document.getElementById("plex_base_url").value.trim();
-    save_config.token = document.getElementById("plex_token").value.trim();
-    save_config.kometa_base = document.getElementById("kometa_base").value.trim();
-    save_config.temp_dir = document.getElementById("temp_dir").value.trim();
-    save_config.bulk_txt = document.getElementById("bulk_import_file").value;
+function getCanonicalConfig(config) {
+    const result = {};
+
+    Object.keys(config).sort().forEach(key => {
+        // Omit the "schedules" key since bulk import schedules are
+        // managed by the Bulk Import tab and not in the Settings tab
+        if (key === "schedules") return;
+
+        if (Array.isArray(config[key])) {
+            // Sort lists so that list order changes don't trigger a config 
+            // changed state where the buttons get enabled unnecessarily
+            result[key] = [...config[key]].sort()
+        } else {
+            result[key] = config[key]
+        }
+    });
+
+    return result;
+}
+
+function getCurrentConfigForm() {
+    const current_form = {};
+
+    current_form.base_url = document.getElementById("plex_base_url").value.trim();
+    current_form.token = document.getElementById("plex_token").value.trim();
+    current_form.kometa_base = document.getElementById("kometa_base").value.trim();
+    current_form.temp_dir = document.getElementById("temp_dir").value.trim();
+    current_form.bulk_txt = document.getElementById("bulk_import_file").value;
     
     // Save the Apprise URLs
     // Collect all non-empty Apprise URLs from the dynamic inputs
-    save_config.apprise_urls = Array.from(document.querySelectorAll(".apprise-url-input"))
+    current_form.apprise_urls = Array.from(document.querySelectorAll(".apprise-url-input"))
         .map(input => input.value.trim())
         .filter(url => url !== "");
 
     // Collect movie and TV library lists from TomSelect pickers
-    save_config.tv_library = tvPicker ? tvPicker.getValue() : [];
-    save_config.movie_library = moviePicker ? moviePicker.getValue() : [];
+    current_form.tv_library = tvPicker ? tvPicker.getValue() : [];
+    current_form.movie_library = moviePicker ? moviePicker.getValue() : [];
 
     // Checkbox for tracking artwork IDs
-    save_config.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
+    current_form.track_artwork_ids = document.getElementById("track_artwork_ids").checked;
 
     // Checkbox for saving artwork to Kometa asset directory
-    save_config.save_to_kometa = document.getElementById("save_to_kometa").checked;
+    current_form.save_to_kometa = document.getElementById("save_to_kometa").checked;
 
     // Checkbox for staging assets
-    save_config.stage_assets = document.getElementById("stage_assets").checked;
+    current_form.stage_assets = document.getElementById("stage_assets").checked;
 
     // Checkbox for managing bulk files
-    save_config.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
+    current_form.auto_manage_bulk_files = document.getElementById("auto_manage_bulk_files").checked;
 
     // Checkbox for reset overlay for Kometa
-    save_config.reset_overlay = document.getElementById("reset_overlay").checked;
+    current_form.reset_overlay = document.getElementById("reset_overlay").checked;
 
     // Checkbox for skipping artwork with locked fields in Plex
-    save_config.skip_locked_artwork = document.getElementById("skip_locked_artwork").checked;
+    current_form.skip_locked_artwork = document.getElementById("skip_locked_artwork").checked;
 
     // Checkbox for matching artwork against the local libraries before fetching poster pages
-    save_config.local_library_matching = document.getElementById("local_library_matching").checked;
+    current_form.local_library_matching = document.getElementById("local_library_matching").checked;
     
     // Checkbox for caching ThePosterDB user scrapes
-    save_config.cache_user_scrapes = document.getElementById("cache_user_scrapes").checked;
+    current_form.cache_user_scrapes = document.getElementById("cache_user_scrapes").checked;
 
     // ThePosterDB user cache expiration threshold
-    save_config.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value) || 0;
+    current_form.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value) || 0;
 
     // Checkbox for taking an artist's newer artwork for posters we applied
-    save_config.allow_artist_updates = document.getElementById("allow_artist_updates").checked;
+    current_form.allow_artist_updates = document.getElementById("allow_artist_updates").checked;
 
     // Get selected mediux filters
-    save_config.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
+    current_form.mediux_filters = Array.from(document.querySelectorAll('[id^="m_filter-"]:checked'))
         .map(checkbox => checkbox.value);
 
     // Get selected tpdb filters
-    save_config.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
+    current_form.tpdb_filters = Array.from(document.querySelectorAll('[id^="p_filter-"]:checked'))
         .map(checkbox => checkbox.value);
 
     // Save schedules (Ensure it's an array)
-    save_config.schedules = Array.isArray(schedules) ? schedules : [];
+    current_form.schedules = Array.isArray(schedules) ? schedules : [];
 
     // Authentication settings
-    save_config.auth_enabled = document.getElementById("auth_enabled").checked;
-    save_config.auth_username = document.getElementById("auth_username").value.trim();
-    save_config.auth_password = document.getElementById("auth_password").value;
+    current_form.auth_enabled = document.getElementById("auth_enabled").checked;
+    current_form.auth_username = document.getElementById("auth_username").value.trim();
+    current_form.auth_password = document.getElementById("auth_password").value;
 
     // Webhook settings
-    save_config.enable_webhooks = document.getElementById("enable_webhooks").checked;
-    save_config.webhook_token = document.getElementById("webhook_token").value.trim();
-    save_config.webhook_tpdb_users = tpdbUserPicker ? tpdbUserPicker.getValue() : [];
-    save_config.webhook_apply_delay = parseInt(document.getElementById("webhook_apply_delay").value, 10) || 0;
+    current_form.enable_webhooks = document.getElementById("enable_webhooks").checked;
+    current_form.webhook_token = document.getElementById("webhook_token").value.trim();
+    current_form.webhook_tpdb_users = tpdbUserPicker ? tpdbUserPicker.getValue() : [];
+    current_form.webhook_apply_delay = parseInt(document.getElementById("webhook_apply_delay").value, 10) || 0;
+
+    return current_form
+}
+
+// Save configuration
+function saveConfig() {
+    const save_config = getCurrentConfigForm();
 
     // Process every possible condition of auth enable/disable and same/different username and password/no password provided
     // If auth is enabled and a password is NOT provided
@@ -1019,8 +1147,7 @@ function saveConfig() {
             socket.emit("save_config", { instance_id: instanceId, config: save_config });
         // If the username has changed and a password is not provided, don't proceed
         } else if (save_config.auth_enabled != config.auth_username) {
-            socket.emit("display_message", { "instance_id": instanceId, "message": "🔴 Password must be provided", "level": "log" });
-            updateStatus("Password must be provided", "danger", false, false, "x-circle");
+            updateStatus("Password must be provided when changing authentication account", "danger", false, false, "x-circle");
         // Proceed saving the configuration with a new username/password combination
         } else {
             socket.emit("display_message", { "instance_id": instanceId, "message": "Changing username and providing password", "level": "log"});
@@ -1050,6 +1177,8 @@ function saveConfig() {
                     broadcast: true
                 });
                 configureTabs(true);
+                initialConfig = JSON.stringify(getCanonicalConfig(getCurrentConfigForm()));
+                toggleConfigButtons();
             } else {
                 updateStatus("Configuration could not be saved", "danger", false, false, "x-circle");
                 configureTabs(true);
@@ -1062,6 +1191,10 @@ socket.on("update_ui", (data) => {
     if (validResponse(data, true)) {
         updateConfigUI(data.config);
     }
+});
+
+socket.on("toggle_config_buttons", () => {
+    toggleConfigButtons();
 });
 
 
@@ -1186,22 +1319,43 @@ function updateConfigUI(config) {
     }
     
     schedules = config.schedules;
-    console.log(schedules);
     
     loadBulkFileList(); // For the switcher
 };
 
 // Load configuration
-function loadConfig() {
+function loadConfig(silent=false, restore=false) {
     socket.emit("load_config", { instance_id: instanceId });
 
     socket.once("load_config", (data) => { // Use 'once' to prevent duplicate listeners
         if (validResponse(data) && data.config) {
             config = data.config;
             updateConfigUI(config)
-            configureTabs();
+            configureTabs(silent);
+            initialConfig = JSON.stringify(getCanonicalConfig(getCurrentConfigForm()));
+            document.getElementById("config_form").addEventListener("change", toggleConfigButtons);
+            document.getElementById("config_form").querySelectorAll(".form-control").forEach(element => {
+                element.addEventListener("input", toggleConfigButtons);
+            });
+            toggleConfigButtons();
+            if (restore) {
+                updateStatus("Configuration restored successfully", "success", false, false, "check2-circle");
+                const passwordField = document.getElementById("auth_password");
+                if (passwordField) passwordField.value = '';
+            }
         }
     });
+}
+
+function toggleConfigButtons() {
+    const currentConfig = JSON.stringify(getCanonicalConfig(getCurrentConfigForm()));
+
+    if (currentConfig === initialConfig) {
+        disableElement(["save_config_button", "restore_config"], true);
+    } else {
+        disableElement(["save_config_button", "restore_config"], false);
+
+    }
 }
 
 // ==================================================
@@ -1489,7 +1643,6 @@ function saveBulkImport(filename, nowLoad = null) {
                 bulkTextAsLoaded = textArea.value
                 updateBulkSaveButtonState()
                 if (data.now_load) {
-                    //console.log("Saved, now loading " + data.now_load)
                     loadBulkFile(data.now_load);
                 }
             }
@@ -2079,108 +2232,106 @@ socket.on("upload_complete", function (data) {
 // Scheduler
 // =====================
 
-    function updateOrAddSchedule(fileName, newTime) {
-        if (newTime == null) {
-            // Remove this schedule form the list of schedules
-            schedules = schedules.filter(s => s.file !== fileName);
+function updateOrAddSchedule(fileName, newTime) {
+    if (newTime == null) {
+        // Remove this schedule form the list of schedules
+        schedules = schedules.filter(s => s.file !== fileName);
+    } else {
+        const schedule = schedules.find(s => s.file === fileName);
+        if (schedule) {
+            // Update the existing schedule
+            schedule.time = newTime;
         } else {
-            const schedule = schedules.find(s => s.file === fileName);
-            if (schedule) {
-                // Update the existing schedule
-                schedule.time = newTime;
-            } else {
-                // Add the new schedule
-                schedules.push({ file: fileName, time: newTime });
-            }
+            // Add the new schedule
+            schedules.push({ file: fileName, time: newTime });
         }
     }
+}
 
-    // Show the time selector when the clock icon is clicked
-    scheduleIcon.addEventListener("click", function () {
+// Show the time selector when the clock icon is clicked
+scheduleIcon.addEventListener("click", function () {
 
-        const iconRect = scheduleIcon.getBoundingClientRect();
+    const iconRect = scheduleIcon.getBoundingClientRect();
 
-        // Position tooltip relative to the icon
-        timeSelectBox.style.top = `${iconRect.bottom + window.scrollY + 10}px`; // Below the icon
-        timeSelectBox.style.right = `${window.innerWidth - iconRect.right - window.scrollX - 15}px`; // Align right edge
+    // Position tooltip relative to the icon
+    timeSelectBox.style.top = `${iconRect.bottom + window.scrollY + 10}px`; // Below the icon
+    timeSelectBox.style.right = `${window.innerWidth - iconRect.right - window.scrollX - 15}px`; // Align right edge
 
-        // Toggle visibility
-        timeSelectBox.classList.toggle("show-tooltip");
+    // Toggle visibility
+    timeSelectBox.classList.toggle("show-tooltip");
 
-    });
+});
 
-    document.addEventListener("click", function (event) {
-        if (!timeSelectBox.contains(event.target) && !scheduleIcon.contains(event.target)) {
-            timeSelectBox.classList.remove("show-tooltip");
-        }
-    });
+document.addEventListener("click", function (event) {
+    if (!timeSelectBox.contains(event.target) && !scheduleIcon.contains(event.target)) {
+        timeSelectBox.classList.remove("show-tooltip");
+    }
+});
 
-    // Handle setting the time
-    setTimeBtn.addEventListener("click", function () {
-        const selectedTime = scheduleTimeInput.value;
-        if (selectedTime) {
-            socket.emit("add_schedule",{instance_id:instanceId, file: currentBulkImport, time: selectedTime})
+// Handle setting the time
+setTimeBtn.addEventListener("click", function () {
+    const selectedTime = scheduleTimeInput.value;
+    if (selectedTime) {
+        socket.emit("add_schedule",{instance_id:instanceId, file: currentBulkImport, time: selectedTime})
 
-            // Wait for response on add schedule
-            socket.once("add_schedule", (data) => {
-                if (validResponse(data)) {
-                    if (data.added) {
-                        updateOrAddSchedule(data.file, data.time);
-                        updateSchedulerIcon();
-                        timeSelectBox.classList.remove("show-tooltip");
-                    }
-                }
-            });
-
-        }
-    });
-
-    // Handle cancelling the schedule
-    cancelTimeBtn.addEventListener("click", function () {
-        socket.emit("delete_schedule",{instance_id:instanceId, file: currentBulkImport})
-
-        // Wait for response
-        socket.once("delete_schedule", (data) => {
+        // Wait for response on add schedule
+        socket.once("add_schedule", (data) => {
             if (validResponse(data)) {
-                if (data.deleted) {
-                    // Get the value of the default bulk file from the hidden field
-                    console.log(schedules)
-                    updateOrAddSchedule(data.file, null, null)
-                    console.log(schedules)
+                if (data.added) {
+                    updateOrAddSchedule(data.file, data.time);
                     updateSchedulerIcon();
-                } else {
-
+                    timeSelectBox.classList.remove("show-tooltip");
                 }
-            timeSelectBox.classList.remove("show-tooltip");
             }
         });
 
+    }
+});
+
+// Handle cancelling the schedule
+cancelTimeBtn.addEventListener("click", function () {
+    socket.emit("delete_schedule",{instance_id:instanceId, file: currentBulkImport})
+
+    // Wait for response
+    socket.once("delete_schedule", (data) => {
+        if (validResponse(data)) {
+            if (data.deleted) {
+                // Get the value of the default bulk file from the hidden field
+                updateOrAddSchedule(data.file, null, null)
+                updateSchedulerIcon();
+            } else {
+
+            }
+        timeSelectBox.classList.remove("show-tooltip");
+        }
     });
 
-    function updateSchedulerIcon(){
-        let details = getScheduleDetails(currentBulkImport);
-        if (details && details['time']) {
-            scheduleIcon.classList.remove("bi-clock");
-            scheduleIcon.classList.add("bi-clock-fill"); // Change to filled icon
-            setContainer.classList.remove("show"); // Hide Set button
-            cancelContainer.classList.add("show"); // Show Delete button
-            scheduleTimeInput.value = details['time'];
-            scheduleTimeInput.readOnly = true;
-            scheduleIcon.classList.add("text-success"); // Turn icon green
-        } else {
-            scheduleIcon.classList.add("bi-clock"); // Change to unfilled icon
-            scheduleIcon.classList.remove("bi-clock-fill");
-            scheduleIcon.classList.remove("text-success"); // Remove green color
-            setContainer.classList.add("show"); // Show Set button
-            cancelContainer.classList.remove("show"); // Hide Delete button
-            scheduleTimeInput.value = "";
-            scheduleTimeInput.readOnly = false;
-        }
-    }
+});
 
-    function getScheduleDetails(fileName) {
-        return schedules.find(s => s.file === fileName);
+function updateSchedulerIcon(){
+    let details = getScheduleDetails(currentBulkImport);
+    if (details && details['time']) {
+        scheduleIcon.classList.remove("bi-clock");
+        scheduleIcon.classList.add("bi-clock-fill"); // Change to filled icon
+        setContainer.classList.remove("show"); // Hide Set button
+        cancelContainer.classList.add("show"); // Show Delete button
+        scheduleTimeInput.value = details['time'];
+        scheduleTimeInput.readOnly = true;
+        scheduleIcon.classList.add("text-success"); // Turn icon green
+    } else {
+        scheduleIcon.classList.add("bi-clock"); // Change to unfilled icon
+        scheduleIcon.classList.remove("bi-clock-fill");
+        scheduleIcon.classList.remove("text-success"); // Remove green color
+        setContainer.classList.add("show"); // Show Set button
+        cancelContainer.classList.remove("show"); // Hide Delete button
+        scheduleTimeInput.value = "";
+        scheduleTimeInput.readOnly = false;
     }
+}
+
+function getScheduleDetails(fileName) {
+    return schedules.find(s => s.file === fileName);
+}
 
 
 
@@ -2262,6 +2413,7 @@ function generateRandomToken() {
 
 document.getElementById("generate_webhook_token").addEventListener("click", function () {
     document.getElementById("webhook_token").value = generateRandomToken();
+    toggleConfigButtons();
 })
 
 document.getElementById("enable_webhooks").addEventListener("change", toggleWebhookSettings);
@@ -2504,6 +2656,7 @@ function createAppriseUrlRow(value = "", last = false) {
         createAppriseUrlRow();
         const inputs = document.querySelectorAll(".apprise-url-input");
         inputs[inputs.length - 1].focus();
+        inputs[inputs.length - 1].addEventListener("input", toggleConfigButtons);
     });
 
     // Event listener to remove this row
@@ -2513,7 +2666,9 @@ function createAppriseUrlRow(value = "", last = false) {
         if (container.children.length === 0) {
             createAppriseUrlRow();
         }
+        toggleConfigButtons();
     });
 
     container.appendChild(row);
+    toggleConfigButtons();
 }

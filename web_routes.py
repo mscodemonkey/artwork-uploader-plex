@@ -527,15 +527,24 @@ def setup_socket_handlers(
             current_config_dict.pop("auth_password_hash")
 
             # Ensure a simple change in the order of a list isn't detected as a change
+            config_changed = False
             for key in new_config_dict:
-                if isinstance(new_config_dict[key], list) and len(new_config_dict[key]) > 0 and isinstance(new_config_dict[key][0], str):
-                    new_config_dict[key].sort()
-                if isinstance(current_config_dict[key], list) and len(current_config_dict[key]) > 0 and isinstance(current_config_dict[key][0], str):
-                    current_config_dict[key].sort()
+                if isinstance(new_config_dict[key], list):
+                    if len(new_config_dict[key]) > 0 and len(current_config_dict[key]) > 0 and isinstance(new_config_dict[key][0], str):
+                        new_list_to_compare = new_config_dict[key]
+                        new_list_to_compare.sort()
+                        current_list_to_compare = current_config_dict[key]
+                        current_list_to_compare.sort()
+                        config_changed = config_changed or new_list_to_compare != current_list_to_compare
+                    elif len(new_config_dict[key]) != len(current_config_dict[key]):
+                        config_changed = True
+                else:
+                    config_changed = config_changed or new_config_dict[key] != current_config_dict[key]
 
             # If the new configuration is the same, return
-            if new_config_dict == current_config_dict and not password_change:
+            if not config_changed and not password_change:
                 update_status(instance, "No configuration change detected", "info", False, False, "info-circle")
+                notify_web(instance, "toggle_config_buttons")
                 return
             
             if new_config_dict["auth_enabled"] and password:
@@ -568,6 +577,33 @@ def setup_socket_handlers(
             notify_web(instance, "update_ui", {"config": vars(config)})
         except Exception as config_error:
             update_status(instance, str(config_error), color=StatusColor.WARNING.value)
+
+    @globals.web_socket.on("create_directory")
+    def create_directory(data):
+        instance = Instance(data.get("instance_id"), "web")
+
+        parent_path = data.get("parent_path")
+        folder_name = data.get("folder_name")
+
+        clean_name = os.path.basename(folder_name)
+        target_path = os.path.join(parent_path, clean_name)
+
+        try:
+            os.makedirs(target_path, exist_ok=False)
+            notify_web(instance, "folder_created", {
+                "success": True,
+                "path": target_path
+            })
+            update_status(instance, "Folder created successully", "success", icon="check2-circle", width="modal")
+            update_log(instance, f"✅ Successfully created new folder '{target_path}'")
+        except PermissionError:
+            update_status(instance, "Permission denied", "danger", icon="x-circle", width="modal")
+        except FileExistsError:
+            update_status(instance, "Folder already exists", "warning", icon="exclamation-triangle", width="modal")
+        except Exception as e:
+            update_status(instance, "Failed to create folder, check log for details", "danger", icon="x-circle", width="modal")
+            update_log(f"Faile to create folder: {str(e)}")
+
 
     @globals.web_socket.on("delete_schedule")
     def delete_task_from_scheduler(data):

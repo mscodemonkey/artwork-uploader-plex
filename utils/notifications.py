@@ -10,12 +10,23 @@ from services.notify_service import NotifyService
 bootstrap_colors = BOOTSTRAP_COLORS
 print_lock = threading.Lock()
 
-def update_status(instance: Instance, message, color="primary", sticky=False, spinner=False, icon=None, cli = False):
+def update_status(instance: Instance, message, color="primary", sticky=False, spinner=False, icon=None, cli = False, width = None):
     """Update the status label with a message and color."""
 
     if instance.mode == "web":
-        notify_web(instance, "status_update",
-                   {"message": message, "color": color, "sticky": sticky, "spinner": spinner, "icon": icon if icon else BOOTSTRAP_COLORS.get(color, {}).get('icon', None)})
+        notify_web(
+            instance=instance,
+            event="status_update",
+            data_to_include={
+                "message": message,
+                "color": color,
+                "sticky": sticky,
+                "spinner": spinner,
+                "icon": icon if icon else BOOTSTRAP_COLORS.get(color, {}).get('icon', None),
+                "width": width
+            }
+        )
+    
     if (instance.mode == "cli" and cli) or globals.debug:
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
         message = f"[{timestamp}] {message}"
@@ -93,7 +104,11 @@ def update_log(instance: Instance, update_text: str, broadcast: bool = False) ->
         if instance.mode == "web":
             if not instance.broadcast and broadcast:
                 instance.broadcast = broadcast
-            notify_web(instance, "log_update", {"message": update_text})
+            notify_web(
+                instance=instance,
+                event="log_update",
+                data_to_include={"message": update_text}
+            )
     except Exception as e:
         # Fail silently for logging errors to avoid cascading failures
         if globals.debug:
@@ -103,7 +118,11 @@ def update_log(instance: Instance, update_text: str, broadcast: bool = False) ->
 def notify_web(instance: Instance, event, data_to_include = None, silent=False):
 
     if instance.mode == "web":
-        instance_data = {"instance_id": instance.id, "instance_mode": instance.mode, "broadcast": instance.broadcast}
+        instance_data = {
+            "instance_id": instance.id,
+            "instance_mode": instance.mode,
+            "broadcast": instance.broadcast
+        }
         payload = data_to_include or {}
         merged_arguments = payload | instance_data
         if not silent:

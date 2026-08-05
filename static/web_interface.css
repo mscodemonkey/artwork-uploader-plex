@@ -3,7 +3,7 @@
    ========================================================================== */
 
 * {
-    font-family: "Noto Sans", serif;
+    font-family:system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
     font-optical-sizing: auto;
     font-weight: 400;
     font-style: normal;
@@ -802,4 +802,109 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 .filter-toggle-item {
     min-width: 11rem; /* ~176px - keeps switches perfectly aligned in columns */
     flex-shrink: 0;
+}
+
+/* ==========================================================================
+   Generic Collapsible Floating Action Buttons (FAB)
+   ========================================================================== */
+
+/* Base transition rules */
+.fab-collapse {
+    transition: padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                transform 0.2s ease, 
+                box-shadow 0.2s ease;
+}
+
+/* Label text transition (for Save / Run buttons) */
+.fab-collapse > span:not(.visually-hidden) {
+    display: inline-block;
+    max-width: 100px;
+    opacity: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Caret arrow transition (for the #bd-theme dropdown button) */
+.fab-collapse.dropdown-toggle::after {
+    transition: opacity 0.2s ease, margin 0.3s ease;
+    opacity: 1;
+}
+
+/* --------------------------------------------------------------------------
+   Collapsed Floating State (Icon-only FABs over content)
+   -------------------------------------------------------------------------- */
+
+.fab-collapse.collapsed {
+    padding-left: 0.60rem !important;
+    padding-right: 0.60rem !important;
+}
+
+/* Hide label text */
+.fab-collapse.collapsed > span:not(.visually-hidden) {
+    max-width: 0;
+    opacity: 0;
+    margin: 0;
+}
+
+/* Hide caret arrow on theme selector when floating */
+.fab-collapse.collapsed.dropdown-toggle::after {
+    opacity: 0;
+    margin-left: 0;
+    display: none; /* Collapses the arrow completely */
+}
+
+/* ==========================================================================
+   Smooth Caret Icon Collapse
+   ========================================================================== */
+
+/* 1. Strip Bootstrap's automatic CSS-border caret */
+.dropdown-toggle.no-caret::after,
+#bd-theme.dropdown-toggle::after {
+    display: none !important;
+    content: none !important;
+    border: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+}
+
+/* 2. Transition for the inline caret wrapper span */
+/* 1. Base state: spacing handled via margin-left instead of flex gap */
+.fab-collapse .caret-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 20px;
+    margin-left: 0.5rem; /* Replaces the flex gap-2 spacing */
+    opacity: 1;
+    transform: scale(1);
+    transform-origin: center center;
+    white-space: nowrap;
+    overflow: hidden;
+    /* Synchronize width, spacing, and opacity */
+    transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+                transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. Collapsed state: zero out margin and width simultaneously */
+.fab-collapse.collapsed .caret-wrapper {
+    max-width: 0 !important;
+    margin-left: 0 !important;
+    opacity: 0 !important;
+    transform: scale(0) !important;
+}
+
+/* ==========================================================================
+   Elevate Status Banner above Modals & Backdrops
+   ========================================================================== */
+
+#status,
+#status_container { /* Replace with your banner's actual class or ID */
+    z-index: 1060 !important; /* Higher than Bootstrap modal (1055) and backdrop (1050) */
 }
