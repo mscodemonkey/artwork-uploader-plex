@@ -81,7 +81,7 @@
                 <i class="bi bi-shift"></i>&nbsp;Update Now&nbsp;
             </button>
         </div>
-        <div class="fixed-top w-100 mt-3" id="status_container">
+        <div class="fixed-top w-100 mx-auto mt-3" id="status_container">
             <div class="container">
                 <div class="row m-1 rounded-4 fade shadow-sm" id="status">
                     <div class="col-12">
@@ -519,19 +519,29 @@
                         </div>
                     </div>
                     <!-- Floating Save Button Container -->
+                    <div class="setttings-bottom-sentinel" style="height: 1px; margin-top: 1rem;"></div>
                     <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
-                        <button type="submit" id="save_config_button" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill">
-                            <i class="bi bi-floppy2"></i>
-                            <span>Save</span>
-                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="submit" id="save_config_button" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill no-caret fab-collapse collapsed">
+                                <i class="bi bi-floppy2"></i>
+                                <span>Save</span>
+                            </button>
+                            <button type="button" id="restore_config" onclick="loadConfig(true, true)" class="btn btn-secondary shadow d-flex align-items-center gap-2 rounded-pill no-caret fab-collapse collapsed">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                                <span>Restore</span>
+                            </button>
+                        </div>
                         <div class="dropdown">
-                            <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                            <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                     id="bd-theme"
                                     type="button"
                                     aria-expanded="false"
                                     data-bs-toggle="dropdown"
                                     aria-label="Toggle theme (auto)">
                                 <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                <span class="caret-wrapper d-inline-flex align-items-center">
+                                    <i class="bi bi-caret-down-fill" style="font-size: 0.65rem;"></i>
+                                </span>
                                 <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
@@ -638,25 +648,29 @@
                 </div>
 
                 <!-- Floating Button Container -->
+                 <div class="bulk-bottom-sentinel" style="height: 1px; margin-top: 1rem;"></div>
                 <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
                     <div class="d-flex align-items-center gap-2">
-                        <button type="button" id="save_bulk_button" onclick="checkBulkImportFileToSave()" class="btn shadow d-flex align-items-center gap-2 rounded-pill">
+                        <button type="button" id="save_bulk_button" onclick="checkBulkImportFileToSave()" class="btn shadow d-flex align-items-center gap-2 rounded-pill fab-collapse collapsed">
                             <i class="bi bi-floppy2"></i>
                             <span>Save</span>
                         </button>
-                        <button type="button" id="bulk_button" onclick="runBulkImport()" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill">
+                        <button type="button" id="bulk_button" onclick="runBulkImport()" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill fab-collapse collapsed">
                             <i class="bi bi-play-circle"></i>
                             <span>Run</span>
                         </button>
                     </div>
                     <div class="dropdown">
-                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
                                 type="button"
                                 aria-expanded="false"
                                 data-bs-toggle="dropdown"
                                 aria-label="Toggle theme (auto)">
                             <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="caret-wrapper d-inline-flex align-items-center">
+                                <i class="bi bi-caret-down-fill" style="font-size: 0.65rem;"></i>
+                            </span>
                             <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
@@ -840,21 +854,26 @@
                             </div>
                         </div>
                     </div>
+                    <div class="scraper-bottom-sentinel" style="height: 1px; margin-top: 1rem;"></div>
                     <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
-                        <button type="button" id="scrape_button" onclick="startScrape()" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill">
+                        <button type="button" id="scrape_button" onclick="startScrape()" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill fab-collapse collapsed">
                             <i class="bi bi-play-circle"></i>
                             <span>Scrape</span>
                         </button>
                         <div class="dropdown">
-                            <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                            <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                     id="bd-theme"
                                     type="button"
                                     aria-expanded="false"
                                     data-bs-toggle="dropdown"
                                     aria-label="Toggle theme (auto)">
                                 <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                <span class="caret-wrapper d-inline-flex align-items-center">
+                                    <i class="bi bi-caret-down-fill" style="font-size: 0.65rem;"></i>
+                                </span>
                                 <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
                             </button>
+
                             <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
                                 <li>
                                     <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
@@ -1022,13 +1041,16 @@
                 </div>
                 <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
                     <div class="dropdown">
-                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
                                 type="button"
                                 aria-expanded="false"
                                 data-bs-toggle="dropdown"
                                 aria-label="Toggle theme (auto)">
                             <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="caret-wrapper d-inline-flex align-items-center">
+                                <i class="bi bi-caret-down-fill" style="font-size: 0.65rem;"></i>
+                            </span>
                             <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
@@ -1063,13 +1085,16 @@
                 <div class="mt-3" id="scraping_log"><!-- --></div>
                 <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
                     <div class="dropdown">
-                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
                                 type="button"
                                 aria-expanded="false"
                                 data-bs-toggle="dropdown"
                                 aria-label="Toggle theme (auto)">
                             <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="caret-wrapper d-inline-flex align-items-center">
+                                <i class="bi bi-caret-down-fill" style="font-size: 0.65rem;"></i>
+                            </span>
                             <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
@@ -1123,13 +1148,16 @@
                 </div>
                 <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
                     <div class="dropdown">
-                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle"
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
                                 type="button"
                                 aria-expanded="false"
                                 data-bs-toggle="dropdown"
                                 aria-label="Toggle theme (auto)">
                             <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="caret-wrapper d-inline-flex align-items-center">
+                                <i class="bi bi-caret-down-fill" style="font-size: 0.65rem;"></i>
+                            </span>
                             <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
@@ -1211,12 +1239,18 @@
                     <div class="list-group list-group-flush" id="folder_list">
                         <!-- Loaded dynamically via JS -->
                     </div>
+                    <div class="ms-3 me-3 mt-3 mb-3">
+                        <label for="new_folder_name" class="mb-1"><i class="bi bi-folder-plus"></i>&ensp;Create folder</label>
+                        <input type="text" id="new_folder_name" class="form-control" placeholder="New folder name...">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-danger btn-sm rounded-pill" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle"></i>&ensp;Cancel&nbsp;</button>
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill" id="add_folder" disabled>
+                        <i class="bi bi-folder-plus"></i>&ensp;Create&nbsp;</button>
                     <button type="button" class="btn btn-primary btn-sm rounded-pill" id="select_folder_confirm">
-                        <i class="bi bi-check2-circle"></i>&ensp;Select This Directory&nbsp;</button>
+                        <i class="bi bi-check2-circle"></i>&ensp;Select&nbsp;</button>
                 </div>
             </div>
         </div>
