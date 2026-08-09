@@ -429,6 +429,10 @@ function scrapeState(running, type) {
         if (btnElement) {
             btnElement.querySelector("i").className = btnElement.querySelector("i").dataset.originalIcon || "bi bi-gear";
         }
+
+        if (type == "bulk") {
+            loadRunHistory();
+        }
     }
 }
 socket.on("scrape_state", (data) => {
@@ -1338,6 +1342,7 @@ function updateConfigUI(config) {
     schedules = config.schedules;
     
     loadBulkFileList(); // For the switcher
+    loadRunHistory();
 };
 
 // Load configuration
@@ -1517,6 +1522,7 @@ if (scrapeUrlInput) {
 
 function configureTabs(afterSave = false) {
         document.getElementById('scraping-log-tab').classList.add("show");
+        document.getElementById('run-history-tab').classList.add("show");
         document.getElementById('about-tab').classList.add("show");
         if (config.base_url && config.token) {
             document.getElementById('bulk-import-tab').classList.add("show");
@@ -1635,6 +1641,77 @@ function loadBulkFileList() {
                 selectElement.appendChild(placeholder);
             }
         }
+    });
+}
+
+/* Loading the run history */
+
+const RUN_HISTORY_OUTCOME_LABELS = {
+    success: { text: "Completed", className: "text-success" },
+    partial: { text: "Completed with errors", className: "text-warning" },
+    stopped: { text: "Stopped", className: "text-warning" },
+    failed: { text: "Failed", className: "text-danger" },
+    skipped: { text: "Skipped", className: "text-muted" }
+};
+
+function formatRunDuration(startedAt, endedAt) {
+    const start = new Date(startedAt);
+    const end = new Date(endedAt);
+    const seconds = Math.max(0, Math.round((end - start) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    const remainder = seconds % 60;
+    return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
+}
+
+function loadRunHistory() {
+
+    socket.emit("load_run_history", { instance_id: instanceId });
+
+    socket.once("load_run_history", (data) => {
+        if (!validResponse(data)) { return; }
+
+        const body = document.getElementById("run_history_body");
+        body.innerHTML = "";
+
+        const runs = data.runs || [];
+
+        if (runs.length === 0) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+            cell.colSpan = 10;
+            cell.className = "text-muted";
+            cell.textContent = "No runs recorded yet.";
+            row.appendChild(cell);
+            body.appendChild(row);
+            return;
+        }
+
+        runs.forEach((run) => {
+            const row = document.createElement("tr");
+            const outcome = RUN_HISTORY_OUTCOME_LABELS[run.outcome] || { text: run.outcome, className: "" };
+
+            const cells = [
+                new Date(run.started_at).toLocaleString(),
+                run.filename,
+                run.scheduled ? "Scheduled" : "Manual",
+                outcome.text,
+                run.assets_processed,
+                run.success_count,
+                run.cached_count,
+                run.locked_count,
+                run.error_count,
+                formatRunDuration(run.started_at, run.ended_at)
+            ];
+
+            cells.forEach((value, index) => {
+                const cell = document.createElement("td");
+                cell.textContent = value;
+                if (index === 3) { cell.className = outcome.className; }
+                row.appendChild(cell);
+            });
+
+            body.appendChild(row);
+        });
     });
 }
 

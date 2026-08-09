@@ -13,6 +13,7 @@ from .authentication_service import AuthenticationService
 from .notify_service import NotifyService
 from .asset_index import AssetIndex
 from .webhook_service import WebhookService
+from .run_history import RunHistory
 
 __all__ = [
     'BulkFileService',
@@ -22,5 +23,6 @@ __all__ = [
     'AuthenticationService',
     'NotifyService',
     'AssetIndex',
-    'WebhookService'
+    'WebhookService',
+    'RunHistory'
 ]

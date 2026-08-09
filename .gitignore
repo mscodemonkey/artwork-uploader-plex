@@ -117,3 +117,4 @@ DEVELOPER_GUIDE.md
 docker-compose.yml
 config/.plex_client_id
 config/asset_index.db*
+config/run_history.json

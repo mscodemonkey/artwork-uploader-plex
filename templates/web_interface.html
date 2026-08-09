@@ -116,7 +116,10 @@
 
             <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
             role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&ensp;Log</a>
-            
+
+            <a class="nav-link collapse" id="run-history-tab" data-bs-toggle="tab" data-bs-target="#run-history" type="button"
+            role="tab" aria-controls="run-history" aria-selected="false"><i class="bi bi-clock-history"></i>&ensp;History</a>
+
             <a class="nav-link collapse" id="about-tab" data-bs-toggle="tab" data-bs-target="#about" type="button"
             role="tab" aria-controls="about" aria-selected="false"><i class="bi bi-code-slash"></i>&ensp;About</a>
             
@@ -1168,6 +1171,31 @@
                             </li>
                         </ul>
                     </div>
+                </div>
+            </div>
+
+            <!-- Run History Tab -->
+            <div class="tab-pane fade" id="run-history" role="tabpanel" aria-labelledby="run-history-tab" tabindex="0">
+                <div class="mt-3 table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Started</th>
+                                <th>File</th>
+                                <th>Trigger</th>
+                                <th>Outcome</th>
+                                <th>Processed</th>
+                                <th>Updated</th>
+                                <th>Cached</th>
+                                <th>Locked</th>
+                                <th>Errors</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="run_history_body">
+                            <tr><td colspan="10" class="text-muted">No runs recorded yet.</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
