@@ -136,7 +136,8 @@ class ArtworkProcessor:
                 self.callbacks.status(f"Process canceled {f'{title} by {scraper.author}' if title else f"for {scraper.author}'s TPDb portfolio"}", "warning")
         else:
             self.callbacks.assets(count=(scraper.total - scraper.skipped))
-            self.callbacks.log(f"✔️ {description} | {scraper.total - scraper.skipped} asset(s) processed in {elapsed} • {self.callbacks.success_counter[0]} asset(s) updated")
+            failed_note = f" • {self.callbacks.failed_counter[0]} asset(s) failed" if self.callbacks.failed_counter and self.callbacks.failed_counter[0] else ""
+            self.callbacks.log(f"✔️ {description} | {scraper.total - scraper.skipped} asset(s) processed in {elapsed} • {self.callbacks.success_counter[0]} asset(s) updated{failed_note}")
             if not bulk:
                 self.callbacks.status(f"Process completed {f'{title} by {scraper.author}' if title else f"for {scraper.author}'s TPDb portfolio"}", "success")
         return scraper.title, scraper.author
@@ -180,6 +181,10 @@ class ArtworkProcessor:
             # Track artwork left alone because its Plex field was locked
                 elif result.startswith('🔒'):
                     self.callbacks.locked(1)
+
+            # Track uploads that failed after exhausting their retries
+                elif result.startswith('❌'):
+                    self.callbacks.failed(1)
 
             # Log the result
                 self.callbacks.log(result)
@@ -251,6 +256,7 @@ class ArtworkProcessor:
         
         processed_files = 0
         success_counter = 0  # Mutable counter to track successful uploads
+        failed_counter = 0  # Mutable counter to track uploads that failed after exhausting their retries
 
         # Initial progress update
         self.callbacks.debug("Processing uploaded file...")
@@ -319,6 +325,10 @@ class ArtworkProcessor:
                         if result.startswith('✅') or result.startswith('♻️'):
                             success_counter += 1
 
+                        # Track uploads that failed after exhausting their retries
+                        elif result.startswith('❌'):
+                            failed_counter += 1
+
                         # Log the result
                         self.callbacks.log(result)
 
@@ -351,10 +361,11 @@ class ArtworkProcessor:
             except OSError:
                 pass
         # Final progress update
+        failed_note = f" • {failed_counter} asset(s) failed" if failed_counter else ""
         if globals.cancel_scrape:
             self.callbacks.progress(1, 1, "", "main")
-            self.callbacks.log(f"🛑 {title}{f' ({year})' if year else ''} • {author} | Stopped by user. {processed_files} file(s) processed • {success_counter} asset(s) updated.")
+            self.callbacks.log(f"🛑 {title}{f' ({year})' if year else ''} • {author} | Stopped by user. {processed_files} file(s) processed • {success_counter} asset(s) updated{failed_note}.")
 
         else:
-            self.callbacks.log(f"✔️ {title}{f' ({year})' if year else ''} • {author} | {total_files} file(s) processed • {success_counter} asset(s) updated.")
+            self.callbacks.log(f"✔️ {title}{f' ({year})' if year else ''} • {author} | {total_files} file(s) processed • {success_counter} asset(s) updated{failed_note}.")
             self.callbacks.progress(total_files, total_files, f"Processing ZIP file • {total_files} of {total_files}")

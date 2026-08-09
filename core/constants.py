@@ -145,6 +145,17 @@ SCHEDULER_CHECK_INTERVAL = 60  # 1 minute
 UPLOAD_CHUNK_SIZE = 1024 * 512  # bytes
 UPLOAD_CHUNK_TIMEOUT = 10 # seconds
 
+# Network timeouts (seconds)
+DEFAULT_PLEX_CONNECT_TIMEOUT = 10  # PlexConnector.connect()
+DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT = 5  # "Test connection" in the web settings
+DEFAULT_KOMETA_DOWNLOAD_TIMEOUT = 5  # Downloading artwork to save to the Kometa asset directory
+
+# Upload retry behaviour: a transient failure (timeout, connection error, 5xx) is retried this many
+# times in total, waiting backoff seconds and doubling that wait after each attempt. A 401 or 404
+# is never transient and is not retried.
+DEFAULT_UPLOAD_RETRY_ATTEMPTS = 3
+DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS = 1
+
 # Web UI colors (Bootstrap)
 BOOTSTRAP_COLORS = {
     'primary': {'bg': '#0d6efd', 'fg': '#ffffff', 'ansi': '\033[0m'},

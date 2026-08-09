@@ -5,7 +5,8 @@ from plexapi.collection import Collection
 from utils import utils
 from models.options import Options
 from core.enums import ScraperSource, ArtworkIDPrefix
-from core.constants import TPDB_RATE_LIMIT_DELAY, KOMETA_OVERLAY_LABEL
+from core.constants import TPDB_RATE_LIMIT_DELAY, KOMETA_OVERLAY_LABEL, DEFAULT_UPLOAD_RETRY_ATTEMPTS, DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS
+from core.retry import call_with_retry
 from models.artwork_types import AnyArtwork
 
 class PlexUploader:
@@ -31,6 +32,8 @@ class PlexUploader:
         self.artist_assets: Optional[dict] = None  # {md5(asset url): asset id} for the artist being processed
         self.confirm_match = None
         self.stale_labels: list = []
+        self.retry_attempts: int = DEFAULT_UPLOAD_RETRY_ATTEMPTS
+        self.retry_backoff: float = DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS
 
     def set_artwork(self, artwork: AnyArtwork) -> None:
         self.artwork = artwork
@@ -72,27 +75,28 @@ class PlexUploader:
 
                 if self.artwork_id == ArtworkIDPrefix.BACKGROUND.value:
                     if self.type == "file":
-                        self.upload_target.uploadArt(filepath = self.artwork['path'])
+                        upload_call = lambda: self.upload_target.uploadArt(filepath = self.artwork['path'])
                     else:
-                        self.upload_target.uploadArt(url = self.artwork["url"])
-                    if self.track_artwork_ids:
-                        self.upload_target.addLabel(self.label)
+                        upload_call = lambda: self.upload_target.uploadArt(url = self.artwork["url"])
 
                 elif self.artwork_id == ArtworkIDPrefix.SQUARE_ART.value:
                     if self.type == "file":
-                        self.upload_target.uploadSquareArt(filepath = self.artwork['path'])
+                        upload_call = lambda: self.upload_target.uploadSquareArt(filepath = self.artwork['path'])
                     else:
-                        self.upload_target.uploadSquareArt(url = self.artwork["url"])
-                    if self.track_artwork_ids:
-                        self.upload_target.addLabel(self.label)
+                        upload_call = lambda: self.upload_target.uploadSquareArt(url = self.artwork["url"])
 
                 else:
                     if self.type == "file":
-                        self.upload_target.uploadPoster(filepath = self.artwork['path'])
+                        upload_call = lambda: self.upload_target.uploadPoster(filepath = self.artwork['path'])
                     else:
-                        self.upload_target.uploadPoster(url = self.artwork["url"])
-                    if self.track_artwork_ids:
-                        self.upload_target.addLabel(self.label)
+                        upload_call = lambda: self.upload_target.uploadPoster(url = self.artwork["url"])
+
+                # A timeout, dropped connection, or 5xx from Plex is worth trying again; anything
+                # else (a 401, a 404) fails immediately rather than burning the retry budget.
+                call_with_retry(upload_call, self.retry_attempts, self.retry_backoff)
+
+                if self.track_artwork_ids:
+                    self.upload_target.addLabel(self.label)
                 # Remove the labels for the artwork we just replaced only AFTER the new one is on
                 # the item, so a failed upload leaves the old label in place and the item stays
                 # recognisable as ours, rather than looking like artwork set by hand
@@ -103,7 +107,9 @@ class PlexUploader:
             else:
                 return f'⏩ {self.description} | {self.artwork_type} unchanged in {self.upload_target.librarySectionTitle}'
         except Exception as e:
-            return f'❌ {self.description} | Failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}: {str(e)}'
+            attempts = getattr(e, "attempts", 1)
+            attempts_note = f" after {attempts} attempt(s)" if attempts > 1 else ""
+            return f'❌ {self.description} | Failed to update {self.artwork_type} in {self.upload_target.librarySectionTitle}{attempts_note}: {str(e)}'
 
     def artwork_exists_on_plex(self) -> bool:
         existing_artwork = False

@@ -30,3 +30,31 @@ def test_locked_results_are_counted_and_successes_still_are():
 
     assert locked[0] == 2
     assert success[0] == 1
+
+
+def test_failed_counter_increments():
+    failed = [0]
+    callbacks = ProcessingCallbacks(failed_counter=failed)
+    callbacks.failed(1)
+    callbacks.failed(2)
+    assert failed[0] == 3
+
+
+def test_failed_is_a_no_op_without_a_counter():
+    ProcessingCallbacks().failed(1)   # must not raise
+
+
+def test_failed_uploads_are_counted_and_do_not_count_as_success():
+    # An upload that exhausted its retries returns a ❌ result - it must be counted as a failure
+    # and must not also be counted as a success.
+    success, failed = [0], [0]
+    callbacks = ProcessingCallbacks(success_counter=success, failed_counter=failed)
+    processor = ArtworkProcessor(plex=None, callbacks=callbacks)
+
+    processor._process_single_artwork({}, lambda artwork: [
+        "✅ A Movie | Poster updated in Movies",
+        "❌ B Movie | Failed to update Poster in Movies after 3 attempt(s): timed out",
+    ])
+
+    assert success[0] == 1
+    assert failed[0] == 1

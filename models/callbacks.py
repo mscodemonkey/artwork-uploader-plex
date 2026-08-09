@@ -17,6 +17,7 @@ class ProcessingCallbacks:
     assets_processed: Optional[list] = None  # Mutable list to track total assets processed (contains count as single element)
     cached_counter: Optional[list] = None  # Mutable list to track assets newly added to the user cache (contains count as single element)
     locked_counter: Optional[list] = None  # Mutable list to track artwork skipped because the Plex field was locked (contains count as single element)
+    failed_counter: Optional[list] = None  # Mutable list to track uploads that failed after exhausting their retries (contains count as single element)
 
     def status(self, message: str, color: str = "info", spinner: bool = False, sticky: bool = False):
         if self.on_status_update:
@@ -49,3 +50,7 @@ class ProcessingCallbacks:
     def locked(self, count: int):
         if self.locked_counter:
             self.locked_counter[0] += count
+
+    def failed(self, count: int):
+        if self.failed_counter:
+            self.failed_counter[0] += count
