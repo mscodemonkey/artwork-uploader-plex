@@ -1920,7 +1920,10 @@ document.getElementById("delete_icon").addEventListener("click", function () {
                         loadBulkFileList(); // Reload the file list if deleted
                         loadBulkFile(defaultBulkFile);
                         updateBulkSaveButtonState();
-                        getSchedulesForFile(data.filename).forEach(s => deleteSchedule(s.id));
+                        // The server removes the file's schedules authoritatively;
+                        // mirror it in the local list.
+                        schedules = schedules.filter(s => s.file !== data.filename);
+                        updateSchedulerIcon();
                     }
                 }
             });

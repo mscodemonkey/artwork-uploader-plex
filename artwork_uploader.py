@@ -276,6 +276,11 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             send_notification(instance, message)
         return
 
+    if scheduled and filename:
+        # Stamp the run only once it holds the lock: a refused run has not run,
+        # and stamping it would hide the miss from catch-up.
+        record_schedule_run(filename)
+
     # Track successful poster uploads (those with ✅ or ♻️)
     success_counter = [0]
     assets_processed = [0]
@@ -637,8 +642,12 @@ def add_file_to_schedule_thread(instance: Instance, filename):
         debug_me(f"Skipped scheduled run for '{filename}': already in progress")
         return
 
-    record_schedule_run(filename)
-    threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
+    try:
+        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
+    except Exception as e:
+        # The guard must not leak, and an error here must not kill the scheduler thread
+        globals.scheduler_service.finish(filename)
+        update_log(instance, f"🔴 Could not start scheduled bulk import for '{filename}' ({e})")
 
 def record_schedule_run(filename):
     """Record that a scheduled run for this bulk file has just started, so a future
@@ -649,10 +658,15 @@ def record_schedule_run(filename):
     with no last_run, which disables catch-up for them."""
     if globals.config is None:
         return
-    for each_schedule in globals.config.schedules:
-        if each_schedule.get("file") == filename:
-            each_schedule["last_run"] = datetime.now().isoformat()
-    globals.config.save()
+    try:
+        for each_schedule in globals.config.schedules:
+            if each_schedule.get("file") == filename:
+                each_schedule["last_run"] = datetime.now().isoformat()
+        globals.config.save()
+    except Exception as e:
+        # A failed stamp costs one catch-up decision; letting it propagate would
+        # kill the scheduler thread, which costs every future run.
+        debug_me(f"Could not record schedule run for '{filename}': {e}")
 
 def process_bulk_file_on_schedule(instance: Instance, filename):
 
@@ -703,20 +717,21 @@ def setup_scheduler_on_first_load(instance: Instance):
                 add_file_to_schedule_thread(instance, filename)
 
             # Add to scheduler service, reusing the id already stored in
-            # config so the schedule keeps the same identity across reloads
-            globals.scheduler_service.add_schedule(
-                schedule_file,
-                schedule_callback,
-                schedule_id=schedule_id,
-                time=each_schedule.get("time"),
-                interval_value=each_schedule.get("interval_value"),
-                interval_unit=each_schedule.get("interval_unit"),
-            )
-
-            # Catch up any daily run that was due while the app was not running.
-            # Interval schedules carry no fixed due time, so get_missed_run
-            # reports nothing missed for them.
-            catch_up_missed_schedule(instance, schedule_file, each_schedule.get("time"), each_schedule.get("last_run"))
+            # config so the schedule keeps the same identity across reloads.
+            # A malformed persisted entry is skipped, not fatal: one bad line in
+            # config.json must not stop the app starting.
+            try:
+                globals.scheduler_service.add_schedule(
+                    schedule_file,
+                    schedule_callback,
+                    schedule_id=schedule_id,
+                    time=each_schedule.get("time"),
+                    interval_value=each_schedule.get("interval_value"),
+                    interval_unit=each_schedule.get("interval_unit"),
+                )
+            except ValueError as e:
+                update_log(instance, f"🔴 Skipping invalid schedule for '{schedule_file}': {e}")
+                debug_me(f"Skipping invalid schedule entry {each_schedule}: {e}")
 
 
         # Start the scheduler
@@ -724,6 +739,18 @@ def setup_scheduler_on_first_load(instance: Instance):
             debug_me("Scheduler started.")
 
         debug_me(globals.config.schedules)
+
+
+def catch_up_missed_schedules(instance: Instance):
+    """Run any daily schedule that was due while the app was not running.
+
+    Called from main only after the Plex libraries are connected: a catch-up run
+    fired before that point executes against empty libraries, fails every item,
+    and burns its one chance to be caught up."""
+    if globals.config is None:
+        return
+    for each_schedule in globals.config.schedules:
+        catch_up_missed_schedule(instance, each_schedule.get("file"), each_schedule.get("time"), each_schedule.get("last_run"))
 
 
 def catch_up_missed_schedule(instance: Instance, filename, schedule_time, last_run):
@@ -936,6 +963,10 @@ if __name__ == "__main__":
                     print(f"{e}\n")
                     print("The web UI will still start, but you won't be able to upload artwork")
                     print("until you fix the Plex connection in Settings.\n")
+
+            # Catch up missed schedules only now that the libraries are connected
+            if plex_connected and (os.getenv("WERKZEUG_RUN_MAIN") == "true" or not globals.debug):
+                catch_up_missed_schedules(cli_instance)
 
             # Create the app and web server
 

@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import core.globals as globals
-from artwork_uploader import add_file_to_schedule_thread, catch_up_missed_schedule, record_schedule_run
+from artwork_uploader import add_file_to_schedule_thread, catch_up_missed_schedule, record_schedule_run, setup_scheduler_on_first_load
 from models.instance import Instance
 from services.scheduler_service import SchedulerService
 
@@ -136,3 +136,23 @@ def test_catch_up_missed_schedule_does_nothing_for_a_never_run_schedule(schedule
 
     mock_add.assert_not_called()
     mock_log.assert_not_called()
+
+
+def test_setup_scheduler_skips_an_invalid_persisted_schedule(scheduler):
+    """One malformed entry in config.json must not stop the app starting or
+    block the valid schedules from registering."""
+    globals.config = FakeConfig(schedules=[
+        {"id": "bad", "file": "a.txt"},
+        {"id": "good", "file": "b.txt", "time": "02:00"},
+    ])
+    instance = Instance(mode="cli")
+
+    try:
+        with patch("artwork_uploader.update_log"), patch("artwork_uploader.debug_me"):
+            setup_scheduler_on_first_load(instance)
+
+        assert scheduler.get_jobs_for_file("b.txt") == ["good"]
+        assert scheduler.get_jobs_for_file("a.txt") == []
+    finally:
+        scheduler.stop()
+        scheduler.clear_all_schedules()

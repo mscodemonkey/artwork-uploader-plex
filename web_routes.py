@@ -369,7 +369,10 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web")
         old_name = data.get("old_filename")
         new_name = data.get("new_filename")
-        rename_bulk_import_file(instance, old_name, new_name)
+        if not rename_bulk_import_file(instance, old_name, new_name):
+            # The file on disk still has its old name; repointing the schedules
+            # would leave every one of them targeting a file that does not exist.
+            return
 
         renamed_ids = globals.scheduler_service.rename_file(old_name, new_name)
         if renamed_ids:
@@ -381,9 +384,23 @@ def setup_socket_handlers(
 
     @globals.web_socket.on("delete_bulk_file")
     def delete_bulk_file(data):
-        """Delete a bulk import file."""
+        """Delete a bulk import file, and every schedule that points at it."""
         instance = Instance(data.get("instance_id"), "web")
-        delete_bulk_import_file(instance, data.get("filename"))
+        filename = data.get("filename")
+        if not delete_bulk_import_file(instance, filename):
+            return
+
+        # The server owns this cleanup: a client's in-memory schedule list can be
+        # stale, and an orphaned schedule fires forever against a missing file.
+        for job_id in globals.scheduler_service.get_jobs_for_file(filename):
+            globals.scheduler_service.remove_schedule(job_id)
+        config.load()
+        remaining = [s for s in config.schedules if s.get("file") != filename]
+        if len(remaining) != len(config.schedules):
+            removed = len(config.schedules) - len(remaining)
+            config.schedules = remaining
+            config.save()
+            update_log(instance, f"🗑️ Removed {removed} schedule(s) for '{filename}'")
 
     @globals.web_socket.on("create_bulk_file")
     def create_bulk_file(data):
@@ -658,6 +675,14 @@ def setup_socket_handlers(
                 schedule_time = data.get("time")
                 interval_value = data.get("interval_value")
                 interval_unit = data.get("interval_unit")
+
+                # Validate the shape before anything is persisted or removed: a bad
+                # payload written to config.json would raise on every startup.
+                from services.scheduler_service import VALID_INTERVAL_UNITS
+                if not schedule_time and not (interval_value and interval_unit in VALID_INTERVAL_UNITS):
+                    update_log(instance, f"🔴 Rejected invalid schedule for '{schedule_file}': needs a daily time or a valid interval")
+                    notify_web(instance, "add_schedule", {"added": False, "file": schedule_file})
+                    return {"added": False, "file": schedule_file}
 
                 # Editing an existing schedule replaces its job under the same id
                 if schedule_id:
