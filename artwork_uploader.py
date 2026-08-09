@@ -263,6 +263,20 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         filename:       The filename of the bulk import file being processed.
     """
 
+    display_filename = filename if filename else "bulk_import.txt"
+
+    # Single-flight guard: two bulk imports racing against the same Plex library is worse than
+    # a skipped one - the artwork ID label and locked-field logic both assume a single writer.
+    # A second run is refused rather than queued, so it doesn't silently pile up if schedules
+    # collide repeatedly; the caller (a schedule or the user) simply tries again later.
+    if not globals.bulk_import_lock.acquire(blocking=False):
+        message = f"⚠️ Bulk import of '{display_filename}' refused - another bulk import is already running"
+        update_log(instance, message)
+        update_status(instance, "Bulk import refused: another bulk import is already running", color=StatusColor.WARNING.value)
+        if scheduled:
+            send_notification(instance, message)
+        return
+
     # Track successful poster uploads (those with ✅ or ♻️)
     success_counter = [0]
     assets_processed = [0]
@@ -284,7 +298,6 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         start_time = time.time()
         # Log the start of the bulk import process
-        display_filename = filename if filename else "bulk_import.txt"
 
         # Show the progress bar on the web UI
         message = f"{display_filename} • 0 of {len(parsed_urls)}"
@@ -367,6 +380,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             globals.cancel_scrape = False
             notify_web(instance, "scrape_state", {"running": False, "type": globals.scrape_type})
             globals.scrape_type = "stopped"
+        globals.bulk_import_lock.release()
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
 def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None, cached_counter=None, locked_counter=None, failed_counter=None):
