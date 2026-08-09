@@ -1703,10 +1703,13 @@ function loadRunHistory() {
                 formatRunDuration(run.started_at, run.ended_at)
             ];
 
+            // Indexes match the header row: detail columns collapse on narrow screens
+            const narrowHidden = [2, 4, 5, 6, 7, 9];
             cells.forEach((value, index) => {
                 const cell = document.createElement("td");
                 cell.textContent = value;
                 if (index === 3) { cell.className = outcome.className; }
+                if (narrowHidden.includes(index)) { cell.classList.add("d-none", "d-md-table-cell"); }
                 row.appendChild(cell);
             });
 

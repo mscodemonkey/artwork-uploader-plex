@@ -5,7 +5,7 @@ record. Otherwise the answer to "did last night's run do anything" stays "check 
 logs" for exactly the runs that did the least.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -13,14 +13,6 @@ import core.globals as globals
 from artwork_uploader import process_bulk_file_on_schedule
 from models.instance import Instance
 from services.run_history import RunHistory, OUTCOME_FAILED, OUTCOME_SKIPPED
-
-
-@pytest.fixture(autouse=True)
-def scheduler_service():
-    # The overlap guard merged from issue 8 releases the scheduler service in a
-    # finally block, so these direct calls need a service present.
-    with patch.object(globals, "scheduler_service", MagicMock()) as service:
-        yield service
 
 
 @pytest.fixture

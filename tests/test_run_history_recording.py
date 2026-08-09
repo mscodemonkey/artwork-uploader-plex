@@ -39,7 +39,7 @@ def test_successful_run_is_recorded_with_its_counters(history):
     globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
     globals.config = MagicMock(apprise_urls=[])
 
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None, failed_counter=None):
+    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None):
         assets_processed[0] += 1
         success_counter[0] += 1
         cached_counter[0] += 1
