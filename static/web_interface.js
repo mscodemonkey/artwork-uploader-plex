@@ -1107,6 +1107,13 @@ function getCurrentConfigForm() {
     // ThePosterDB user cache expiration threshold
     current_form.user_cache_refresh_days = parseInt(document.getElementById("user_cache_refresh_days").value) || 0;
 
+    // Timeouts and retries
+    current_form.plex_connect_timeout = parseInt(document.getElementById("plex_connect_timeout").value) || 10;
+    current_form.plex_test_connection_timeout = parseInt(document.getElementById("plex_test_connection_timeout").value) || 5;
+    current_form.kometa_download_timeout = parseInt(document.getElementById("kometa_download_timeout").value) || 5;
+    current_form.upload_retry_attempts = parseInt(document.getElementById("upload_retry_attempts").value) || 3;
+    current_form.upload_retry_backoff_seconds = parseFloat(document.getElementById("upload_retry_backoff_seconds").value) || 0;
+
     // Checkbox for taking an artist's newer artwork for posters we applied
     current_form.allow_artist_updates = document.getElementById("allow_artist_updates").checked;
 
@@ -1231,6 +1238,11 @@ function updateConfigUI(config) {
     document.getElementById("local_library_matching").checked = config.local_library_matching;
     document.getElementById("cache_user_scrapes").checked = config.cache_user_scrapes;
     document.getElementById("user_cache_refresh_days").value = config.user_cache_refresh_days ?? 7;
+    document.getElementById("plex_connect_timeout").value = config.plex_connect_timeout ?? 10;
+    document.getElementById("plex_test_connection_timeout").value = config.plex_test_connection_timeout ?? 5;
+    document.getElementById("kometa_download_timeout").value = config.kometa_download_timeout ?? 5;
+    document.getElementById("upload_retry_attempts").value = config.upload_retry_attempts ?? 3;
+    document.getElementById("upload_retry_backoff_seconds").value = config.upload_retry_backoff_seconds ?? 1;
     document.getElementById("allow_artist_updates").checked = config.allow_artist_updates;
     document.getElementById("option-add-to-bulk").checked = config.auto_manage_bulk_files;
     
