@@ -1,4 +1,5 @@
 import uuid, os, re, threading, sys, time
+from datetime import datetime
 from core import globals
 
 # plexapi builds its X-Plex-Client-Identifier from uuid.getnode(), which can be
@@ -628,8 +629,29 @@ def get_latest_version():
     return globals.update_service.get_latest_version() if globals.update_service else None
 
 def add_file_to_schedule_thread(instance: Instance, filename):
-    if instance:
-        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
+    if not instance:
+        return
+
+    # Overlap guard: don't let a catch-up run and a normally scheduled run for the
+    # same file execute at the same time.
+    if not globals.scheduler_service.try_start(filename):
+        update_log(instance, f"⏳ Scheduled bulk import for '{filename}' skipped, a run is already in progress")
+        debug_me(f"Skipped scheduled run for '{filename}': already in progress")
+        return
+
+    record_schedule_run(filename)
+    threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
+
+def record_schedule_run(filename):
+    """Record that a scheduled run for this bulk file has just started, so a future
+    restart can tell whether a run was missed."""
+    if globals.config is None:
+        return
+    for each_schedule in globals.config.schedules:
+        if each_schedule.get("file") == filename:
+            each_schedule["last_run"] = datetime.now().isoformat()
+            break
+    globals.config.save()
 
 def process_bulk_file_on_schedule(instance: Instance, filename):
 
@@ -652,6 +674,8 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
         update_log(instance, f"🔴 Scheduled bulk import failed due to missing file ({filename})")
     except Exception as e:
         update_log(instance, f"🔴 Scheduled bulk import unexpectedly failed ({str(e)})")
+    finally:
+        globals.scheduler_service.finish(filename)
 
 
 # Legacy functions - now handled by SchedulerService
@@ -692,11 +716,45 @@ def setup_scheduler_on_first_load(instance: Instance):
             each_schedule["jobReference"] = job_id
             scheduled_jobs_by_file[schedule_file] = job_id
 
+            # Catch up any run that was due while the app was not running
+            catch_up_missed_schedule(instance, schedule_file, schedule_time, each_schedule.get("last_run"))
+
         # Start the scheduler
         if globals.scheduler_service.start():
             debug_me("Scheduler started.")
 
         debug_me(globals.config.schedules)
+
+
+def catch_up_missed_schedule(instance: Instance, filename, schedule_time, last_run):
+    """
+    Run a scheduled bulk import that was due while the app was not running, if it falls
+    inside the configured catch-up window. Otherwise, just log that it was skipped.
+
+    Args:
+        instance: Instance to run/log the catch-up as
+        filename: Bulk file the schedule is for
+        schedule_time: Time of day the schedule runs, as "HH:MM"
+        last_run: ISO timestamp of the last time this schedule ran, or None
+    """
+    window_minutes = globals.config.catch_up_window_minutes if globals.config else 0
+
+    due, within_window = globals.scheduler_service.get_missed_run(
+        schedule_time, last_run, datetime.now(), window_minutes
+    )
+
+    if due is None:
+        return
+
+    due_display = due.strftime("%Y-%m-%d %H:%M")
+
+    if within_window:
+        update_log(instance, f"⏰ Catching up missed scheduled run for '{filename}' (was due {due_display})")
+        debug_me(f"Catch-up run for '{filename}', due {due.isoformat()}, window {window_minutes} minutes")
+        add_file_to_schedule_thread(instance, filename)
+    else:
+        update_log(instance, f"⚠️ Scheduled run for '{filename}' was missed and is outside the catch-up window (was due {due_display})")
+        debug_me(f"Missed scheduled run for '{filename}', due {due.isoformat()}, outside catch-up window of {window_minutes} minutes")
 
 
 # Update the job references for any scheduled jobs if we reload the config file

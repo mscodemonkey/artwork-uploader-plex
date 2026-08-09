@@ -1113,6 +1113,9 @@ function getCurrentConfigForm() {
     current_form.upload_retry_attempts = parseInt(document.getElementById("upload_retry_attempts").value) || 3;
     current_form.upload_retry_backoff_seconds = parseFloat(document.getElementById("upload_retry_backoff_seconds").value) || 1;
 
+    // How late a missed scheduled run can be and still be caught up on startup
+    current_form.catch_up_window_minutes = parseInt(document.getElementById("catch_up_window_minutes").value) || 0;
+
     // Checkbox for taking an artist's newer artwork for posters we applied
     current_form.allow_artist_updates = document.getElementById("allow_artist_updates").checked;
 
@@ -1241,6 +1244,7 @@ function updateConfigUI(config) {
     document.getElementById("kometa_download_timeout").value = config.kometa_download_timeout ?? 10;
     document.getElementById("upload_retry_attempts").value = config.upload_retry_attempts ?? 3;
     document.getElementById("upload_retry_backoff_seconds").value = config.upload_retry_backoff_seconds ?? 1;
+    document.getElementById("catch_up_window_minutes").value = config.catch_up_window_minutes ?? 0;
     document.getElementById("allow_artist_updates").checked = config.allow_artist_updates;
     document.getElementById("option-add-to-bulk").checked = config.auto_manage_bulk_files;
     

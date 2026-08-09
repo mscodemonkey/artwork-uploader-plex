@@ -489,6 +489,21 @@
                                                 required />
                                             days</label>
                                         </div>                                        
+                                        <div class="mt-2 d-flex align-items-center">
+                                            <label for="catch_up_window_minutes" class="form-label me-2 mb-0"><i class="bi bi-calendar-x"></i>&ensp;Missed scheduled run catch-up window:
+                                            <input type="number"
+                                                class="form-control form-control-sm text-center d-inline-block me-0 input-monospace"
+                                                id="catch_up_window_minutes"
+                                                name="catch_up_window_minutes"
+                                                min="0"
+                                                max="1440"
+                                                value="0"
+                                                style="width: 60px;"
+                                                required />
+                                            <span class="text-nowrap">minutes
+                                            &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="If the app was not running when a scheduled bulk import was due, run it on startup as long as it's within this many minutes of when it was due. Set to 0 to leave missed runs skipped, as before."></i></span></label>
+                                        </div>
+
                                     </div>
                                 </div>
                             </div>
@@ -527,7 +542,7 @@
                                             &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Waits this amount of seconds before first retry. Doubles every subsequent retry."></i></span></label>
                                         </div>
                                     </div>
-                                </div>
+                                </div> 
                             </div>
                             <!-- Notifications settings -->
                             <div class="row mb-3">

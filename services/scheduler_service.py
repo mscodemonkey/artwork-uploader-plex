@@ -6,7 +6,8 @@ maintainability.
 """
 
 import threading, schedule, time, uuid
-from typing import Dict, Callable, Optional
+from datetime import datetime, timedelta
+from typing import Dict, Callable, Optional, Set, Tuple
 
 
 class SchedulerService:
@@ -25,6 +26,8 @@ class SchedulerService:
         self.scheduled_jobs_by_file: Dict[str, str] = {}
         self.run_times_by_file: Dict [str, str] = {}
         self.is_running = False
+        self._running_lock = threading.Lock()
+        self._running_files: Set[str] = set()
 
     def add_schedule(
         self,
@@ -155,3 +158,79 @@ class SchedulerService:
             True if there are schedules, False otherwise
         """
         return len(self.scheduled_jobs) > 0
+
+    def try_start(self, filename: str) -> bool:
+        """
+        Mark a scheduled bulk file as running, if it isn't already.
+
+        This is the overlap guard: a catch-up run and a normally scheduled run for the
+        same file must not execute at the same time.
+
+        Args:
+            filename: Bulk file the run is for
+
+        Returns:
+            True if the run was allowed to start, False if one was already in progress
+        """
+        with self._running_lock:
+            if filename in self._running_files:
+                return False
+            self._running_files.add(filename)
+            return True
+
+    def finish(self, filename: str) -> None:
+        """
+        Mark a scheduled bulk file run as finished, releasing the overlap guard.
+
+        Args:
+            filename: Bulk file the run was for
+        """
+        with self._running_lock:
+            self._running_files.discard(filename)
+
+    @staticmethod
+    def get_missed_run(
+        schedule_time: str,
+        last_run: Optional[str],
+        now: datetime,
+        window_minutes: int
+    ) -> Tuple[Optional[datetime], bool]:
+        """
+        Work out whether a daily schedule missed its most recent run.
+
+        A run is only considered missed if we have a recorded last run time that
+        predates it - a schedule with no recorded run yet (brand new, or never run
+        under a build that tracked this) is never treated as having missed anything.
+
+        Args:
+            schedule_time: Time of day the schedule runs, as "HH:MM"
+            last_run: ISO timestamp of the last time this schedule ran, or None
+            now: Current time
+            window_minutes: How late a missed run can be and still count as catchable
+
+        Returns:
+            A (due, within_window) tuple. due is None if nothing was missed.
+            within_window is True if the miss is inside the catch-up window.
+        """
+        if not last_run:
+            return None, False
+
+        try:
+            hour, minute = (int(part) for part in schedule_time.split(":"))
+            due = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        except (ValueError, AttributeError, TypeError):
+            return None, False
+
+        if due > now:
+            due -= timedelta(days=1)
+
+        try:
+            last_run_at = datetime.fromisoformat(last_run)
+        except (ValueError, TypeError):
+            last_run_at = None
+
+        if last_run_at is not None and last_run_at >= due:
+            return None, False
+
+        within_window = (now - due) <= timedelta(minutes=window_minutes)
+        return due, within_window
