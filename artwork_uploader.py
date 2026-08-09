@@ -100,8 +100,6 @@ globals.docker = os.getenv("RUNNING_IN_DOCKER") == "1"
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
 mode = InstanceMode.CLI.value
-scheduled_jobs = {}  # Legacy - kept for backwards compatibility
-scheduled_jobs_by_file = {}  # Legacy - kept for backwards compatibility
 # Services moved to core.globals for proper cross-module access
 config = None  # Initialized in main
 
@@ -644,13 +642,16 @@ def add_file_to_schedule_thread(instance: Instance, filename):
 
 def record_schedule_run(filename):
     """Record that a scheduled run for this bulk file has just started, so a future
-    restart can tell whether a run was missed."""
+    restart can tell whether a run was missed.
+
+    A run executes the whole file, so every schedule the file carries gets the
+    stamp. Stamping only the first would leave the file's other daily schedules
+    with no last_run, which disables catch-up for them."""
     if globals.config is None:
         return
     for each_schedule in globals.config.schedules:
         if each_schedule.get("file") == filename:
             each_schedule["last_run"] = datetime.now().isoformat()
-            break
     globals.config.save()
 
 def process_bulk_file_on_schedule(instance: Instance, filename):
@@ -678,10 +679,6 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
         globals.scheduler_service.finish(filename)
 
 
-# Legacy functions - now handled by SchedulerService
-# Kept for backwards compatibility but no longer used internally
-
-
 #Initialises the scheduler when the script is run
 def setup_scheduler_on_first_load(instance: Instance):
     """
@@ -698,26 +695,29 @@ def setup_scheduler_on_first_load(instance: Instance):
     # If there are no scheduled jobs already...
     if not globals.scheduler_service.has_schedules():
         for each_schedule in globals.config.schedules:
+            schedule_id = each_schedule.get("id")
             schedule_file = each_schedule.get("file")
-            schedule_time = each_schedule.get("time")
 
             # Create the callback for this schedule
             def schedule_callback(filename=schedule_file):
                 add_file_to_schedule_thread(instance, filename)
 
-            # Add to scheduler service
-            job_id = globals.scheduler_service.add_schedule(
+            # Add to scheduler service, reusing the id already stored in
+            # config so the schedule keeps the same identity across reloads
+            globals.scheduler_service.add_schedule(
                 schedule_file,
-                schedule_time,
-                schedule_callback
+                schedule_callback,
+                schedule_id=schedule_id,
+                time=each_schedule.get("time"),
+                interval_value=each_schedule.get("interval_value"),
+                interval_unit=each_schedule.get("interval_unit"),
             )
 
-            # Store job reference in config and legacy dicts
-            each_schedule["jobReference"] = job_id
-            scheduled_jobs_by_file[schedule_file] = job_id
+            # Catch up any daily run that was due while the app was not running.
+            # Interval schedules carry no fixed due time, so get_missed_run
+            # reports nothing missed for them.
+            catch_up_missed_schedule(instance, schedule_file, each_schedule.get("time"), each_schedule.get("last_run"))
 
-            # Catch up any run that was due while the app was not running
-            catch_up_missed_schedule(instance, schedule_file, schedule_time, each_schedule.get("last_run"))
 
         # Start the scheduler
         if globals.scheduler_service.start():
@@ -757,14 +757,13 @@ def catch_up_missed_schedule(instance: Instance, filename, schedule_time, last_r
         debug_me(f"Missed scheduled run for '{filename}', due {due.isoformat()}, outside catch-up window of {window_minutes} minutes")
 
 
-# Update the job references for any scheduled jobs if we reload the config file
+# Kept as a hook for the "load_config" socket event. There is nothing to
+# resync here: a schedule's id is the single source of truth shared between
+# config.json and the running scheduler, and every add/edit/delete/rename
+# already keeps the two in step as they happen, so reloading config.json
+# from disk does not need to tear down and rebuild the live jobs.
 def update_scheduled_jobs():
-    if globals.config is None:
-        return
-    for each_schedule in globals.config.schedules:
-        schedule_file = each_schedule.get("file", "")
-        if schedule_file and schedule_file in scheduled_jobs_by_file:
-            each_schedule["jobReference"] = scheduled_jobs_by_file[schedule_file]
+    pass
 
 
 # * Main Initialization ---

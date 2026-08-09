@@ -7,11 +7,20 @@ maintainability.
 
 import threading, schedule, time, uuid
 from datetime import datetime, timedelta
-from typing import Dict, Callable, Optional, Set, Tuple
+from typing import Dict, Callable, List, Optional, Set, Tuple
+
+VALID_INTERVAL_UNITS = ("hours", "days")
 
 
 class SchedulerService:
-    """Handles scheduling of bulk import jobs."""
+    """Handles scheduling of bulk import jobs.
+
+    A bulk file can carry more than one schedule, and each schedule can
+    either run daily at a fixed time or repeat every N hours/days. Every
+    schedule is tracked by its own id rather than by filename, so a file
+    can have any number of schedules and renaming a file does not require
+    tearing down and recreating its jobs.
+    """
 
     def __init__(self, check_interval: int = 1) -> None:
         """
@@ -23,8 +32,8 @@ class SchedulerService:
         self.check_interval = check_interval
         self.scheduler_thread: Optional[threading.Thread] = None
         self.scheduled_jobs: Dict[str, schedule.Job] = {}
-        self.scheduled_jobs_by_file: Dict[str, str] = {}
-        self.run_times_by_file: Dict [str, str] = {}
+        # job_id -> {"file": str, "time": str} or {"file": str, "interval_value": int, "interval_unit": str}
+        self.schedule_meta: Dict[str, Dict] = {}
         self.is_running = False
         self._running_lock = threading.Lock()
         self._running_files: Set[str] = set()
@@ -32,32 +41,54 @@ class SchedulerService:
     def add_schedule(
         self,
         filename: str,
-        schedule_time: str,
-        callback: Callable[[str], None]
+        callback: Callable[[str], None],
+        schedule_id: Optional[str] = None,
+        time: Optional[str] = None,
+        interval_value: Optional[int] = None,
+        interval_unit: Optional[str] = None,
     ) -> str:
         """
-        Add a new scheduled job.
+        Add a new scheduled job, either a daily time or a repeating interval.
 
         Args:
             filename: Name of the bulk file to process
-            schedule_time: Time to run (e.g., "14:30")
             callback: Function to call with filename when job runs
+            schedule_id: Reuse this id instead of generating one (used when
+                restoring schedules from config on load)
+            time: Time of day to run daily (e.g., "14:30"). Mutually
+                exclusive with interval_value/interval_unit.
+            interval_value: Repeat every this many hours/days. Requires
+                interval_unit.
+            interval_unit: "hours" or "days".
 
         Returns:
             Unique job ID for this schedule
+
+        Raises:
+            ValueError: If neither a time nor a valid interval is given
         """
-        # Create the scheduled job
-        job = schedule.every().day.at(schedule_time).do(
-            lambda: callback(filename)
-        )
+        job_id = schedule_id or str(uuid.uuid4())
 
-        # Create a unique job ID
-        job_id = str(uuid.uuid4())
+        # The callback reads the filename from schedule_meta at run time
+        # (rather than capturing it in the closure) so that renaming a
+        # file only needs to update the metadata, not the underlying job.
+        def run_job(job_id=job_id):
+            meta = self.schedule_meta.get(job_id)
+            if meta:
+                callback(meta["file"])
 
-        # Store job references
+        if time:
+            job = schedule.every().day.at(time).do(run_job)
+            meta = {"file": filename, "time": time}
+        elif interval_value and interval_unit in VALID_INTERVAL_UNITS:
+            interval_job = getattr(schedule.every(interval_value), interval_unit)
+            job = interval_job.do(run_job)
+            meta = {"file": filename, "interval_value": interval_value, "interval_unit": interval_unit}
+        else:
+            raise ValueError("A schedule needs either a daily time or an interval_value with a valid interval_unit")
+
         self.scheduled_jobs[job_id] = job
-        self.scheduled_jobs_by_file[filename] = job_id
-        self.run_times_by_file[filename] = schedule_time
+        self.schedule_meta[job_id] = meta
 
         return job_id
 
@@ -74,37 +105,44 @@ class SchedulerService:
         if job_id not in self.scheduled_jobs:
             return False
 
-        # Get the job
-        job = self.scheduled_jobs[job_id]
+        schedule.cancel_job(self.scheduled_jobs[job_id])
 
-        # Remove from schedule library
-        schedule.cancel_job(job)
-
-        # Remove from our tracking dicts
         del self.scheduled_jobs[job_id]
-
-        # Remove from file lookup (find which file maps to this job_id)
-        file_to_remove = None
-        for filename, jid in self.scheduled_jobs_by_file.items():
-            if jid == job_id:
-                file_to_remove = filename
-                break
-        if file_to_remove:
-            del self.scheduled_jobs_by_file[file_to_remove]
+        self.schedule_meta.pop(job_id, None)
 
         return True
 
-    def get_job_id_by_file(self, filename: str) -> Optional[str]:
+    def get_jobs_for_file(self, filename: str) -> List[str]:
         """
-        Get the job ID for a scheduled file.
+        Get every job ID scheduled against a file.
 
         Args:
             filename: Filename to look up
 
         Returns:
-            Job ID if found, None otherwise
+            List of job IDs (possibly empty)
         """
-        return self.scheduled_jobs_by_file.get(filename)
+        return [job_id for job_id, meta in self.schedule_meta.items() if meta["file"] == filename]
+
+    def rename_file(self, old_filename: str, new_filename: str) -> List[str]:
+        """
+        Point every schedule for old_filename at new_filename instead.
+
+        Because the callback reads the filename from schedule_meta at run
+        time, this is enough to keep the schedules working - the
+        underlying jobs never need to be cancelled and recreated.
+
+        Args:
+            old_filename: Filename the schedules currently reference
+            new_filename: Filename they should reference instead
+
+        Returns:
+            List of job IDs that were updated
+        """
+        job_ids = self.get_jobs_for_file(old_filename)
+        for job_id in job_ids:
+            self.schedule_meta[job_id]["file"] = new_filename
+        return job_ids
 
     def start(self) -> bool:
         """
@@ -139,7 +177,7 @@ class SchedulerService:
         """Clear all scheduled jobs."""
         schedule.clear()
         self.scheduled_jobs.clear()
-        self.scheduled_jobs_by_file.clear()
+        self.schedule_meta.clear()
 
     def get_all_job_ids(self) -> list[str]:
         """

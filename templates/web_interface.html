@@ -675,18 +675,34 @@
                 <!-- Time Selector for scheduler -->
                 <div id="time_select_box" class="p-3 border">
                     <div id="tooltip_arrow"></div>
-                    <div class="row">
+
+                    <!-- Existing schedules for the current bulk file -->
+                    <ul id="schedule_list" class="list-group mb-2"></ul>
+
+                    <div class="row g-2 align-items-end">
                         <div class="col-auto">
-                            <label class="col-form-label text-dark">Every day at</label>
+                            <label class="col-form-label">Repeat</label>
+                            <select id="schedule_type" class="form-select">
+                                <option value="daily">Daily at</option>
+                                <option value="interval">Every</option>
+                            </select>
                         </div>
-                        <div class="col-auto">
+                        <div class="col-auto" id="schedule_time_group">
+                            <label class="col-form-label d-block invisible">Time</label>
                             <input type="time" id="schedule_time" class="form-control">
                         </div>
-                        <div class="col-auto collapse" id="set_container">
-                            <button id="set_time" class="btn btn-primary">Set</button>
+                        <div class="col-auto d-none" id="schedule_interval_group">
+                            <label class="col-form-label d-block invisible">Interval</label>
+                            <div class="input-group">
+                                <input type="number" id="schedule_interval_value" class="form-control" min="1" value="1" style="max-width: 80px;">
+                                <select id="schedule_interval_unit" class="form-select">
+                                    <option value="hours">Hours</option>
+                                    <option value="days">Days</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-auto collapse" id="cancel_container">
-                            <button id="cancel_time" class="btn btn-danger">Delete</button>
+                        <div class="col-auto">
+                            <button id="set_time" class="btn btn-primary">Add schedule</button>
                         </div>
                     </div>
                 </div>

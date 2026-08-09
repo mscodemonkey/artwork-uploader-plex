@@ -64,10 +64,13 @@ const scrapeUrlInput = document.getElementById("scrape_url");
 const dropArea = document.getElementById("drop-area");
 const scheduleIcon = document.getElementById("schedule_icon");
 const setTimeBtn = document.getElementById("set_time");
-const cancelTimeBtn = document.getElementById("cancel_time");
-const setContainer = document.getElementById("set_container");
-const cancelContainer = document.getElementById("cancel_container");
 const scheduleTimeInput = document.getElementById("schedule_time");
+const scheduleTypeSelect = document.getElementById("schedule_type");
+const scheduleTimeGroup = document.getElementById("schedule_time_group");
+const scheduleIntervalGroup = document.getElementById("schedule_interval_group");
+const scheduleIntervalValueInput = document.getElementById("schedule_interval_value");
+const scheduleIntervalUnitSelect = document.getElementById("schedule_interval_unit");
+const scheduleListEl = document.getElementById("schedule_list");
 const timeSelectBox = document.getElementById("time_select_box");
 const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 
@@ -1846,6 +1849,14 @@ document.getElementById("rename_icon").addEventListener("click", function () {
                             // Set the currently loaded file
                             currentBulkImport = data.new_filename
 
+                            // Carry any schedules over to the new filename
+                            schedules.forEach(s => {
+                                if (s.file === data.old_filename) {
+                                    s.file = data.new_filename;
+                                }
+                            });
+                            updateSchedulerIcon();
+
                             // If the renamed file is the default, update the config
                             const bulkImportFileField = document.getElementById("bulk_import_file");
                             const selectElement = document.getElementById("switch_bulk_file");
@@ -1909,7 +1920,7 @@ document.getElementById("delete_icon").addEventListener("click", function () {
                         loadBulkFileList(); // Reload the file list if deleted
                         loadBulkFile(defaultBulkFile);
                         updateBulkSaveButtonState();
-                        socket.emit("delete_schedule", { instance_id: instanceId, "file": data.filename });
+                        getSchedulesForFile(data.filename).forEach(s => deleteSchedule(s.id));
                     }
                 }
             });
@@ -2246,106 +2257,166 @@ socket.on("upload_complete", function (data) {
 // Scheduler
 // =====================
 
-function updateOrAddSchedule(fileName, newTime) {
-    if (newTime == null) {
-        // Remove this schedule form the list of schedules
-        schedules = schedules.filter(s => s.file !== fileName);
-    } else {
-        const schedule = schedules.find(s => s.file === fileName);
-        if (schedule) {
-            // Update the existing schedule
-            schedule.time = newTime;
+    let editingScheduleId = null; // Set while the form is editing an existing schedule rather than adding a new one
+
+    function describeSchedule(s) {
+        if (s.time) {
+            return `Daily at ${s.time}`;
+        }
+        const unit = s.interval_value === 1 ? s.interval_unit.replace(/s$/, "") : s.interval_unit;
+        return `Every ${s.interval_value} ${unit}`;
+    }
+
+    function getSchedulesForFile(fileName) {
+        return schedules.filter(s => s.file === fileName);
+    }
+
+    // Show the time selector when the clock icon is clicked
+    scheduleIcon.addEventListener("click", function () {
+
+        const iconRect = scheduleIcon.getBoundingClientRect();
+
+        // Position tooltip relative to the icon
+        timeSelectBox.style.top = `${iconRect.bottom + window.scrollY + 10}px`; // Below the icon
+        timeSelectBox.style.right = `${window.innerWidth - iconRect.right - window.scrollX - 15}px`; // Align right edge
+
+        // Toggle visibility
+        timeSelectBox.classList.toggle("show-tooltip");
+
+    });
+
+    document.addEventListener("click", function (event) {
+        if (!timeSelectBox.contains(event.target) && !scheduleIcon.contains(event.target)) {
+            timeSelectBox.classList.remove("show-tooltip");
+        }
+    });
+
+    // Toggle between the "daily at a time" and "every N hours/days" inputs
+    scheduleTypeSelect.addEventListener("change", function () {
+        const isDaily = scheduleTypeSelect.value === "daily";
+        scheduleTimeGroup.classList.toggle("d-none", !isDaily);
+        scheduleIntervalGroup.classList.toggle("d-none", isDaily);
+    });
+
+    function resetScheduleForm() {
+        editingScheduleId = null;
+        setTimeBtn.textContent = "Add schedule";
+        scheduleTypeSelect.value = "daily";
+        scheduleTimeGroup.classList.remove("d-none");
+        scheduleIntervalGroup.classList.add("d-none");
+        scheduleTimeInput.value = "";
+        scheduleIntervalValueInput.value = 1;
+        scheduleIntervalUnitSelect.value = "hours";
+    }
+
+    function editSchedule(s) {
+        editingScheduleId = s.id;
+        setTimeBtn.textContent = "Update schedule";
+        if (s.time) {
+            scheduleTypeSelect.value = "daily";
+            scheduleTimeGroup.classList.remove("d-none");
+            scheduleIntervalGroup.classList.add("d-none");
+            scheduleTimeInput.value = s.time;
         } else {
-            // Add the new schedule
-            schedules.push({ file: fileName, time: newTime });
+            scheduleTypeSelect.value = "interval";
+            scheduleTimeGroup.classList.add("d-none");
+            scheduleIntervalGroup.classList.remove("d-none");
+            scheduleIntervalValueInput.value = s.interval_value;
+            scheduleIntervalUnitSelect.value = s.interval_unit;
         }
     }
-}
 
-// Show the time selector when the clock icon is clicked
-scheduleIcon.addEventListener("click", function () {
+    // Handle adding or updating a schedule
+    setTimeBtn.addEventListener("click", function () {
+        const payload = { instance_id: instanceId, file: currentBulkImport };
+        if (editingScheduleId) {
+            payload.id = editingScheduleId;
+        }
 
-    const iconRect = scheduleIcon.getBoundingClientRect();
+        if (scheduleTypeSelect.value === "daily") {
+            if (!scheduleTimeInput.value) return;
+            payload.time = scheduleTimeInput.value;
+        } else {
+            const intervalValue = parseInt(scheduleIntervalValueInput.value, 10);
+            if (!intervalValue || intervalValue < 1) return;
+            payload.interval_value = intervalValue;
+            payload.interval_unit = scheduleIntervalUnitSelect.value;
+        }
 
-    // Position tooltip relative to the icon
-    timeSelectBox.style.top = `${iconRect.bottom + window.scrollY + 10}px`; // Below the icon
-    timeSelectBox.style.right = `${window.innerWidth - iconRect.right - window.scrollX - 15}px`; // Align right edge
-
-    // Toggle visibility
-    timeSelectBox.classList.toggle("show-tooltip");
-
-});
-
-document.addEventListener("click", function (event) {
-    if (!timeSelectBox.contains(event.target) && !scheduleIcon.contains(event.target)) {
-        timeSelectBox.classList.remove("show-tooltip");
-    }
-});
-
-// Handle setting the time
-setTimeBtn.addEventListener("click", function () {
-    const selectedTime = scheduleTimeInput.value;
-    if (selectedTime) {
-        socket.emit("add_schedule",{instance_id:instanceId, file: currentBulkImport, time: selectedTime})
+        socket.emit("add_schedule", payload);
 
         // Wait for response on add schedule
         socket.once("add_schedule", (data) => {
             if (validResponse(data)) {
                 if (data.added) {
-                    updateOrAddSchedule(data.file, data.time);
+                    schedules = schedules.filter(s => s.id !== data.id);
+                    schedules.push({
+                        id: data.id,
+                        file: data.file,
+                        time: data.time,
+                        interval_value: data.interval_value,
+                        interval_unit: data.interval_unit
+                    });
                     updateSchedulerIcon();
-                    timeSelectBox.classList.remove("show-tooltip");
                 }
             }
         });
-
-    }
-});
-
-// Handle cancelling the schedule
-cancelTimeBtn.addEventListener("click", function () {
-    socket.emit("delete_schedule",{instance_id:instanceId, file: currentBulkImport})
-
-    // Wait for response
-    socket.once("delete_schedule", (data) => {
-        if (validResponse(data)) {
-            if (data.deleted) {
-                // Get the value of the default bulk file from the hidden field
-                updateOrAddSchedule(data.file, null, null)
-                updateSchedulerIcon();
-            } else {
-
-            }
-        timeSelectBox.classList.remove("show-tooltip");
-        }
     });
 
-});
-
-function updateSchedulerIcon(){
-    let details = getScheduleDetails(currentBulkImport);
-    if (details && details['time']) {
-        scheduleIcon.classList.remove("bi-clock");
-        scheduleIcon.classList.add("bi-clock-fill"); // Change to filled icon
-        setContainer.classList.remove("show"); // Hide Set button
-        cancelContainer.classList.add("show"); // Show Delete button
-        scheduleTimeInput.value = details['time'];
-        scheduleTimeInput.readOnly = true;
-        scheduleIcon.classList.add("text-success"); // Turn icon green
-    } else {
-        scheduleIcon.classList.add("bi-clock"); // Change to unfilled icon
-        scheduleIcon.classList.remove("bi-clock-fill");
-        scheduleIcon.classList.remove("text-success"); // Remove green color
-        setContainer.classList.add("show"); // Show Set button
-        cancelContainer.classList.remove("show"); // Hide Delete button
-        scheduleTimeInput.value = "";
-        scheduleTimeInput.readOnly = false;
+    // Handle removing a schedule from the list
+    function deleteSchedule(scheduleId) {
+        // Uses the ack callback (rather than a shared "once" listener) so that
+        // deleting several schedules in a row - e.g. all of a file's schedules
+        // when the file itself is deleted - matches each response to its own
+        // request instead of every listener consuming the first reply.
+        socket.emit("delete_schedule", { instance_id: instanceId, id: scheduleId }, (data) => {
+            if (data && data.deleted) {
+                schedules = schedules.filter(s => s.id !== data.id);
+                updateSchedulerIcon();
+            }
+        });
     }
-}
 
-function getScheduleDetails(fileName) {
-    return schedules.find(s => s.file === fileName);
-}
+    function renderScheduleList() {
+        scheduleListEl.innerHTML = "";
+        const fileSchedules = getSchedulesForFile(currentBulkImport);
+
+        fileSchedules.forEach(s => {
+            const item = document.createElement("li");
+            item.className = "list-group-item d-flex justify-content-between align-items-center";
+
+            const label = document.createElement("span");
+            label.textContent = describeSchedule(s);
+            label.setAttribute("role", "button");
+            label.addEventListener("click", () => editSchedule(s));
+
+            const deleteBtn = document.createElement("i");
+            deleteBtn.className = "bi bi-trash3 text-danger";
+            deleteBtn.setAttribute("role", "button");
+            deleteBtn.addEventListener("click", () => deleteSchedule(s.id));
+
+            item.appendChild(label);
+            item.appendChild(deleteBtn);
+            scheduleListEl.appendChild(item);
+        });
+    }
+
+    function updateSchedulerIcon(){
+        const fileSchedules = getSchedulesForFile(currentBulkImport);
+        renderScheduleList();
+
+        if (fileSchedules.length > 0) {
+            scheduleIcon.classList.remove("bi-clock");
+            scheduleIcon.classList.add("bi-clock-fill"); // Change to filled icon
+            scheduleIcon.classList.add("text-success"); // Turn icon green
+        } else {
+            scheduleIcon.classList.add("bi-clock"); // Change to unfilled icon
+            scheduleIcon.classList.remove("bi-clock-fill");
+            scheduleIcon.classList.remove("text-success"); // Remove green color
+        }
+
+        resetScheduleForm();
+    }
 
 
 

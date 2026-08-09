@@ -2,7 +2,7 @@
 Application configuration management.
 """
 
-import json, os
+import json, os, uuid
 from core import globals
 from typing import List, Dict, Any
 from core.constants import (
@@ -129,7 +129,7 @@ class Config:
             self.user_cache_refresh_days = config.get("user_cache_refresh_days", 7)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
             self.reset_overlay = config.get("reset_overlay", False)
-            self.schedules = config.get("schedules", [])
+            self.schedules, schedules_migrated = self._migrate_schedules(config.get("schedules", []))
             self.catch_up_window_minutes = config.get("catch_up_window_minutes", 0)
             self.auth_enabled = config.get("auth_enabled", False)
             self.auth_username = config.get("auth_username", "")
@@ -146,6 +146,33 @@ class Config:
 
         except Exception as e:
             raise ConfigLoadError(f"Error loading configuration from '{self.path}': {e}") from e
+
+        # Persist any ids minted by the migration above, so they stay stable
+        # across reloads instead of being handed out fresh every time (which
+        # would break anything that had already matched a schedule by id).
+        if schedules_migrated:
+            self.save()
+
+    @staticmethod
+    def _migrate_schedules(schedules: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], bool]:
+        """
+        Give every schedule an id, so schedules are addressed by their own
+        id rather than by filename.
+
+        Older config.json files stored one schedule per file as
+        {"file": ..., "time": ...} with no id. Those entries keep working
+        unchanged, they just gain an id here so they can sit alongside
+        other schedules on the same file.
+
+        Returns:
+            The schedule list, and whether any entry was missing an id
+        """
+        migrated = False
+        for entry in schedules:
+            if "id" not in entry:
+                entry["id"] = str(uuid.uuid4())
+                migrated = True
+        return schedules, migrated
 
     def create(self) -> None:
         """Create a new configuration file with default values."""

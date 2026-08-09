@@ -162,11 +162,11 @@ With ```cache_user_scrapes``` enabled, the app already knows every poster your f
 On an import the title is looked up in the cached index; if one of the configured users covers it, that single poster (plus season covers for the imported seasons, on TV) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same.  Imports usually reach the webhook before Plex has scanned the new file, so the apply retries quietly for a few minutes, then gives up and leaves it to the next scheduled run.  Ambiguous title matches (for example same-name remakes) are skipped rather than guessed, and nothing is applied when no configured user has the title.  The endpoints return 404 if ```enable_webhooks``` is disabled.
 
 ### Scheduler with Apprise notifications
-Basic scheduler, so that you can leave this running and update all your artwork every day. 
+Basic scheduler, so that you can leave this running and update all your artwork automatically.
 
-The basic version is available now on the bulk imports page, click on the clock to enable or disable per file.  
+Available now on the bulk imports page, click on the clock to add, edit or remove schedules for the file you have open. A file can carry more than one schedule, and each one either runs daily at a fixed time or repeats every N hours or days, so a large nightly run and a smaller one twice a day can share the same list without needing separate files.
 
-It's there for when we have API access (and works for scrapers in the meantime) but is limited to running once a day which should be fine.  If you enable ```cache_user_scrapes```, a daily scheduled user scrape only fetches uploads that are new since the last run, so scheduled full-catalogue runs stay fast.
+It's there for when we have API access (and works for scrapers in the meantime).  If you enable ```cache_user_scrapes```, a scheduled user scrape only fetches uploads that are new since the last run, so scheduled full-catalogue runs stay fast.
 
 If you enable ```skip_locked_artwork```, a scheduled user or bulk scrape will only fill items that are still on their default artwork and leave anything you've set by hand untouched, so it's safe to leave running against a curated library.
 
