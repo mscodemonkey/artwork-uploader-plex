@@ -2891,6 +2891,7 @@ function toggleUserCacheExpiryField() {
 
 // Notification events a channel can be subscribed to, mirrors core/enums.py NotificationEvent
 const NOTIFICATION_EVENTS = [
+    { value: "run_started", label: "Started" },
     { value: "run_completed", label: "Completed cleanly" },
     { value: "run_completed_with_errors", label: "Completed with errors" },
     { value: "run_failed_to_start", label: "Failed to start" },
@@ -2899,7 +2900,7 @@ const NOTIFICATION_EVENTS = [
 ];
 
 // Events a newly added channel is subscribed to, matches core/constants.py DEFAULT_NOTIFICATION_EVENTS
-const DEFAULT_NOTIFICATION_EVENTS = ["run_completed", "run_completed_with_errors"];
+const DEFAULT_NOTIFICATION_EVENTS = ["run_started", "run_completed", "run_completed_with_errors", "run_cancelled"];
 
 let appriseRowCounter = 0;
 
@@ -2925,7 +2926,6 @@ function createAppriseUrlRow(channel = {}, last = false) {
             <input type="text"
                    class="form-control input-monospace apprise-url-input ${last ? 'has-two-inline-btns' : 'has-inline-btn'}"
                    placeholder="discord://{botname}@{WebhookID}/{WebhookToken}"
-                   value="${url}"
                    spellcheck="false"
                    autocomplete="off"
                    autocorrect="off"
@@ -2959,6 +2959,10 @@ function createAppriseUrlRow(channel = {}, last = false) {
         }
         toggleConfigButtons();
     });
+
+    // Assign as a property, not interpolated into innerHTML: a quote in the
+    // URL would truncate the attribute and corrupt the channel on next save.
+    row.querySelector(".apprise-url-input").value = url;
 
     container.appendChild(row);
     toggleConfigButtons();

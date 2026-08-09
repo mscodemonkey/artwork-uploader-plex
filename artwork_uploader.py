@@ -792,6 +792,7 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
             if content:
                 update_log(instance, f"🕘 Scheduled bulk import started for '{filename}'")
                 debug_me(f"Scheduled import started for instance {instance.id} mode {instance.mode}")
+                send_notification(instance, f"🕘 Scheduled bulk import started for '{filename}'", event=NotificationEvent.RUN_STARTED.value)
                 run_bulk_import_scrape_in_thread(instance, content, filename, scheduled=True)
             else:
                 update_log(instance, f"⏭️ Scheduled bulk import of '{filename}' skipped • file is empty")
