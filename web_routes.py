@@ -20,7 +20,7 @@ from core import globals
 from services.notify_service import NotifyService
 from utils import utils
 from models.instance import Instance
-from core.config import Config
+from core.config import Config, normalize_notification_channels
 from core.enums import FileType, MediaType, ScraperSource, StatusColor
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
@@ -324,7 +324,8 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web", broadcast=True)
         bulk_list = data.get("bulk_list").lower()
         filename = data.get("filename", "bulk_import.txt")
-        run_bulk_import_scrape_in_thread(instance, bulk_list, filename)
+        notify = data.get("notify", False)
+        run_bulk_import_scrape_in_thread(instance, bulk_list, filename, notify=notify)
 
     @globals.web_socket.on("save_bulk_import")
     def handle_bulk_import(data):
@@ -519,6 +520,10 @@ def setup_socket_handlers(
             # Unpack the config dictionary into the local config
             for key, value in data.get("config").items():
                 new_config_dict[key] = value
+
+            # Normalize the notification channels sent from the web UI into {"url", "events"} form
+            if "apprise_urls" in new_config_dict:
+                new_config_dict["apprise_urls"] = normalize_notification_channels(new_config_dict["apprise_urls"])
 
 
             # Prepare configurations to be compared

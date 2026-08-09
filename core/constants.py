@@ -3,7 +3,7 @@ Application-wide constants.
 """
 
 from core.__version__ import __version__, __url__
-from core.enums import ArtworkIDPrefix, FileType, MediaType
+from core.enums import ArtworkIDPrefix, FileType, MediaType, NotificationEvent
 
 # Application metadata
 APP_NAME = "Artwork Uploader for Plex"
@@ -180,3 +180,11 @@ STATUS_COLORS = {
     'warning': 'warning',
     'info': 'info',
 }
+
+# Events a channel is subscribed to when it is created or migrated from an older config
+# that had no per-event selection. Matches the notifications that were sent before
+# per-event routing existed: scheduled run completion, success or failure.
+DEFAULT_NOTIFICATION_EVENTS = [
+    NotificationEvent.RUN_COMPLETED.value,
+    NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value,
+]
