@@ -183,8 +183,11 @@ STATUS_COLORS = {
 
 # Events a channel is subscribed to when it is created or migrated from an older config
 # that had no per-event selection. Matches the notifications that were sent before
-# per-event routing existed: scheduled run completion, success or failure.
+# per-event routing existed: scheduled run start, and the completion or cancellation
+# summary, in success or failure.
 DEFAULT_NOTIFICATION_EVENTS = [
+    NotificationEvent.RUN_STARTED.value,
     NotificationEvent.RUN_COMPLETED.value,
     NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value,
+    NotificationEvent.RUN_CANCELLED.value,
 ]

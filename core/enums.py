@@ -71,6 +71,7 @@ class StatusColor(str, Enum):
 
 class NotificationEvent(str, Enum):
     """Events that can trigger a notification, individually switchable per channel."""
+    RUN_STARTED = "run_started"
     RUN_COMPLETED = "run_completed"
     RUN_COMPLETED_WITH_ERRORS = "run_completed_with_errors"
     RUN_FAILED_TO_START = "run_failed_to_start"

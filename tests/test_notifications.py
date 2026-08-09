@@ -25,7 +25,9 @@ from utils.notifications import send_notification
 def test_legacy_string_urls_migrate_to_default_events(tmp_path):
     """A pre-existing config.json with a bare list of URL strings must come back as
     channels subscribed to exactly the events that were sent before per-event routing
-    existed (scheduled run completion, success or failure) - not every event."""
+    existed: the started push and the completion or cancellation summary. The truly
+    new events (failed to start, skipped) stay off - an upgrade must not send more
+    kinds of notification than the user already received."""
     config_path = tmp_path / "config.json"
     config_path.write_text(
         '{"apprise_urls": ["discord://webhook1", "discord://webhook2"]}', encoding="utf-8"
@@ -38,10 +40,13 @@ def test_legacy_string_urls_migrate_to_default_events(tmp_path):
         {"url": "discord://webhook1", "events": list(DEFAULT_NOTIFICATION_EVENTS)},
         {"url": "discord://webhook2", "events": list(DEFAULT_NOTIFICATION_EVENTS)},
     ]
-    # None of the newly introduced events are silently switched on for an upgraded channel.
+    # The genuinely new events are not silently switched on for an upgraded channel.
+    # run_started and run_cancelled ARE on: upstream sent both before per-event
+    # routing existed, so keeping them matches what the user already received.
     assert NotificationEvent.RUN_FAILED_TO_START.value not in config.apprise_urls[0]["events"]
     assert NotificationEvent.RUN_SKIPPED.value not in config.apprise_urls[0]["events"]
-    assert NotificationEvent.RUN_CANCELLED.value not in config.apprise_urls[0]["events"]
+    assert NotificationEvent.RUN_STARTED.value in config.apprise_urls[0]["events"]
+    assert NotificationEvent.RUN_CANCELLED.value in config.apprise_urls[0]["events"]
 
 
 @pytest.mark.unit
@@ -144,7 +149,6 @@ def test_scheduled_run_with_missing_bulk_file_fires_failed_to_start():
         patch("artwork_uploader.find_bulk_file", return_value=None),
         patch("artwork_uploader.send_notification", side_effect=fake_send_notification),
         patch("artwork_uploader.update_log"),
-        patch.object(globals, "scheduler_service", MagicMock()),
     ):
         process_bulk_file_on_schedule(Instance(mode="cli"), "missing.txt")
 
@@ -168,7 +172,6 @@ def test_scheduled_run_with_empty_bulk_file_fires_skipped(tmp_path):
         patch("artwork_uploader.send_notification", side_effect=fake_send_notification),
         patch("artwork_uploader.update_log"),
         patch("artwork_uploader.run_bulk_import_scrape_in_thread") as mock_run,
-        patch.object(globals, "scheduler_service", MagicMock()),
     ):
         process_bulk_file_on_schedule(Instance(mode="cli"), "empty.txt")
 
@@ -345,7 +348,7 @@ def test_mid_run_crash_after_processing_is_not_reported_as_failed_to_start():
 
         call_count = {"n": 0}
 
-        def flaky_scrape_and_upload(inst, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None, failed_counter=None):
+        def flaky_scrape_and_upload(inst, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None):
             call_count["n"] += 1
             if call_count["n"] == 1:
                 assets_processed[0] += 1
