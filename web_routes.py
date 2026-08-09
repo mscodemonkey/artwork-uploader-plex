@@ -574,6 +574,11 @@ def setup_socket_handlers(
                         config_changed = config_changed or new_list_to_compare != current_list_to_compare
                     elif len(new_config_dict[key]) != len(current_config_dict[key]):
                         config_changed = True
+                    else:
+                        # Lists of dicts (notification channels since per-event routing)
+                        # fall through the string branch above; compare them by content
+                        # or an edit inside a channel is never detected as a change.
+                        config_changed = config_changed or new_config_dict[key] != current_config_dict[key]
                 else:
                     config_changed = config_changed or new_config_dict[key] != current_config_dict[key]
 
