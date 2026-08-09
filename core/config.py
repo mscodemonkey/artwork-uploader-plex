@@ -10,10 +10,37 @@ from core.constants import (
     DEFAULT_KOMETA_DOWNLOAD_TIMEOUT,
     DEFAULT_UPLOAD_RETRY_ATTEMPTS,
     DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS,
+    DEFAULT_NOTIFICATION_EVENTS
 )
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 from utils.notifications import debug_me
 from utils.utils import get_host_path
+
+
+def normalize_notification_channels(apprise_urls: List[Any]) -> List[Dict[str, Any]]:
+    """
+    Normalize the apprise_urls config entry into a list of {"url", "events"} channels.
+
+    Older config files store apprise_urls as a bare list of URL strings, with every
+    configured channel receiving every notification. Those are migrated here to
+    channels subscribed to DEFAULT_NOTIFICATION_EVENTS, which matches what they
+    actually received before per-event routing existed, so upgrading does not
+    suddenly start sending more than before.
+    """
+    channels = []
+    for entry in apprise_urls or []:
+        if isinstance(entry, dict):
+            url = entry.get("url", "")
+            if not url:
+                continue
+            events = entry.get("events", DEFAULT_NOTIFICATION_EVENTS)
+            if not isinstance(events, list):
+                events = DEFAULT_NOTIFICATION_EVENTS
+            channels.append({"url": url, "events": list(events)})
+        elif isinstance(entry, str):
+            if entry:
+                channels.append({"url": entry, "events": list(DEFAULT_NOTIFICATION_EVENTS)})
+    return channels
 
 
 class Config:
@@ -46,7 +73,7 @@ class Config:
         auth_enabled: Whether authentication is enabled for the web server
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
-        apprise_urls: List of Apprise notification URLs
+        apprise_urls: List of notification channels, each {"url": Apprise URL, "events": list of event names the channel is subscribed to}
         enable_webhooks: Whether the Sonarr/Radarr import webhook endpoint is enabled
         webhook_token: Shared secret required on webhook requests
         webhook_tpdb_users: ThePosterDB users to apply cached artwork from on import, in priority order
@@ -83,7 +110,7 @@ class Config:
         self.auth_enabled: bool = False
         self.auth_username: str = ""
         self.auth_password_hash: str = ""
-        self.apprise_urls: List[str] = []
+        self.apprise_urls: List[Dict[str, Any]] = []
         self.enable_webhooks: bool = False
         self.webhook_token: str = ""
         self.webhook_tpdb_users: List[str] = []
@@ -134,7 +161,7 @@ class Config:
             self.auth_enabled = config.get("auth_enabled", False)
             self.auth_username = config.get("auth_username", "")
             self.auth_password_hash = config.get("auth_password_hash", "")
-            self.apprise_urls = config.get("apprise_urls", [])
+            self.apprise_urls = normalize_notification_channels(config.get("apprise_urls", []))
             self.enable_webhooks = config.get("enable_webhooks", False)
             self.webhook_token = config.get("webhook_token", "")
             self.webhook_tpdb_users = config.get("webhook_tpdb_users", [])

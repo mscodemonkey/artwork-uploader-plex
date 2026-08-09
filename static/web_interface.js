@@ -1081,11 +1081,8 @@ function getCurrentConfigForm() {
     current_form.temp_dir = document.getElementById("temp_dir").value.trim();
     current_form.bulk_txt = document.getElementById("bulk_import_file").value;
     
-    // Save the Apprise URLs
-    // Collect all non-empty Apprise URLs from the dynamic inputs
-    current_form.apprise_urls = Array.from(document.querySelectorAll(".apprise-url-input"))
-        .map(input => input.value.trim())
-        .filter(url => url !== "");
+    // Save the Apprise notification channels (URL plus the events each one is subscribed to)
+    current_form.apprise_urls = collectAppriseChannels();
 
     // Collect movie and TV library lists from TomSelect pickers
     current_form.tv_library = tvPicker ? tvPicker.getValue() : [];
@@ -1780,7 +1777,8 @@ function runBulkImport() {
     socket.emit("start_bulk_import",{
         instance_id: instanceId,
         bulk_list: document.getElementById("bulk_import_text").value,
-        filename: currentBulkImport || document.getElementById("switch_bulk_file").value || "bulk_import.txt"
+        filename: currentBulkImport || document.getElementById("switch_bulk_file").value || "bulk_import.txt",
+        notify: document.getElementById("bulk_notify").checked
     });
 }
 
@@ -2891,30 +2889,57 @@ function toggleUserCacheExpiryField() {
     }
 }
 
-// Creates a single Apprise URL input row with a delete button
-function createAppriseUrlRow(value = "", last = false) {
+// Notification events a channel can be subscribed to, mirrors core/enums.py NotificationEvent
+const NOTIFICATION_EVENTS = [
+    { value: "run_completed", label: "Completed cleanly" },
+    { value: "run_completed_with_errors", label: "Completed with errors" },
+    { value: "run_failed_to_start", label: "Failed to start" },
+    { value: "run_skipped", label: "Skipped" },
+    { value: "run_cancelled", label: "Cancelled" },
+];
+
+// Events a newly added channel is subscribed to, matches core/constants.py DEFAULT_NOTIFICATION_EVENTS
+const DEFAULT_NOTIFICATION_EVENTS = ["run_completed", "run_completed_with_errors"];
+
+let appriseRowCounter = 0;
+
+// Creates a single Apprise URL input row, with a delete button and per-event notification toggles
+function createAppriseUrlRow(channel = {}, last = false) {
     const container = document.getElementById("apprise_urls_container");
+    const url = channel.url || "";
+    const events = Array.isArray(channel.events) ? channel.events : DEFAULT_NOTIFICATION_EVENTS;
+    const rowId = appriseRowCounter++;
 
     const row = document.createElement("div");
-    row.className = "position-relative apprise-url-row";
+    row.className = "apprise-url-row";
+
+    const eventChecks = NOTIFICATION_EVENTS.map(event => `
+            <div class="form-check form-check-inline">
+                <input class="form-check-input apprise-event-checkbox" type="checkbox" value="${event.value}"
+                       id="apprise_event_${rowId}_${event.value}" ${events.includes(event.value) ? "checked" : ""}>
+                <label class="form-check-label small" for="apprise_event_${rowId}_${event.value}">${event.label}</label>
+            </div>`).join("");
 
     row.innerHTML = `
-        <input type="text" 
-               class="form-control input-monospace apprise-url-input ${last ? 'has-two-inline-btns' : 'has-inline-btn'}" 
-               placeholder="discord://{botname}@{WebhookID}/{WebhookToken}" 
-               value="${value}"
-               spellcheck="false"
-               autocomplete="off"
-               autocorrect="off"
-               autocapitalize="off">
-        <div class="apprise-row-actions">
-            <button type="button" class="btn-inline-icon add-apprise-url-btn" title="Add another URL">
-                <i class="bi bi-plus-circle"></i>
-            </button>
-            <button type="button" class="btn-inline-icon remove-apprise-url-btn" title="Remove URL">
-                <i class="bi bi-x-circle"></i>
-            </button>
+        <div class="position-relative apprise-url-input-wrap">
+            <input type="text"
+                   class="form-control input-monospace apprise-url-input ${last ? 'has-two-inline-btns' : 'has-inline-btn'}"
+                   placeholder="discord://{botname}@{WebhookID}/{WebhookToken}"
+                   value="${url}"
+                   spellcheck="false"
+                   autocomplete="off"
+                   autocorrect="off"
+                   autocapitalize="off">
+            <div class="apprise-row-actions">
+                <button type="button" class="btn-inline-icon add-apprise-url-btn" title="Add another URL">
+                    <i class="bi bi-plus-circle"></i>
+                </button>
+                <button type="button" class="btn-inline-icon remove-apprise-url-btn" title="Remove URL">
+                    <i class="bi bi-x-circle"></i>
+                </button>
+            </div>
         </div>
+        <div class="apprise-event-checks d-flex flex-wrap mb-2">${eventChecks}</div>
     `;
 
     // Event listener to add a row
@@ -2937,4 +2962,15 @@ function createAppriseUrlRow(value = "", last = false) {
 
     container.appendChild(row);
     toggleConfigButtons();
+}
+
+// Reads the URL and subscribed events out of every Apprise channel row currently in the DOM
+function collectAppriseChannels() {
+    return Array.from(document.querySelectorAll(".apprise-url-row"))
+        .map(row => {
+            const url = row.querySelector(".apprise-url-input").value.trim();
+            const events = Array.from(row.querySelectorAll(".apprise-event-checkbox:checked")).map(checkbox => checkbox.value);
+            return { url, events };
+        })
+        .filter(channel => channel.url !== "");
 }

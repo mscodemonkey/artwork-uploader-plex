@@ -48,7 +48,7 @@ from core.constants import (
     MIN_PYTHON_MINOR,
     VALID_FILENAME_PATTERN
 )
-from core.enums import InstanceMode, StatusColor, RunType, RunTrigger, RunOutcome
+from core.enums import InstanceMode, NotificationEvent, StatusColor, RunType, RunTrigger, RunOutcome
 from services import (
     BulkFileService,
     ImageService,
@@ -249,7 +249,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
             globals.scrape_type = "stopped"
 
-def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, scheduled: bool = False) -> None:
+def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, scheduled: bool = False, notify: bool = False) -> None:
 
     """Run the bulk import scrape in a separate thread."""
 
@@ -272,7 +272,7 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
                 continue
             except InvalidFlag as e:
                 update_log(instance, f"❌ One or more invalid flags found in bulk import file '{filename}', line {n}: {str(e)}")
-                continue                
+                continue
     if len(parsed_urls) == 0:
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         now = datetime.now(timezone.utc).isoformat()
@@ -280,16 +280,20 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
             RunType.BULK.value, filename if filename else "bulk_import.txt", now, now,
             RunTrigger.SCHEDULED.value if scheduled else RunTrigger.MANUAL.value, RunOutcome.SKIPPED.value
         )
+        if scheduled or notify:
+            prefix = "Scheduled b" if scheduled else "B"
+            display_filename = filename if filename else "bulk_import.txt"
+            send_notification(instance, f"⏭️ {prefix}ulk import of '{display_filename}' skipped • no valid entries found", event=NotificationEvent.RUN_SKIPPED.value)
         return
 
     # Pass the processing of the parsed URLs off to a thread
     try:
-        process_bulk_import_from_ui(instance, parsed_urls, filename, scheduled)
+        process_bulk_import_from_ui(instance, parsed_urls, filename, scheduled, notify)
     except Exception:
         raise
 
 
-def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None, scheduled: bool = False) -> None:
+def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None, scheduled: bool = False, notify: bool = False) -> None:
 
     """
     Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
@@ -330,6 +334,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     errors = 0
     started_at = datetime.now(timezone.utc).isoformat()
     trigger = RunTrigger.SCHEDULED.value if scheduled else RunTrigger.MANUAL.value
+    notify_enabled = scheduled or notify
+    display_filename = filename if filename else "bulk_import.txt"
 
     try:
 
@@ -341,6 +347,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 RunType.BULK.value, filename if filename else "bulk_import.txt",
                 started_at, now, trigger, RunOutcome.FAILED.value
             )
+            if notify_enabled:
+                send_notification(instance, f"🔴 Bulk import of '{display_filename}' failed to start • Plex setup incomplete", event=NotificationEvent.RUN_FAILED_TO_START.value)
             return
 
         globals.scrapes_running += 1
@@ -403,6 +411,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             update_status(instance, message[2:], color=StatusColor.WARNING.value, sticky=False, spinner=False)
             notify_web(instance, "progress_bar", {"percent": 100, "bar_type": "bulk"})
             outcome = RunOutcome.STOPPED.value
+            if notify_enabled:
+                send_notification(instance, message, event=NotificationEvent.RUN_CANCELLED.value)
         else:
             message = (
                 ("🏁 " if total_errors == 0 else "⚠️ ")
@@ -417,15 +427,14 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             )
             update_status(instance, message[2:], color=StatusColor.SUCCESS.value if total_errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
             outcome = RunOutcome.SUCCESS.value if total_errors == 0 else RunOutcome.PARTIAL.value
+            if notify_enabled:
+                event = NotificationEvent.RUN_COMPLETED.value if errors == 0 else NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value
+                debug_me(f"Sending '{event}' notifications to {len(globals.config.apprise_urls)} configured notification channel(s).")
+                send_notification(instance, message, event=event)
         update_log(instance, message)
         if scheduled:
             debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).")
             send_notification(instance, message)
-
-        RunHistory().add_run(
-            RunType.BULK.value, display_filename, started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], errors
-        )
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
@@ -435,6 +444,15 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             started_at, datetime.now(timezone.utc).isoformat(), trigger, RunOutcome.FAILED.value,
             assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], errors
         )
+        if notify_enabled:
+            # scrape_and_upload only shields the loop from ScraperException - a PlexConnectorException
+            # or anything else raised mid-run lands here after real work has already happened, so it must
+            # not be reported as "failed to start". assets_processed only moves once an item has actually
+            # been processed, so it tells the two cases apart.
+            if assets_processed[0] > 0:
+                send_notification(instance, f"⚠️ Bulk import of '{display_filename}' stopped unexpectedly after {assets_processed[0]} asset(s) processed • {bulk_import_exception}", event=NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value)
+            else:
+                send_notification(instance, f"🔴 Bulk import of '{display_filename}' failed to start • {bulk_import_exception}", event=NotificationEvent.RUN_FAILED_TO_START.value)
 
     finally:
         globals.scrapes_running -= 1
@@ -774,23 +792,26 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
             if content:
                 update_log(instance, f"🕘 Scheduled bulk import started for '{filename}'")
                 debug_me(f"Scheduled import started for instance {instance.id} mode {instance.mode}")
-                send_notification(instance, f"🕘 Scheduled bulk import started for '{filename}'")
                 run_bulk_import_scrape_in_thread(instance, content, filename, scheduled=True)
             else:
                 update_log(instance, f"⏭️ Scheduled bulk import of '{filename}' skipped • file is empty")
                 now = datetime.now(timezone.utc).isoformat()
                 RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.SKIPPED.value)
+                send_notification(instance, f"⏭️ Scheduled bulk import of '{filename}' skipped • file is empty", event=NotificationEvent.RUN_SKIPPED.value)
         else:
             update_log(instance, f"🔴 Bulk file does not exist: {filename}")
             now = datetime.now(timezone.utc).isoformat()
             RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
+            send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • file does not exist", event=NotificationEvent.RUN_FAILED_TO_START.value)
             return
     except FileNotFoundError:
         update_log(instance, f"🔴 Scheduled bulk import failed due to missing file ({filename})")
         now = datetime.now(timezone.utc).isoformat()
         RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
+        send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • file not found", event=NotificationEvent.RUN_FAILED_TO_START.value)
     except Exception as e:
         update_log(instance, f"🔴 Scheduled bulk import unexpectedly failed ({str(e)})")
+        send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • {e}", event=NotificationEvent.RUN_FAILED_TO_START.value)
         now = datetime.now(timezone.utc).isoformat()
         RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
     finally:

@@ -69,6 +69,15 @@ class StatusColor(str, Enum):
     DARK = "dark"
 
 
+class NotificationEvent(str, Enum):
+    """Events that can trigger a notification, individually switchable per channel."""
+    RUN_COMPLETED = "run_completed"
+    RUN_COMPLETED_WITH_ERRORS = "run_completed_with_errors"
+    RUN_FAILED_TO_START = "run_failed_to_start"
+    RUN_SKIPPED = "run_skipped"
+    RUN_CANCELLED = "run_cancelled"
+
+
 class FileType(str, Enum):
     """File types in MediUX responses."""
     TITLE_CARD = "title_card"

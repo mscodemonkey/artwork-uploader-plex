@@ -129,23 +129,31 @@ def notify_web(instance: Instance, event, data_to_include = None, silent=False):
             debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('secondary').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}")
         globals.web_socket.emit(event, merged_arguments)
 
-def send_notification(instance: Instance, message: str) -> None:
+def send_notification(instance: Instance, message: str, event: str = None) -> None:
 
     """
-    Sends a notification using the NotifyService class.
+    Sends a notification to every configured channel subscribed to the given event.
 
     Args:
         instance (Instance):
         message (str):
+        event (str): One of the NotificationEvent values. A channel only receives the
+            message if this event is in its configured "events" list. If omitted, every
+            configured channel is notified regardless of its event selection.
 
     Returns:
         None
     """
     try:
-        if len(globals.config.apprise_urls) > 0:
+        channels = globals.config.apprise_urls
+        if event is not None:
+            channels = [channel for channel in channels if event in channel.get("events", [])]
+        urls = [channel["url"] for channel in channels if channel.get("url")]
+
+        if len(urls) > 0:
             notifier = NotifyService()
             notify_success = True
-            for url in globals.config.apprise_urls:
+            for url in urls:
                 notifier.add_url(url)
                 url_success = notifier.send_notification("Artwork Uploader", message)
                 if url_success:
@@ -156,10 +164,10 @@ def send_notification(instance: Instance, message: str) -> None:
                     update_log(instance, f"⚠️ Notification failed to send for URL: {url}")
                 notify_success = notify_success and url_success
                 notifier.clear_urls()
-            if len(globals.config.apprise_urls) > 1:
+            if len(urls) > 1:
                 if notify_success:
-                    debug_me(f"✅ {len(globals.config.apprise_urls)} notifications sent successfully.")
-                    update_log(instance, f"✅ {len(globals.config.apprise_urls)} notifications sent successfully.")
+                    debug_me(f"✅ {len(urls)} notifications sent successfully.")
+                    update_log(instance, f"✅ {len(urls)} notifications sent successfully.")
                 elif not notify_success:
                     debug_me("⚠️ Some notifications failed to send. Check logs for details.")
                     update_log(instance, "⚠️ Some notifications failed to send. Check logs for details.")

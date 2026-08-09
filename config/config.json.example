@@ -60,8 +60,8 @@
     "_schedules_help": "Scheduled bulk import jobs. Configure through the web UI",
 
     "apprise_urls": [],
-    "_apprise_urls": "Comma-separated list of Apprise notification URLs",
-
+    "_apprise_urls_help": "List of notification channels, each {\"url\": <Apprise URL>, \"events\": [<event names>]}. Configure through the web UI"
+}
     "plex_connect_timeout": 10,
     "_plex_connect_timeout_help": "Seconds to wait when connecting to the Plex server (also applies to uploads)",
 
