@@ -438,7 +438,7 @@ def setup_socket_handlers(
         token = data.get("token", "")
 
         try:
-            plex_server = PlexServer(url, token, timeout=globals.config.plex_test_connection_timeout)
+            plex_server = PlexServer(url, token, timeout=globals.config.plex_connect_timeout)
             debug_me(f"Successfully connected to Plex server at '{url}'")
         except Exception as e:
             debug_me(f"Failed to connect to Plex server at '{url}'")

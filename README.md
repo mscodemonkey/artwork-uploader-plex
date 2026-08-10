@@ -172,7 +172,7 @@ If you enable ```skip_locked_artwork```, a scheduled user or bulk scrape will on
 
 If you also enable ```allow_artist_updates```, a scheduled scrape may additionally replace artwork it applied earlier when the same artist has posted a newer version of it. It still never touches artwork you set by hand (anything without one of this tool's artwork-ID labels) or artwork from a different artist, and it only ever moves forward to a newer upload, so runs settle on each artist's latest rather than flip-flopping. It needs both ```skip_locked_artwork``` and ```track_artwork_ids``` on. Because this writes over artwork the tool previously chose, take a note of your current posters before the first run if you want to be able to revert.
 
-With ```local_library_matching``` enabled (the default), a user-catalog scrape skips everything that isn't in your libraries without any web requests, so full-catalog runs take minutes rather than hours.
+With ```local_library_matching``` enabled, a user-catalog scrape skips everything that isn't in your libraries without any web requests, so full-catalog runs take minutes rather than hours.
 
 Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the ```apprise_urls``` variable in the ```config.json```file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
 
@@ -292,6 +292,18 @@ This is optional - if you don't do this, a new config.json will be created when 
 
 ```"webhook_apply_delay"```
 - Seconds to wait after an import before applying artwork (default ```30```).  The *arr apps fire the webhook the moment they import a file, usually before Plex has scanned it, so this gives Plex a head start; if the item still is not in Plex the apply retries for a few minutes before giving up.
+
+```"plex_connect_timeout"```
+- Timeout for connecting to or uploading artwork to Plex. Defaults to `10` seconds.
+
+```"kometa_download_timeout"```
+- Timeout for downloading assets from ThePosterDB or MediUX. Defaults to `10` seconds.
+
+```"upload_retry_attemts"```
+- Total number of times to attempt an operation, including the original attempt. Only transient errors (timeouts or server errors) are retried. Defaults to `3`.
+
+```"upload_retry_backoff_seconds"```
+- Cool-down period before first retry of an operation. Doubles every subsequent retry. Defaults to `1` second.
 
 ### Filter options
 Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]. TPDb does not provide title cards, backgrounds or square art so these filters are not available in the web UI.

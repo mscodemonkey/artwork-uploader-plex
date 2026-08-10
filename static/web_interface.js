@@ -1109,10 +1109,9 @@ function getCurrentConfigForm() {
 
     // Timeouts and retries
     current_form.plex_connect_timeout = parseInt(document.getElementById("plex_connect_timeout").value) || 10;
-    current_form.plex_test_connection_timeout = parseInt(document.getElementById("plex_test_connection_timeout").value) || 5;
-    current_form.kometa_download_timeout = parseInt(document.getElementById("kometa_download_timeout").value) || 5;
+    current_form.kometa_download_timeout = parseInt(document.getElementById("kometa_download_timeout").value) || 10;
     current_form.upload_retry_attempts = parseInt(document.getElementById("upload_retry_attempts").value) || 3;
-    current_form.upload_retry_backoff_seconds = parseFloat(document.getElementById("upload_retry_backoff_seconds").value) || 0;
+    current_form.upload_retry_backoff_seconds = parseFloat(document.getElementById("upload_retry_backoff_seconds").value) || 1;
 
     // Checkbox for taking an artist's newer artwork for posters we applied
     current_form.allow_artist_updates = document.getElementById("allow_artist_updates").checked;
@@ -1137,7 +1136,7 @@ function getCurrentConfigForm() {
     current_form.enable_webhooks = document.getElementById("enable_webhooks").checked;
     current_form.webhook_token = document.getElementById("webhook_token").value.trim();
     current_form.webhook_tpdb_users = tpdbUserPicker ? tpdbUserPicker.getValue() : [];
-    current_form.webhook_apply_delay = parseInt(document.getElementById("webhook_apply_delay").value, 10) || 0;
+    current_form.webhook_apply_delay = parseInt(document.getElementById("webhook_apply_delay").value, 10) || 30;
 
     return current_form
 }
@@ -1239,8 +1238,7 @@ function updateConfigUI(config) {
     document.getElementById("cache_user_scrapes").checked = config.cache_user_scrapes;
     document.getElementById("user_cache_refresh_days").value = config.user_cache_refresh_days ?? 7;
     document.getElementById("plex_connect_timeout").value = config.plex_connect_timeout ?? 10;
-    document.getElementById("plex_test_connection_timeout").value = config.plex_test_connection_timeout ?? 5;
-    document.getElementById("kometa_download_timeout").value = config.kometa_download_timeout ?? 5;
+    document.getElementById("kometa_download_timeout").value = config.kometa_download_timeout ?? 10;
     document.getElementById("upload_retry_attempts").value = config.upload_retry_attempts ?? 3;
     document.getElementById("upload_retry_backoff_seconds").value = config.upload_retry_backoff_seconds ?? 1;
     document.getElementById("allow_artist_updates").checked = config.allow_artist_updates;
@@ -2439,9 +2437,15 @@ function toggleKometaSettings() {
     const kometaSettings = document.getElementById("kometa_settings");
     const kometaBase = document.getElementById("kometa_base");
     const dockerWarning = document.getElementById("docker_warning");
+    const kometaTimeout = document.getElementById("kometa_timeout_container");
+    const uploadTimeoutLabel = document.getElementById("plex_timeout_label");
+    const uploadRetryLabel = document.getElementById("upload_retry_label");
 
     if (saveToKometa) {
         kometaSettings.style.display = "block";
+        kometaTimeout.classList.remove("d-none");
+        uploadTimeoutLabel.innerHTML='<i class="bi bi-plugin"></i>&ensp;Plex connect timeout:';
+        uploadRetryLabel.textContent="download";
         if (docker) {
             if (dockerWarning) {
                 dockerWarning.classList.remove("d-none");
@@ -2462,6 +2466,9 @@ function toggleKometaSettings() {
             dockerWarning.classList.add("d-none");
         }
         kometaSettings.style.display = "none";
+        kometaTimeout.classList.add("d-none");
+        uploadTimeoutLabel.innerHTML='<i class="bi bi-cloud-upload"></i>&ensp;Plex connect/upload timeout:';
+        uploadRetryLabel.textContent="upload";
         if (kometaBase) {
             kometaBase.required = false;
             // Clear invalid styling when hiding
