@@ -7,7 +7,6 @@ from core import globals
 from typing import List, Dict, Any
 from core.constants import (
     DEFAULT_PLEX_CONNECT_TIMEOUT,
-    DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT,
     DEFAULT_KOMETA_DOWNLOAD_TIMEOUT,
     DEFAULT_UPLOAD_RETRY_ATTEMPTS,
     DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS,
@@ -51,9 +50,8 @@ class Config:
         webhook_token: Shared secret required on webhook requests
         webhook_tpdb_users: ThePosterDB users to apply cached artwork from on import, in priority order
         webhook_apply_delay: Seconds to wait after an import before applying artwork (lets Plex scan first)
-        plex_connect_timeout: Seconds to wait when connecting to the Plex server (also applies to uploads)
-        plex_test_connection_timeout: Seconds to wait when testing a Plex connection from the web settings
-        kometa_download_timeout: Seconds to wait when downloading artwork to save to the Kometa asset directory
+        plex_connect_timeout: Timeout for connecting to the Plex server (also applies to uploads)
+        kometa_download_timeout: Timeout for downloading artwork to save to the Kometa asset directory
         upload_retry_attempts: Total attempts (including the first) made for a transient upload failure
         upload_retry_backoff_seconds: Seconds to wait before the first retry, doubling after each attempt
     """
@@ -73,7 +71,7 @@ class Config:
         self.stage_assets: bool = False
         self.track_artwork_ids: bool = True
         self.skip_locked_artwork: bool = False
-        self.local_library_matching: bool = True
+        self.local_library_matching: bool = False
         self.allow_artist_updates: bool = False
         self.cache_user_scrapes: bool = False
         self.user_cache_refresh_days: int = 7
@@ -89,7 +87,6 @@ class Config:
         self.webhook_tpdb_users: List[str] = []
         self.webhook_apply_delay: int = 30
         self.plex_connect_timeout: int = DEFAULT_PLEX_CONNECT_TIMEOUT
-        self.plex_test_connection_timeout: int = DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT
         self.kometa_download_timeout: int = DEFAULT_KOMETA_DOWNLOAD_TIMEOUT
         self.upload_retry_attempts: int = DEFAULT_UPLOAD_RETRY_ATTEMPTS
         self.upload_retry_backoff_seconds: float = DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS
@@ -124,7 +121,7 @@ class Config:
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.skip_locked_artwork = config.get("skip_locked_artwork", False)
-            self.local_library_matching = config.get("local_library_matching", True)
+            self.local_library_matching = config.get("local_library_matching", False)
             self.allow_artist_updates = config.get("allow_artist_updates", False)
             self.cache_user_scrapes = config.get("cache_user_scrapes", False)
             self.user_cache_refresh_days = config.get("user_cache_refresh_days", 7)
@@ -140,7 +137,6 @@ class Config:
             self.webhook_tpdb_users = config.get("webhook_tpdb_users", [])
             self.webhook_apply_delay = config.get("webhook_apply_delay", 30)
             self.plex_connect_timeout = config.get("plex_connect_timeout", DEFAULT_PLEX_CONNECT_TIMEOUT)
-            self.plex_test_connection_timeout = config.get("plex_test_connection_timeout", DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT)
             self.kometa_download_timeout = config.get("kometa_download_timeout", DEFAULT_KOMETA_DOWNLOAD_TIMEOUT)
             self.upload_retry_attempts = config.get("upload_retry_attempts", DEFAULT_UPLOAD_RETRY_ATTEMPTS)
             self.upload_retry_backoff_seconds = config.get("upload_retry_backoff_seconds", DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS)
@@ -164,7 +160,7 @@ class Config:
             "stage_assets": False,
             "track_artwork_ids": True,
             "skip_locked_artwork": False,
-            "local_library_matching": True,
+            "local_library_matching": False,
             "allow_artist_updates": False,
             "cache_user_scrapes": False,
             "user_cache_refresh_days": 7,
@@ -177,7 +173,6 @@ class Config:
             "webhook_tpdb_users": [],
             "webhook_apply_delay": 30,
             "plex_connect_timeout": DEFAULT_PLEX_CONNECT_TIMEOUT,
-            "plex_test_connection_timeout": DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT,
             "kometa_download_timeout": DEFAULT_KOMETA_DOWNLOAD_TIMEOUT,
             "upload_retry_attempts": DEFAULT_UPLOAD_RETRY_ATTEMPTS,
             "upload_retry_backoff_seconds": DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS
@@ -234,7 +229,6 @@ class Config:
             "webhook_tpdb_users": self.webhook_tpdb_users,
             "webhook_apply_delay": self.webhook_apply_delay,
             "plex_connect_timeout": self.plex_connect_timeout,
-            "plex_test_connection_timeout": self.plex_test_connection_timeout,
             "kometa_download_timeout": self.kometa_download_timeout,
             "upload_retry_attempts": self.upload_retry_attempts,
             "upload_retry_backoff_seconds": self.upload_retry_backoff_seconds

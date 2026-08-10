@@ -244,10 +244,8 @@ h1 {
 }
 
 /* Remove Bootstrap's validation checkmark icon on small numeric inputs */
-.was-validated #user_cache_refresh_days.form-control:valid,
-.was-validated #user_cache_refresh_days.form-control:invalid,
-.was-validated #webhook_apply_delay.form-control:valid,
-.was-validated #webhook_apply_delay.form-control:invalid {
+.was-validated .d-inline-block.form-control:valid,
+.was-validated .d-inline-block.form-control:invalid {
     background-image: none !important;
     padding-right: 0.5rem !important; /* Prevents text clipping */
 }
@@ -907,4 +905,27 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 #status,
 #status_container { /* Replace with your banner's actual class or ID */
     z-index: 1060 !important; /* Higher than Bootstrap modal (1055) and backdrop (1050) */
+}
+
+/* ==========================================================================
+   Code Snippet Styling Inside Tooltips
+   ========================================================================== */
+
+.tooltip-inner code {
+    color: #D789B2;
+    background-color: rgba(14, 39, 47, 1); /* Match the background of the alertbox */
+    padding: 0.15em 0.35em;
+    border-radius: 0.25rem;
+}
+
+[data-bs-theme="dark"] .tooltip-inner code {
+    color: #C54282;
+    background-color: rgba(214, 243, 251, 1); /* Match the background of the alertbox in light mode*/
+    padding: 0.15em 0.35em;
+    border-radius: 0.25rem;
+}
+
+/* Optional: Slightly increase tooltip width for longer instructions */
+.wide-tooltip .tooltip-inner {
+    max-width: 320px !important;
 }
