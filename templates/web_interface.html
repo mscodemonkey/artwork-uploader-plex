@@ -1176,12 +1176,23 @@
 
             <!-- Run History Tab -->
             <div class="tab-pane fade" id="run-history" role="tabpanel" aria-labelledby="run-history-tab" tabindex="0">
+                <div class="mt-3 d-flex align-items-center gap-2">
+                    <label for="run_history_type" class="col-form-label">Show</label>
+                    <select class="form-select form-select-sm w-auto" id="run_history_type" aria-label="Filter run history by type">
+                        <option value="" selected>All runs</option>
+                        <option value="bulk">Bulk imports</option>
+                        <option value="scrape">Scrapes</option>
+                        <option value="upload">Uploads</option>
+                        <option value="webhook">Webhook imports</option>
+                    </select>
+                </div>
                 <div class="mt-3 table-responsive">
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
                                 <th>Started</th>
-                                <th>File</th>
+                                <th>Type</th>
+                                <th>Run</th>
                                 <th class="d-none d-md-table-cell">Trigger</th>
                                 <th>Outcome</th>
                                 <th class="d-none d-md-table-cell">Processed</th>
@@ -1193,7 +1204,7 @@
                             </tr>
                         </thead>
                         <tbody id="run_history_body">
-                            <tr><td colspan="10" class="text-muted">No runs recorded yet.</td></tr>
+                            <tr><td colspan="11" class="text-muted">No runs recorded yet.</td></tr>
                         </tbody>
                     </table>
                 </div>

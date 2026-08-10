@@ -1,10 +1,11 @@
 """
-Persistent record of bulk import runs.
+Persistent record of what the tool has done.
 
-A small JSON file (in the config directory) that keeps one entry per run of a bulk
-import file, whether that run was triggered manually from the web UI or by a schedule.
-Container logs rotate; this is what answers "did last night's run actually do
-anything" without needing them.
+A small JSON file (in the config directory) that keeps one entry per run, whatever
+started it: a bulk import file run manually or by a schedule, a single URL scraped
+from the main tab, an artwork ZIP uploaded through the browser, or a Radarr/Sonarr
+import applied by the webhook. Container logs rotate; this is what answers "did last
+night's run actually do anything" without needing them.
 """
 
 import json
@@ -16,26 +17,40 @@ from typing import Any, Dict, List, Optional
 
 from core.constants import RUN_HISTORY_PATH, RUN_HISTORY_MAX_ENTRIES, RUN_HISTORY_MAX_AGE_DAYS
 
+# What kind of run produced the record
+RUN_TYPE_BULK = "bulk"          # a bulk import file, manual or scheduled
+RUN_TYPE_SCRAPE = "scrape"      # a single URL scraped from the main tab
+RUN_TYPE_UPLOAD = "upload"      # an artwork ZIP uploaded through the browser
+RUN_TYPE_WEBHOOK = "webhook"    # a Radarr/Sonarr import applied from the cache
+
+RUN_TYPES = (RUN_TYPE_BULK, RUN_TYPE_SCRAPE, RUN_TYPE_UPLOAD, RUN_TYPE_WEBHOOK)
+
+# What started the run
+TRIGGER_MANUAL = "manual"
+TRIGGER_SCHEDULED = "scheduled"
+TRIGGER_RADARR = "radarr"
+TRIGGER_SONARR = "sonarr"
+
 # Recorded outcomes for a run
 OUTCOME_SUCCESS = "success"
-OUTCOME_PARTIAL = "partial"    # completed, but one or more URLs errored
+OUTCOME_PARTIAL = "partial"    # completed, but one or more items errored
 OUTCOME_STOPPED = "stopped"    # cancelled by the user
 OUTCOME_FAILED = "failed"      # an exception aborted the run
 OUTCOME_SKIPPED = "skipped"    # nothing to do (e.g. no valid entries in the file)
 
 # A new RunHistory() is created per call rather than shared, so the read-modify-write in
 # add_run needs a lock keyed by file path (not an instance lock) to stop two runs finishing
-# at the same time - e.g. a schedule firing while a manual run is still in progress - from
+# at the same time - e.g. a schedule firing while a webhook applies a new import - from
 # each loading the same list and one overwriting the other's record.
 _write_locks: Dict[str, threading.Lock] = defaultdict(threading.Lock)
 
 
 class RunHistory:
     """
-    Append-only log of bulk import runs, capped by both count and age so it cannot
-    grow without limit. Readers and writers each open the file for the duration of
-    the call, matching the short-lived-connection approach used by AssetIndex; writes
-    are serialized per path so two runs finishing at once can't clobber each other.
+    Append-only log of runs, capped by both count and age so it cannot grow without
+    limit. Readers and writers each open the file for the duration of the call, matching
+    the short-lived-connection approach used by AssetIndex; writes are serialized per path
+    so two runs finishing at once can't clobber each other.
     """
 
     def __init__(
@@ -77,16 +92,28 @@ class RunHistory:
         if self.max_age_days:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=self.max_age_days)).isoformat()
             runs = [run for run in runs if run.get("started_at", "") >= cutoff]
-        if self.max_entries and len(runs) > self.max_entries:
-            runs = runs[-self.max_entries:]
+        if self.max_entries:
+            # The count cap is per run type. A busy library can take dozens of webhook
+            # imports a day, and a single shared cap would push a nightly bulk import out
+            # of the history within the week - the run people most want to look back at.
+            kept_per_type: Dict[str, int] = defaultdict(int)
+            kept: List[Dict[str, Any]] = []
+            for run in reversed(runs):
+                run_type = run.get("run_type", RUN_TYPE_BULK)
+                if kept_per_type[run_type] >= self.max_entries:
+                    continue
+                kept_per_type[run_type] += 1
+                kept.append(run)
+            runs = list(reversed(kept))
         return runs
 
     def add_run(
         self,
-        filename: str,
+        run_type: str,
+        label: str,
         started_at: str,
         ended_at: str,
-        scheduled: bool,
+        trigger: str,
         outcome: str,
         assets_processed: int = 0,
         success_count: int = 0,
@@ -94,14 +121,18 @@ class RunHistory:
         locked_count: int = 0,
         error_count: int = 0,
     ) -> None:
-        """Append a record for one completed (or skipped/failed) run."""
+        """Append a record for one completed (or skipped/failed) run.
+
+        `label` is what the run was about: the bulk file name, the scraped URL, the
+        uploaded ZIP name, or the title the webhook imported."""
         with _write_locks[os.path.abspath(self.path)]:
             runs = self._load()
             runs.append({
-                "filename": filename,
+                "run_type": run_type,
+                "label": label,
                 "started_at": started_at,
                 "ended_at": ended_at,
-                "scheduled": scheduled,
+                "trigger": trigger,
                 "outcome": outcome,
                 "assets_processed": assets_processed,
                 "success_count": success_count,
@@ -111,9 +142,28 @@ class RunHistory:
             })
             self._save(self._prune(runs))
 
-    def get_runs(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Most recent runs first, optionally capped to `limit`."""
-        runs = list(reversed(self._load()))
+    @staticmethod
+    def _normalise(run: Dict[str, Any]) -> Dict[str, Any]:
+        """Fill in the fields a record written by an older version doesn't carry, so an
+        existing history file keeps rendering. Those records were all bulk imports and
+        held the file name as `filename` and the trigger as a `scheduled` boolean."""
+        normalised = dict(run)
+        if not normalised.get("run_type"):
+            normalised["run_type"] = RUN_TYPE_BULK
+        if not normalised.get("label"):
+            normalised["label"] = run.get("filename", "")
+        if not normalised.get("trigger"):
+            normalised["trigger"] = TRIGGER_SCHEDULED if run.get("scheduled") else TRIGGER_MANUAL
+        return normalised
+
+    def get_runs(self, limit: Optional[int] = None, run_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Most recent runs first, optionally narrowed to one run type and capped to `limit`.
+
+        The type filter is applied before the limit, so asking for bulk imports returns the
+        last `limit` bulk imports rather than the bulk imports among the last `limit` runs."""
+        runs = [self._normalise(run) for run in reversed(self._load())]
+        if run_type:
+            runs = [run for run in runs if run["run_type"] == run_type]
         if limit:
             runs = runs[:limit]
         return runs

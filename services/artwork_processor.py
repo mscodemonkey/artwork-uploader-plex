@@ -187,6 +187,7 @@ class ArtworkProcessor:
                     self.callbacks.failed(1)
 
             # Log the result
+                self.callbacks.record_result(result)
                 self.callbacks.log(result)
 
         except CollectionNotFound as e:
@@ -321,15 +322,11 @@ class ArtworkProcessor:
                     results = process_func(artwork)
 
                     for result in results:
-                        # Track successful uploads (those starting with ✅ or ♻️)
-                        if result.startswith('✅') or result.startswith('♻️'):
+                        counted = self.callbacks.record_result(result)
+                        if counted == "success":
                             success_counter += 1
-
-                        # Track uploads that failed after exhausting their retries
-                        elif result.startswith('❌'):
+                        elif counted == "failed":
                             failed_counter += 1
-
-                        # Log the result
                         self.callbacks.log(result)
 
                 except CollectionNotFound as e:
@@ -361,6 +358,7 @@ class ArtworkProcessor:
             except OSError:
                 pass
         # Final progress update
+        self.callbacks.assets(count=processed_files)
         failed_note = f" • {failed_counter} asset(s) failed" if failed_counter else ""
         if globals.cancel_scrape:
             self.callbacks.progress(1, 1, "", "main")

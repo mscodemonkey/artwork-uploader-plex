@@ -11,15 +11,30 @@ code a normal scrape uses, so the webhook inherits all of it without re-implemen
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import FrozenSet, List, Optional, Union
 
 from core import globals
 from core.constants import WEBHOOK_RETRY_DELAYS
 from core.enums import ScraperSource
 from core.exceptions import MovieNotFound, ShowNotFound
+from models.callbacks import ProcessingCallbacks
 from models.instance import Instance
 from models.options import Options
 from services.asset_index import AssetIndex, normalize_title
+from services.run_history import (
+    RunHistory,
+    RUN_TYPE_WEBHOOK,
+    TRIGGER_RADARR,
+    TRIGGER_SONARR,
+    OUTCOME_SUCCESS,
+    OUTCOME_PARTIAL,
+    OUTCOME_FAILED,
+    OUTCOME_SKIPPED,
+)
+
+# The *arr app that sent the event, as the history records it
+_TRIGGER_BY_SOURCE = {"radarr": TRIGGER_RADARR, "sonarr": TRIGGER_SONARR}
 
 
 def _log(text: str) -> None:
@@ -111,11 +126,17 @@ class WebhookService:
                 _debug(f"Import for {event.label()} is already pending, ignoring the duplicate")
                 return
             self._inflight.add(key)
+        # One history record covers the whole event, retries included, so the run starts
+        # counting from the moment it was accepted and the tally survives every attempt.
+        started_at = datetime.now(timezone.utc).isoformat()
+        tally = ProcessingCallbacks(
+            success_counter=[0], assets_processed=[0], locked_counter=[0], failed_counter=[0]
+        )
         # Wait a configurable delay before the first attempt: the *arr apps fire the webhook the
         # moment they import a file, usually before Plex has scanned it in, so give Plex a head
         # start. If it is still not ready by then, the retry ladder takes over.
         delay = max(0, globals.config.webhook_apply_delay or 0)
-        timer = threading.Timer(delay, self._attempt, args=(event, key))
+        timer = threading.Timer(delay, self._attempt, args=(event, key, started_at, tally))
         timer.daemon = True
         timer.start()
 
@@ -128,19 +149,21 @@ class WebhookService:
         with self._lock:
             self._inflight.discard(key)
 
-    def _attempt(self, event: WebhookEvent, key, attempt: int = 0,
-                 artwork: Optional[List[dict]] = None) -> None:
+    def _attempt(self, event: WebhookEvent, key, started_at: str, tally: ProcessingCallbacks,
+                 attempt: int = 0, artwork: Optional[List[dict]] = None) -> None:
         # UploadProcessor pulls in the processors -> plex chain; import it here so the services
         # package does not drag that in at start-up (mirrors the app's own lazy-import pattern).
         from processors.upload_processor import UploadProcessor
+        outcome = OUTCOME_FAILED
         try:
             if artwork is None:
                 artwork = self._collect_artwork(event)
                 if not artwork:
                     _log(f"📥 Webhook | No cached artwork for '{event.label()}' from the configured users")
-                    self._release(key)
+                    self._finish(event, key, started_at, tally, OUTCOME_SKIPPED)
                     return
                 _log(f"📥 Webhook | {event.source.title()} import: {event.label()}")
+                tally.assets(len(artwork))
             globals.plex.connect()
             processor = UploadProcessor(globals.plex)
             processor.set_options(Options())
@@ -166,22 +189,58 @@ class WebhookService:
                         pending.append(item)
                     else:
                         for result in results:
+                            tally.record_result(result)
                             _log(result)
                 except (MovieNotFound, ShowNotFound):
                     pending.append(item)          # not in Plex yet, retry it
                 except Exception as error:
+                    tally.failed(1)
                     _log(f"❌ Webhook | {event.label()}: {error}")
             if pending and attempt < len(WEBHOOK_RETRY_DELAYS):
                 delay = WEBHOOK_RETRY_DELAYS[attempt]
                 _debug(f"{event.label()} not in Plex yet, retrying in {delay}s")
-                timer = threading.Timer(delay, self._attempt, args=(event, key, attempt + 1, pending))
+                timer = threading.Timer(
+                    delay, self._attempt, args=(event, key, started_at, tally, attempt + 1, pending)
+                )
                 timer.daemon = True
                 timer.start()
                 return                            # keep the in-flight key until the chain ends
             if pending:
                 _log(f"⚠️ Webhook | '{event.label()}' has not appeared in Plex, leaving it for the next scheduled run")
+                # Artwork still pending when the ladder runs out never got applied, so it counts
+                # against the run the same way an upload that exhausted its retries does.
+                tally.failed(len(pending))
+            if not tally.failed_counter[0]:
+                outcome = OUTCOME_SUCCESS
+            elif tally.success_counter[0]:
+                outcome = OUTCOME_PARTIAL
+            else:
+                outcome = OUTCOME_FAILED
         except Exception as error:
             _debug(f"Webhook apply failed for {event.label()}: {error}")
+            outcome = OUTCOME_FAILED
+        self._finish(event, key, started_at, tally, outcome)
+
+    def _finish(self, event: WebhookEvent, key, started_at: str,
+                tally: ProcessingCallbacks, outcome: str) -> None:
+        """Record the run and let the next event for this title through."""
+        try:
+            RunHistory().add_run(
+                RUN_TYPE_WEBHOOK, event.label(), started_at,
+                datetime.now(timezone.utc).isoformat(),
+                _TRIGGER_BY_SOURCE.get(event.source, event.source), outcome,
+                tally.assets_processed[0], tally.success_counter[0], 0,
+                tally.locked_counter[0], tally.failed_counter[0],
+            )
+            # Nothing else tells an open History tab that this happened. A scrape and a
+            # bulk import both end with a scrape_state broadcast the browser reacts to;
+            # an import applied in the background raises no such event.
+            from utils.notifications import notify_web
+            notify_web(Instance(broadcast=True), "run_history_updated", silent=True)
+        except Exception as error:
+            # A history write must never cost an in-flight key, which would deadlock every
+            # future import of this title behind the dedupe guard.
+            _debug(f"Could not record the webhook run for {event.label()}: {error}")
         self._release(key)
 
     def _collect_artwork(self, event: WebhookEvent) -> List[dict]:

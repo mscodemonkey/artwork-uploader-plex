@@ -12,8 +12,8 @@ from .utility_service import UtilityService
 from .authentication_service import AuthenticationService
 from .notify_service import NotifyService
 from .asset_index import AssetIndex
-from .webhook_service import WebhookService
 from .run_history import RunHistory
+from .webhook_service import WebhookService  # imports run_history, so it comes after it
 
 __all__ = [
     'BulkFileService',

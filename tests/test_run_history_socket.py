@@ -8,7 +8,14 @@ import pytest
 
 import core.globals as globals
 import web_routes
-from services.run_history import RunHistory, OUTCOME_SUCCESS
+from services.run_history import (
+    RunHistory,
+    OUTCOME_SUCCESS,
+    RUN_TYPE_BULK,
+    RUN_TYPE_WEBHOOK,
+    TRIGGER_MANUAL,
+    TRIGGER_RADARR,
+)
 
 
 def _iso():
@@ -39,7 +46,7 @@ def stub_socket(monkeypatch):
 @pytest.mark.unit
 def test_load_run_history_emits_recent_runs(tmp_path, stub_socket, monkeypatch):
     history = RunHistory(str(tmp_path / "run_history.json"))
-    history.add_run("bulk_import.txt", _iso(), _iso(), False, OUTCOME_SUCCESS)
+    history.add_run(RUN_TYPE_BULK, "bulk_import.txt", _iso(), _iso(), TRIGGER_MANUAL, OUTCOME_SUCCESS)
     monkeypatch.setattr(web_routes, "RunHistory", lambda: history)
 
     emitted = {}
@@ -53,7 +60,47 @@ def test_load_run_history_emits_recent_runs(tmp_path, stub_socket, monkeypatch):
 
     assert emitted["event"] == "load_run_history"
     assert len(emitted["data"]["runs"]) == 1
-    assert emitted["data"]["runs"][0]["filename"] == "bulk_import.txt"
+    assert emitted["data"]["runs"][0]["label"] == "bulk_import.txt"
+    assert emitted["data"]["run_type"] == "all"
+
+
+@pytest.mark.unit
+def test_load_run_history_narrows_to_the_requested_run_type(tmp_path, stub_socket, monkeypatch):
+    history = RunHistory(str(tmp_path / "run_history.json"))
+    history.add_run(RUN_TYPE_BULK, "bulk_import.txt", _iso(), _iso(), TRIGGER_MANUAL, OUTCOME_SUCCESS)
+    history.add_run(RUN_TYPE_WEBHOOK, "The Matrix (1999)", _iso(), _iso(), TRIGGER_RADARR, OUTCOME_SUCCESS)
+    monkeypatch.setattr(web_routes, "RunHistory", lambda: history)
+
+    emitted = {}
+
+    def fake_notify_web(instance, event, data=None, silent=False):
+        emitted["data"] = data
+
+    with patch("web_routes.notify_web", side_effect=fake_notify_web):
+        stub_socket.handlers["load_run_history"]({"instance_id": "abc", "run_type": RUN_TYPE_WEBHOOK})
+
+    assert [run["label"] for run in emitted["data"]["runs"]] == ["The Matrix (1999)"]
+    assert emitted["data"]["run_type"] == RUN_TYPE_WEBHOOK
+
+
+@pytest.mark.unit
+def test_an_unknown_run_type_falls_back_to_every_run(tmp_path, stub_socket, monkeypatch):
+    """The filter comes off the wire, so a value that isn't a run type must not silently
+    return nothing - it shows everything, the way the unfiltered table does."""
+    history = RunHistory(str(tmp_path / "run_history.json"))
+    history.add_run(RUN_TYPE_BULK, "bulk_import.txt", _iso(), _iso(), TRIGGER_MANUAL, OUTCOME_SUCCESS)
+    monkeypatch.setattr(web_routes, "RunHistory", lambda: history)
+
+    emitted = {}
+
+    def fake_notify_web(instance, event, data=None, silent=False):
+        emitted["data"] = data
+
+    with patch("web_routes.notify_web", side_effect=fake_notify_web):
+        stub_socket.handlers["load_run_history"]({"instance_id": "abc", "run_type": "nonsense"})
+
+    assert len(emitted["data"]["runs"]) == 1
+    assert emitted["data"]["run_type"] == "all"
 
 
 @pytest.mark.unit

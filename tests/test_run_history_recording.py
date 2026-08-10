@@ -130,7 +130,7 @@ def test_no_valid_urls_in_the_file_is_recorded_as_skipped(history):
     runs = history.get_runs()
     assert len(runs) == 1
     assert runs[0]["outcome"] == OUTCOME_SKIPPED
-    assert runs[0]["filename"] == "no_urls.txt"
+    assert runs[0]["label"] == "no_urls.txt"
 
 
 @pytest.mark.unit
@@ -141,4 +141,4 @@ def test_no_filename_falls_back_to_the_default_bulk_file_name(history):
 
     runs = history.get_runs()
     assert len(runs) == 1
-    assert runs[0]["filename"] == "bulk_import.txt"
+    assert runs[0]["label"] == "bulk_import.txt"

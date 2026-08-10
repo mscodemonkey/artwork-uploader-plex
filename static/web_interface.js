@@ -430,13 +430,17 @@ function scrapeState(running, type) {
             btnElement.querySelector("i").className = btnElement.querySelector("i").dataset.originalIcon || "bi bi-gear";
         }
 
-        if (type == "bulk") {
-            loadRunHistory();
-        }
+        // Every run kind lands in the history now, not just bulk imports
+        loadRunHistory();
     }
 }
 socket.on("scrape_state", (data) => {
     scrapeState(data.running, data.type)
+});
+
+// A webhook import finishes without a scrape_state change, so it says so itself
+socket.on("run_history_updated", () => {
+    loadRunHistory();
 });
 
 
@@ -1654,6 +1658,20 @@ const RUN_HISTORY_OUTCOME_LABELS = {
     skipped: { text: "Skipped", className: "text-muted" }
 };
 
+const RUN_HISTORY_TYPE_LABELS = {
+    bulk: "Bulk import",
+    scrape: "Scrape",
+    upload: "Upload",
+    webhook: "Webhook"
+};
+
+const RUN_HISTORY_TRIGGER_LABELS = {
+    manual: "Manual",
+    scheduled: "Scheduled",
+    radarr: "Radarr",
+    sonarr: "Sonarr"
+};
+
 function formatRunDuration(startedAt, endedAt) {
     const start = new Date(startedAt);
     const end = new Date(endedAt);
@@ -1663,9 +1681,19 @@ function formatRunDuration(startedAt, endedAt) {
     return minutes > 0 ? `${minutes}m ${remainder}s` : `${remainder}s`;
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+    const typeFilter = document.getElementById("run_history_type");
+    if (typeFilter) {
+        typeFilter.addEventListener("change", loadRunHistory);
+    }
+});
+
 function loadRunHistory() {
 
-    socket.emit("load_run_history", { instance_id: instanceId });
+    const typeFilter = document.getElementById("run_history_type");
+    const runType = typeFilter ? typeFilter.value : "";
+
+    socket.emit("load_run_history", { instance_id: instanceId, run_type: runType });
 
     socket.once("load_run_history", (data) => {
         if (!validResponse(data)) { return; }
@@ -1678,9 +1706,9 @@ function loadRunHistory() {
         if (runs.length === 0) {
             const row = document.createElement("tr");
             const cell = document.createElement("td");
-            cell.colSpan = 10;
+            cell.colSpan = 11;
             cell.className = "text-muted";
-            cell.textContent = "No runs recorded yet.";
+            cell.textContent = runType ? "No runs of this type recorded yet." : "No runs recorded yet.";
             row.appendChild(cell);
             body.appendChild(row);
             return;
@@ -1692,8 +1720,9 @@ function loadRunHistory() {
 
             const cells = [
                 new Date(run.started_at).toLocaleString(),
-                run.filename,
-                run.scheduled ? "Scheduled" : "Manual",
+                RUN_HISTORY_TYPE_LABELS[run.run_type] || run.run_type,
+                run.label,
+                RUN_HISTORY_TRIGGER_LABELS[run.trigger] || run.trigger,
                 outcome.text,
                 run.assets_processed,
                 run.success_count,
@@ -1704,11 +1733,11 @@ function loadRunHistory() {
             ];
 
             // Indexes match the header row: detail columns collapse on narrow screens
-            const narrowHidden = [2, 4, 5, 6, 7, 9];
+            const narrowHidden = [3, 5, 6, 7, 8, 10];
             cells.forEach((value, index) => {
                 const cell = document.createElement("td");
                 cell.textContent = value;
-                if (index === 3) { cell.className = outcome.className; }
+                if (index === 4) { cell.className = outcome.className; }
                 if (narrowHidden.includes(index)) { cell.classList.add("d-none", "d-md-table-cell"); }
                 row.appendChild(cell);
             });

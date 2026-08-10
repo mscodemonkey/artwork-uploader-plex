@@ -1,7 +1,29 @@
-"""Unit tests for the bulk-import run-summary counters."""
+"""Unit tests for the run-summary counters."""
+
+import pytest
 
 from models.callbacks import ProcessingCallbacks
 from services.artwork_processor import ArtworkProcessor
+
+
+@pytest.mark.parametrize("result, expected", [
+    ("✅ A Movie | Poster updated in Movies", "success"),
+    ("♻️ A Movie | Poster forced update in Movies", "success"),
+    ("🔒 A Movie | Poster locked, skipped in Movies", "locked"),
+    ("❌ A Movie | Failed to update Poster in Movies", "failed"),
+    ("⏩ A Movie | Poster unchanged in Movies", None),
+    ("⚠️ A Movie | Poster skipped - artwork is for a different title", None),
+])
+def test_record_result_reads_the_uploader_prefixes(result, expected):
+    """Every caller that tallies a run reads these prefixes, so they are checked once
+    here rather than restated in each one."""
+    counters = ProcessingCallbacks(success_counter=[0], locked_counter=[0], failed_counter=[0])
+
+    assert counters.record_result(result) == expected
+
+
+def test_record_result_is_a_no_op_without_counters():
+    assert ProcessingCallbacks().record_result("✅ A Movie | Poster updated") == "success"
 
 
 def test_locked_counter_increments():

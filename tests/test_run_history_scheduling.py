@@ -12,7 +12,7 @@ import pytest
 import core.globals as globals
 from artwork_uploader import process_bulk_file_on_schedule
 from models.instance import Instance
-from services.run_history import RunHistory, OUTCOME_FAILED, OUTCOME_SKIPPED
+from services.run_history import RunHistory, TRIGGER_SCHEDULED, OUTCOME_FAILED, OUTCOME_SKIPPED
 
 
 @pytest.fixture
@@ -29,9 +29,9 @@ def test_missing_bulk_file_is_recorded_as_failed(history):
 
     runs = history.get_runs()
     assert len(runs) == 1
-    assert runs[0]["filename"] == "missing.txt"
+    assert runs[0]["label"] == "missing.txt"
     assert runs[0]["outcome"] == OUTCOME_FAILED
-    assert runs[0]["scheduled"] is True
+    assert runs[0]["trigger"] == TRIGGER_SCHEDULED
 
 
 @pytest.mark.unit

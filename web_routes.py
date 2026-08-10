@@ -25,6 +25,7 @@ from core.enums import FileType, MediaType, ScraperSource, StatusColor
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService, RunHistory
+from services.run_history import RUN_TYPES
 from services.webhook_service import parse_event
 from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER
 
@@ -359,10 +360,13 @@ def setup_socket_handlers(
 
     @globals.web_socket.on("load_run_history")
     def load_run_history(data):
-        """Load recent bulk import run history."""
+        """Load recent run history, optionally narrowed to one run type."""
         instance = Instance(data.get("instance_id"), "web")
-        runs = RunHistory().get_runs(limit=50)
-        notify_web(instance, "load_run_history", {"runs": runs})
+        run_type = data.get("run_type") or None
+        if run_type not in RUN_TYPES:
+            run_type = None
+        runs = RunHistory().get_runs(limit=50, run_type=run_type)
+        notify_web(instance, "load_run_history", {"runs": runs, "run_type": run_type or "all"})
 
     @globals.web_socket.on("load_bulk_import")
     def load_bulk_import(data):
