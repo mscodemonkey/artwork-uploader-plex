@@ -60,5 +60,20 @@
     "_schedules_help": "Scheduled bulk import jobs. Configure through the web UI",
 
     "apprise_urls": [],
-    "_apprise_urls": "Comma-separated list of Apprise notification URLs"
+    "_apprise_urls": "Comma-separated list of Apprise notification URLs",
+
+    "plex_connect_timeout": 10,
+    "_plex_connect_timeout_help": "Seconds to wait when connecting to the Plex server (also applies to uploads)",
+
+    "plex_test_connection_timeout": 5,
+    "_plex_test_connection_timeout_help": "Seconds to wait when testing a Plex connection from the web settings",
+
+    "kometa_download_timeout": 5,
+    "_kometa_download_timeout_help": "Seconds to wait when downloading artwork to save to the Kometa asset directory",
+
+    "upload_retry_attempts": 3,
+    "_upload_retry_attempts_help": "Total attempts (including the first) made for a transient upload failure - a timeout or a 5xx",
+
+    "upload_retry_backoff_seconds": 1,
+    "_upload_retry_backoff_seconds_help": "Seconds to wait before the first retry, doubling after each subsequent attempt"
 }

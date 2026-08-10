@@ -1,6 +1,8 @@
 import requests, plexapi.exceptions, xml.etree.ElementTree, re
 from typing import Optional, List, Tuple, Union, Literal
+from core import globals
 from core.enums import MediaType
+from core.constants import DEFAULT_PLEX_CONNECT_TIMEOUT
 from plexapi.server import PlexServer
 from plexapi.library import MovieSection, ShowSection
 from plexapi.video import Movie, Show
@@ -48,14 +50,16 @@ class PlexConnector:
             if not self.base_url or not self.token:
                 raise PlexConnectorException("Invalid Plex token or base URL. Please provide valid values in config.json or via the GUI.")
 
+            timeout = globals.config.plex_connect_timeout if globals.config else DEFAULT_PLEX_CONNECT_TIMEOUT
+
             try:
-                self.plex = PlexServer(self.base_url, self.token, timeout=10)  # Initialize the Plex server connection with 10 second timeout
+                self.plex = PlexServer(self.base_url, self.token, timeout=timeout)  # Also governs the timeout for uploads, which reuse this connection
 
             except requests.exceptions.Timeout as e:
                 # Handle timeout errors specifically
                 self.plex = None
                 raise PlexConnectorException(
-                    f'Connection to Plex server at {self.base_url} timed out after 10 seconds. Please check that the server is running and accessible.',
+                    f'Connection to Plex server at {self.base_url} timed out after {timeout} seconds. Please check that the server is running and accessible.',
                     f"Plex connection timeout: {str(e)}")
 
             except requests.exceptions.RequestException as e:

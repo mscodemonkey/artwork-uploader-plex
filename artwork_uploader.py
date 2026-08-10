@@ -268,6 +268,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     assets_processed = [0]
     cached_counter = [0]
     locked_counter = [0]
+    failed_counter = [0]  # Uploads that failed after exhausting their retries
     errors = 0
 
     try:
@@ -299,7 +300,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 break
 
             try:
-                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed, cached_counter=cached_counter, locked_counter=locked_counter)
+                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed, cached_counter=cached_counter, locked_counter=locked_counter, failed_counter=failed_counter)
                 #time.sleep(1)
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
@@ -319,6 +320,11 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         end_time = time.time()
         elapsed = elapsed_time(end_time - start_time)
 
+        # A line that failed to scrape at all (errors) and an item that failed to upload after
+        # exhausting its retries (failed_counter) both count as errors in the run summary. An
+        # item that succeeded on a retry never reaches failed_counter, so it isn't one.
+        total_errors = errors + failed_counter[0]
+
         if globals.cancel_scrape:
             message = (
                 "🛑 "
@@ -328,21 +334,23 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 + (f"{cached_counter[0]} new in cache • " if cached_counter[0] else "")
                 + f"{success_counter[0]} asset(s) updated"
                 + (f" • {locked_counter[0]} asset(s) locked (skipped)" if locked_counter[0] else "")
+                + (f" • {failed_counter[0]} asset(s) failed" if failed_counter[0] else "")
             )
             update_status(instance, message[2:], color=StatusColor.WARNING.value, sticky=False, spinner=False)
             notify_web(instance, "progress_bar", {"percent": 100, "bar_type": "bulk"})
         else:
             message = (
-                ("🏁 " if errors == 0 else "⚠️ ")
+                ("🏁 " if total_errors == 0 else "⚠️ ")
                 + ("Scheduled b" if scheduled else "B")
                 + f"ulk import of '{display_filename}' completed "
-                + (f"successfully in {elapsed} • " if errors == 0 else f"with {errors} error(s) in {elapsed}, check logs for details • ")
+                + (f"successfully in {elapsed} • " if total_errors == 0 else f"with {total_errors} error(s) in {elapsed}, check logs for details • ")
                 + f"{assets_processed[0]} asset(s) processed • "
                 + (f"{cached_counter[0]} new in cache • " if cached_counter[0] else "")
                 + f"{success_counter[0]} asset(s) updated"
                 + (f" • {locked_counter[0]} asset(s) locked (skipped)" if locked_counter[0] else "")
+                + (f" • {failed_counter[0]} asset(s) failed" if failed_counter[0] else "")
             )
-            update_status(instance, message[2:], color=StatusColor.SUCCESS.value if errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
+            update_status(instance, message[2:], color=StatusColor.SUCCESS.value if total_errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
         update_log(instance, message)
         if scheduled:
             debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).")
@@ -361,7 +369,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             globals.scrape_type = "stopped"
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
-def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None, cached_counter=None, locked_counter=None):
+def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None, cached_counter=None, locked_counter=None, failed_counter=None):
     """
     Scrape artwork from a URL and upload to Plex.
 
@@ -401,7 +409,8 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, success_coun
         success_counter=success_counter,
         assets_processed=assets_processed,
         cached_counter=cached_counter,
-        locked_counter=locked_counter
+        locked_counter=locked_counter,
+        failed_counter=failed_counter
     )
 
     # Use the service to do the actual work

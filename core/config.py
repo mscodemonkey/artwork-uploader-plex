@@ -5,6 +5,13 @@ Application configuration management.
 import json, os
 from core import globals
 from typing import List, Dict, Any
+from core.constants import (
+    DEFAULT_PLEX_CONNECT_TIMEOUT,
+    DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT,
+    DEFAULT_KOMETA_DOWNLOAD_TIMEOUT,
+    DEFAULT_UPLOAD_RETRY_ATTEMPTS,
+    DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS,
+)
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 from utils.notifications import debug_me
 from utils.utils import get_host_path
@@ -44,6 +51,11 @@ class Config:
         webhook_token: Shared secret required on webhook requests
         webhook_tpdb_users: ThePosterDB users to apply cached artwork from on import, in priority order
         webhook_apply_delay: Seconds to wait after an import before applying artwork (lets Plex scan first)
+        plex_connect_timeout: Seconds to wait when connecting to the Plex server (also applies to uploads)
+        plex_test_connection_timeout: Seconds to wait when testing a Plex connection from the web settings
+        kometa_download_timeout: Seconds to wait when downloading artwork to save to the Kometa asset directory
+        upload_retry_attempts: Total attempts (including the first) made for a transient upload failure
+        upload_retry_backoff_seconds: Seconds to wait before the first retry, doubling after each attempt
     """
 
     def __init__(self, config_path: str = "config/config.json") -> None:
@@ -76,6 +88,11 @@ class Config:
         self.webhook_token: str = ""
         self.webhook_tpdb_users: List[str] = []
         self.webhook_apply_delay: int = 30
+        self.plex_connect_timeout: int = DEFAULT_PLEX_CONNECT_TIMEOUT
+        self.plex_test_connection_timeout: int = DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT
+        self.kometa_download_timeout: int = DEFAULT_KOMETA_DOWNLOAD_TIMEOUT
+        self.upload_retry_attempts: int = DEFAULT_UPLOAD_RETRY_ATTEMPTS
+        self.upload_retry_backoff_seconds: float = DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS
 
 
     def load(self) -> None:
@@ -122,6 +139,11 @@ class Config:
             self.webhook_token = config.get("webhook_token", "")
             self.webhook_tpdb_users = config.get("webhook_tpdb_users", [])
             self.webhook_apply_delay = config.get("webhook_apply_delay", 30)
+            self.plex_connect_timeout = config.get("plex_connect_timeout", DEFAULT_PLEX_CONNECT_TIMEOUT)
+            self.plex_test_connection_timeout = config.get("plex_test_connection_timeout", DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT)
+            self.kometa_download_timeout = config.get("kometa_download_timeout", DEFAULT_KOMETA_DOWNLOAD_TIMEOUT)
+            self.upload_retry_attempts = config.get("upload_retry_attempts", DEFAULT_UPLOAD_RETRY_ATTEMPTS)
+            self.upload_retry_backoff_seconds = config.get("upload_retry_backoff_seconds", DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS)
 
         except Exception as e:
             raise ConfigLoadError(f"Error loading configuration from '{self.path}': {e}") from e
@@ -153,7 +175,12 @@ class Config:
             "enable_webhooks": False,
             "webhook_token": "",
             "webhook_tpdb_users": [],
-            "webhook_apply_delay": 30
+            "webhook_apply_delay": 30,
+            "plex_connect_timeout": DEFAULT_PLEX_CONNECT_TIMEOUT,
+            "plex_test_connection_timeout": DEFAULT_PLEX_TEST_CONNECTION_TIMEOUT,
+            "kometa_download_timeout": DEFAULT_KOMETA_DOWNLOAD_TIMEOUT,
+            "upload_retry_attempts": DEFAULT_UPLOAD_RETRY_ATTEMPTS,
+            "upload_retry_backoff_seconds": DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS
         }
 
         if globals.docker:
@@ -205,7 +232,12 @@ class Config:
             "enable_webhooks": self.enable_webhooks,
             "webhook_token": self.webhook_token,
             "webhook_tpdb_users": self.webhook_tpdb_users,
-            "webhook_apply_delay": self.webhook_apply_delay
+            "webhook_apply_delay": self.webhook_apply_delay,
+            "plex_connect_timeout": self.plex_connect_timeout,
+            "plex_test_connection_timeout": self.plex_test_connection_timeout,
+            "kometa_download_timeout": self.kometa_download_timeout,
+            "upload_retry_attempts": self.upload_retry_attempts,
+            "upload_retry_backoff_seconds": self.upload_retry_backoff_seconds
         }
 
         try:

@@ -141,6 +141,9 @@ class UploadProcessor:
                 if self.kometa:
                     asset_folder = collection_item.title.replace("/", "").replace(":", "")
                     saver = KometaSaver(artwork_type, library)
+                    saver.download_timeout = self.config.kometa_download_timeout
+                    saver.retry_attempts = self.config.upload_retry_attempts
+                    saver.retry_backoff = self.config.upload_retry_backoff_seconds
                     saver.set_artwork(artwork)
                     base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                     saver.dest_dir = os.path.join(base_dir, library, asset_folder)
@@ -159,6 +162,8 @@ class UploadProcessor:
                     uploader.skip_locked = self.skip_locked
                     uploader.allow_artist_updates = self.allow_artist_updates
                     uploader.artist_assets = self.artist_assets
+                    uploader.retry_attempts = self.config.upload_retry_attempts
+                    uploader.retry_backoff = self.config.upload_retry_backoff_seconds
                     uploader.set_description(description)
                     uploader.set_options(self.options)
                     result = uploader.upload_to_plex()
@@ -198,6 +203,9 @@ class UploadProcessor:
                     path_parts = get_path_parts(item_path)
                     asset_folder = path_parts[-2]
                     saver = KometaSaver(artwork_type, library)
+                    saver.download_timeout = self.config.kometa_download_timeout
+                    saver.retry_attempts = self.config.upload_retry_attempts
+                    saver.retry_backoff = self.config.upload_retry_backoff_seconds
                     saver.set_artwork(artwork)
                     base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                     saver.dest_dir = os.path.join(base_dir, library, asset_folder)
@@ -218,6 +226,8 @@ class UploadProcessor:
                     uploader.skip_locked = self.skip_locked
                     uploader.allow_artist_updates = self.allow_artist_updates
                     uploader.artist_assets = self.artist_assets
+                    uploader.retry_attempts = self.config.upload_retry_attempts
+                    uploader.retry_backoff = self.config.upload_retry_backoff_seconds
                     if locally_matched:
                         uploader.confirm_match = lambda a=artwork, item=movie_item: self._artwork_matches_item(a, item, "movie")
                     uploader.set_description(desc)
@@ -335,6 +345,9 @@ class UploadProcessor:
                 try:
                     if self.kometa:
                         saver = KometaSaver(artwork_type, library)
+                        saver.download_timeout = self.config.kometa_download_timeout
+                        saver.retry_attempts = self.config.upload_retry_attempts
+                        saver.retry_backoff = self.config.upload_retry_backoff_seconds
                         saver.set_artwork(artwork)
                         base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, 'temp_dir' if self.options.temp else 'kometa_base', None)
                         saver.dest_dir = os.path.join(base_dir, library, asset_folder)
@@ -356,6 +369,8 @@ class UploadProcessor:
                         uploader.skip_locked = self.skip_locked
                         uploader.allow_artist_updates = self.allow_artist_updates
                         uploader.artist_assets = self.artist_assets
+                        uploader.retry_attempts = self.config.upload_retry_attempts
+                        uploader.retry_backoff = self.config.upload_retry_backoff_seconds
                         if locally_matched:
                             uploader.confirm_match = lambda a=artwork, item=tv_show: self._artwork_matches_item(a, item, "tv")
                         uploader.set_description(desc)

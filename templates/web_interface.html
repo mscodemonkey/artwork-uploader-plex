@@ -490,6 +490,45 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Timeouts and retries -->
+                            <div class="row mb-3">
+                                <div class="col">
+                                    <div class="p-3 border rounded-4 shadow-sm">
+                                        <h5 class="mb-3"><i class="bi bi-stopwatch"></i>&ensp;Timeouts and retries</h5>
+                                        <div class="mt-2 d-flex align-items-center">
+                                            <label for="plex_connect_timeout" class="form-label me-2 mb-0">Wait for a Plex connection or upload for</label>
+                                            <input type="number" class="form-control form-control-sm text-center d-inline-block me-2 input-monospace"
+                                                id="plex_connect_timeout" name="plex_connect_timeout" min="1" max="300" value="10" style="width: 60px;" required />
+                                            <span class="text-body">seconds</span>
+                                        </div>
+                                        <div class="mt-2 d-flex align-items-center">
+                                            <label for="plex_test_connection_timeout" class="form-label me-2 mb-0">Wait for a settings connection test for</label>
+                                            <input type="number" class="form-control form-control-sm text-center d-inline-block me-2 input-monospace"
+                                                id="plex_test_connection_timeout" name="plex_test_connection_timeout" min="1" max="60" value="5" style="width: 60px;" required />
+                                            <span class="text-body">seconds</span>
+                                        </div>
+                                        <div class="mt-2 d-flex align-items-center">
+                                            <label for="kometa_download_timeout" class="form-label me-2 mb-0">Wait for a Kometa artwork download for</label>
+                                            <input type="number" class="form-control form-control-sm text-center d-inline-block me-2 input-monospace"
+                                                id="kometa_download_timeout" name="kometa_download_timeout" min="1" max="300" value="5" style="width: 60px;" required />
+                                            <span class="text-body">seconds</span>
+                                        </div>
+                                        <div class="mt-2 d-flex align-items-center">
+                                            <label for="upload_retry_attempts" class="form-label me-2 mb-0">Attempt a failed upload</label>
+                                            <input type="number" class="form-control form-control-sm text-center d-inline-block me-2 input-monospace"
+                                                id="upload_retry_attempts" name="upload_retry_attempts" min="1" max="10" value="3" style="width: 60px;" required />
+                                            <span class="text-body">times in total</span>
+                                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Only transient failures are retried: a timeout or a server error. The count includes the first attempt."></i>
+                                        </div>
+                                        <div class="mt-2 mb-3 d-flex align-items-center">
+                                            <label for="upload_retry_backoff_seconds" class="form-label me-2 mb-0">Wait before the first retry for</label>
+                                            <input type="number" class="form-control form-control-sm text-center d-inline-block me-2 input-monospace"
+                                                id="upload_retry_backoff_seconds" name="upload_retry_backoff_seconds" min="0" max="60" step="0.5" value="1" style="width: 60px;" required />
+                                            <span class="text-body">seconds, doubling each retry</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <!-- Notifications settings -->
                             <div class="row mb-3">
                                 <div class="col">
