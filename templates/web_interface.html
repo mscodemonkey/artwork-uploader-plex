@@ -345,7 +345,7 @@
                                 <div class="col">
                                     <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3">
-                                            <i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from ThePosterDB&thinsp;
+                                            <i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none h5 d-sm-inline-block">to include&nbsp;</span>from ThePosterDB&thinsp;
                                             <a href="https://theposterdb.com" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a>
                                         </h5>
                                         
@@ -387,7 +387,7 @@
                                 <div class="col">
                                     <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3">
-                                            <i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none d-sm-inline-block">to include&nbsp;</span>from MediUX&thinsp;
+                                            <i class="bi bi-card-image"></i>&ensp;Artwork <span class="d-none h5 d-sm-inline-block">to include&nbsp;</span>from MediUX&thinsp;
                                             <a href="https://mediux.pro" target="_blank" rel="noopener noreferrer"><i class="bi bi-link-45deg"></i></a>
                                         </h5>
 
@@ -490,7 +490,7 @@
                                             days</label>
                                         </div>                                        
                                         <div class="mt-2 d-flex align-items-center">
-                                            <label for="catch_up_window_minutes" class="form-label me-2 mb-0"><i class="bi bi-calendar-x"></i>&ensp;Missed scheduled run catch-up window:
+                                            <label for="catch_up_window_minutes" class="form-label me-2 mb-0"><i class="bi bi-calendar-x"></i>&ensp;Missed run catch-up window:
                                             <input type="number"
                                                 class="form-control form-control-sm text-center d-inline-block me-0 input-monospace"
                                                 id="catch_up_window_minutes"
@@ -501,7 +501,7 @@
                                                 style="width: 60px;"
                                                 required />
                                             <span class="text-nowrap">minutes
-                                            &nbsp;<i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="If the app was not running when a scheduled bulk import was due, run it on startup as long as it's within this many minutes of when it was due. Set to 0 to leave missed runs skipped, as before."></i></span></label>
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="If the app was not running when a scheduled bulk import was due, run it on startup as long as it's within this many minutes of when it was due. Set to 0 to leave missed runs skipped, as before."></i></span></label>
                                         </div>
 
                                     </div>
@@ -545,7 +545,7 @@
                                 </div> 
                             </div>
                             <!-- Notifications settings -->
-                            <div class="row mb-3">
+                            <div class="row mb-0">
                                 <div class="col">
                                     <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3"><i class="bi bi-app-indicator"></i>&ensp;Notifications settings</h5>
@@ -572,8 +572,7 @@
                         </div>
                     </div>
                     <!-- Floating Save Button Container -->
-                    <div class="setttings-bottom-sentinel" style="height: 1px; margin-top: 1rem;"></div>
-                    <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
+                    <div class="sticky-bottom pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
                         <div class="d-flex align-items-center gap-2">
                             <button type="submit" id="save_config_button" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill no-caret fab-collapse collapsed">
                                 <i class="bi bi-floppy2"></i>
@@ -717,8 +716,7 @@
                 </div>
 
                 <!-- Floating Button Container -->
-                 <div class="bulk-bottom-sentinel" style="height: 1px; margin-top: 1rem;"></div>
-                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
+                <div class="sticky-bottom pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
                     <div class="d-flex align-items-center gap-2">
                         <button type="button" id="save_bulk_button" onclick="checkBulkImportFileToSave()" class="btn shadow d-flex align-items-center gap-2 rounded-pill fab-collapse collapsed">
                             <i class="bi bi-floppy2"></i>
@@ -859,13 +857,13 @@
                         <div class="col">
                             <div class="p-3 border rounded-4 shadow-sm">
                                 <h5 class="mb-3"><i class="bi bi-card-image"></i>&ensp;Artwork to include</h5>
-                                <div class="form-check form-switch mb-2">
+                                <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" checked value="inherit" name="filter" id="scraper-filters-global"/>
                                     <label for="scraper-filters-global" class="form-check-label">As set by global filters</label>
                                 </div>
                                 <div id="scraper-filters" class="collapse">
                                     <!-- TV Shows -->
-                                    <div class="mb-2"><strong>TV Shows</strong></div>
+                                    <div class="mt-2 mb-2"><strong>TV Shows</strong></div>
                                     <div class="d-flex flex-wrap align-items-center gap-y-2 mb-3">
                                         <div class="form-check form-switch filter-toggle-item m-0">
                                             <input class="form-check-input" type="checkbox" checked value="show_cover" id="filter-show_cover"/>
@@ -910,8 +908,7 @@
                             </div>
                         </div>
                     </div>
-                    <div class="scraper-bottom-sentinel" style="height: 1px; margin-top: 1rem;"></div>
-                    <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
+                    <div class="sticky-bottom pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
                         <button type="button" id="scrape_button" onclick="startScrape()" class="btn btn-primary shadow d-flex align-items-center gap-2 rounded-pill fab-collapse collapsed">
                             <i class="bi bi-play-circle"></i>
                             <span>Scrape</span>
@@ -975,9 +972,9 @@
                     </div>
                 </div>
                 <form id="upload_form" class="needs-validation" novalidate>
-                    <div class="row">
+                    <div class="row mt-3">
                         <div class="col mb-3">
-                            <div class="p-3 border mt-3 rounded-4 shadow-sm">
+                            <div class="p-3 border mt-0 rounded-4 shadow-sm">
                                 <label for="plex_title" class="form-label h5"><i class="bi bi-textarea-t"></i>&ensp;Plex title</label>
                                 <input type="text" id="plex_title" name="plex_title" class="form-control"
                                     value=""
@@ -986,7 +983,7 @@
                             </div>
                         </div>
                         <div class="mb-3 col-md-4 col-lg-3">
-                            <div class="p-3 border mt-3 rounded-4 shadow-sm">
+                            <div class="p-3 border mt-0 rounded-4 shadow-sm">
                                     <label for="plex_year" class="form-label h5"><i class="bi bi-calendar3"></i>&ensp;Plex <span class="text-nowrap h5">year
                                     &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Use this if the year in Plex is different to that on MediUX or TPDb"></i></span></label>
                                     <input type="text" id="plex_year" name="plex_year" class="form-control"
@@ -1082,7 +1079,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                <div class="sticky-bottom pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
                     <div class="dropdown">
                         <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
@@ -1126,7 +1123,7 @@
             <!-- Scraping Log Tab -->
             <div class="tab-pane fade" id="scraping-log" role="tabpanel" aria-labelledby="scraping-log-tab" tabindex="0">
                 <div class="mt-3" id="scraping_log"><!-- --></div>
-                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                <div class="sticky-bottom pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
                     <div class="dropdown">
                         <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
@@ -1170,7 +1167,7 @@
             <!-- About Tab -->
             <div class="tab-pane fade" id="about" role="tabpanel" aria-labelledby="about-tab" tabindex="0">
                 <div class="row">
-                    <div class="col mb-3">
+                    <div class="col">
                         <div class="p-3 border rounded-4 shadow-sm">
                             <h5 class="mb-3"><i class="bi bi-code-slash"></i>&ensp;About Artwork Uploader for Plex</h5>
                             <div class="col">
@@ -1189,7 +1186,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="sticky-bottom mt-3 pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                <div class="sticky-bottom pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
                     <div class="dropdown">
                         <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
