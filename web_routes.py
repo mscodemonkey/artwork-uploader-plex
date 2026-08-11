@@ -10,7 +10,7 @@ The routes are organized into:
 - Helper functions for file uploads and processing
 """
 
-import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading
+import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading, uuid
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
@@ -365,21 +365,42 @@ def setup_socket_handlers(
 
     @globals.web_socket.on("rename_bulk_file")
     def rename_bulk_file(data):
-        """Rename a bulk import file."""
+        """Rename a bulk import file, taking any of its schedules along with it."""
         instance = Instance(data.get("instance_id"), "web")
         old_name = data.get("old_filename")
         new_name = data.get("new_filename")
-        time = globals.scheduler_service.run_times_by_file.get(old_name)
-        rename_bulk_import_file(instance, old_name, new_name)
-        if time:
-            delete_task_from_scheduler({"instance_id": instance.id, "file": old_name})
-            add_tasks_to_scheduler({"instance_id": instance.id, "file": new_name, "time": time})
+        if not rename_bulk_import_file(instance, old_name, new_name):
+            # The file on disk still has its old name; repointing the schedules
+            # would leave every one of them targeting a file that does not exist.
+            return
+
+        renamed_ids = globals.scheduler_service.rename_file(old_name, new_name)
+        if renamed_ids:
+            config.load()
+            for each_schedule in config.schedules:
+                if each_schedule.get("id") in renamed_ids:
+                    each_schedule["file"] = new_name
+            config.save()
 
     @globals.web_socket.on("delete_bulk_file")
     def delete_bulk_file(data):
-        """Delete a bulk import file."""
+        """Delete a bulk import file, and every schedule that points at it."""
         instance = Instance(data.get("instance_id"), "web")
-        delete_bulk_import_file(instance, data.get("filename"))
+        filename = data.get("filename")
+        if not delete_bulk_import_file(instance, filename):
+            return
+
+        # The server owns this cleanup: a client's in-memory schedule list can be
+        # stale, and an orphaned schedule fires forever against a missing file.
+        for job_id in globals.scheduler_service.get_jobs_for_file(filename):
+            globals.scheduler_service.remove_schedule(job_id)
+        config.load()
+        remaining = [s for s in config.schedules if s.get("file") != filename]
+        if len(remaining) != len(config.schedules):
+            removed = len(config.schedules) - len(remaining)
+            config.schedules = remaining
+            config.save()
+            update_log(instance, f"🗑️ Removed {removed} schedule(s) for '{filename}'")
 
     @globals.web_socket.on("create_bulk_file")
     def create_bulk_file(data):
@@ -607,49 +628,71 @@ def setup_socket_handlers(
 
     @globals.web_socket.on("delete_schedule")
     def delete_task_from_scheduler(data):
-        """Delete a scheduled task."""
+        """Delete a scheduled task, addressed by its own id.
+
+        Returns an ack value as well as broadcasting, so a caller that fires
+        several of these in a row (e.g. deleting a file with more than one
+        schedule) can match each response to its own request instead of all
+        of them racing to consume the same "delete_schedule" event.
+        """
         if data.get("instance_id"):
             instance = Instance(data.get("instance_id"), "web")
-            schedule_file = data.get("file")
+            schedule_id = data.get("id")
 
-            if schedule_file:
-                # Get job ID from scheduler service
-                job_id = globals.scheduler_service.get_job_id_by_file(schedule_file)
+            if schedule_id:
+                # Remove from scheduler service
+                removed = globals.scheduler_service.remove_schedule(schedule_id)
 
-                if job_id:
-                    # Remove from scheduler service
-                    globals.scheduler_service.remove_schedule(job_id)
-
+                if removed:
                     # Make sure it's also removed from the config file
                     config.load()
                     config.schedules = [
                         each_schedule
                         for each_schedule in config.schedules
-                        if each_schedule["file"] != schedule_file
+                        if each_schedule.get("id") != schedule_id
                     ]
                     config.save()
 
                     # And update the front-end
-                    notify_web(instance, "delete_schedule", { "file": schedule_file, "job_reference": job_id, "deleted": True })
-                    update_log(instance, f"🗑️ Deleted scheduled task for '{schedule_file}'")
-                    debug_me(f"Deleted scheduled task for '{schedule_file}' with job ID '{job_id}'")
+                    notify_web(instance, "delete_schedule", { "id": schedule_id, "deleted": True })
+                    update_log(instance, f"🗑️ Deleted scheduled task '{schedule_id}'")
+                    debug_me(f"Deleted scheduled task with job ID '{schedule_id}'")
+                    return {"id": schedule_id, "deleted": True}
                 else:
-                    debug_me(f"Couldn't find a scheduled job for '{schedule_file}'")
-                    notify_web(instance, "delete_schedule", {"deleted": False, "job_id": job_id})
+                    debug_me(f"Couldn't find a scheduled job with ID '{schedule_id}'")
+                    notify_web(instance, "delete_schedule", {"deleted": False, "id": schedule_id})
+                    return {"id": schedule_id, "deleted": False}
 
     @globals.web_socket.on("add_schedule")
     def add_tasks_to_scheduler(data):
-        """Add a new scheduled task."""
+        """Add a new scheduled task, or update an existing one if an id is given."""
         try:
             # Schedule bulk import task
             if data.get("instance_id"):
                 instance = Instance(data.get("instance_id"), "web")
+                schedule_id = data.get("id")
                 schedule_file = data.get("file")
                 schedule_time = data.get("time")
+                interval_value = data.get("interval_value")
+                interval_unit = data.get("interval_unit")
+
+                # Validate the shape before anything is persisted or removed: a bad
+                # payload written to config.json would raise on every startup.
+                from services.scheduler_service import VALID_INTERVAL_UNITS
+                if not schedule_time and not (interval_value and interval_unit in VALID_INTERVAL_UNITS):
+                    update_log(instance, f"🔴 Rejected invalid schedule for '{schedule_file}': needs a daily time or a valid interval")
+                    notify_web(instance, "add_schedule", {"added": False, "file": schedule_file})
+                    return {"added": False, "file": schedule_file}
+
+                # Editing an existing schedule replaces its job under the same id
+                if schedule_id:
+                    globals.scheduler_service.remove_schedule(schedule_id)
 
                 # Make sure the schedule is saved as part of the config
                 config.load()
-                update_or_add_schedule(schedule_file, schedule_time)
+                schedule_id = update_or_add_schedule(
+                    schedule_id, schedule_file, schedule_time, interval_value, interval_unit
+                )
                 config.save()
 
                 try:
@@ -657,16 +700,27 @@ def setup_socket_handlers(
                     def schedule_callback(filename=schedule_file):
                         add_file_to_schedule_thread(instance, filename)
 
-                    # Add to scheduler service
-                    job_id = globals.scheduler_service.add_schedule(
+                    # Add to scheduler service, keeping the id from config
+                    globals.scheduler_service.add_schedule(
                         schedule_file,
-                        schedule_time,
-                        schedule_callback
+                        schedule_callback,
+                        schedule_id=schedule_id,
+                        time=schedule_time,
+                        interval_value=interval_value,
+                        interval_unit=interval_unit,
                     )
 
-                    notify_web(instance, "add_schedule", { "added": True, "file": schedule_file, "time": schedule_time, "jobReference": job_id })
-                    update_log(instance, f"⏰ Added scheduled task '{schedule_file}' every day at {schedule_time}")
-                    debug_me(f"Added scheduled task '{schedule_file}' every day at {schedule_time} with job ID '{job_id}'")
+                    description = f"every day at {schedule_time}" if schedule_time else f"every {interval_value} {interval_unit}"
+                    notify_web(instance, "add_schedule", {
+                        "added": True,
+                        "id": schedule_id,
+                        "file": schedule_file,
+                        "time": schedule_time,
+                        "interval_value": interval_value,
+                        "interval_unit": interval_unit,
+                    })
+                    update_log(instance, f"⏰ Scheduled task '{schedule_file}' {description}")
+                    debug_me(f"Scheduled task '{schedule_file}' {description} with job ID '{schedule_id}'")
                 except Exception as e:
                     update_log(instance, f"🔴 Failed to add scheduled task '{schedule_file}'")
                     debug_me(f"Error adding schedule: {e}")
@@ -679,16 +733,28 @@ def setup_socket_handlers(
             debug_me(f"Error in scheduler setup: {e}")
             raise
 
-    def update_or_add_schedule(file_name, new_time):
-        """Helper function to update or add a schedule in config."""
+    def update_or_add_schedule(schedule_id, file_name, schedule_time, interval_value, interval_unit):
+        """Helper function to update or add a schedule in config. Returns the schedule's id."""
+        entry = {"file": file_name}
+        if schedule_time:
+            entry["time"] = schedule_time
+        else:
+            entry["interval_value"] = interval_value
+            entry["interval_unit"] = interval_unit
+
         for each_schedule in config.schedules:
-            if each_schedule["file"] == file_name:
-                # Update existing schedule
-                each_schedule["time"] = new_time
-                return
+            if each_schedule.get("id") == schedule_id:
+                # Update existing schedule in place, clearing out fields from the old type
+                each_schedule.pop("time", None)
+                each_schedule.pop("interval_value", None)
+                each_schedule.pop("interval_unit", None)
+                each_schedule.update(entry)
+                return schedule_id
 
         # Add new schedule if not found
-        config.schedules.append({"file": file_name, "time": new_time})
+        new_id = schedule_id or str(uuid.uuid4())
+        config.schedules.append({"id": new_id, **entry})
+        return new_id
 
     @globals.web_socket.on("detect_docker")
     def docker_detection(data):

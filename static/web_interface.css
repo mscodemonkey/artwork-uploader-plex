@@ -195,8 +195,8 @@ h1 {
     position: absolute;
     top: 0;
     right: 55px; /* Move the tooltip 20px to the right */
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bs-body-bg);
+    border: 1px solid var(--bs-border-color);
     padding: 15px;
     border-radius: 5px;
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
@@ -215,7 +215,7 @@ h1 {
     height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    border-bottom: 10px solid #dee2e6; /* Arrow border color */
+    border-bottom: 10px solid var(--bs-border-color); /* Arrow border color */
 }
 
 /* Inner arrow (matches tooltip background) */
@@ -228,7 +228,7 @@ h1 {
     height: 0;
     border-left: 9px solid transparent;
     border-right: 9px solid transparent;
-    border-bottom: 9px solid #f8f9fa; /* Matches tooltip background */
+    border-bottom: 9px solid var(--bs-body-bg); /* Matches tooltip background */
 }
 
 /* Class to show tooltip */

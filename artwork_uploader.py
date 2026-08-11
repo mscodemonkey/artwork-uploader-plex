@@ -1,4 +1,5 @@
 import uuid, os, re, threading, sys, time
+from datetime import datetime
 from core import globals
 
 # plexapi builds its X-Plex-Client-Identifier from uuid.getnode(), which can be
@@ -99,8 +100,6 @@ globals.docker = os.getenv("RUNNING_IN_DOCKER") == "1"
 # ! Interactive CLI mode flag
 interactive_cli = False  # Set to False when building the executable with PyInstaller for it launches the web UI by default
 mode = InstanceMode.CLI.value
-scheduled_jobs = {}  # Legacy - kept for backwards compatibility
-scheduled_jobs_by_file = {}  # Legacy - kept for backwards compatibility
 # Services moved to core.globals for proper cross-module access
 config = None  # Initialized in main
 
@@ -263,6 +262,25 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         filename:       The filename of the bulk import file being processed.
     """
 
+    display_filename = filename if filename else "bulk_import.txt"
+
+    # Single-flight guard: two bulk imports racing against the same Plex library is worse than
+    # a skipped one - the artwork ID label and locked-field logic both assume a single writer.
+    # A second run is refused rather than queued, so it doesn't silently pile up if schedules
+    # collide repeatedly; the caller (a schedule or the user) simply tries again later.
+    if not globals.bulk_import_lock.acquire(blocking=False):
+        message = f"⚠️ Bulk import of '{display_filename}' refused - another bulk import is already running"
+        update_log(instance, message)
+        update_status(instance, "Bulk import refused: another bulk import is already running", color=StatusColor.WARNING.value)
+        if scheduled:
+            send_notification(instance, message)
+        return
+
+    if scheduled and filename:
+        # Stamp the run only once it holds the lock: a refused run has not run,
+        # and stamping it would hide the miss from catch-up.
+        record_schedule_run(filename)
+
     # Track successful poster uploads (those with ✅ or ♻️)
     success_counter = [0]
     assets_processed = [0]
@@ -284,7 +302,6 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
         start_time = time.time()
         # Log the start of the bulk import process
-        display_filename = filename if filename else "bulk_import.txt"
 
         # Show the progress bar on the web UI
         message = f"{display_filename} • 0 of {len(parsed_urls)}"
@@ -367,6 +384,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             globals.cancel_scrape = False
             notify_web(instance, "scrape_state", {"running": False, "type": globals.scrape_type})
             globals.scrape_type = "stopped"
+        globals.bulk_import_lock.release()
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
 def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None, cached_counter=None, locked_counter=None, failed_counter=None):
@@ -614,8 +632,41 @@ def get_latest_version():
     return globals.update_service.get_latest_version() if globals.update_service else None
 
 def add_file_to_schedule_thread(instance: Instance, filename):
-    if instance:
+    if not instance:
+        return
+
+    # Overlap guard: don't let a catch-up run and a normally scheduled run for the
+    # same file execute at the same time.
+    if not globals.scheduler_service.try_start(filename):
+        update_log(instance, f"⏳ Scheduled bulk import for '{filename}' skipped, a run is already in progress")
+        debug_me(f"Skipped scheduled run for '{filename}': already in progress")
+        return
+
+    try:
         threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
+    except Exception as e:
+        # The guard must not leak, and an error here must not kill the scheduler thread
+        globals.scheduler_service.finish(filename)
+        update_log(instance, f"🔴 Could not start scheduled bulk import for '{filename}' ({e})")
+
+def record_schedule_run(filename):
+    """Record that a scheduled run for this bulk file has just started, so a future
+    restart can tell whether a run was missed.
+
+    A run executes the whole file, so every schedule the file carries gets the
+    stamp. Stamping only the first would leave the file's other daily schedules
+    with no last_run, which disables catch-up for them."""
+    if globals.config is None:
+        return
+    try:
+        for each_schedule in globals.config.schedules:
+            if each_schedule.get("file") == filename:
+                each_schedule["last_run"] = datetime.now().isoformat()
+        globals.config.save()
+    except Exception as e:
+        # A failed stamp costs one catch-up decision; letting it propagate would
+        # kill the scheduler thread, which costs every future run.
+        debug_me(f"Could not record schedule run for '{filename}': {e}")
 
 def process_bulk_file_on_schedule(instance: Instance, filename):
 
@@ -638,10 +689,8 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
         update_log(instance, f"🔴 Scheduled bulk import failed due to missing file ({filename})")
     except Exception as e:
         update_log(instance, f"🔴 Scheduled bulk import unexpectedly failed ({str(e)})")
-
-
-# Legacy functions - now handled by SchedulerService
-# Kept for backwards compatibility but no longer used internally
+    finally:
+        globals.scheduler_service.finish(filename)
 
 
 #Initialises the scheduler when the script is run
@@ -660,23 +709,30 @@ def setup_scheduler_on_first_load(instance: Instance):
     # If there are no scheduled jobs already...
     if not globals.scheduler_service.has_schedules():
         for each_schedule in globals.config.schedules:
+            schedule_id = each_schedule.get("id")
             schedule_file = each_schedule.get("file")
-            schedule_time = each_schedule.get("time")
 
             # Create the callback for this schedule
             def schedule_callback(filename=schedule_file):
                 add_file_to_schedule_thread(instance, filename)
 
-            # Add to scheduler service
-            job_id = globals.scheduler_service.add_schedule(
-                schedule_file,
-                schedule_time,
-                schedule_callback
-            )
+            # Add to scheduler service, reusing the id already stored in
+            # config so the schedule keeps the same identity across reloads.
+            # A malformed persisted entry is skipped, not fatal: one bad line in
+            # config.json must not stop the app starting.
+            try:
+                globals.scheduler_service.add_schedule(
+                    schedule_file,
+                    schedule_callback,
+                    schedule_id=schedule_id,
+                    time=each_schedule.get("time"),
+                    interval_value=each_schedule.get("interval_value"),
+                    interval_unit=each_schedule.get("interval_unit"),
+                )
+            except ValueError as e:
+                update_log(instance, f"🔴 Skipping invalid schedule for '{schedule_file}': {e}")
+                debug_me(f"Skipping invalid schedule entry {each_schedule}: {e}")
 
-            # Store job reference in config and legacy dicts
-            each_schedule["jobReference"] = job_id
-            scheduled_jobs_by_file[schedule_file] = job_id
 
         # Start the scheduler
         if globals.scheduler_service.start():
@@ -685,14 +741,56 @@ def setup_scheduler_on_first_load(instance: Instance):
         debug_me(globals.config.schedules)
 
 
-# Update the job references for any scheduled jobs if we reload the config file
-def update_scheduled_jobs():
+def catch_up_missed_schedules(instance: Instance):
+    """Run any daily schedule that was due while the app was not running.
+
+    Called from main only after the Plex libraries are connected: a catch-up run
+    fired before that point executes against empty libraries, fails every item,
+    and burns its one chance to be caught up."""
     if globals.config is None:
         return
     for each_schedule in globals.config.schedules:
-        schedule_file = each_schedule.get("file", "")
-        if schedule_file and schedule_file in scheduled_jobs_by_file:
-            each_schedule["jobReference"] = scheduled_jobs_by_file[schedule_file]
+        catch_up_missed_schedule(instance, each_schedule.get("file"), each_schedule.get("time"), each_schedule.get("last_run"))
+
+
+def catch_up_missed_schedule(instance: Instance, filename, schedule_time, last_run):
+    """
+    Run a scheduled bulk import that was due while the app was not running, if it falls
+    inside the configured catch-up window. Otherwise, just log that it was skipped.
+
+    Args:
+        instance: Instance to run/log the catch-up as
+        filename: Bulk file the schedule is for
+        schedule_time: Time of day the schedule runs, as "HH:MM"
+        last_run: ISO timestamp of the last time this schedule ran, or None
+    """
+    window_minutes = globals.config.catch_up_window_minutes if globals.config else 0
+
+    due, within_window = globals.scheduler_service.get_missed_run(
+        schedule_time, last_run, datetime.now(), window_minutes
+    )
+
+    if due is None:
+        return
+
+    due_display = due.strftime("%Y-%m-%d %H:%M")
+
+    if within_window:
+        update_log(instance, f"⏰ Catching up missed scheduled run for '{filename}' (was due {due_display})")
+        debug_me(f"Catch-up run for '{filename}', due {due.isoformat()}, window {window_minutes} minutes")
+        add_file_to_schedule_thread(instance, filename)
+    else:
+        update_log(instance, f"⚠️ Scheduled run for '{filename}' was missed and is outside the catch-up window (was due {due_display})")
+        debug_me(f"Missed scheduled run for '{filename}', due {due.isoformat()}, outside catch-up window of {window_minutes} minutes")
+
+
+# Kept as a hook for the "load_config" socket event. There is nothing to
+# resync here: a schedule's id is the single source of truth shared between
+# config.json and the running scheduler, and every add/edit/delete/rename
+# already keeps the two in step as they happen, so reloading config.json
+# from disk does not need to tear down and rebuild the live jobs.
+def update_scheduled_jobs():
+    pass
 
 
 # * Main Initialization ---
@@ -865,6 +963,10 @@ if __name__ == "__main__":
                     print(f"{e}\n")
                     print("The web UI will still start, but you won't be able to upload artwork")
                     print("until you fix the Plex connection in Settings.\n")
+
+            # Catch up missed schedules only now that the libraries are connected
+            if plex_connected and (os.getenv("WERKZEUG_RUN_MAIN") == "true" or not globals.debug):
+                catch_up_missed_schedules(cli_instance)
 
             # Create the app and web server
 

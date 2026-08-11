@@ -2,7 +2,7 @@
 Application configuration management.
 """
 
-import json, os
+import json, os, uuid
 from core import globals
 from typing import List, Dict, Any
 from core.constants import (
@@ -42,6 +42,7 @@ class Config:
         auto_manage_bulk_files: Whether to auto-organize bulk files
         reset_overlay: Whether to reset Kometa overlay labels on upload
         schedules: List of scheduled bulk import jobs
+        catch_up_window_minutes: How late a missed scheduled run can be and still run on startup, in minutes (0 disables catch-up)
         auth_enabled: Whether authentication is enabled for the web server
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
@@ -78,6 +79,7 @@ class Config:
         self.auto_manage_bulk_files: bool = True
         self.reset_overlay: bool = False
         self.schedules: List[Dict[str, Any]] = []
+        self.catch_up_window_minutes: int = 0
         self.auth_enabled: bool = False
         self.auth_username: str = ""
         self.auth_password_hash: str = ""
@@ -127,7 +129,8 @@ class Config:
             self.user_cache_refresh_days = config.get("user_cache_refresh_days", 7)
             self.auto_manage_bulk_files = config.get("auto_manage_bulk_files", True)
             self.reset_overlay = config.get("reset_overlay", False)
-            self.schedules = config.get("schedules", [])
+            self.schedules, schedules_migrated = self._migrate_schedules(config.get("schedules", []))
+            self.catch_up_window_minutes = config.get("catch_up_window_minutes", 0)
             self.auth_enabled = config.get("auth_enabled", False)
             self.auth_username = config.get("auth_username", "")
             self.auth_password_hash = config.get("auth_password_hash", "")
@@ -143,6 +146,33 @@ class Config:
 
         except Exception as e:
             raise ConfigLoadError(f"Error loading configuration from '{self.path}': {e}") from e
+
+        # Persist any ids minted by the migration above, so they stay stable
+        # across reloads instead of being handed out fresh every time (which
+        # would break anything that had already matched a schedule by id).
+        if schedules_migrated:
+            self.save()
+
+    @staticmethod
+    def _migrate_schedules(schedules: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], bool]:
+        """
+        Give every schedule an id, so schedules are addressed by their own
+        id rather than by filename.
+
+        Older config.json files stored one schedule per file as
+        {"file": ..., "time": ...} with no id. Those entries keep working
+        unchanged, they just gain an id here so they can sit alongside
+        other schedules on the same file.
+
+        Returns:
+            The schedule list, and whether any entry was missing an id
+        """
+        migrated = False
+        for entry in schedules:
+            if "id" not in entry:
+                entry["id"] = str(uuid.uuid4())
+                migrated = True
+        return schedules, migrated
 
     def create(self) -> None:
         """Create a new configuration file with default values."""
@@ -167,6 +197,7 @@ class Config:
             "auto_manage_bulk_files": True,
             "reset_overlay": True,
             "schedules": [],
+            "catch_up_window_minutes": 0,
             "apprise_urls": [],
             "enable_webhooks": False,
             "webhook_token": "",
@@ -220,6 +251,7 @@ class Config:
             "auto_manage_bulk_files": self.auto_manage_bulk_files,
             "reset_overlay": self.reset_overlay,
             "schedules": self.schedules,
+            "catch_up_window_minutes": self.catch_up_window_minutes,
             "auth_enabled": self.auth_enabled,
             "auth_username": self.auth_username,
             "auth_password_hash": self.auth_password_hash,
