@@ -1,12 +1,16 @@
 """Unit tests for the Sonarr/Radarr import webhook (services/webhook_service.py)."""
 
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 import pytest
 
+import services.webhook_service as webhook_service_module
 from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP
+from models.callbacks import ProcessingCallbacks
 from plex.plex_uploader import PlexUploader
 from services.asset_index import AssetIndex
+from services.run_history import RunHistory
 from services.webhook_service import WebhookEvent, WebhookService, parse_event
 
 FAR_FUTURE = "2999-01-01T00:00:00+00:00"
@@ -15,6 +19,24 @@ FAR_FUTURE = "2999-01-01T00:00:00+00:00"
 @pytest.fixture
 def index(tmp_path):
     return AssetIndex(str(tmp_path / "asset_index.db"))
+
+
+@pytest.fixture
+def history(tmp_path, monkeypatch):
+    """Keep the webhook's history writes inside the test's own tmp directory."""
+    real_history = RunHistory(str(tmp_path / "run_history.json"))
+    monkeypatch.setattr(webhook_service_module, "RunHistory", lambda: real_history)
+    return real_history
+
+
+def _tally():
+    return ProcessingCallbacks(
+        success_counter=[0], assets_processed=[0], locked_counter=[0], failed_counter=[0]
+    )
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _rec(index, user, asset_id, title, year, media_type, season=None):
@@ -165,7 +187,7 @@ def test_artwork_dict_carries_the_file_type_key_the_processor_reads(artwork_type
 # --------------------------- allow_artist_updates ---------------------------
 
 @pytest.mark.unit
-def test_attempt_forces_allow_artist_updates_off(monkeypatch):
+def test_attempt_forces_allow_artist_updates_off(monkeypatch, history):
     """The webhook must never inherit allow_artist_updates from the global config.
 
     set_options resolves the flag as `self.options.allow_artist_updates or
@@ -200,7 +222,108 @@ def test_attempt_forces_allow_artist_updates_off(monkeypatch):
     service = WebhookService()
     event = parse_event({"eventType": "Download",
                          "movie": {"title": "Dune", "year": 2021, "tmdbId": 438631}})
-    service._attempt(event, ("movie", 438631), artwork=[{"id": 1, "file_type": "movie_poster"}])
+    service._attempt(event, ("movie", 438631), _now(), _tally(),
+                     artwork=[{"id": 1, "file_type": "movie_poster"}])
 
     assert seen.get("at_upload") is False, \
         "the webhook reached the uploader with allow_artist_updates still on"
+
+
+# ------------------------------- run history -------------------------------
+
+def _applying_service(monkeypatch, results):
+    """A WebhookService whose uploader returns `results` for every artwork item."""
+    import processors.upload_processor as upload_processor_module
+    from core import globals as app_globals
+
+    class _FakeProcessor:
+        def __init__(self, _plex):
+            self.allow_artist_updates = True
+
+        def set_options(self, _options):
+            pass
+
+        def process_movie_artwork(self, _item):
+            return list(results)
+
+    monkeypatch.setattr(upload_processor_module, "UploadProcessor", _FakeProcessor)
+    monkeypatch.setattr(app_globals, "plex", MagicMock())
+    return WebhookService()
+
+
+def _dune():
+    return parse_event({"eventType": "Download",
+                        "movie": {"title": "Dune", "year": 2021, "tmdbId": 438631}})
+
+
+@pytest.mark.unit
+def test_an_applied_import_is_recorded_as_a_successful_webhook_run(monkeypatch, history):
+    service = _applying_service(monkeypatch, ["✅ Dune (2021) • someone | Poster updated in Movies"])
+    tally = _tally()
+    tally.assets(1)
+
+    service._attempt(_dune(), ("movie", 438631), _now(), tally,
+                     artwork=[{"id": 1, "file_type": "movie_poster"}])
+
+    runs = history.get_runs()
+    assert len(runs) == 1
+    assert runs[0]["run_type"] == "webhook"
+    assert runs[0]["trigger"] == "radarr"
+    assert runs[0]["label"] == "Dune (2021)"
+    assert runs[0]["outcome"] == "success"
+    assert runs[0]["assets_processed"] == 1
+    assert runs[0]["success_count"] == 1
+    assert runs[0]["error_count"] == 0
+
+
+@pytest.mark.unit
+def test_a_failed_upload_is_recorded_as_a_failed_webhook_run(monkeypatch, history):
+    service = _applying_service(monkeypatch, ["❌ Dune (2021) • someone | Failed to update Poster"])
+
+    service._attempt(_dune(), ("movie", 438631), _now(), _tally(),
+                     artwork=[{"id": 1, "file_type": "movie_poster"}])
+
+    runs = history.get_runs()
+    assert runs[0]["outcome"] == "failed"
+    assert runs[0]["error_count"] == 1
+
+
+@pytest.mark.unit
+def test_artwork_that_never_appeared_in_plex_is_recorded_as_an_error(monkeypatch, history):
+    """The retry ladder is exhausted here (attempt is past its end), so the item is
+    given up on. A run that applied nothing has failed, whatever the logs said."""
+    service = _applying_service(monkeypatch, ["Poster not available on Plex"])
+
+    service._attempt(_dune(), ("movie", 438631), _now(), _tally(),
+                     attempt=99, artwork=[{"id": 1, "file_type": "movie_poster"}])
+
+    runs = history.get_runs()
+    assert runs[0]["outcome"] == "failed"
+    assert runs[0]["error_count"] == 1
+
+
+@pytest.mark.unit
+def test_a_retry_does_not_record_a_run_of_its_own(monkeypatch, history):
+    """One import is one run. The record waits for the ladder to finish, or the tab
+    fills up with a row per retry."""
+    service = _applying_service(monkeypatch, ["Poster not available on Plex"])
+
+    service._attempt(_dune(), ("movie", 438631), _now(), _tally(),
+                     attempt=0, artwork=[{"id": 1, "file_type": "movie_poster"}])
+
+    assert history.get_runs() == []
+
+
+@pytest.mark.unit
+def test_an_import_with_no_cached_artwork_is_recorded_as_skipped(monkeypatch, history):
+    from core import globals as app_globals
+
+    monkeypatch.setattr(app_globals, "config", MagicMock(webhook_tpdb_users=[]))
+    service = WebhookService()
+
+    service._attempt(_dune(), ("movie", 438631), _now(), _tally())
+
+    runs = history.get_runs()
+    assert len(runs) == 1
+    assert runs[0]["outcome"] == "skipped"
+    assert runs[0]["assets_processed"] == 0

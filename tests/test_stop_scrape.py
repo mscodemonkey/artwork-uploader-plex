@@ -20,6 +20,7 @@ from models.instance import Instance
 from models.options import Options
 from scrapers.theposterdb_scraper import ThePosterDBScraper
 from services.artwork_processor import ArtworkProcessor
+from services.run_history import RunHistory, OUTCOME_STOPPED
 from models.callbacks import ProcessingCallbacks
 
 
@@ -108,7 +109,7 @@ def test_cancel_scrape_breaks_crawl_and_blocks_partial_upload():
 
 
 @pytest.mark.unit
-def test_cancelled_bulk_run_reports_stopped_not_success():
+def test_cancelled_bulk_run_reports_stopped_not_success(tmp_path, monkeypatch):
     """
     P3: once cancel_scrape is armed, the bulk summary must report an honest
     "stopped" message - never the green "completed successfully" wording a
@@ -118,7 +119,14 @@ def test_cancelled_bulk_run_reports_stopped_not_success():
     globals.cancel_scrape, not a mock of it. scheduled=True so the
     notification branch runs too - a suppressed notification on a cancelled
     scheduled run would leave a dangling "started" with no terminal event.
+
+    Also drives the outcome the run gets recorded with: a cancelled run must
+    be filed as OUTCOME_STOPPED, never OUTCOME_SUCCESS, so the run history
+    tells the truth about a run the user actually stopped.
     """
+    history = RunHistory(str(tmp_path / "run_history.json"))
+    monkeypatch.setattr("artwork_uploader.RunHistory", lambda: history)
+
     try:
         globals.cancel_scrape = True
         globals.scrapes_running = 0
@@ -171,6 +179,10 @@ def test_cancelled_bulk_run_reports_stopped_not_success():
             if len(c.args) >= 3 and c.args[1] == "progress_bar" and c.args[2].get("percent") == 100
         ]
         assert progress_hides, "a cancelled bulk run must clear the progress bar (emit percent 100)"
+
+        runs = history.get_runs()
+        assert len(runs) == 1
+        assert runs[0]["outcome"] == OUTCOME_STOPPED, "a cancelled run must be recorded as stopped, not success"
     finally:
         globals.cancel_scrape = False
         globals.scrapes_running = 0

@@ -24,7 +24,8 @@ from core.config import Config
 from core.enums import FileType, MediaType, ScraperSource, StatusColor
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
-from services import UtilityService, AuthenticationService
+from services import UtilityService, AuthenticationService, RunHistory
+from services.run_history import RUN_TYPES
 from services.webhook_service import parse_event
 from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER
 
@@ -356,6 +357,16 @@ def setup_socket_handlers(
         except (FileNotFoundError, PermissionError) as e:
             debug_me(f"Error loading bulk import file list: {e}")
         notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
+
+    @globals.web_socket.on("load_run_history")
+    def load_run_history(data):
+        """Load recent run history, optionally narrowed to one run type."""
+        instance = Instance(data.get("instance_id"), "web")
+        run_type = data.get("run_type") or None
+        if run_type not in RUN_TYPES:
+            run_type = None
+        runs = RunHistory().get_runs(limit=50, run_type=run_type)
+        notify_web(instance, "load_run_history", {"runs": runs, "run_type": run_type or "all"})
 
     @globals.web_socket.on("load_bulk_import")
     def load_bulk_import(data):

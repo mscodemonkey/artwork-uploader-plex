@@ -23,6 +23,12 @@ DEFAULT_CONFIG_PATH = "config.json"
 ASSET_INDEX_PATH = "config/asset_index.db"
 DEFAULT_BULK_IMPORTS_DIR = "bulk_imports"
 DEFAULT_BULK_IMPORT_FILE = "bulk_import.txt"
+RUN_HISTORY_PATH = "config/run_history.json"
+
+# Run history retention (whichever limit is hit first prunes the record).
+# The entry cap is per run type, so frequent webhook imports can't crowd out bulk runs.
+RUN_HISTORY_MAX_ENTRIES = 200
+RUN_HISTORY_MAX_AGE_DAYS = 90
 
 # Plex library defaults
 DEFAULT_TV_LIBRARY = ["TV Shows"]
