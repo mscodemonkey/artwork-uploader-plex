@@ -234,6 +234,12 @@ h1 {
     display: block !important;
 }
 
+/* Ensure selected list group items show all 4 borders over adjacent items */
+#schedule_list .list-group-item.border-primary {
+    border-top: 1px solid var(--bs-primary) !important;
+    z-index: 2;
+}
+
 /* Monospace font for token input fields */
 .input-monospace,
 .input-monospace::placeholder {

@@ -2297,6 +2297,9 @@ socket.on("upload_complete", function (data) {
             arrow.style.right = 'auto';
         }
 
+        // Reset the state of selected schedules
+        resetScheduleForm();
+        
         // Toggle visibility
         timeSelectBox.classList.toggle("show-tooltip");
 
@@ -2320,7 +2323,10 @@ socket.on("upload_complete", function (data) {
         const fileSchedules = getSchedulesForFile(currentBulkImport);
         fileSchedules.forEach(s => {
             const row = document.getElementById(s.id);
-            if (row) row.classList.remove("bg-body-secondary")
+            if (row){
+                row.classList.remove("bg-body-secondary");
+                row.classList.remove("border-primary");
+            };
         });
         editingScheduleId = null;
         setTimeBtn.innerHTML = '<i class="bi bi-plus-lg"></i>';
@@ -2432,11 +2438,14 @@ socket.on("upload_complete", function (data) {
             label.addEventListener("click", () => {
                 if (s.id != editingScheduleId) {
                     activeRow = document.getElementById(editingScheduleId);
-                    if (activeRow) activeRow.classList.remove("bg-body-secondary");
+                    if (activeRow) {
+                        activeRow.classList.remove("bg-body-secondary");
+                        activeRow.classList.remove("border-primary");
+                    };
                     label.parentElement.classList.toggle("bg-body-secondary");
+                    label.parentElement.classList.toggle("border-primary");
                     editSchedule(s);
                 } else {
-                    // label.parentElement.classList.toggle("bg-body-secondary");
                     resetScheduleForm();
                 }
             });
