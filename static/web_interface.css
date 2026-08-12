@@ -193,42 +193,40 @@ h1 {
 /* Time Select tooltip box */
 #time_select_box {
     position: absolute;
-    top: 0;
-    right: 55px; /* Move the tooltip 20px to the right */
     background: var(--bs-body-bg);
     border: 1px solid var(--bs-border-color);
     padding: 15px;
-    border-radius: 5px;
-    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.25);
     display: none;
     z-index: 1100;
-    min-width: 250px;
-    overflow: visible !important;
+    width: calc(100vw - 30px);
+    max-width: 380px; /* Expanded slightly to comfortably fit 'Every' controls on 1 line */
 }
 
 /* Outer arrow (border color matches the tooltip border) */
 #tooltip_arrow {
     position: absolute;
-    top: -10px; /* Move arrow to the top */
-    right: 15px; /* Align the arrow to the right */
+    top: -10px;
     width: 0;
     height: 0;
     border-left: 10px solid transparent;
     border-right: 10px solid transparent;
-    border-bottom: 10px solid var(--bs-border-color); /* Arrow border color */
+    border-bottom: 10px solid var(--bs-border-color);
+    transform: translateX(-50%); /* Keeps arrow tip centered on its left coordinate */
 }
 
 /* Inner arrow (matches tooltip background) */
 #tooltip_arrow::after {
     content: "";
     position: absolute;
-    top: 1px; /* Moves inner arrow down slightly */
+    top: 1px;
     left: -9px;
     width: 0;
     height: 0;
     border-left: 9px solid transparent;
     border-right: 9px solid transparent;
-    border-bottom: 9px solid var(--bs-body-bg); /* Matches tooltip background */
+    border-bottom: 9px solid var(--bs-body-bg);
 }
 
 /* Class to show tooltip */
@@ -297,19 +295,23 @@ h1 {
 
 /* Hover effects */
 @media (hover: hover) {
+    .delete-schedule-btn:hover,
     .btn-inline-icon:hover {
         opacity: 1;
     }
 
+    .delete-schedule-btn:hover,
     .btn-inline-icon:hover i {
         transform: scale(1.15); /* Scales the icon cleanly without affecting position */
     }
 }
 
+.delete-schedule-btn:active,
 .btn-inline-icon:active {
     opacity: 1;
 }
 
+.delete-schedule-btn:active,
 .btn-inline-icon:active i {
     transform: scale(0.90) !important;
     transition: transform 0.1s ease, opacity 0.1s ease;

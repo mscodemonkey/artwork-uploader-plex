@@ -676,32 +676,39 @@
                     <div id="tooltip_arrow"></div>
 
                     <!-- Existing schedules for the current bulk file -->
-                    <ul id="schedule_list" class="list-group mb-2"></ul>
+                    <ul id="schedule_list" class="list-group mb-0"></ul>
 
-                    <div class="row g-2 align-items-end">
-                        <div class="col-auto">
-                            <label class="col-form-label">Repeat</label>
+                    <label class="form-label mb-1 fw-medium text-body d-flex align-items-center">
+                        <i class="bi bi-alarm"></i>&ensp;Add a scheduled bulk import
+                    </label>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- Dropdown -->
+                        <div style="flex: 0 0 auto;">
                             <select id="schedule_type" class="form-select">
                                 <option value="daily">Daily at</option>
                                 <option value="interval">Every</option>
                             </select>
                         </div>
-                        <div class="col-auto" id="schedule_time_group">
-                            <label class="col-form-label d-block invisible">Time</label>
+                        <!-- Daily time input -->
+                        <div id="schedule_time_group" style="flex: 1 1 auto; min-width: 0;">
+                            <!-- <label class="col-form-label d-block invisible">Time</label> -->
                             <input type="time" id="schedule_time" class="form-control">
                         </div>
-                        <div class="col-auto d-none" id="schedule_interval_group">
-                            <label class="col-form-label d-block invisible">Interval</label>
+                        <!-- Interval input group -->
+                        <div id="schedule_interval_group" style="flex: 1 1 auto; min-width: 0;">
+                            <!-- <label class="form-label d-block invisible">Interval</label> -->
                             <div class="input-group">
-                                <input type="number" id="schedule_interval_value" class="form-control" min="1" value="1" style="max-width: 80px;">
+                                <input type="number" id="schedule_interval_value" class="form-control" min="1" value="1" style="max-width: 50px;">
                                 <select id="schedule_interval_unit" class="form-select">
                                     <option value="hours">Hours</option>
                                     <option value="days">Days</option>
                                 </select>
                             </div>
                         </div>
-                        <div class="col-auto">
-                            <button id="set_time" class="btn btn-primary">Add schedule</button>
+                        <!-- Submit button -->
+                        <div style="flex: 0 0 auto;">
+                            <button id="set_time" class="btn rounded-pill btn-primary align-items-center p-0" style="width: 38px; height: 38px;"></button>
                         </div>
                     </div>
                 </div>
