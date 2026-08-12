@@ -2278,10 +2278,24 @@ socket.on("upload_complete", function (data) {
     scheduleIcon.addEventListener("click", function () {
 
         const iconRect = scheduleIcon.getBoundingClientRect();
+        const boxWidth = timeSelectBox.offsetWidth || 300; // Fallback width
 
-        // Position tooltip relative to the icon
-        timeSelectBox.style.top = `${iconRect.bottom + window.scrollY + 10}px`; // Below the icon
-        timeSelectBox.style.right = `${window.innerWidth - iconRect.right - window.scrollX - 15}px`; // Align right edge
+        // Vertical placement below icon
+        timeSelectBox.style.top = `${iconRect.bottom + window.scrollY + 10}px`;
+
+        // Horizontal placement bounded to screen edges (15px padding)
+        let leftPos = iconRect.right + window.scrollX - boxWidth + 13;
+        leftPos = Math.max(15, Math.min(leftPos, window.innerWidth - boxWidth - 15));
+        timeSelectBox.style.left = `${leftPos}px`;
+        timeSelectBox.style.right = 'auto';
+
+        // Align arrow directly under the clock icon center
+        const arrow = document.getElementById("tooltip_arrow");
+        if (arrow) {
+            const arrowOffset = (iconRect.left + window.scrollX + (iconRect.width / 2)) - leftPos;
+            arrow.style.left = `${Math.max(15, Math.min(arrowOffset, boxWidth - 25))}px`;
+            arrow.style.right = 'auto';
+        }
 
         // Toggle visibility
         timeSelectBox.classList.toggle("show-tooltip");
@@ -2290,6 +2304,7 @@ socket.on("upload_complete", function (data) {
 
     document.addEventListener("click", function (event) {
         if (!timeSelectBox.contains(event.target) && !scheduleIcon.contains(event.target)) {
+            resetScheduleForm();
             timeSelectBox.classList.remove("show-tooltip");
         }
     });
@@ -2302,8 +2317,15 @@ socket.on("upload_complete", function (data) {
     });
 
     function resetScheduleForm() {
+        const fileSchedules = getSchedulesForFile(currentBulkImport);
+        fileSchedules.forEach(s => {
+            const row = document.getElementById(s.id);
+            if (row) row.classList.remove("bg-body-secondary")
+        });
         editingScheduleId = null;
-        setTimeBtn.textContent = "Add schedule";
+        setTimeBtn.innerHTML = '<i class="bi bi-plus-lg"></i>';
+        setTimeBtn.classList.add("btn-primary");
+        setTimeBtn.classList.remove("btn-success");
         scheduleTypeSelect.value = "daily";
         scheduleTimeGroup.classList.remove("d-none");
         scheduleIntervalGroup.classList.add("d-none");
@@ -2314,7 +2336,9 @@ socket.on("upload_complete", function (data) {
 
     function editSchedule(s) {
         editingScheduleId = s.id;
-        setTimeBtn.textContent = "Update schedule";
+        setTimeBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+        setTimeBtn.classList.remove("btn-primary");
+        setTimeBtn.classList.add("btn-success");
         if (s.time) {
             scheduleTypeSelect.value = "daily";
             scheduleTimeGroup.classList.remove("d-none");
@@ -2384,19 +2408,46 @@ socket.on("upload_complete", function (data) {
         scheduleListEl.innerHTML = "";
         const fileSchedules = getSchedulesForFile(currentBulkImport);
 
-        fileSchedules.forEach(s => {
+        if (!fileSchedules.length) return;
+
+        const title = document.createElement("label");
+        title.innerHTML = '<i class="bi bi-calendar-check"></i>&ensp;Current schedules';
+        scheduleListEl.appendChild(title);
+        
+        fileSchedules.forEach((s, i, arr) => {
+            
             const item = document.createElement("li");
+            item.id = s.id;
             item.className = "list-group-item d-flex justify-content-between align-items-center";
+
+            const isFirst = i === 0;
+            const isLast = i === arr.length - 1;
+
+            if (isFirst) item.classList.add("mt-2", "rounded-top");
+            if (isLast) item.classList.add("mb-2", "rounded-bottom");
 
             const label = document.createElement("span");
             label.textContent = describeSchedule(s);
             label.setAttribute("role", "button");
-            label.addEventListener("click", () => editSchedule(s));
+            label.addEventListener("click", () => {
+                if (s.id != editingScheduleId) {
+                    activeRow = document.getElementById(editingScheduleId);
+                    if (activeRow) activeRow.classList.remove("bg-body-secondary");
+                    label.parentElement.classList.toggle("bg-body-secondary");
+                    editSchedule(s);
+                } else {
+                    // label.parentElement.classList.toggle("bg-body-secondary");
+                    resetScheduleForm();
+                }
+            });
 
             const deleteBtn = document.createElement("i");
-            deleteBtn.className = "bi bi-trash3 text-danger";
+            deleteBtn.className = "bi bi-trash3 text-danger delete-schedule-btn";
             deleteBtn.setAttribute("role", "button");
-            deleteBtn.addEventListener("click", () => deleteSchedule(s.id));
+            deleteBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                deleteSchedule(s.id);
+            });
 
             item.appendChild(label);
             item.appendChild(deleteBtn);
