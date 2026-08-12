@@ -48,7 +48,7 @@ from core.constants import (
     MIN_PYTHON_MINOR,
     VALID_FILENAME_PATTERN
 )
-from core.enums import InstanceMode, StatusColor
+from core.enums import InstanceMode, StatusColor, RunType, RunTrigger, RunOutcome
 from services import (
     BulkFileService,
     ImageService,
@@ -56,18 +56,6 @@ from services import (
     WebhookService,
     UtilityService,
     RunHistory
-)
-from services.run_history import (
-    OUTCOME_SUCCESS,
-    OUTCOME_PARTIAL,
-    OUTCOME_STOPPED,
-    OUTCOME_FAILED,
-    OUTCOME_SKIPPED,
-    RUN_TYPE_BULK,
-    RUN_TYPE_SCRAPE,
-    RUN_TYPE_UPLOAD,
-    TRIGGER_MANUAL,
-    TRIGGER_SCHEDULED
 )
 from services.artwork_processor import ArtworkProcessor
 from models.callbacks import ProcessingCallbacks
@@ -201,7 +189,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
     # gets to say otherwise.
     started_at = datetime.now(timezone.utc).isoformat()
     label = url
-    outcome = OUTCOME_FAILED
+    outcome = RunOutcome.FAILED.value
     success_counter = [0]
     assets_processed = [0]
     cached_counter = [0]
@@ -230,13 +218,13 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
 
         # Read the cancel flag here, not in the finally below - that's where it gets cleared
         if globals.cancel_scrape:
-            outcome = OUTCOME_STOPPED
+            outcome = RunOutcome.STOPPED.value
         elif failed_counter[0]:
-            outcome = OUTCOME_PARTIAL
+            outcome = RunOutcome.PARTIAL.value
         elif assets_processed[0]:
-            outcome = OUTCOME_SUCCESS
+            outcome = RunOutcome.SUCCESS.value
         else:
-            outcome = OUTCOME_SKIPPED
+            outcome = RunOutcome.SKIPPED.value
 
         # Update the web ui bulk list with this URL and artwork (only if it's not already in the bulk list)
         if instance.mode == "web" and parsed_line.options.add_to_bulk and title:
@@ -250,8 +238,8 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         # makes the browser reload the history table, so a record written afterwards would
         # miss its own refresh and only appear the next time somebody opened the tab.
         RunHistory().add_run(
-            RUN_TYPE_SCRAPE, label, started_at, datetime.now(timezone.utc).isoformat(),
-            TRIGGER_MANUAL, outcome,
+            RunType.SCRAPE.value, label, started_at, datetime.now(timezone.utc).isoformat(),
+            RunTrigger.MANUAL.value, outcome,
             assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], failed_counter[0]
         )
         globals.scrapes_running -= 1
@@ -289,8 +277,8 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         now = datetime.now(timezone.utc).isoformat()
         RunHistory().add_run(
-            RUN_TYPE_BULK, filename if filename else "bulk_import.txt", now, now,
-            TRIGGER_SCHEDULED if scheduled else TRIGGER_MANUAL, OUTCOME_SKIPPED
+            RunType.BULK.value, filename if filename else "bulk_import.txt", now, now,
+            RunTrigger.SCHEDULED.value if scheduled else RunTrigger.MANUAL.value, RunOutcome.SKIPPED.value
         )
         return
 
@@ -341,7 +329,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     failed_counter = [0]  # Uploads that failed after exhausting their retries
     errors = 0
     started_at = datetime.now(timezone.utc).isoformat()
-    trigger = TRIGGER_SCHEDULED if scheduled else TRIGGER_MANUAL
+    trigger = RunTrigger.SCHEDULED.value if scheduled else RunTrigger.MANUAL.value
 
     try:
 
@@ -350,8 +338,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             update_status(instance, "Plex setup incomplete. Please check the settings.", color=StatusColor.DANGER.value)
             now = datetime.now(timezone.utc).isoformat()
             RunHistory().add_run(
-                RUN_TYPE_BULK, filename if filename else "bulk_import.txt",
-                started_at, now, trigger, OUTCOME_FAILED
+                RunType.BULK.value, filename if filename else "bulk_import.txt",
+                started_at, now, trigger, RunOutcome.FAILED.value
             )
             return
 
@@ -414,7 +402,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             )
             update_status(instance, message[2:], color=StatusColor.WARNING.value, sticky=False, spinner=False)
             notify_web(instance, "progress_bar", {"percent": 100, "bar_type": "bulk"})
-            outcome = OUTCOME_STOPPED
+            outcome = RunOutcome.STOPPED.value
         else:
             message = (
                 ("🏁 " if total_errors == 0 else "⚠️ ")
@@ -428,14 +416,14 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 + (f" • {failed_counter[0]} asset(s) failed" if failed_counter[0] else "")
             )
             update_status(instance, message[2:], color=StatusColor.SUCCESS.value if total_errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
-            outcome = OUTCOME_SUCCESS if total_errors == 0 else OUTCOME_PARTIAL
+            outcome = RunOutcome.SUCCESS.value if total_errors == 0 else RunOutcome.PARTIAL.value
         update_log(instance, message)
         if scheduled:
             debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).")
             send_notification(instance, message)
 
         RunHistory().add_run(
-            RUN_TYPE_BULK, display_filename, started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
+            RunType.BULK.value, display_filename, started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
             assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], errors
         )
 
@@ -443,8 +431,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
         update_status(instance, f"Error during bulk import: {bulk_import_exception}", color=StatusColor.DANGER.value)
         RunHistory().add_run(
-            RUN_TYPE_BULK, filename if filename else "bulk_import.txt",
-            started_at, datetime.now(timezone.utc).isoformat(), trigger, OUTCOME_FAILED,
+            RunType.BULK.value, filename if filename else "bulk_import.txt",
+            started_at, datetime.now(timezone.utc).isoformat(), trigger, RunOutcome.FAILED.value,
             assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], errors
         )
 
@@ -581,21 +569,21 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
     # the bulk imports. There is no cache crawl behind an upload, so cached stays at zero.
     started_at = datetime.now(timezone.utc).isoformat()
     label = plex_title or zip_title or "Uploaded artwork"
-    outcome = OUTCOME_FAILED
+    outcome = RunOutcome.FAILED.value
     try:
         processor.process_uploaded_files(file_list, skipped, zip_title, zip_author, zip_source, opts, override_title=plex_title)
         if globals.cancel_scrape:
-            outcome = OUTCOME_STOPPED
+            outcome = RunOutcome.STOPPED.value
         elif failed_counter[0]:
-            outcome = OUTCOME_PARTIAL
+            outcome = RunOutcome.PARTIAL.value
         elif assets_processed[0]:
-            outcome = OUTCOME_SUCCESS
+            outcome = RunOutcome.SUCCESS.value
         else:
-            outcome = OUTCOME_SKIPPED
+            outcome = RunOutcome.SKIPPED.value
     finally:
         RunHistory().add_run(
-            RUN_TYPE_UPLOAD, label, started_at, datetime.now(timezone.utc).isoformat(),
-            TRIGGER_MANUAL, outcome,
+            RunType.UPLOAD.value, label, started_at, datetime.now(timezone.utc).isoformat(),
+            RunTrigger.MANUAL.value, outcome,
             assets_processed[0], success_counter[0], 0, locked_counter[0], failed_counter[0]
         )
 
@@ -786,20 +774,20 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
             else:
                 update_log(instance, f"⏭️ Scheduled bulk import of '{filename}' skipped • file is empty")
                 now = datetime.now(timezone.utc).isoformat()
-                RunHistory().add_run(RUN_TYPE_BULK, filename, now, now, TRIGGER_SCHEDULED, OUTCOME_SKIPPED)
+                RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.SKIPPED.value)
         else:
             update_log(instance, f"🔴 Bulk file does not exist: {filename}")
             now = datetime.now(timezone.utc).isoformat()
-            RunHistory().add_run(RUN_TYPE_BULK, filename, now, now, TRIGGER_SCHEDULED, OUTCOME_FAILED)
+            RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
             return
     except FileNotFoundError:
         update_log(instance, f"🔴 Scheduled bulk import failed due to missing file ({filename})")
         now = datetime.now(timezone.utc).isoformat()
-        RunHistory().add_run(RUN_TYPE_BULK, filename, now, now, TRIGGER_SCHEDULED, OUTCOME_FAILED)
+        RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
     except Exception as e:
         update_log(instance, f"🔴 Scheduled bulk import unexpectedly failed ({str(e)})")
         now = datetime.now(timezone.utc).isoformat()
-        RunHistory().add_run(RUN_TYPE_BULK, filename, now, now, TRIGGER_SCHEDULED, OUTCOME_FAILED)
+        RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
     finally:
         globals.scheduler_service.finish(filename)
 

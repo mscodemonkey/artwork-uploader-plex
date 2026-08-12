@@ -81,3 +81,24 @@ class FileType(str, Enum):
     COLLECTION_POSTER = "collection_poster"
     ALBUM_ART = "album_art"
     SQUARE_ART = "square_art"
+
+class RunType(str, Enum):
+    """Types of runs"""
+    BULK = "bulk"       # a bulk import file, manual or scheduled
+    SCRAPE = "scrape"   # a single URL scraped from the main tab
+    UPLOAD = "upload"   # an artwork ZIP uploaded through the browser
+    WEBHOOK = "webhook" # a Radarr/Sonarr import applied from the cache
+
+class RunTrigger(str, Enum):
+    """Type of trigger that triggered a run"""
+    MANUAL = "manual"
+    SCHEDULED = "scheduled"
+    RADARR = "radarr"
+    SONARR = "sonarr"
+
+class RunOutcome(str, Enum):
+    SUCCESS = "success"
+    PARTIAL = "partial" # completed, but one or more items errored
+    STOPPED = "stopped" # cancelled by the user
+    FAILED = "failed"   # an exception aborted the run
+    SKIPPED = "skipped" # nothing to do (e.g. no valid entries in the file)

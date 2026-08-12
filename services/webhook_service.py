@@ -16,25 +16,16 @@ from typing import FrozenSet, List, Optional, Union
 
 from core import globals
 from core.constants import WEBHOOK_RETRY_DELAYS
-from core.enums import ScraperSource
+from core.enums import ScraperSource, RunType, RunTrigger, RunOutcome
 from core.exceptions import MovieNotFound, ShowNotFound
 from models.callbacks import ProcessingCallbacks
 from models.instance import Instance
 from models.options import Options
 from services.asset_index import AssetIndex, normalize_title
-from services.run_history import (
-    RunHistory,
-    RUN_TYPE_WEBHOOK,
-    TRIGGER_RADARR,
-    TRIGGER_SONARR,
-    OUTCOME_SUCCESS,
-    OUTCOME_PARTIAL,
-    OUTCOME_FAILED,
-    OUTCOME_SKIPPED,
-)
+from services.run_history import RunHistory
 
 # The *arr app that sent the event, as the history records it
-_TRIGGER_BY_SOURCE = {"radarr": TRIGGER_RADARR, "sonarr": TRIGGER_SONARR}
+_TRIGGER_BY_SOURCE = {"radarr": RunTrigger.RADARR.value, "sonarr": RunTrigger.SONARR.value}
 
 
 def _log(text: str) -> None:
@@ -154,13 +145,13 @@ class WebhookService:
         # UploadProcessor pulls in the processors -> plex chain; import it here so the services
         # package does not drag that in at start-up (mirrors the app's own lazy-import pattern).
         from processors.upload_processor import UploadProcessor
-        outcome = OUTCOME_FAILED
+        outcome = RunOutcome.FAILED.value
         try:
             if artwork is None:
                 artwork = self._collect_artwork(event)
                 if not artwork:
                     _log(f"📥 Webhook | No cached artwork for '{event.label()}' from the configured users")
-                    self._finish(event, key, started_at, tally, OUTCOME_SKIPPED)
+                    self._finish(event, key, started_at, tally, RunOutcome.SKIPPED.value)
                     return
                 _log(f"📥 Webhook | {event.source.title()} import: {event.label()}")
                 tally.assets(len(artwork))
@@ -211,14 +202,14 @@ class WebhookService:
                 # against the run the same way an upload that exhausted its retries does.
                 tally.failed(len(pending))
             if not tally.failed_counter[0]:
-                outcome = OUTCOME_SUCCESS
+                outcome = RunOutcome.SUCCESS.value
             elif tally.success_counter[0]:
-                outcome = OUTCOME_PARTIAL
+                outcome = RunOutcome.PARTIAL.value
             else:
-                outcome = OUTCOME_FAILED
+                outcome = RunOutcome.FAILED.value
         except Exception as error:
             _debug(f"Webhook apply failed for {event.label()}: {error}")
-            outcome = OUTCOME_FAILED
+            outcome = RunOutcome.FAILED.value
         self._finish(event, key, started_at, tally, outcome)
 
     def _finish(self, event: WebhookEvent, key, started_at: str,
@@ -226,7 +217,7 @@ class WebhookService:
         """Record the run and let the next event for this title through."""
         try:
             RunHistory().add_run(
-                RUN_TYPE_WEBHOOK, event.label(), started_at,
+                RunType.WEBHOOK.value, event.label(), started_at,
                 datetime.now(timezone.utc).isoformat(),
                 _TRIGGER_BY_SOURCE.get(event.source, event.source), outcome,
                 tally.assets_processed[0], tally.success_counter[0], 0,

@@ -14,29 +14,9 @@ import threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
+from core.enums import RunType, RunTrigger
 
 from core.constants import RUN_HISTORY_PATH, RUN_HISTORY_MAX_ENTRIES, RUN_HISTORY_MAX_AGE_DAYS
-
-# What kind of run produced the record
-RUN_TYPE_BULK = "bulk"          # a bulk import file, manual or scheduled
-RUN_TYPE_SCRAPE = "scrape"      # a single URL scraped from the main tab
-RUN_TYPE_UPLOAD = "upload"      # an artwork ZIP uploaded through the browser
-RUN_TYPE_WEBHOOK = "webhook"    # a Radarr/Sonarr import applied from the cache
-
-RUN_TYPES = (RUN_TYPE_BULK, RUN_TYPE_SCRAPE, RUN_TYPE_UPLOAD, RUN_TYPE_WEBHOOK)
-
-# What started the run
-TRIGGER_MANUAL = "manual"
-TRIGGER_SCHEDULED = "scheduled"
-TRIGGER_RADARR = "radarr"
-TRIGGER_SONARR = "sonarr"
-
-# Recorded outcomes for a run
-OUTCOME_SUCCESS = "success"
-OUTCOME_PARTIAL = "partial"    # completed, but one or more items errored
-OUTCOME_STOPPED = "stopped"    # cancelled by the user
-OUTCOME_FAILED = "failed"      # an exception aborted the run
-OUTCOME_SKIPPED = "skipped"    # nothing to do (e.g. no valid entries in the file)
 
 # A new RunHistory() is created per call rather than shared, so the read-modify-write in
 # add_run needs a lock keyed by file path (not an instance lock) to stop two runs finishing
@@ -99,7 +79,7 @@ class RunHistory:
             kept_per_type: Dict[str, int] = defaultdict(int)
             kept: List[Dict[str, Any]] = []
             for run in reversed(runs):
-                run_type = run.get("run_type", RUN_TYPE_BULK)
+                run_type = run.get("run_type", RunType.BULK.value)
                 if kept_per_type[run_type] >= self.max_entries:
                     continue
                 kept_per_type[run_type] += 1
@@ -149,11 +129,11 @@ class RunHistory:
         held the file name as `filename` and the trigger as a `scheduled` boolean."""
         normalised = dict(run)
         if not normalised.get("run_type"):
-            normalised["run_type"] = RUN_TYPE_BULK
+            normalised["run_type"] = RunType.BULK.value
         if not normalised.get("label"):
             normalised["label"] = run.get("filename", "")
         if not normalised.get("trigger"):
-            normalised["trigger"] = TRIGGER_SCHEDULED if run.get("scheduled") else TRIGGER_MANUAL
+            normalised["trigger"] = RunTrigger.SCHEDULED.value if run.get("scheduled") else RunTrigger.MANUAL.value
         return normalised
 
     def get_runs(self, limit: Optional[int] = None, run_type: Optional[str] = None) -> List[Dict[str, Any]]:

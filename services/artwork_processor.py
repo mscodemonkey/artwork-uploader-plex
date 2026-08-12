@@ -173,20 +173,8 @@ class ArtworkProcessor:
             # Process the artwork
             results = process_func(artwork)
 
-            for result in results:
-            # Track successful uploads (those starting with ✅ or ♻️)
-                if result.startswith('✅') or result.startswith('♻️'):
-                    self.callbacks.success(1)
-
-            # Track artwork left alone because its Plex field was locked
-                elif result.startswith('🔒'):
-                    self.callbacks.locked(1)
-
-            # Track uploads that failed after exhausting their retries
-                elif result.startswith('❌'):
-                    self.callbacks.failed(1)
-
             # Log the result
+            for result in results:
                 self.callbacks.record_result(result)
                 self.callbacks.log(result)
 
