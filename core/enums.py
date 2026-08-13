@@ -103,6 +103,7 @@ class RunTrigger(str, Enum):
     """Type of trigger that triggered a run"""
     MANUAL = "manual"
     SCHEDULED = "scheduled"
+    CLI = "cli"
     RADARR = "radarr"
     SONARR = "sonarr"
 

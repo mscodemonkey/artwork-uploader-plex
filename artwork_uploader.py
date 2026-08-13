@@ -114,43 +114,87 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
     Load and parse the URLs from a bulk import file, then scrape them with any options set for that URL.
     """
 
+    display_filename = os.path.basename(file_path)
+
+    # A bulk import started from the command line is a run like any other, so it keeps the same
+    # counters as one started from the Bulk Import tab and gets the same record in the history.
+    # The outcome starts as failed: every path out of here is recorded, including one that
+    # raises, and only a run that finished gets to say otherwise.
+    started_at = datetime.now(timezone.utc).isoformat()
+    outcome = RunOutcome.FAILED.value
+    success_counter = [0]
+    assets_processed = [0]
+    cached_counter = [0]
+    locked_counter = [0]
+    failed_counter = [0]  # Uploads that failed after exhausting their retries
+    errors = 0
+
     # Open the file and read the contents
     try:
         with open(file_path, 'r', encoding='utf-8') as file:
             urls = file.readlines()
     except FileNotFoundError:
         print("File not found. Please enter a valid file path.")
+        now = datetime.now(timezone.utc).isoformat()
+        RunHistory().add_run(
+            RunType.BULK.value, display_filename, started_at, now,
+            RunTrigger.CLI.value, RunOutcome.FAILED.value
+        )
+        return
 
     start_time = time.time()
-    update_log(instance, f"🎬 Bulk process started for '{os.path.basename(file_path)}'")
+    update_log(instance, f"🎬 Bulk process started for '{display_filename}'")
 
-    # Loop through the file, process the URL and options, then scrape according to the URL
-    for n, line in enumerate(urls, 1):
+    try:
 
-        # Skip comments
-        if is_not_comment(line):
+        # Loop through the file, process the URL and options, then scrape according to the URL
+        for n, line in enumerate(urls, 1):
 
-            # Parse the line to extract the URL and options
-            try:
-                parsed_url = parse_url_and_options(line)
-            except InvalidUrl as e:
-                update_log(instance, f"❌ Invalid URL found in bulk import file '{os.path.basename(file_path)}', line {n}: '{str(e)}'")
-                continue
-            except InvalidFlag as e:
-                update_log(instance, f"❌ One or more invalid flags found in bulk import file '{os.path.basename(file_path)}', line {n}: {str(e)}")
-                continue
+            # Skip comments
+            if is_not_comment(line):
 
-            try:
-                success_counter = [0]
-                scrape_and_upload(instance, parsed_url.url, parsed_url.options, False, success_counter)
-            except ScraperException as e:
-                debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}")
-            except Exception as e:
-                debug_me(f"Unknown Exception: Error processing {parsed_url.url}: {str(e)}")
+                # Parse the line to extract the URL and options
+                try:
+                    parsed_url = parse_url_and_options(line)
+                except InvalidUrl as e:
+                    update_log(instance, f"❌ Invalid URL found in bulk import file '{display_filename}', line {n}: '{str(e)}'")
+                    errors += 1
+                    continue
+                except InvalidFlag as e:
+                    update_log(instance, f"❌ One or more invalid flags found in bulk import file '{display_filename}', line {n}: {str(e)}")
+                    errors += 1
+                    continue
 
-    end_time = time.time()
-    elapsed = elapsed_time(end_time - start_time)
-    update_log(instance, f"🏁 Bulk process completed in {elapsed} for '{os.path.basename(file_path)}'")
+                try:
+                    scrape_and_upload(instance, parsed_url.url, parsed_url.options, False, success_counter, assets_processed, cached_counter=cached_counter, locked_counter=locked_counter, failed_counter=failed_counter)
+                except ScraperException as e:
+                    debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}")
+                    errors += 1
+                except Exception as e:
+                    debug_me(f"Unknown Exception: Error processing {parsed_url.url}: {str(e)}")
+                    errors += 1
+
+        end_time = time.time()
+        elapsed = elapsed_time(end_time - start_time)
+        update_log(instance, f"🏁 Bulk process completed in {elapsed} for '{display_filename}'")
+
+        # A line that failed to scrape at all (errors) and an item that failed to upload after
+        # exhausting its retries (failed_counter) both count as errors in the run summary. An
+        # item that succeeded on a retry never reaches failed_counter, so it isn't one.
+        if errors + failed_counter[0]:
+            outcome = RunOutcome.PARTIAL.value
+        elif assets_processed[0]:
+            outcome = RunOutcome.SUCCESS.value
+        else:
+            outcome = RunOutcome.SKIPPED.value
+
+    finally:
+        RunHistory().add_run(
+            RunType.BULK.value, display_filename, started_at, datetime.now(timezone.utc).isoformat(),
+            RunTrigger.CLI.value, outcome,
+            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0],
+            errors + failed_counter[0]
+        )
 
 # ---------------------- GUI FUNCTIONS ----------------------
 
