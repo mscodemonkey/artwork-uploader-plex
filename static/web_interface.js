@@ -1665,6 +1665,7 @@ const RUN_HISTORY_TYPE_LABELS = {
 const RUN_HISTORY_TRIGGER_LABELS = {
     manual: "Manual",
     scheduled: "Scheduled",
+    cli: "Command line",
     radarr: "Radarr",
     sonarr: "Sonarr"
 };
