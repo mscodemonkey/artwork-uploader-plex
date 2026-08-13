@@ -1,8 +1,10 @@
 """Unit tests for the persistent run history (services/run_history.py)."""
 
 import json
+import os
 import threading
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 import pytest
 
@@ -237,3 +239,29 @@ def test_concurrent_runs_finishing_together_do_not_lose_a_record(tmp_path):
         thread.join()
 
     assert len(RunHistory(path).get_runs()) == 20
+
+
+@pytest.mark.unit
+def test_saving_leaves_no_temporary_file_behind(tmp_path):
+    path = tmp_path / "run_history.json"
+    RunHistory(str(path)).add_run(RUN_TYPE_BULK, "file.txt", _iso(), _iso(), TRIGGER_MANUAL, OUTCOME_SUCCESS)
+
+    assert path.is_file()
+    assert not os.path.exists(f"{path}.tmp")
+
+
+@pytest.mark.unit
+def test_a_failed_write_leaves_the_existing_history_intact(tmp_path):
+    """The history is written to a temporary file and moved into place, so a write that
+    dies part way cannot take the records already on disk with it."""
+    path = tmp_path / "run_history.json"
+    history = RunHistory(str(path))
+    history.add_run(RUN_TYPE_BULK, "first.txt", _iso(), _iso(), TRIGGER_MANUAL, OUTCOME_SUCCESS)
+
+    with patch("services.run_history.json.dump", side_effect=OSError("no space left on device")):
+        history.add_run(RUN_TYPE_BULK, "second.txt", _iso(), _iso(), TRIGGER_MANUAL, OUTCOME_SUCCESS)
+
+    runs = history.get_runs()
+    assert len(runs) == 1
+    assert runs[0]["label"] == "first.txt"
+    assert not os.path.exists(f"{path}.tmp")
