@@ -2978,3 +2978,44 @@ function collectAppriseChannels() {
         })
         .filter(channel => channel.url !== "");
 }
+
+let tooltipTimeout = null;
+
+function toggleNotification() {
+    const checkbox = document.getElementById("bulk_notify");
+    const button = document.getElementById("notify_toggle");
+    const icon = document.getElementById("notify_icon");
+    
+    // Toggle state
+    checkbox.checked = !checkbox.checked;
+
+    if (checkbox.checked) {
+        // Active State (Enabled)
+        button.classList.remove("btn-secondary");
+        button.classList.add("btn-success");
+        icon.classList.remove("bi-bell-slash");
+        icon.classList.add("bi-bell");
+        newTitle = "Notifications enabled";
+    } else {
+        // Inactive State (Disabled)
+        button.classList.remove("btn-success");
+        button.classList.add("btn-secondary");
+        icon.classList.remove("bi-bell");
+        icon.classList.add("bi-bell-slash");        
+        newTitle = "Notifications disabled";
+    }
+    
+    let tooltip = bootstrap.Tooltip.getInstance(button);
+    if (!tooltip) {
+        tooltip = new bootstrap.Tooltip(button, { trigger: 'manual' });
+    }
+    
+    if (tooltipTimeout) clearTimeout(tooltipTimeout);
+
+    tooltip.setContent({ '.tooltip-inner': newTitle });
+    tooltip.show()
+
+    tooltipTimeout = setTimeout(() => {
+        tooltip.hide();
+    }, 1000);    
+}
