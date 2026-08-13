@@ -20,8 +20,11 @@ from models.instance import Instance
 from models.options import Options
 from scrapers.theposterdb_scraper import ThePosterDBScraper
 from services.artwork_processor import ArtworkProcessor
-from services.run_history import RunHistory, OUTCOME_STOPPED
+from services.run_history import RunHistory
+from core.enums import RunOutcome
 from models.callbacks import ProcessingCallbacks
+
+OUTCOME_STOPPED = RunOutcome.STOPPED.value
 
 
 @pytest.mark.unit

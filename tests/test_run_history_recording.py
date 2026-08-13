@@ -13,7 +13,12 @@ import pytest
 import core.globals as globals
 from artwork_uploader import process_bulk_import_from_ui, run_bulk_import_scrape_in_thread
 from models.instance import Instance
-from services.run_history import RunHistory, OUTCOME_SUCCESS, OUTCOME_PARTIAL, OUTCOME_FAILED, OUTCOME_SKIPPED
+from services.run_history import RunHistory
+from core.enums import RunOutcome
+OUTCOME_SUCCESS = RunOutcome.SUCCESS.value
+OUTCOME_PARTIAL = RunOutcome.PARTIAL.value
+OUTCOME_FAILED = RunOutcome.FAILED.value
+OUTCOME_SKIPPED = RunOutcome.SKIPPED.value
 
 
 @pytest.fixture
@@ -39,7 +44,7 @@ def test_successful_run_is_recorded_with_its_counters(history):
     globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
     globals.config = MagicMock(apprise_urls=[])
 
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None):
+    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None, failed_counter=None):
         assets_processed[0] += 1
         success_counter[0] += 1
         cached_counter[0] += 1

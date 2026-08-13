@@ -8,14 +8,14 @@ import pytest
 
 import core.globals as globals
 import web_routes
-from services.run_history import (
-    RunHistory,
-    OUTCOME_SUCCESS,
-    RUN_TYPE_BULK,
-    RUN_TYPE_WEBHOOK,
-    TRIGGER_MANUAL,
-    TRIGGER_RADARR,
-)
+from services.run_history import RunHistory
+from core.enums import RunType, RunTrigger, RunOutcome
+
+OUTCOME_SUCCESS = RunOutcome.SUCCESS.value
+RUN_TYPE_BULK = RunType.BULK.value
+RUN_TYPE_WEBHOOK = RunType.WEBHOOK.value
+TRIGGER_MANUAL = RunTrigger.MANUAL.value
+TRIGGER_RADARR = RunTrigger.RADARR.value
 
 
 def _iso():

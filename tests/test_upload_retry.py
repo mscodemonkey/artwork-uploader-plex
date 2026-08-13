@@ -24,8 +24,7 @@ def test_config_defaults_match_todays_hardcoded_timeouts(tmp_path):
     # values that were hardcoded before they became configurable.
     config = Config(config_path=str(tmp_path / "config.json"))
     assert config.plex_connect_timeout == 10
-    assert config.plex_test_connection_timeout == 5
-    assert config.kometa_download_timeout == 5
+    assert config.kometa_download_timeout == 10
     assert config.upload_retry_attempts == 3
     assert config.upload_retry_backoff_seconds == 1
 

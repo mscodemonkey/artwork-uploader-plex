@@ -14,16 +14,16 @@ import pytest
 import core.globals as globals
 from artwork_uploader import process_scrape_url_from_web
 from models.instance import Instance
-from services.run_history import (
-    RunHistory,
-    OUTCOME_SUCCESS,
-    OUTCOME_PARTIAL,
-    OUTCOME_STOPPED,
-    OUTCOME_FAILED,
-    OUTCOME_SKIPPED,
-    RUN_TYPE_SCRAPE,
-    TRIGGER_MANUAL,
-)
+from services.run_history import RunHistory
+from core.enums import RunType, RunTrigger, RunOutcome
+
+OUTCOME_SUCCESS = RunOutcome.SUCCESS.value
+OUTCOME_PARTIAL = RunOutcome.PARTIAL.value
+OUTCOME_STOPPED = RunOutcome.STOPPED.value
+OUTCOME_FAILED = RunOutcome.FAILED.value
+OUTCOME_SKIPPED = RunOutcome.SKIPPED.value
+RUN_TYPE_SCRAPE = RunType.SCRAPE.value
+TRIGGER_MANUAL = RunTrigger.MANUAL.value
 
 URL = "https://theposterdb.com/set/12345"
 

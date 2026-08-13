@@ -9,10 +9,13 @@ from unittest.mock import patch
 
 import pytest
 
-import core.globals as globals
 from artwork_uploader import process_bulk_file_on_schedule
 from models.instance import Instance
-from services.run_history import RunHistory, TRIGGER_SCHEDULED, OUTCOME_FAILED, OUTCOME_SKIPPED
+from services.run_history import RunHistory
+from core.enums import RunTrigger, RunOutcome
+TRIGGER_SCHEDULED = RunTrigger.SCHEDULED.value
+OUTCOME_FAILED = RunOutcome.FAILED.value
+OUTCOME_SKIPPED = RunOutcome.SKIPPED.value
 
 
 @pytest.fixture
