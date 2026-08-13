@@ -102,3 +102,7 @@ class RunOutcome(str, Enum):
     STOPPED = "stopped" # cancelled by the user
     FAILED = "failed"   # an exception aborted the run
     SKIPPED = "skipped" # nothing to do (e.g. no valid entries in the file)
+
+class WebhookSource(str, Enum):
+    RADARR = "radarr"
+    SONARR = "sonarr"

@@ -16,7 +16,7 @@ from typing import FrozenSet, List, Optional, Union
 
 from core import globals
 from core.constants import WEBHOOK_RETRY_DELAYS
-from core.enums import ScraperSource, RunType, RunTrigger, RunOutcome
+from core.enums import ScraperSource, RunType, RunTrigger, RunOutcome, WebhookSource, FileType
 from core.exceptions import MovieNotFound, ShowNotFound
 from models.callbacks import ProcessingCallbacks
 from models.instance import Instance
@@ -25,7 +25,7 @@ from services.asset_index import AssetIndex, normalize_title
 from services.run_history import RunHistory
 
 # The *arr app that sent the event, as the history records it
-_TRIGGER_BY_SOURCE = {"radarr": RunTrigger.RADARR.value, "sonarr": RunTrigger.SONARR.value}
+_TRIGGER_BY_SOURCE = {WebhookSource.RADARR.value: RunTrigger.RADARR.value, WebhookSource.SONARR.value: RunTrigger.SONARR.value}
 
 
 def _log(text: str) -> None:
@@ -82,9 +82,13 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
     movie = payload.get("movie")
     if isinstance(movie, dict) and movie.get("title"):
         return WebhookEvent(
-            kind="movie", title=movie["title"], year=_int_or_none(movie.get("year")),
-            tmdb_id=_int_or_none(movie.get("tmdbId")), tvdb_id=None,
-            seasons=frozenset(), source="radarr",
+            kind="movie",
+            title=movie["title"],
+            year=_int_or_none(movie.get("year")),
+            tmdb_id=_int_or_none(movie.get("tmdbId")),
+            tvdb_id=None,
+            seasons=frozenset(),
+            source=WebhookSource.RADARR.value
         )
     series = payload.get("series")
     if isinstance(series, dict) and series.get("title"):
@@ -94,9 +98,13 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
             if isinstance(episode, dict) and isinstance(episode.get("seasonNumber"), int)
         )
         return WebhookEvent(
-            kind="tv", title=series["title"], year=_int_or_none(series.get("year")),
-            tmdb_id=_int_or_none(series.get("tmdbId")), tvdb_id=_int_or_none(series.get("tvdbId")),
-            seasons=seasons, source="sonarr",
+            kind="tv",
+            title=series["title"],
+            year=_int_or_none(series.get("year")),
+            tmdb_id=_int_or_none(series.get("tmdbId")),
+            tvdb_id=_int_or_none(series.get("tvdbId")),
+            seasons=seasons,
+            source=WebhookSource.SONARR.value
         )
     return None
 
@@ -244,17 +252,17 @@ class WebhookService:
         cache_buster = f"&_cb={int(time.time())}"
         artwork: List[dict] = []
         if event.kind == "movie":
-            row = index.lookup(user_keys, event.title, event.year, ["movie_poster"])
+            row = index.lookup(user_keys, event.title, event.year, [FileType.MOVIE_POSTER.value])
             if row:
-                artwork.append(self._artwork_dict(row, cache_buster, "movie_poster"))
+                artwork.append(self._artwork_dict(row, cache_buster, FileType.MOVIE_POSTER.value))
         else:
-            row = index.lookup(user_keys, event.title, event.year, ["show_cover"])
+            row = index.lookup(user_keys, event.title, event.year, [FileType.SHOW_COVER.value])
             if row:
-                artwork.append(self._artwork_dict(row, cache_buster, "show_cover"))
+                artwork.append(self._artwork_dict(row, cache_buster, FileType.SHOW_COVER.value))
             for season in sorted(event.seasons):
-                season_row = index.lookup(user_keys, event.title, event.year, ["season_cover"], season=season)
+                season_row = index.lookup(user_keys, event.title, event.year, [FileType.SEASON_COVER.value], season=season)
                 if season_row:
-                    artwork.append(self._artwork_dict(season_row, cache_buster, "season_cover", season))
+                    artwork.append(self._artwork_dict(season_row, cache_buster, FileType.SEASON_COVER.value, season))
         return artwork
 
     @staticmethod
@@ -274,7 +282,7 @@ class WebhookService:
             "id": str(row["asset_id"]),
             "file_type": artwork_type,
         }
-        if artwork_type in ("show_cover", "season_cover"):
-            artwork["season"] = "Cover" if artwork_type == "show_cover" else season
+        if artwork_type in (FileType.SHOW_COVER.value, FileType.SEASON_COVER.value):
+            artwork["season"] = "Cover" if artwork_type == FileType.SHOW_COVER.value else season
             artwork["episode"] = None
         return artwork
