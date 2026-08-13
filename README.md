@@ -6,32 +6,31 @@ Artwork Uploader is a tool to help process sets of posters from ThePosterDB or M
 
 # What's different from Brian's original app?
 ### Upload Zip files
-You can upload the Zip file you download from theposterdb.com or mediux.pro.  It should handle all types of Zip, including the odd misnamed file from MediUX.  This feature is still in Beta so help out with some feedback here!
-This is also to keep theposterdb happy that we're not breaking their terms of service by scraping.
+You can upload the Zip file you download from theposterdb.com or mediux.pro. It should handle all types of Zip, including the odd misnamed file from MediUX. This is also to keep theposterdb happy that we're not breaking their terms of service by scraping.
 
 ### Artwork tracking for speedy updates
-We (optionally) store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again.  If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time.  
+We (optionally) store an artwork ID in a Plex label against each movie, show, episode and collection, so it can check whether the same artwork is about to be uploaded again. If it detects the same artwork has been requested, it'll skip it, resulting in a quicker run time. 
 
 ### Force artwork to be updated
-If you really want to upload artwork again, use the ```--force``` option at the command line, in the bulk file, or when entering the URL in the Web UI.
+If you really want to upload artwork again, use the `--force` option at the command line, in the bulk file, or when entering the URL in the Web UI.
 
 ### ThePosterDB scraping
-There are also a couple of new options for thePosterDb, which will allow you to also grab additional sets and additional posters from the same page.  This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets.  This is against the terms of service of theposterdb.com so we encourage you to login, download the files you want, and upload them using this tool, rather than scraping.  Once an API is available we'll switch over ASAP.  If you regularly scrape the same ThePosterDB users, enable ```cache_user_scrapes``` so repeat scrapes only fetch new uploads instead of re-crawling the whole catalogue every time.
+There are also a couple of new options for ThePosterDb, which will allow you to also grab additional sets and additional posters from the same page. This is sometimes useful for big sets like the Marvel or Disney movies, where you'll otherwise need to specify multiple sets. This is against the terms of service of theposterdb.com so we encourage you to login, download the files you want, and upload them using this tool, rather than scraping. Once an API is available we'll switch over ASAP. If you regularly scrape the same ThePosterDB users, enable `cache_user_scrapes` so repeat scrapes only fetch new uploads instead of re-crawling the whole catalogue every time.
 
 ### Per-URL filtering and artwork excludes 
-And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example).  And if you don't like a particular piece of artwork or poster from a set, you can now exclude it. You can also exclude entire seasons or individual episodes, that way the app doesn't have to provess all the previous seasons for which you already have artwork applied.
+And there are other options such as per-URL filtering, fixing missing things that I found while I was using the tool (where I wanted to apply episode title cards but didn't like the season artwork for example). And if you don't like a particular piece of artwork or poster from a set, you can now exclude it. You can also exclude entire seasons or individual episodes, that way the app doesn't have to provess all the previous seasons for which you already have artwork applied.
 
 ### Kometa support
-Kometa support is offered in two different ways. The simple way is for the script to reset Kometa's overlay label so the next time Kometa runs the overlay gets added to the new artwork (`reset_overlay` set to `true` in config.json). Alternatively, if you're using Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) to manage all your Plex custom art, you can check the option to save the artwork to the Kometa asset directory instead of applying it directly to Plex (either in the GUI or by setting `save_to_kometa` to `true` in the config.json file). In that case, whenever Kometa runs again it will apply all new or updated artwork with its corresponding overlays. If this option is enabled, you will have to set the Kometa base directory (`kometa_base` in the config file, or with the appropriate text field in the GUI) to the base asset directory.
+Kometa support is offered in two different ways. The simple way is for the app to reset Kometa's overlay label so the next time Kometa runs the overlay gets added to the new artwork (`reset_overlay` set to `true` in config.json or via the corresponding GUI toggle). Alternatively, if you're using Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) to manage all your Plex custom art, you can check the option to save the artwork to the Kometa asset directory instead of applying it directly to Plex (either in the GUI or by setting `save_to_kometa` to `true` in the config.json file). In that case, whenever Kometa runs again it will apply all new or updated artwork with its corresponding overlays. If this option is enabled, you will have to set the Kometa base directory (`kometa_base` in the config file, or with the appropriate text field in the GUI) to the base asset directory.
 
 Kometa asset directory support works on the following assumptions:
 
 - `asset_folders` is set to `true` in Kometa's config.yml, so that each TV show or movie has its own dedicated folder for its artwork assets
 - `assets_for_all` should be set to `true` in each library
-- `assets_for_all_collections` should be set to `true` in each library (if you want ot manage collection assets)
+- `assets_for_all_collections` should be set to `true` in each library (if you want to manage collection assets)
 - `create_asset_folders` should be set to `true`
 - Each library has a folder that matches the library name under the base asset directory
-- Collections have their assets stored in the same folders as the movies or TV shows in the same library
+- Collections have their assets stored in the same folders as the movies or TV shows of the same library
 
 Here's a snippet of the config.yml file:
 
@@ -125,7 +124,7 @@ The structure of your Kometa asset directories should look like this:
 
 ```
 
-Finally, if you're using the Kometa asset directory and you're running the script in a Docker container, the script will detect that it's running in Docker (via the RUNNING_IN_DOCKER environment variable) and will hardcode the Kometa base directory to ```/assets``` and the temp directory to ```/temp```. You must therefore map the asset directory base and temp folders to these paths inside the container. This allows you to keep your real paths to your Kometa base and temp folders in the config.json file so if you run the script manually from outside the container it will also work. Your ```docker-compose.yml``` file should look like this:
+Finally, if you're using the Kometa asset directory and you're running the app as a Docker container, it will detect that it's running in Docker (via the RUNNING_IN_DOCKER environment variable) and will hardcode the Kometa base directory to `/assets` and the temp directory to `/temp`. You must therefore map the asset directory base and temp folders to these paths inside the container. This allows you to keep your real paths to your Kometa base and temp folders in the config.json file so if you run the app manually from outside the container it will also work. Your `docker-compose.yml` file should look like this:
 
 ```yaml
 services:
@@ -146,41 +145,41 @@ services:
 ```
 
 ### Year matching
-Sometimes the year on Plex and the year at the artwork provider is different.  Use the --year <year> argument to set the Plex year, so the artwork matches.  Also available in the Web UI and bulk files.
+Sometimes the year on Plex and the year at the artwork provider is different. Use the `--year` argument to set the Plex year, so the artwork matches. Also available in the Web UI and bulk files.
 
 ### Clean up your bulk files
-Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you).  It's not really production ready yet but works just fine I think - do let me know!
+Plus you can allow your bulk file to be auto-managed (cleaned and sorted for you).
 
 ### Web UI
-Oh, last but not least, there's now a shiny new web UI so you can leave it running on your Plex Server and access it remotely!
+There is a fully-functional Web UI that you can leave running in the background to access remotely.
 
 ### Automatic artwork for new imports (Sonarr/Radarr webhook)
-With ```cache_user_scrapes``` enabled, the app already knows every poster your favourite ThePosterDB users have uploaded, so it can apply the right artwork within about a minute of Sonarr or Radarr importing something, instead of waiting for the next scheduled run.  Turn on ```enable_webhooks```, set a ```webhook_token``` and list the ThePosterDB users to apply from (in order of preference) under Webhook settings in the web UI, then add a webhook connection in each app:
+With `cache_user_scrapes` enabled (TPDb only), the app already knows every poster your favourite ThePosterDB users have uploaded, so it can apply the right artwork within about a minute of Sonarr or Radarr importing something, instead of waiting for the next scheduled run. Turn on `enable_webhooks`, set a `webhook_token` and list the ThePosterDB users to apply from (in order of preference) under Webhook settings in the web UI, then add a webhook connection in each app:
 
-- **Radarr / Sonarr:** Settings -> Connect -> + -> Webhook.  URL ```http://<artwork-uploader host>:4567/webhook/radarr``` (or ```/webhook/sonarr```), Method POST.  Tick only the "On File Import" trigger.  Send the token as the connection's Password, or as a header: click the **Advanced** (cog) button and add a Header with Key ```X-Webhook-Token``` and Value set to the token.  The Test button is acknowledged so you can save the connection.
+- **Radarr / Sonarr:** Settings -> Connect -> + -> Webhook. URL `http://<artwork-uploader-host>:4567/webhook/radarr` (or `/webhook/sonarr`), Method POST. Tick only the "On File Import" trigger. Send the token as the connection's Password, or as a header: click the **Advanced** (cog) button and add a Header with Key `X-Webhook-Token` and Value set to the token. The Test button is acknowledged so you can save the connection.
 
-On an import the title is looked up in the cached index; if one of the configured users covers it, that single poster (plus season covers for the imported seasons, on TV) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same.  Imports usually reach the webhook before Plex has scanned the new file, so the apply retries quietly for a few minutes, then gives up and leaves it to the next scheduled run.  Ambiguous title matches (for example same-name remakes) are skipped rather than guessed, and nothing is applied when no configured user has the title.  The endpoints return 404 if ```enable_webhooks``` is disabled.
+On an import the title is looked up in the cached index; if one of the configured users covers it, that single poster (plus season covers for the imported seasons on TV items) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same. Imports could reach the webhook before Plex has scanned the new file, so the apply retries quietly for a few minutes, then gives up and leaves it to the next scheduled run. Ambiguous title matches (for example same-name remakes) are skipped rather than guessed, and nothing is applied when no configured user has the title. The endpoints return 404 if `enable_webhooks` is disabled.
 
 ### Scheduler with Apprise notifications
 Basic scheduler, so that you can leave this running and update all your artwork automatically.
 
 Available now on the bulk imports page, click on the clock to add, edit or remove schedules for the file you have open. A file can carry more than one schedule, and each one either runs daily at a fixed time or repeats every N hours or days, so a large nightly run and a smaller one twice a day can share the same list without needing separate files.
 
-It's there for when we have API access (and works for scrapers in the meantime).  If you enable ```cache_user_scrapes```, a scheduled user scrape only fetches uploads that are new since the last run, so scheduled full-catalogue runs stay fast.
+It's there for when we have API access (and works for scrapers in the meantime). If you enable `cache_user_scrapes`, a scheduled user scrape only fetches uploads that are new since the last run, so scheduled full-catalogue runs stay fast.
 
-If you enable ```skip_locked_artwork```, a scheduled user or bulk scrape will only fill items that are still on their default artwork and leave anything you've set by hand untouched, so it's safe to leave running against a curated library.
+If you enable `skip_locked_artwork`, a scheduled user or bulk scrape will only fill items that are still on their default artwork and leave anything you've set by hand untouched, so it's safe to leave running against a curated library.
 
-If you also enable ```allow_artist_updates```, a scheduled scrape may additionally replace artwork it applied earlier when the same artist has posted a newer version of it. It still never touches artwork you set by hand (anything without one of this tool's artwork-ID labels) or artwork from a different artist, and it only ever moves forward to a newer upload, so runs settle on each artist's latest rather than flip-flopping. It needs both ```skip_locked_artwork``` and ```track_artwork_ids``` on. Because this writes over artwork the tool previously chose, take a note of your current posters before the first run if you want to be able to revert.
+If you also enable `allow_artist_updates` (TPDb only), a scheduled scrape may additionally replace artwork it applied earlier when the same artist has posted a newer version of it. It still never touches artwork you set by hand (anything without an artwork-ID label) or artwork from a different artist, and it only ever moves forward to a newer upload, so runs settle on each artist's latest rather than flip-flopping. It needs both `skip_locked_artwork` and `track_artwork_ids` on. Because this writes over artwork the tool previously chose, take a note of your current posters before the first run if you want to be able to revert.
 
-With ```local_library_matching``` enabled, a user-catalog scrape skips everything that isn't in your libraries without any web requests, so full-catalog runs take minutes rather than hours.
+With `local_library_matching` enabled (TPDb only), a user-catalog scrape skips everything that isn't in your libraries without any web requests, so full-catalog runs take minutes rather than hours. This feature builds an index on your libraries and matches based on titles only instead of fetching each indivudal poster page to get the TMDb ID (since TPDb doesn't provide the TMDb ID on the set page), so scrapes will be much faster but matching will be less accurate, especially for foreign titles or titles with special characters.
 
-Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the ```apprise_urls``` variable in the ```config.json```file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
+Additionally, you can configure one or more push notification services so you get a notification every time a scheduled bulk import job completes. Notifications are provided by Apprise. Configure the list of notification services by providing a comma-separated list of Apprise notification URLs through the web UI or via the `apprise_urls` variable in the `config.json` file. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
 
 ## Thanks
-Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea!  It's saved me a load of time, and it's made my Plex beautiful!  And it's made me learn a bit of Python too!  I really hope you don't mind me taking your work and running with it, please get in touch if you'd like to merge the two projects!
+Many thanks to Brian Brown [@bbrown430] (https://github.com/bbrown430) for the original plex-poster-set-helper - what a fantastic idea! It's saved me a load of time, and it's made my Plex beautiful! And it's made me learn a bit of Python too! I really hope you don't mind me taking your work and running with it, please get in touch if you'd like to merge the two projects!
 
 ## Disclaimer
-This is a first project for me, I'm using it to learn Python so it will be constantly changing as I learn more.  I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work!  Any help would be appreciated, so feel free to contribute.   I am also aware that scraping breaks the terms of service of TPDb so please consider using the upload Zip feature from there.  Wish these sites had APIs!
+This is a first project for me, I'm using it to learn Python so it will be constantly changing as I learn more. I therefore don't offer any support further than my own knowledge, or any guarantee that it will actually work! Any help would be appreciated, so feel free to contribute. I am also aware that scraping breaks the terms of service of TPDb so please consider using the upload Zip feature from there. Wish these sites had APIs!
 
 ## For Developers
 If you're interested in contributing to this project or want to understand how it works under the hood, check out the [Technical Information for Contributors](TECHNICAL_INFO.md) which includes:
@@ -194,7 +193,7 @@ If you're interested in contributing to this project or want to understand how i
 # Installation
 
 ### 1. Install Python
-[Install Python](https://www.python.org/downloads/) (if not installed already).  You'll need version 3.12 or later.
+[Install Python](https://www.python.org/downloads/) (if not installed already). You'll need version 3.12 or later.
 
 ### 2. Get Artwork Uploader for Plex
 Either download the Zip and extract all files into a folder, or Git Clone the repository
@@ -208,9 +207,9 @@ Then CD to the folder where you extracted Artwork Uploader
    pip install -r requirements.txt
    ```
 
-You may need to use ```python3 -m pip install -r requirements.txt```
+You may need to use `python3 -m pip install -r requirements.txt`
 
-### 5. Rename ```example_config.json``` to ```config.json``` inside the ```/config``` directory.  
+### 5. Rename `example_config.json` to `config.json` inside the `/config` directory. 
 This is optional - if you don't do this, a new config.json will be created when you first run the utility and you'll be prompted to edit the config.
 
 ### 6. Edit your config.json to provide the following information:  
@@ -228,70 +227,70 @@ This is optional - if you don't do this, a new config.json will be created when 
 - The name of your Movies library (e.g., "Movies"). Multiple libraries are also supported (see the **Multiple Libraries** section below).
 
 ```"mediux_filters"```
-- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the Web UI.
+- See the list of filter options below. Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the Web UI.
 
 ```"tpdb_filters"```
-- See the list of filter options below.  Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the Web UI.
+- See the list of filter options below. Anything not in this list will not be uploaded unless requested in the command line, in the bulk file or in the scraper URL in the Web UI.
 
 ```"track_artwork_ids"```
-- Setting this to ```true``` will result in speedy scraping re-runs.  It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.
-- By setting this to ```false```, it'll upload every artwork every time you run (like using the --force option for every item).  This can result in long run-times, especially if you're using ThePosterDB.  We recommend you leave this as **true** and use --force when you need to!
+- Setting this to `true` will result in speedy scraping re-runs. It uses Plex labels to store a special ID for the artwork, so that next time, we can check if the scraped artwork is the same as the current artwork and skip re-uploading.
+- By setting this to `false`, it'll upload every artwork every time you run (like using the `--force` option for every item). This can result in long run-times, especially if you're using ThePosterDB. We recommend you leave this as **true** and use `--force` when you need to!
 
 ```"skip_locked_artwork"```
-- Setting this to ```true``` will skip any artwork whose target field (poster, background or square art) is locked in Plex, unless ```--force``` is used.  Plex locks a field whenever artwork is deliberately set - manually or by an upload - so this makes scheduled bulk imports and user scrapes fill items still on default artwork while leaving anything you've already set alone.
-- Setting to ```false``` (the default) keeps the existing behaviour where artwork is applied regardless of locks.
+- Setting this to `true` will skip any artwork whose target field (poster, background or square art) is locked in Plex, unless `--force` is used. Plex locks a field whenever artwork is deliberately set - manually or by an upload - so this makes scheduled bulk imports and user scrapes fill items still on default artwork while leaving anything you've already set alone.
+- Setting to `false` (the default) keeps the existing behaviour where artwork is applied regardless of locks.
 
 ```"allow_artist_updates"```
-- Setting this to ```true``` lets a run replace artwork it applied earlier when the same artist has posted a newer version, even though the field is locked.  Artwork you set by hand (anything without one of this tool's artwork-ID labels) and artwork from a different artist are still left alone, and it only moves forward to a newer upload.
-- Requires ```skip_locked_artwork``` and ```track_artwork_ids``` to both be ```true```.  Has no effect otherwise.
-- Setting to ```false``` (the default) keeps the existing behaviour where a locked field is never updated by a scrape.
+- TPDb only: Setting this to `true` lets a run replace artwork it applied earlier when the same artist has posted a newer version, even though the field is locked. Artwork you set by hand (anything without an artwork-ID label) and artwork from a different artist are still left alone, and it only moves forward to a newer upload.
+- Requires `skip_locked_artwork` and `track_artwork_ids` to both be `true`. Has no effect otherwise.
+- Setting to `false` (the default) keeps the existing behaviour where a locked field is never updated by a scrape.
 
 ```"cache_user_scrapes"```
-- Setting this to ```true``` keeps a local index of each ThePosterDB user's uploads (a small SQLite file in your config directory), so scraping a user page again only fetches pages until it reaches uploads it has already seen - full-catalogue re-runs drop from hundreds of page requests to a couple, which is also much kinder to ThePosterDB.  Every ```user_cache_refresh_days``` days the next scrape of that user re-crawls every page to pick up edited or deleted uploads.
-- Setting to ```false``` (the default) crawls every page on every user scrape, exactly as before.
+- Setting this to `true` keeps a local index of each ThePosterDB user's uploads (a small SQLite file in your config directory), so scraping a user page again only fetches pages until it reaches uploads it has already seen - full-catalogue re-runs drop from hundreds of page requests to a couple, which is also much kinder to ThePosterDB. Every `user_cache_refresh_days` days the next scrape of that user re-crawls every page to pick up edited or deleted uploads.
+- Setting to `false` (the default) crawls every page on every user scrape, exactly as before.
 
 ```"user_cache_refresh_days"```
-- The number of days between full re-crawls of a cached user's uploads (default ```7```).  Only used when ```cache_user_scrapes``` is ```true```.
+- The number of days between full re-crawls of a cached user's uploads (default `7`). Only used when `cache_user_scrapes` is `true`.
 
 ```"local_library_matching"```
-- Setting this to ```true``` (the default) matches scraped artwork against your Plex libraries locally before fetching each poster's page, so big user scrapes skip everything you don't own without a web request and run dramatically faster.  The poster page is still checked right before anything is uploaded, so nothing less accurate ever gets written.
-- Setting to ```false``` restores the previous per-poster lookups.  Use this if items you own start logging "not available on Plex" because their Plex titles differ from the titles on ThePosterDB.
+- Setting this to `true` (the default) matches scraped artwork against your Plex libraries locally before fetching each poster's page, so big user scrapes skip everything you don't own without a web request and run dramatically faster. The poster page is still checked right before anything is uploaded, so nothing less accurate ever gets written.
+- Setting to `false` restores the previous per-poster lookups. Use this if items you own start logging "not available on Plex" because their Plex titles differ from the titles on ThePosterDB.
 
 ```"auto_manage_bulk_files"```
-- Setting this to ```true``` will automatically add, label and sort URLs from the scrape tab into the currently loaded bulk import file.  At the moment it won't auto-save, but I might add that later.
-- Setting to ```false``` will leave the organisation of your bulk files up to you.
+- Setting this to `true` will automatically add, label and sort URLs from the scrape tab into the currently loaded bulk import file. At the moment it won't auto-save, but I might add that later.
+- Setting to `false` will leave the organisation of your bulk files up to you.
 
 ```"reset_overlay"```
-- Setting this to ```true``` will remove the Overlay label that Kometa uses when we upload new artwork, so Kometa can reapply any overlays in future
-- Setting to ```false``` will leave the Overlay label as it is, Kometa will not re-apply your overlays.
+- Setting this to `true` will remove the Overlay label that Kometa uses when we upload new artwork, so Kometa can reapply any overlays in future
+- Setting to `false` will leave the Overlay label as it is, Kometa will not re-apply your overlays.
 
 ```"save_to_kometa"```
-- Setting this to ```true``` will save scraped artwork to the Kometa asset directory
-- Setting to ```false``` will keep the original behavior where the artwork will be immediately applied to Plex directly
+- Setting this to `true` will save scraped artwork to the Kometa asset directory
+- Setting to `false` will keep the original behavior where the artwork will be immediately applied to Plex directly
 
 ```"kometa_base"```
 - Path to your Kometa base asset directory
 
 ```"temp_dir"```
-- (Optional) Path to temporary save directory that can be used for testing purposes when using the ```--temp``` argument in the CLI
+- (Optional) Path to temporary save directory that can be used for testing purposes when using the `--temp` argument in the CLI or the corresponding toggle in the web UI
 
 ```"stage_assets"```
-- Set to ```true``` to download assets for TV show seasons and episodes not yet available in Plex. This can be useful if the scheduled run happens before a particular season or episode is downloaded by your automation. This feature does not apply to the Specials season (Seaon 0).
+- Set to `true` to download assets for TV show seasons and episodes not yet available in Plex. This can be useful if the scheduled run happens before a particular season or episode is downloaded by your automation. This feature does not apply to the Specials season (Seaon 0).
 
 ```"apprise_urls"```
-- Provide a comma-separated list of Apprise service URLs to send notifications upong completion of scheduled bulk imports. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
+- Provide a comma-separated list of Apprise service URLs to send notifications upon completion of scheduled bulk imports. Check [the Apprise service list](https://appriseit.com/services/) for details on the supported services and how to set them up and generate a notification URL for your favorite services.
 
 ```"enable_webhooks"```
-- Set to ```true``` to enable the Sonarr/Radarr import webhook endpoints (```/webhook/radarr``` and ```/webhook/sonarr```).  ```false``` (default) leaves them disabled and returning 404, so the app is unchanged unless you turn this on.  Requires ```cache_user_scrapes``` so there is an index to look artwork up in.
+- TPDb only: Set to `true` to enable the Sonarr/Radarr import webhook endpoints (`/webhook/radarr` and `/webhook/sonarr`). `false` (default) leaves them disabled and returning 404, so the app is unchanged unless you turn this on. Requires `cache_user_scrapes` so there is an index to look artwork up in.
 
 ```"webhook_token"```
-- The shared secret that webhook requests must provide, in an ```X-Webhook-Token``` header, as the HTTP Basic password, or a ```?token=``` query parameter.  Required when ```enable_webhooks``` is ```true```.
+- The shared secret that webhook requests must provide, in an `X-Webhook-Token` header, as the HTTP Basic password, or a `?token=` query parameter. Required when `enable_webhooks` is `true`.
 
 ```"webhook_tpdb_users"```
-- A list of ThePosterDB user names to apply cached artwork from on import, in order of preference (first match wins).  Only used when ```enable_webhooks``` is ```true```.
+- A list of ThePosterDB user names to apply cached artwork from on import, in order of preference (first match wins). Only used when `enable_webhooks` is `true`.
 
 ```"webhook_apply_delay"```
-- Seconds to wait after an import before applying artwork (default ```30```).  The *arr apps fire the webhook the moment they import a file, usually before Plex has scanned it, so this gives Plex a head start; if the item still is not in Plex the apply retries for a few minutes before giving up.
+- Seconds to wait after an import before applying artwork (default `30`). The *arr apps fire the webhook the moment they import a file, usually before Plex has scanned it, so this gives Plex a head start; if the item still is not in Plex the apply retries for a few minutes before giving up.
 
 ```"plex_connect_timeout"```
 - Timeout for connecting to or uploading artwork to Plex. Defaults to `10` seconds.
@@ -306,7 +305,7 @@ This is optional - if you don't do this, a new config.json will be created when 
 - Cool-down period before first retry of an operation. Doubles every subsequent retry. Defaults to `1` second.
 
 ### Filter options
-Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below.  Specify one or more in an array ["show_cover, "title_card"]. TPDb does not provide title cards, backgrounds or square art so these filters are not available in the web UI.
+Both mediux_filters and tpdb_filters specify which artwork types to upload by including the flags below. Specify one or more in an array ["show_cover, "title_card"]. TPDb does not provide title cards, backgrounds or square art so these filters are not available in the web UI.
 - show_cover
 - background
 - square_art
@@ -315,7 +314,7 @@ Both mediux_filters and tpdb_filters specify which artwork types to upload by in
 - movie_poster
 - collection_poster
 
-A NOTE ON SQUARE ART ASSETS: Even though MediUX supports per-season ```square_art``` assets for TV Shows, Plex only supports a single ```square_art``` asset at the show level. When saving assets to the Kometa asset directory, the first asset processed will be saved as ```square.ext``` and will be the one applied by Kometa. Subsequent assets will be saved as ```square_alt_#.ext``` in case you want to select an alternative one which you can rename as ```square.ext``` for Kometa to pick up. When applying artwork directly to a Plex server, Artwork Uploader will apply the first one and ignore the rest.
+**A NOTE ON SQUARE ART ASSETS**: Even though MediUX supports per-season `square_art` assets for TV Shows, Plex only supports a single `square_art` asset at the show level. When saving assets to the Kometa asset directory, the first asset processed will be saved as `square.ext` and will be the one applied by Kometa. Subsequent assets will be saved as `square_alt_#.ext` in case you want to select an alternative one which you can rename as `square.ext` for Kometa to pick up. When applying artwork directly to a Plex server, Artwork Uploader will apply the first one and ignore the rest.
 
 ---
 # Usage
@@ -400,27 +399,27 @@ The script supports various command-line arguments for flexible use.
 ```
 #### Optional command line arguments
 
-```--add-sets``` will also parse any additional sets when using the Poster DB 
+`--add-sets` will also parse any additional sets when using the Poster DB 
     
-```--add-posters``` will also parse the additional posters section of the set, when using the Poster DB
+`--add-posters` will also parse the additional posters section of the set, when using the Poster DB
    
-```--force``` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
+`--force` will force the artwork to be updated even if it's the same as the one on plex already - or maybe you changed the artwork manually and want to override it...
     
-```--skip-locked``` will skip any artwork whose target field is locked in Plex (i.e. it's been deliberately set, manually or by a previous upload), unless ```--force``` is also used.  This is the same as setting ```skip_locked_artwork``` to ```true``` in ```config.json```, but per URL.
+`--skip-locked` will skip any artwork whose target field is locked in Plex (i.e. it's been deliberately set, manually or by a previous upload), unless `--force` is also used. This is the same as setting `skip_locked_artwork` to `true` in `config.json`, but per URL.
 
-```--allow-artist-updates``` lets a run replace artwork it applied earlier when the same artist has posted a newer version, while still leaving hand-set artwork and other artists' artwork alone.  This is the same as setting ```allow_artist_updates``` to ```true``` in ```config.json```, but per URL.  It needs ```--skip-locked``` (or ```skip_locked_artwork```) and ```track_artwork_ids``` to take effect.
+`--allow-artist-updates` lets a run replace artwork it applied earlier when the same artist has posted a newer version, while still leaving hand-set artwork and other artists' artwork alone. This is the same as setting `allow_artist_updates` to `true` in `config.json`, but per URL. It needs `--skip-locked` (or `skip_locked_artwork`) and `track_artwork_ids` to take effect.
     
-```--exclude <id1> [<id2> <id3> ...]``` will exclude the poster or artwork with the specified ID from being uploaded.  Grab the ID from the session log...
+`--exclude <id1> [<id2> <id3> ...]` will exclude the poster or artwork with the specified ID from being uploaded. Grab the ID from the session log...
 - ThePosterDB is a number
 - MediUX is a UUID
 - For TV shows, you can also exclude specific episodes or entire seasons:
-  - ```--exclude s01e05``` - Excludes the title card for season 1 episode 5
-  - ```--exclude s1e5``` - Same as above (both formats work)
-  - ```--exclude s02``` - Excludes season cover and all episode title cards for season 2
-  - ```--exclude s00e01 s02``` - Excludes specials episode 1 and all of season 2
+  - `--exclude s01e05` - Excludes the title card for season 1 episode 5
+  - `--exclude s1e5` - Same as above (both formats work)
+  - `--exclude s02` - Excludes season cover and all episode title cards for season 2
+  - `--exclude s00e01 s02` - Excludes specials episode 1 and all of season 2
   - You can mix artwork IDs and episode/season patterns in the same command
     
-```--filters <filter1> [<filter2> <filter3> ...]``` will **only** upload the selected artwork types, based on the options below:
+`--filters <filter1> [<filter2> <filter3> ...]` will **only** upload the selected artwork types, based on the options below:
 - show_cover
 - background
 - square_art
@@ -429,15 +428,15 @@ The script supports various command-line arguments for flexible use.
 - movie_poster
 - collection_poster
     
-```--year <year>``` will override the year that it will look for in Plex.  Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork.  Use this option with the year in Plex to force a match.  Will be ignored in bulk mode, where you should specify this on a per-line basis.
+`--year <year>` will override the year that it will look for in Plex. Sometimes the year in Mediux or TPDb doesn't match the year of the show or movie in Plex, therefore won't update the artwork. Use this option with the year in Plex to force a match. Will be ignored in bulk mode, where you should specify this on a per-line basis.
 
-```--kometa``` will save artwork your Kometa asset directory instead of applying it to Plex directly. If ```save_to_kometa``` is set to ```true``` in ```config.json``` then this argument is not necessary. If a specific artwork already exists in the Kometa asset directory, it will not be overwritten unles the ```--force``` argument is also specified.
+`--kometa` will save artwork your Kometa asset directory instead of applying it to Plex directly. If `save_to_kometa` is set to `true` in `config.json` then this argument is not necessary. If a specific artwork already exists in the Kometa asset directory, it will not be overwritten unles the `--force` argument is also specified.
 
-```--temp``` for testing purposes, will save artwork to a temporary directory ```temp_dir``` specified in ```config.json``` instead of the Kometa asset directory.
+`--temp` for testing purposes, will save artwork to a temporary directory `temp_dir` specified in `config.json` instead of the Kometa asset directory.
 
-```--stage```, in conjuction with --kometa (or if ```save_to_kometa```is true in ```config.json```), will download assets for TV show seasons and episodes not yet available in Plex. This can be useful if you run the script before a particular season or episode is downloaded by your automation. If ```stage_assets``` is set to ```true``` in ```config.json``` then this argument is not necessary. This option does not apply to the Specials season (Season 0).
+`--stage`, in conjuction with --kometa (or if `save_to_kometa`is true in `config.json`), will download assets for TV show seasons and episodes not yet available in Plex. This can be useful if you run the script before a particular season or episode is downloaded by your automation. If `stage_assets` is set to `true` in `config.json` then this argument is not necessary. This option does not apply to the Specials season (Season 0).
 
-```--no-cache``` will crawl every page of a ThePosterDB user this run, ignoring the cached index (the index is still refreshed).  Handy to force a full refresh of a user when you have ```cache_user_scrapes``` enabled.  Works on the command line, in bulk files and in the Web UI.
+`--no-cache` will crawl every page of a ThePosterDB user this run, ignoring the cached index (the index is still refreshed). Handy to force a full refresh of a user when you have `cache_user_scrapes` enabled. Works on the command line, in bulk files and in the Web UI.
 
 ### Using these options in files and GUI
 
@@ -617,16 +616,26 @@ until you fix the Plex connection in Settings.
 # Other features
 
 ## Web UI
-It's still work in progress, as is this entire app!  I wouldn't consider it "production" ready but it's fully functional!
+The Web UI has been greatly improved over the last few versions and can be used as the main interface to configure and launch scrapes of all kinds. You can configure any settings, launch scrapes, bulk imports or upload ZIP files. It supports multiple instances open against the same server and will guard against launching multiple simultaneous scrapes by dynamically updating every instance to reflect the state of an ongoing operation while preventing the launch of new operations and allowing a user to cancel an operation that is taking too long. It also allows you to enable debug mode in case you run into any issues and want to open a GitHub issue for our inspection.
 
-![Settings](assets/config-tab.png)
-![Bulk Import](assets/bulk-tab.png)
-![Processing](assets/processing.png)
-![Scraper](assets/scraper-tab.png)
-![Upload ZIP](assets/upload-tab.png)
-![Log](assets/log-tab.png)
-![About](assets/about-tab.png)
+![Scraper](assets/ScraperTab.png)
+![Bulk Import](assets/BulkImportTab.png)
+![Upload ZIP](assets/UploaderTab.png)
+![Settings](assets/SettingsTab.png)
+![Log](assets/LogTab.png)
+![History](assets/HistoryTab.png)
+![About](assets/AboutTab.png)
 
+It even provides a responsive mobile UI that has been perfected to provide the best possible experience accessing the app from your smartphone!
+
+![Mobile Scraper](assets/ScraperMobile.jpeg)
+![Mobile Bulk Import](assets/BulkImportMobile.jpeg)
+![Mobile Bulk Import while Running](assets/BulkImportRunningMobile.jpeg)
+![Mobile Uploader](assets/UploaderMobile.jpeg)
+![Mobile Settings](assets/SettingsMobile.jpeg)
+![Mobile Log](assets/LogMobile.jpeg)
+![Mobile History](assets/HistoryMobile.jpeg)
+![Mobile About](assets/AboutMobile.jpeg)
 
 ## Multiple Libraries
 
@@ -646,30 +655,30 @@ Using these options, the tool will apply artwork to the same media in all specif
 
 ## Filters
 
-Both the ```mediux_filters``` and ```tvdb_filters``` options in **config.json** allows you to control which artwork types are uploaded to Plex on a global level.  You can also set these global filters in the GUI and in the Web UI.
+Both the `mediux_filters` and `tvdb_filters` options in **config.json** allows you to control which artwork types are uploaded to Plex on a global level. You can also set these global filters in the GUI and in the Web UI.
 
-```show_cover``` - Upload a cover for the TV show
+`show_cover` - Upload a cover for the TV show
 
-```background``` - Upload background images
+`background` - Upload background images
 
-```square_art``` - Upload square art background images for mobile platforms
+`square_art` - Upload square art background images for mobile platforms
 
-```season_cover``` - Upload covers for each individual season
+`season_cover` - Upload covers for each individual season
 
-```title_card``` - Upload title cards for individual episodes
+`title_card` - Upload title cards for individual episodes
 
-```movie_poster``` - Upload posters for movies
+`movie_poster` - Upload posters for movies
 
-```collection_poster``` - Upload posters for collections
+`collection_poster` - Upload posters for collections
 
 ### Using the above filters 
 #### These filters can be used from many places...
-- In ```config.json```, which will apply filters globally for each provider.  
+- In `config.json`, which will apply filters globally for each provider. 
 - These options can also be set from the Web UI
 
 ### The global filters can then be overridden on a per-URL basis...
 
-- On the command line, by using ```--filters <filter1> [<filter2> <filter3>...]```
+- On the command line, by using `--filters <filter1> [<filter2> <filter3>...]`
 - After the URL in a bulk file using the same format as you would on the command line
 - After the URL in the Bulk Import tab of the Web UI or local GUI using the same format as you would on the command line
 - In the scraper tab in the Web UI, where you can simply check boxes to set options and filters.
