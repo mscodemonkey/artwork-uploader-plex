@@ -58,15 +58,26 @@ class RunHistory:
             return []
 
     def _save(self, runs: List[Dict[str, Any]]) -> None:
+        # Written to a temporary file and moved into place, so a reader never sees a partly
+        # written one. The write lock above only holds within a single process, and a bulk
+        # import run from the command line is a second process alongside the web interface,
+        # so a read landing mid-write is possible: it would come back empty and the next
+        # save would keep only its own record. os.replace is atomic on POSIX and Windows.
+        temp_path = f"{self.path}.tmp"
         try:
             directory = os.path.dirname(self.path)
             if directory:
                 os.makedirs(directory, exist_ok=True)
-            with open(self.path, "w", encoding="utf-8") as history_file:
+            with open(temp_path, "w", encoding="utf-8") as history_file:
                 json.dump(runs, history_file, indent=4)
+            os.replace(temp_path, self.path)
         except OSError as e:
             from utils.notifications import debug_me
             debug_me(f"Run history could not be saved to '{self.path}': {e}")
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass  # nothing to tidy up, or the same problem that stopped the write
 
     def _prune(self, runs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if self.max_age_days:
