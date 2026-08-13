@@ -619,7 +619,7 @@ def load_bulk_import_file(instance: Instance, filename = None):
         notify_web(instance, "load_bulk_import", {"loaded": False, "error": str(e)})
 
 
-def rename_bulk_import_file(instance: Instance, old_name, new_name):
+def rename_bulk_import_file(instance: Instance, old_name, new_name) -> bool:
     debug_me(f"Renaming from {old_name} to {new_name}")
 
     if old_name != new_name:
@@ -628,25 +628,29 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name):
             notify_web(instance, "rename_bulk_file", {"renamed": True, "old_filename": old_name, "new_filename": new_name})
             update_status(instance, f"Renamed to {new_name}", StatusColor.SUCCESS.value)
             update_log(instance, f"✏️ Renamed bulk import file from '{old_name}' to '{new_name}'")
+            return True
         except Exception as e:
             notify_web(instance, "rename_bulk_file", {"renamed": False, "old_filename": old_name})
             update_status(instance, f"Could not rename {old_name}", StatusColor.WARNING.value)
             update_log(instance, f"🔴 Could not rename bulk import file '{old_name}'")
             debug_me(f"Could not rename bulk import file '{old_name}': {e}")
+    return False
 
 
-def delete_bulk_import_file(instance: Instance, file_name):
+def delete_bulk_import_file(instance: Instance, file_name) -> bool:
     if file_name:
         try:
             globals.bulk_file_service.delete_file(file_name)
             notify_web(instance, "delete_bulk_file", {"deleted": True, "filename": file_name})
             update_status(instance, f"Deleted {file_name}", StatusColor.SUCCESS.value)
             update_log(instance, f"🗑️ Deleted bulk import file '{file_name}'")
+            return True
         except Exception as e:
             notify_web(instance, "delete_bulk_file", {"deleted": False, "filename": file_name})
             update_status(instance, f"Could not delete {file_name}", StatusColor.WARNING.value)
             update_log(instance, f"🔴 Could not delete bulk import file '{file_name}'")
             debug_me(f"Could not delete bulk import file '{file_name}': {e}")
+    return False
 
 
 def save_bulk_import_file(instance: Instance, contents = None, filename = None, now_load = None):
@@ -735,7 +739,8 @@ def add_file_to_schedule_thread(instance: Instance, filename):
         threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
     except Exception as e:
         # The guard must not leak, and an error here must not kill the scheduler thread
-        globals.scheduler_service.finish(filename)
+        if globals.scheduler_service:
+            globals.scheduler_service.finish(filename)
         update_log(instance, f"🔴 Could not start scheduled bulk import for '{filename}' ({e})")
 
 def record_schedule_run(filename):
@@ -789,7 +794,8 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
         now = datetime.now(timezone.utc).isoformat()
         RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
     finally:
-        globals.scheduler_service.finish(filename)
+        if globals.scheduler_service:
+            globals.scheduler_service.finish(filename)
 
 
 #Initialises the scheduler when the script is run
