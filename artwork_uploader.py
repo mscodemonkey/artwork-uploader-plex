@@ -431,10 +431,12 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 event = NotificationEvent.RUN_COMPLETED.value if errors == 0 else NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value
                 debug_me(f"Sending '{event}' notifications to {len(globals.config.apprise_urls)} configured notification channel(s).")
                 send_notification(instance, message, event=event)
+        RunHistory().add_run(
+            RunType.BULK.value, filename if filename else "bulk_import.txt",
+            started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
+            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], errors
+        )
         update_log(instance, message)
-        if scheduled:
-            debug_me(f"Sending notifications to {len(globals.config.apprise_urls)} notification service(s).")
-            send_notification(instance, message)
 
     except Exception as bulk_import_exception:
         notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
