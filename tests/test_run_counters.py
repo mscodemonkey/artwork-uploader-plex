@@ -1,9 +1,16 @@
 """Unit tests for the run-summary counters."""
 
+import dataclasses
+from unittest.mock import MagicMock, patch
+
 import pytest
 
+import core.globals as globals
+from artwork_uploader import parse_bulk_file_from_cli, process_bulk_import_from_ui
 from models.callbacks import ProcessingCallbacks
+from models.instance import Instance
 from services.artwork_processor import ArtworkProcessor
+from services.run_history import RunHistory
 
 
 @pytest.mark.parametrize("result, expected", [
@@ -80,3 +87,71 @@ def test_failed_uploads_are_counted_and_do_not_count_as_success():
 
     assert success[0] == 1
     assert failed[0] == 1
+
+
+# Every counter on ProcessingCallbacks is a keyword argument that defaults to None, and each
+# of the increment methods checks for its list before touching it. Leaving one out of a call
+# to scrape_and_upload therefore raises nothing and logs nothing: the number simply stays at
+# zero. That has already happened once per counter. assets_processed, cached_counter,
+# locked_counter and failed_counter were each added to the bulk import from the Bulk Import
+# tab and none of them reached the command line path, which was still passing only a
+# success_counter years later. These two check that both paths fill in every counter the
+# class declares, so the next one added cannot go quiet in one of them.
+
+def _counter_field_names():
+    """Read the counters off the class rather than listing them here, so one added later
+    is covered without anybody remembering to update this test."""
+    return [field.name for field in dataclasses.fields(ProcessingCallbacks)
+            if not field.name.startswith("on_")]
+
+
+def _callbacks_built_by(start_the_run, tmp_path):
+    """Run one of the bulk paths with the processor stubbed out, and give back the
+    ProcessingCallbacks it handed to it."""
+    with (
+        patch("artwork_uploader.ArtworkProcessor") as processor_class,
+        patch("artwork_uploader.RunHistory", lambda: RunHistory(str(tmp_path / "run_history.json"))),
+        patch("artwork_uploader.notify_web"),
+        patch("artwork_uploader.update_log"),
+        patch("artwork_uploader.update_status"),
+        patch("artwork_uploader.debug_me"),
+    ):
+        processor_class.return_value.scrape_and_process.return_value = ("A Title", "An Author")
+        start_the_run()
+
+    assert processor_class.call_count == 1, "the path under test never reached the processor"
+    return processor_class.call_args.args[1]
+
+
+@pytest.fixture
+def plex_configured():
+    globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
+    globals.config = MagicMock(apprise_urls=[])
+    try:
+        yield
+    finally:
+        globals.plex = None
+        globals.config = None
+        globals.cancel_scrape = False
+        globals.scrapes_running = 0
+
+
+@pytest.mark.unit
+def test_the_command_line_bulk_path_passes_every_counter(tmp_path, plex_configured):
+    bulk_file = tmp_path / "nightly.txt"
+    bulk_file.write_text("https://mediux.pro/sets/12345\n", encoding="utf-8")
+
+    callbacks = _callbacks_built_by(
+        lambda: parse_bulk_file_from_cli(Instance(mode="cli"), str(bulk_file)), tmp_path
+    )
+
+    assert [name for name in _counter_field_names() if getattr(callbacks, name) is None] == []
+
+
+@pytest.mark.unit
+def test_the_bulk_import_tab_path_passes_every_counter(tmp_path, plex_configured):
+    callbacks = _callbacks_built_by(
+        lambda: process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "nightly.txt"), tmp_path
+    )
+
+    assert [name for name in _counter_field_names() if getattr(callbacks, name) is None] == []
