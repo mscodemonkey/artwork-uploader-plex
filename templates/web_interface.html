@@ -736,11 +736,17 @@
                             <i class="bi bi-play-circle"></i>
                             <span>Run</span>
                         </button>
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" id="bulk_notify"/>
-                            <label for="bulk_notify" class="form-check-label">Notify</label>
-                            <i class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Send a notification for this run to any configured channel subscribed to its outcome. Off by default for manual runs."></i>
-                        </div>
+                        <button type="button" 
+                                id="notify_toggle" 
+                                class="btn btn-secondary shadow rounded-pill d-flex align-items-center justify-content-center p-2" 
+                                style="width: 42px; height: 42px;"
+                                onclick="toggleNotification()"
+                                data-bs-toggle="tooltip" 
+                                data-bs-title="Notification disabled">
+                            <i id="notify_icon" class="bi bi-bell-slash fs-5"></i>
+                            <!-- Hidden checkbox to preserve form submission / JS backend reads -->
+                            <input type="checkbox" id="bulk_notify" class="d-none" />
+                        </button>
                     </div>
                     <div class="dropdown">
                         <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
