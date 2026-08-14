@@ -45,7 +45,7 @@
     "_save_to_kometa_help": "Saves artwork to Kometa asset directory instead of applying it to Plex directly",
 
     "stage_assets": false,
-    "_stage_assets": "Saves artwork for seasons and episodes not yet in Plex (except season specials)"
+    "_stage_assets": "Saves artwork for seasons and episodes not yet in Plex (except season specials)",
 
     "track_artwork_ids": true,
     "_track_artwork_ids_help": "Use Plex labels to track uploaded artwork and prevent duplicate uploads",
@@ -60,8 +60,8 @@
     "_schedules_help": "Scheduled bulk import jobs. Configure through the web UI",
 
     "apprise_urls": [],
-    "_apprise_urls_help": "List of notification channels, each {\"url\": <Apprise URL>, \"events\": [<event names>]}. Configure through the web UI"
-}
+    "_apprise_urls_help": "List of notification channels, each {\"url\": <Apprise URL>, \"events\": [<event names>]}. Configure through the web UI",
+
     "plex_connect_timeout": 10,
     "_plex_connect_timeout_help": "Seconds to wait when connecting to the Plex server (also applies to uploads)",
 
