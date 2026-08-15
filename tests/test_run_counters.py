@@ -7,6 +7,7 @@ import pytest
 
 import core.globals as globals
 from artwork_uploader import parse_bulk_file_from_cli, process_bulk_import_from_ui
+from core.enums import RunOutcome
 from models.callbacks import ProcessingCallbacks
 from models.instance import Instance
 from services.artwork_processor import ArtworkProcessor
@@ -29,7 +30,7 @@ def test_record_result_reads_the_uploader_prefixes(result, expected):
     assert counters.record_result(result) == expected
 
 
-def test_record_result_is_a_no_op_without_counters():
+def test_record_result_reads_the_prefix_with_the_default_counters():
     assert ProcessingCallbacks().record_result("✅ A Movie | Poster updated") == "success"
 
 
@@ -89,14 +90,14 @@ def test_failed_uploads_are_counted_and_do_not_count_as_success():
     assert failed[0] == 1
 
 
-# Every counter on ProcessingCallbacks is a keyword argument that defaults to None, and each
-# of the increment methods checks for its list before touching it. Leaving one out of a call
-# to scrape_and_upload therefore raises nothing and logs nothing: the number simply stays at
-# zero. That has already happened once per counter. assets_processed, cached_counter,
+# Every counter on ProcessingCallbacks used to be a keyword argument defaulting to None, and
+# each of the increment methods checks for its list before touching it. Leaving one out of a
+# call to scrape_and_upload therefore raised nothing and logged nothing: the number simply
+# stayed at zero. That had already happened once per counter. assets_processed, cached_counter,
 # locked_counter and failed_counter were each added to the bulk import from the Bulk Import
 # tab and none of them reached the command line path, which was still passing only a
-# success_counter years later. These two check that both paths fill in every counter the
-# class declares, so the next one added cannot go quiet in one of them.
+# success_counter years later. The counters carry a real default now and the paths share one
+# tally, so these two can no longer fail. They stay as a guard on that default.
 
 def _counter_field_names():
     """Read the counters off the class rather than listing them here, so one added later
@@ -155,3 +156,58 @@ def test_the_bulk_import_tab_path_passes_every_counter(tmp_path, plex_configured
     )
 
     assert [name for name in _counter_field_names() if getattr(callbacks, name) is None] == []
+
+
+# The outcome ladder used to be written out once per path that records a run, and the copies
+# had drifted: the Bulk Import tab could not record skipped at all, so a file that processed
+# nothing was stored as a success while the same file from the scrape tab, a ZIP upload or the
+# command line was stored as skipped. It is worked out on the tally now, so there is one copy.
+
+def test_a_run_that_processed_something_cleanly_is_a_success():
+    tally = ProcessingCallbacks()
+    tally.assets(3)
+    tally.success(2)
+
+    assert tally.outcome() == RunOutcome.SUCCESS.value
+
+
+def test_a_run_that_processed_nothing_is_skipped():
+    assert ProcessingCallbacks().outcome() == RunOutcome.SKIPPED.value
+
+
+def test_an_upload_that_exhausted_its_retries_makes_the_run_partial():
+    tally = ProcessingCallbacks()
+    tally.assets(2)
+    tally.success(1)
+    tally.failed(1)
+
+    assert tally.outcome() == RunOutcome.PARTIAL.value
+    assert tally.errors() == 1
+
+
+def test_errors_the_caller_counted_itself_make_the_run_partial():
+    """A bulk import line that could not be scraped at all never reaches the uploader,
+    so the caller counts it and hands it over."""
+    tally = ProcessingCallbacks()
+    tally.assets(1)
+    tally.success(1)
+
+    assert tally.outcome(extra_errors=1) == RunOutcome.PARTIAL.value
+    assert tally.errors(1) == 1
+
+
+def test_stopped_beats_everything_else():
+    tally = ProcessingCallbacks()
+    tally.assets(1)
+    tally.failed(1)
+
+    assert tally.outcome(stopped=True) == RunOutcome.STOPPED.value
+
+
+def test_a_path_with_no_stop_button_never_reports_stopped():
+    """Only the paths that have a Stop button pass stopped, so a run started from the
+    command line cannot report it however the run went."""
+    tally = ProcessingCallbacks()
+    tally.assets(1)
+
+    assert tally.outcome() == RunOutcome.SUCCESS.value

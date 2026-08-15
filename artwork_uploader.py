@@ -1,4 +1,5 @@
 import uuid, os, re, threading, sys, time
+from dataclasses import replace
 from datetime import datetime, timezone
 from core import globals
 
@@ -122,11 +123,7 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
     # raises, and only a run that finished gets to say otherwise.
     started_at = datetime.now(timezone.utc).isoformat()
     outcome = RunOutcome.FAILED.value
-    success_counter = [0]
-    assets_processed = [0]
-    cached_counter = [0]
-    locked_counter = [0]
-    failed_counter = [0]  # Uploads that failed after exhausting their retries
+    tally = ProcessingCallbacks()
     errors = 0
 
     # Open the file and read the contents
@@ -166,7 +163,7 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                     continue
 
                 try:
-                    scrape_and_upload(instance, parsed_url.url, parsed_url.options, False, success_counter, assets_processed, cached_counter=cached_counter, locked_counter=locked_counter, failed_counter=failed_counter)
+                    scrape_and_upload(instance, parsed_url.url, parsed_url.options, False, tally)
                 except ScraperException as e:
                     debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}")
                     errors += 1
@@ -178,22 +175,17 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
         elapsed = elapsed_time(end_time - start_time)
         update_log(instance, f"🏁 Bulk process completed in {elapsed} for '{display_filename}'")
 
-        # A line that failed to scrape at all (errors) and an item that failed to upload after
-        # exhausting its retries (failed_counter) both count as errors in the run summary. An
-        # item that succeeded on a retry never reaches failed_counter, so it isn't one.
-        if errors + failed_counter[0]:
-            outcome = RunOutcome.PARTIAL.value
-        elif assets_processed[0]:
-            outcome = RunOutcome.SUCCESS.value
-        else:
-            outcome = RunOutcome.SKIPPED.value
+        # A line that failed to scrape at all is an error the uploader never saw, so it is
+        # handed to the tally rather than counted twice. There is no Stop button behind a
+        # command line run, so it can never end up stopped.
+        outcome = tally.outcome(extra_errors=errors)
 
     finally:
         RunHistory().add_run(
             RunType.BULK.value, display_filename, started_at, datetime.now(timezone.utc).isoformat(),
             RunTrigger.CLI.value, outcome,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0],
-            errors + failed_counter[0]
+            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
+            tally.locked_counter[0], tally.errors(errors)
         )
 
 # ---------------------- GUI FUNCTIONS ----------------------
@@ -234,11 +226,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
     started_at = datetime.now(timezone.utc).isoformat()
     label = url
     outcome = RunOutcome.FAILED.value
-    success_counter = [0]
-    assets_processed = [0]
-    cached_counter = [0]
-    locked_counter = [0]
-    failed_counter = [0]
+    tally = ProcessingCallbacks()
 
     try:
         # Check if the Plex TV and movie libraries are configured
@@ -255,20 +243,10 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         label = parsed_line.url
         update_status(instance, f"Scraping URL '{parsed_line.url}'", color=StatusColor.INFO.value, sticky=True, spinner=True)
 
-        title, author = scrape_and_upload(
-            instance, parsed_line.url, parsed_line.options, False, success_counter, assets_processed,
-            cached_counter=cached_counter, locked_counter=locked_counter, failed_counter=failed_counter
-        )
+        title, author = scrape_and_upload(instance, parsed_line.url, parsed_line.options, False, tally)
 
         # Read the cancel flag here, not in the finally below - that's where it gets cleared
-        if globals.cancel_scrape:
-            outcome = RunOutcome.STOPPED.value
-        elif failed_counter[0]:
-            outcome = RunOutcome.PARTIAL.value
-        elif assets_processed[0]:
-            outcome = RunOutcome.SUCCESS.value
-        else:
-            outcome = RunOutcome.SKIPPED.value
+        outcome = tally.outcome(stopped=globals.cancel_scrape)
 
         # Update the web ui bulk list with this URL and artwork (only if it's not already in the bulk list)
         if instance.mode == "web" and parsed_line.options.add_to_bulk and title:
@@ -284,7 +262,8 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         RunHistory().add_run(
             RunType.SCRAPE.value, label, started_at, datetime.now(timezone.utc).isoformat(),
             RunTrigger.MANUAL.value, outcome,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], failed_counter[0]
+            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
+            tally.locked_counter[0], tally.errors()
         )
         globals.scrapes_running -= 1
         if globals.scrapes_running <= 0:
@@ -370,11 +349,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         record_schedule_run(filename)
 
     # Track successful poster uploads (those with ✅ or ♻️)
-    success_counter = [0]
-    assets_processed = [0]
-    cached_counter = [0]
-    locked_counter = [0]
-    failed_counter = [0]  # Uploads that failed after exhausting their retries
+    tally = ProcessingCallbacks()
     errors = 0
     started_at = datetime.now(timezone.utc).isoformat()
     trigger = RunTrigger.SCHEDULED.value if scheduled else RunTrigger.MANUAL.value
@@ -416,7 +391,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 break
 
             try:
-                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, success_counter, assets_processed, cached_counter=cached_counter, locked_counter=locked_counter, failed_counter=failed_counter)
+                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, tally)
                 #time.sleep(1)
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
@@ -436,25 +411,24 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         end_time = time.time()
         elapsed = elapsed_time(end_time - start_time)
 
-        # A line that failed to scrape at all (errors) and an item that failed to upload after
-        # exhausting its retries (failed_counter) both count as errors in the run summary. An
-        # item that succeeded on a retry never reaches failed_counter, so it isn't one.
-        total_errors = errors + failed_counter[0]
+        # A line that failed to scrape at all is an error the uploader never saw, so it is
+        # handed to the tally rather than counted twice.
+        total_errors = tally.errors(errors)
+        outcome = tally.outcome(stopped=globals.cancel_scrape, extra_errors=errors)
 
         if globals.cancel_scrape:
             message = (
                 "🛑 "
                 + ("Scheduled b" if scheduled else "B")
                 + f"ulk import of '{display_filename}' stopped by user • "
-                + f"{assets_processed[0]} asset(s) processed • "
-                + (f"{cached_counter[0]} new in cache • " if cached_counter[0] else "")
-                + f"{success_counter[0]} asset(s) updated"
-                + (f" • {locked_counter[0]} asset(s) locked (skipped)" if locked_counter[0] else "")
-                + (f" • {failed_counter[0]} asset(s) failed" if failed_counter[0] else "")
+                + f"{tally.assets_processed[0]} asset(s) processed • "
+                + (f"{tally.cached_counter[0]} new in cache • " if tally.cached_counter[0] else "")
+                + f"{tally.success_counter[0]} asset(s) updated"
+                + (f" • {tally.locked_counter[0]} asset(s) locked (skipped)" if tally.locked_counter[0] else "")
+                + (f" • {tally.failed_counter[0]} asset(s) failed" if tally.failed_counter[0] else "")
             )
             update_status(instance, message[2:], color=StatusColor.WARNING.value, sticky=False, spinner=False)
             notify_web(instance, "progress_bar", {"percent": 100, "bar_type": "bulk"})
-            outcome = RunOutcome.STOPPED.value
             if notify_enabled:
                 send_notification(instance, message, event=NotificationEvent.RUN_CANCELLED.value)
         else:
@@ -463,14 +437,13 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 + ("Scheduled b" if scheduled else "B")
                 + f"ulk import of '{display_filename}' completed "
                 + (f"successfully in {elapsed} • " if total_errors == 0 else f"with {total_errors} error(s) in {elapsed}, check logs for details • ")
-                + f"{assets_processed[0]} asset(s) processed • "
-                + (f"{cached_counter[0]} new in cache • " if cached_counter[0] else "")
-                + f"{success_counter[0]} asset(s) updated"
-                + (f" • {locked_counter[0]} asset(s) locked (skipped)" if locked_counter[0] else "")
-                + (f" • {failed_counter[0]} asset(s) failed" if failed_counter[0] else "")
+                + f"{tally.assets_processed[0]} asset(s) processed • "
+                + (f"{tally.cached_counter[0]} new in cache • " if tally.cached_counter[0] else "")
+                + f"{tally.success_counter[0]} asset(s) updated"
+                + (f" • {tally.locked_counter[0]} asset(s) locked (skipped)" if tally.locked_counter[0] else "")
+                + (f" • {tally.failed_counter[0]} asset(s) failed" if tally.failed_counter[0] else "")
             )
             update_status(instance, message[2:], color=StatusColor.SUCCESS.value if total_errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
-            outcome = RunOutcome.SUCCESS.value if total_errors == 0 else RunOutcome.PARTIAL.value
             if notify_enabled:
                 event = NotificationEvent.RUN_COMPLETED.value if total_errors == 0 else NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value
                 debug_me(f"Sending '{event}' notifications to {len(globals.config.apprise_urls)} configured notification channel(s).")
@@ -478,7 +451,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         RunHistory().add_run(
             RunType.BULK.value, filename if filename else "bulk_import.txt",
             started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], total_errors
+            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
+            tally.locked_counter[0], total_errors
         )
         update_log(instance, message)
 
@@ -488,16 +462,16 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         RunHistory().add_run(
             RunType.BULK.value, filename if filename else "bulk_import.txt",
             started_at, datetime.now(timezone.utc).isoformat(), trigger, RunOutcome.FAILED.value,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0],
-            errors + failed_counter[0]
+            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
+            tally.locked_counter[0], tally.errors(errors)
         )
         if notify_enabled:
             # scrape_and_upload only shields the loop from ScraperException - a PlexConnectorException
             # or anything else raised mid-run lands here after real work has already happened, so it must
             # not be reported as "failed to start". assets_processed only moves once an item has actually
             # been processed, so it tells the two cases apart.
-            if assets_processed[0] > 0:
-                send_notification(instance, f"⚠️ Bulk import of '{display_filename}' stopped unexpectedly after {assets_processed[0]} asset(s) processed • {bulk_import_exception}", event=NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value)
+            if tally.assets_processed[0] > 0:
+                send_notification(instance, f"⚠️ Bulk import of '{display_filename}' stopped unexpectedly after {tally.assets_processed[0]} asset(s) processed • {bulk_import_exception}", event=NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value)
             else:
                 send_notification(instance, f"🔴 Bulk import of '{display_filename}' failed to start • {bulk_import_exception}", event=NotificationEvent.RUN_FAILED_TO_START.value)
 
@@ -511,12 +485,15 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         globals.bulk_import_lock.release()
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
-def scrape_and_upload(instance: Instance, url, options, bulk=False, success_counter=None, assets_processed=None, cached_counter=None, locked_counter=None, failed_counter=None):
+def scrape_and_upload(instance: Instance, url, options, bulk=False, tally: ProcessingCallbacks = None):
     """
     Scrape artwork from a URL and upload to Plex.
 
     This is now a thin wrapper around ArtworkProcessor that handles
     UI updates via callbacks.
+
+    The caller owns the tally, so one run's counters survive across every URL in it.
+    A caller that wants no counting can leave it out and get a throwaway one.
     """
     # Create callbacks for UI updates
     def status_callback(message: str, color: str, spinner: bool, sticky: bool):
@@ -543,16 +520,14 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, success_coun
             globals.bulk_bar["speed"] = bar_speed
             
 
-    callbacks = ProcessingCallbacks(
+    # replace() copies the tally's fields onto a new object, so the counter lists are
+    # shared with the caller's tally and every URL in a run adds to the same numbers.
+    callbacks = replace(
+        tally if tally is not None else ProcessingCallbacks(),
         on_status_update=status_callback,
         on_log_update=log_callback,
         on_debug=debug_callback,
-        on_progress_update=progress_callback,
-        success_counter=success_counter,
-        assets_processed=assets_processed,
-        cached_counter=cached_counter,
-        locked_counter=locked_counter,
-        failed_counter=failed_counter
+        on_progress_update=progress_callback
     )
 
     # Use the service to do the actual work
@@ -603,20 +578,11 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
     def debug_callback(message: str, context: str = None):
         debug_me(message, context)
 
-    success_counter = [0]
-    assets_processed = [0]
-    locked_counter = [0]
-    failed_counter = [0]
-
     callbacks = ProcessingCallbacks(
         on_status_update=status_callback,
         on_log_update=log_callback,
         on_progress_update=progress_callback,
-        on_debug=debug_callback,
-        success_counter=success_counter,
-        assets_processed=assets_processed,
-        locked_counter=locked_counter,
-        failed_counter=failed_counter
+        on_debug=debug_callback
     )
 
     # Use the service to do the actual work
@@ -637,19 +603,13 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
     outcome = RunOutcome.FAILED.value
     try:
         processor.process_uploaded_files(file_list, skipped, zip_title, zip_author, zip_source, opts, override_title=plex_title)
-        if globals.cancel_scrape:
-            outcome = RunOutcome.STOPPED.value
-        elif failed_counter[0]:
-            outcome = RunOutcome.PARTIAL.value
-        elif assets_processed[0]:
-            outcome = RunOutcome.SUCCESS.value
-        else:
-            outcome = RunOutcome.SKIPPED.value
+        outcome = callbacks.outcome(stopped=globals.cancel_scrape)
     finally:
         RunHistory().add_run(
             RunType.UPLOAD.value, label, started_at, datetime.now(timezone.utc).isoformat(),
             RunTrigger.MANUAL.value, outcome,
-            assets_processed[0], success_counter[0], 0, locked_counter[0], failed_counter[0]
+            callbacks.assets_processed[0], callbacks.success_counter[0], 0,
+            callbacks.locked_counter[0], callbacks.errors()
         )
 
 
@@ -1082,9 +1042,9 @@ if __name__ == "__main__":
             cli_options.add_posters = False
             cli_options.add_sets = False
             try:
-                success_counter = [0]
-                scrape_and_upload(cli_instance, cli_command, cli_options, False, success_counter)
-                debug_me(f"Finished scraping TPDb user URL from CLI with {success_counter[0]} asset(s) updated", "__main__")
+                tally = ProcessingCallbacks()
+                scrape_and_upload(cli_instance, cli_command, cli_options, False, tally)
+                debug_me(f"Finished scraping TPDb user URL from CLI with {tally.success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
                 debug_me(f"Error scraping TPDb user URL from CLI: {str(e)}", "__main__")
                 update_status(cli_instance, str(e), color=StatusColor.DANGER.value)
@@ -1092,9 +1052,9 @@ if __name__ == "__main__":
         # User passed in a poster or set URL, so let's process that
         else:
             try:
-                success_counter = [0]
-                scrape_and_upload(cli_instance, cli_command, cli_options, False, success_counter)
-                debug_me(f"Finished scraping URL from CLI with {success_counter[0]} asset(s) updated", "__main__")
+                tally = ProcessingCallbacks()
+                scrape_and_upload(cli_instance, cli_command, cli_options, False, tally)
+                debug_me(f"Finished scraping URL from CLI with {tally.success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
                 debug_me(f"Error scraping URL from CLI: {str(e)}", "__main__")
                 update_status(cli_instance, str(e),color=StatusColor.DANGER.value)

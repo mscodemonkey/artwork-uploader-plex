@@ -348,10 +348,10 @@ def test_mid_run_crash_after_processing_is_not_reported_as_failed_to_start():
 
         call_count = {"n": 0}
 
-        def flaky_scrape_and_upload(inst, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None, failed_counter=None):
+        def flaky_scrape_and_upload(inst, url, options, bulk, tally=None):
             call_count["n"] += 1
             if call_count["n"] == 1:
-                assets_processed[0] += 1
+                tally.assets(1)
                 return
             raise PlexConnectorException("Plex connection dropped")
 
@@ -425,10 +425,9 @@ def test_an_upload_that_exhausted_its_retries_sends_completed_with_errors():
         def fake_send_notification(inst, message, event=None):
             events_sent.append(event)
 
-        def fake_scrape(instance, url, options, bulk, success_counter, assets_processed,
-                        cached_counter=None, locked_counter=None, failed_counter=None):
-            assets_processed[0] += 1
-            failed_counter[0] += 1
+        def fake_scrape(instance, url, options, bulk, tally=None):
+            tally.assets(1)
+            tally.failed(1)
 
         with (
             patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape),

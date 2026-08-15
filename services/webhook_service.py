@@ -128,9 +128,7 @@ class WebhookService:
         # One history record covers the whole event, retries included, so the run starts
         # counting from the moment it was accepted and the tally survives every attempt.
         started_at = datetime.now(timezone.utc).isoformat()
-        tally = ProcessingCallbacks(
-            success_counter=[0], assets_processed=[0], locked_counter=[0], failed_counter=[0]
-        )
+        tally = ProcessingCallbacks()
         # Wait a configurable delay before the first attempt: the *arr apps fire the webhook the
         # moment they import a file, usually before Plex has scanned it in, so give Plex a head
         # start. If it is still not ready by then, the retry ladder takes over.
