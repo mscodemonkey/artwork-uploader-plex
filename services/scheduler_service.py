@@ -5,12 +5,11 @@ Extracted from artwork_uploader.py to reduce file size and improve
 maintainability.
 """
 
-import threading, schedule, time, uuid
+import threading, schedule, time
 from datetime import datetime, timedelta
 from typing import Dict, Callable, List, Optional, Set, Tuple
-
-VALID_INTERVAL_UNITS = ("hours", "days")
-
+from models.bulk_schedule import BulkSchedule
+from core.enums import IntervalUnit
 
 class SchedulerService:
     """Handles scheduling of bulk import jobs.
@@ -38,15 +37,7 @@ class SchedulerService:
         self._running_lock = threading.Lock()
         self._running_files: Set[str] = set()
 
-    def add_schedule(
-        self,
-        filename: str,
-        callback: Callable[[str], None],
-        schedule_id: Optional[str] = None,
-        time: Optional[str] = None,
-        interval_value: Optional[int] = None,
-        interval_unit: Optional[str] = None,
-    ) -> str:
+    def add_schedule(self, sched: BulkSchedule, callback: Callable[[str], None]) -> str:
         """
         Add a new scheduled job, either a daily time or a repeating interval.
 
@@ -67,7 +58,7 @@ class SchedulerService:
         Raises:
             ValueError: If neither a time nor a valid interval is given
         """
-        job_id = schedule_id or str(uuid.uuid4())
+        job_id = sched.id
 
         # The callback reads the filename from schedule_meta at run time
         # (rather than capturing it in the closure) so that renaming a
@@ -77,15 +68,39 @@ class SchedulerService:
             if meta:
                 callback(meta["file"])
 
-        if time:
-            job = schedule.every().day.at(time).do(run_job)
-            meta = {"file": filename, "time": time}
-        elif interval_value and interval_unit in VALID_INTERVAL_UNITS:
-            interval_job = getattr(schedule.every(interval_value), interval_unit)
+        if sched.time:
+            job = schedule.every().day.at(sched.time).do(run_job)
+            sched.next_run = job.next_run.isoformat()
+            meta = {
+                "file": sched.file,
+                "time": sched.time,
+                "last_run": sched.last_run,
+                "next_run": sched.next_run
+            }
+
+        elif sched.interval_value and sched.interval_unit in [u.value for u in IntervalUnit]:
+            interval_job = getattr(schedule.every(sched.interval_value), sched.interval_unit)
             job = interval_job.do(run_job)
-            meta = {"file": filename, "interval_value": interval_value, "interval_unit": interval_unit}
+            if sched.next_run:
+                try:
+                    job.next_run = datetime.fromisoformat(sched.next_run)
+                except (ValueError, TypeError):
+                    pass
+            else:
+                sched.next_run = job.next_run
+            meta = {
+                "file": sched.file,
+                "interval_value": sched.interval_value,
+                "interval_unit": sched.interval_unit,
+                "last_run": sched.last_run,
+                "next_run": sched.next_run
+            }
+
         else:
             raise ValueError("A schedule needs either a daily time or an interval_value with a valid interval_unit")
+
+        if sched.last_run:
+            job.last_run = datetime.fromisoformat(sched.last_run)
 
         self.scheduled_jobs[job_id] = job
         self.schedule_meta[job_id] = meta
@@ -227,48 +242,54 @@ class SchedulerService:
             self._running_files.discard(filename)
 
     @staticmethod
-    def get_missed_run(
-        schedule_time: str,
-        last_run: Optional[str],
-        now: datetime,
-        window_minutes: int
-    ) -> Tuple[Optional[datetime], bool]:
+    def get_missed_run(sched: BulkSchedule, window: int) -> Tuple[Optional[datetime], bool]:
         """
-        Work out whether a daily schedule missed its most recent run.
+        Work out whether a schedule (daily or interval) missed its most recent run.
 
         A run is only considered missed if we have a recorded last run time that
-        predates it - a schedule with no recorded run yet (brand new, or never run
-        under a build that tracked this) is never treated as having missed anything.
+        predates it - a schedule with no recorded run yet is never treated as having missed anything.
 
         Args:
-            schedule_time: Time of day the schedule runs, as "HH:MM"
-            last_run: ISO timestamp of the last time this schedule ran, or None
-            now: Current time
-            window_minutes: How late a missed run can be and still count as catchable
+            sched: The BulkSchedule instance to check
+            window: How late a missed run can be (in minutes) to still count as catchable
 
         Returns:
             A (due, within_window) tuple. due is None if nothing was missed.
             within_window is True if the miss is inside the catch-up window.
         """
-        if not last_run:
+        now = datetime.now()
+
+        if not sched.last_run:
             return None, False
 
         try:
-            hour, minute = (int(part) for part in schedule_time.split(":"))
-            due = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        except (ValueError, AttributeError, TypeError):
-            return None, False
-
-        if due > now:
-            due -= timedelta(days=1)
-
-        try:
-            last_run_at = datetime.fromisoformat(last_run)
+            last_run_at = datetime.fromisoformat(sched.last_run)
         except (ValueError, TypeError):
-            last_run_at = None
-
-        if last_run_at is not None and last_run_at >= due:
             return None, False
 
-        within_window = (now - due) <= timedelta(minutes=window_minutes)
+        due: Optional[datetime] = None
+
+        if sched.time:
+            try:
+                hour, minute = (int(part) for part in sched.time.split(":"))
+                due = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if due > now:
+                    due -= timedelta(days=1)
+            except (ValueError, AttributeError, TypeError):
+                return None, False
+
+        elif sched.interval_value and sched.interval_unit in IntervalUnit:
+            try:
+                delta = timedelta(**{sched.interval_unit: sched.interval_value})
+                due = last_run_at + delta
+            except (ValueError, TypeError):
+                return None, False
+
+        else:
+            return None, False
+
+        if due > now or last_run_at >= due:
+            return None, False
+
+        within_window = (now - due) <= timedelta(minutes=window)
         return due, within_window

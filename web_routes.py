@@ -11,6 +11,7 @@ The routes are organized into:
 """
 
 import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading, uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
@@ -18,10 +19,11 @@ from flask import render_template, send_from_directory, request, redirect, url_f
 from functools import wraps
 from core import globals
 from services.notify_service import NotifyService
-from utils import utils
+from utils.utils import calculate_file_md5, get_host_path
 from models.instance import Instance
+from models.bulk_schedule import BulkSchedule
 from core.config import Config, normalize_notification_channels
-from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType
+from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, IntervalUnit
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService, RunHistory
@@ -418,7 +420,6 @@ def setup_socket_handlers(
         """Create a new bulk import file."""
         instance = Instance(data.get("instance_id"), "web")
 
-        from datetime import datetime
         timestamp = datetime.now().strftime("%d %b %Y %H:%M:%S")
 
         # Generate a unique filename
@@ -683,66 +684,80 @@ def setup_socket_handlers(
                     notify_web(instance, "delete_schedule", {"deleted": False, "id": schedule_id})
                     return {"id": schedule_id, "deleted": False}
 
+    @globals.web_socket.on("get_schedules")
+    def get_schedules(data):
+        """ Gets the list of schedules from the config file and sends it to the frontend """
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
+
+        scheduled_jobs = globals.scheduler_service.scheduled_jobs
+        for job_id, job in scheduled_jobs.items():
+            debug_me(f"Job ID: {job_id}, Last run: {job.last_run}, next run: {job.next_run}")
+        
+        config.load()
+        schedules = config.schedules
+        for schedule in schedules:
+            next_run_at = getattr(scheduled_jobs.get(schedule["id"]), "next_run", None)
+            if next_run_at:
+                schedule["next_run"] = datetime.isoformat(next_run_at)
+        notify_web(
+            instance=instance,
+            event="get_schedules",
+            data_to_include={ "schedules": schedules }
+        )
+
     @globals.web_socket.on("add_schedule")
     def add_tasks_to_scheduler(data):
         """Add a new scheduled task, or update an existing one if an id is given."""
         try:
             # Schedule bulk import task
-            if data.get("instance_id"):
-                instance = Instance(data.get("instance_id"), "web")
-                schedule_id = data.get("id")
-                schedule_file = data.get("file")
-                schedule_time = data.get("time")
-                interval_value = data.get("interval_value")
-                interval_unit = data.get("interval_unit")
+            instance_id = data.pop("instance_id", None)
+            run_now = data.pop("run_now", False)
+            if instance_id:
+                instance = Instance(instance_id, "web")
+                new_schedule = BulkSchedule(**data)
+                if run_now:
+                    new_schedule.next_run = ((datetime.now() + timedelta(minutes=2)).replace(second=0, microsecond=0)).isoformat()
+                else:
+                    new_schedule.compute_next_run()
 
                 # Validate the shape before anything is persisted or removed: a bad
                 # payload written to config.json would raise on every startup.
-                from services.scheduler_service import VALID_INTERVAL_UNITS
-                if not schedule_time and not (interval_value and interval_unit in VALID_INTERVAL_UNITS):
-                    update_log(instance, f"🔴 Rejected invalid schedule for '{schedule_file}': needs a daily time or a valid interval")
-                    notify_web(instance, "add_schedule", {"added": False, "file": schedule_file})
-                    return {"added": False, "file": schedule_file}
+                if not new_schedule.time and not (new_schedule.interval_value and new_schedule.interval_unit in IntervalUnit):
+                    update_log(instance, f"🔴 Rejected invalid schedule for '{new_schedule.file}': needs a daily time or a valid interval")
+                    notify_web(instance, "add_schedule", {"added": False, "file": new_schedule.file})
+                    return {"added": False, "file": new_schedule.file}
 
                 # Editing an existing schedule replaces its job under the same id
-                if schedule_id:
-                    globals.scheduler_service.remove_schedule(schedule_id)
+                if new_schedule.id:
+                    globals.scheduler_service.remove_schedule(new_schedule.id)
 
                 # Make sure the schedule is saved as part of the config
                 config.load()
-                schedule_id = update_or_add_schedule(
-                    schedule_id, schedule_file, schedule_time, interval_value, interval_unit
-                )
+                schedule_id = update_or_add_schedule(new_schedule)
                 config.save()
 
                 try:
                     # Create the callback for this schedule
-                    def schedule_callback(filename=schedule_file):
-                        add_file_to_schedule_thread(instance, filename)
+                    def schedule_callback(filename=new_schedule.file, schedule_id=new_schedule.id):
+                        add_file_to_schedule_thread(instance, filename, schedule_id)
 
                     # Add to scheduler service, keeping the id from config
-                    globals.scheduler_service.add_schedule(
-                        schedule_file,
-                        schedule_callback,
-                        schedule_id=schedule_id,
-                        time=schedule_time,
-                        interval_value=interval_value,
-                        interval_unit=interval_unit,
-                    )
+                    globals.scheduler_service.add_schedule(new_schedule, schedule_callback)
 
-                    description = f"every day at {schedule_time}" if schedule_time else f"every {interval_value} {interval_unit}"
+                    description = f"every day at {new_schedule.time}" if new_schedule.time else f"every {new_schedule.interval_value} {new_schedule.interval_unit}"
                     notify_web(instance, "add_schedule", {
                         "added": True,
                         "id": schedule_id,
-                        "file": schedule_file,
-                        "time": schedule_time,
-                        "interval_value": interval_value,
-                        "interval_unit": interval_unit,
+                        "file": new_schedule.file,
+                        "time": new_schedule.time,
+                        "interval_value": new_schedule.interval_value,
+                        "interval_unit": new_schedule.interval_unit,
+                        "next_run": new_schedule.next_run
                     })
-                    update_log(instance, f"⏰ Scheduled task '{schedule_file}' {description}")
-                    debug_me(f"Scheduled task '{schedule_file}' {description} with job ID '{schedule_id}'")
+                    update_log(instance, f"⏰ Scheduled task '{new_schedule.file}' {description}")
+                    debug_me(f"Scheduled task '{new_schedule.file}' {description} with job ID '{new_schedule.id}'")
                 except Exception as e:
-                    update_log(instance, f"🔴 Failed to add scheduled task '{schedule_file}'")
+                    update_log(instance, f"🔴 Failed to add scheduled task '{new_schedule.file}'")
                     debug_me(f"Error adding schedule: {e}")
                     raise
 
@@ -753,26 +768,31 @@ def setup_socket_handlers(
             debug_me(f"Error in scheduler setup: {e}")
             raise
 
-    def update_or_add_schedule(schedule_id, file_name, schedule_time, interval_value, interval_unit):
+    def update_or_add_schedule(sched: BulkSchedule):
         """Helper function to update or add a schedule in config. Returns the schedule's id."""
-        entry = {"file": file_name}
-        if schedule_time:
-            entry["time"] = schedule_time
+        entry = {"file": sched.file}
+        if sched.time:
+            entry["time"] = sched.time
         else:
-            entry["interval_value"] = interval_value
-            entry["interval_unit"] = interval_unit
+            entry["interval_value"] = sched.interval_value
+            entry["interval_unit"] = sched.interval_unit
+        if sched.last_run:
+            entry["last_run"] = sched.last_run
+        entry["next_run"] = sched.next_run
 
         for each_schedule in config.schedules:
-            if each_schedule.get("id") == schedule_id:
+            if each_schedule.get("id") == sched.id:
                 # Update existing schedule in place, clearing out fields from the old type
                 each_schedule.pop("time", None)
                 each_schedule.pop("interval_value", None)
                 each_schedule.pop("interval_unit", None)
+                each_schedule.pop("last_run", None)
+                each_schedule.pop("next_run", None)
                 each_schedule.update(entry)
-                return schedule_id
+                return sched.id
 
         # Add new schedule if not found
-        new_id = schedule_id or str(uuid.uuid4())
+        new_id = sched.id or str(uuid.uuid4())
         config.schedules.append({"id": new_id, **entry})
         return new_id
 
@@ -781,8 +801,8 @@ def setup_socket_handlers(
         """Detects whether app is running in docker and informs frontend"""
         instance = Instance(data.get("instance_id"), "web")
         if globals.docker:
-            kometa_base = utils.get_host_path("/assets")
-            temp_dir = utils.get_host_path("/temp")
+            kometa_base = get_host_path("/assets")
+            temp_dir = get_host_path("/temp")
             update_log(instance, f"🐳 Docker environment detected")
             debug_me(f"Docker detected, Kometa asset path mapped to '{kometa_base}', temp dir mapped to '{temp_dir}'")
             if kometa_base == "(not defined)":
@@ -1201,7 +1221,7 @@ def extract_and_list_zip(
                 with zip_ref.open(zip_info) as source, open(full_path, "wb") as target:
                     target.write(source.read())
 
-                md5 = utils.calculate_file_md5(full_path)
+                md5 = calculate_file_md5(full_path)
 
                 # Obtain artwork title, year, media type, season, episode and artwork type by parsing the filename
                 debug_me(f"Parsing artwork metadata from filename: {filename}")

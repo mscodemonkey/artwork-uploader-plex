@@ -21,13 +21,15 @@ const instanceId = getInstanceId();
 const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
 const CHUNK_SIZE = 1024 * 512; // 512 KB per chunk for uploads
 
-const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
-tooltipTriggerList.forEach(tooltipTriggerEl => {
+function initInteractiveTooltip(tooltipTriggerEl) {
+    if (!tooltipTriggerEl || bootstrap.Tooltip.getInstance(tooltipTriggerEl)) return; // Already initialized
+
     let hideTimeout = null;
 
     const tooltip = new bootstrap.Tooltip(tooltipTriggerEl, {
         html: true,
         sanitize: false,
+        container: 'body',
         delay: { show: 100, hide: 250 } // 250ms buffer to cross the gap
     });
 
@@ -57,6 +59,10 @@ tooltipTriggerList.forEach(tooltipTriggerEl => {
             if (instance) instance.hide();
         });
     });
+};
+
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    initInteractiveTooltip(el);
 });
 
 // UI References
@@ -72,6 +78,8 @@ const scheduleIntervalValueInput = document.getElementById("schedule_interval_va
 const scheduleIntervalUnitSelect = document.getElementById("schedule_interval_unit");
 const scheduleListEl = document.getElementById("schedule_list");
 const timeSelectBox = document.getElementById("time_select_box");
+const runNowLabel = document.getElementById("run_now_label");
+const runNowCheckbox = document.getElementById("run_now_checkbox");
 const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 
 // Event listeners
@@ -2371,19 +2379,40 @@ socket.on("upload_complete", function (data) {
     let editingScheduleId = null; // Set while the form is editing an existing schedule rather than adding a new one
 
     function describeSchedule(s) {
+        let text = "";
         if (s.time) {
-            return `Daily at ${s.time}`;
+            text = `Daily at ${s.time}`;
+        } else {
+            const unit = s.interval_value === 1 ? s.interval_unit.replace(/s$/, "") : s.interval_unit;
+            text = `Every ${s.interval_value} ${unit}`;
         }
-        const unit = s.interval_value === 1 ? s.interval_unit.replace(/s$/, "") : s.interval_unit;
-        return `Every ${s.interval_value} ${unit}`;
+
+        if (s.next_run) {
+            const formattedNextRun = formatNextRun(s.next_run);
+            if (formattedNextRun){
+                return `${text} <span class="badge text-body-secondary bg-body-tertiary border ms-2 fw-normal fs-7">${formattedNextRun}</span>`;
+            }
+        }
+        return text;
     }
 
     function getSchedulesForFile(fileName) {
         return schedules.filter(s => s.file === fileName);
     }
 
+    socket.on("get_schedules", (data) => {
+        if (validResponse(data, true)) {
+            schedules = data.schedules
+            renderScheduleList();
+            updateSchedulerIcon();
+        } else {
+            console.log("Unable to obtain schedules from backend")
+        }
+    });
+
     // Show the time selector when the clock icon is clicked
     scheduleIcon.addEventListener("click", function () {
+        socket.emit("get_schedules", {instance_id: instanceId})
 
         const iconRect = scheduleIcon.getBoundingClientRect();
         const boxWidth = timeSelectBox.offsetWidth || 300; // Fallback width
@@ -2423,8 +2452,30 @@ socket.on("upload_complete", function (data) {
     // Toggle between the "daily at a time" and "every N hours/days" inputs
     scheduleTypeSelect.addEventListener("change", function () {
         const isDaily = scheduleTypeSelect.value === "daily";
+
         scheduleTimeGroup.classList.toggle("d-none", !isDaily);
         scheduleIntervalGroup.classList.toggle("d-none", isDaily);
+        runNowLabel.classList.toggle("d-none", isDaily);
+        runNowCheckbox.checked = !isDaily;
+        
+        // Initialize tooltip if switching to interval schedule
+        if (!isDaily) {
+            const tooltipIcon = document.getElementById("run_now_info_icon");
+            if (tooltipIcon) {
+                // Dispose of any old/stale instance created while hidden
+                const existingInstance = bootstrap.Tooltip.getInstance(tooltipIcon);
+                if (existingInstance) {
+                    existingInstance.dispose();
+                }
+                // Create fresh instance NOW that the element has non-zero dimensions!
+                new bootstrap.Tooltip(tooltipIcon, {
+                    html: true,
+                    sanitize: false,
+                    container: 'body', // Appends to <body> so z-index/popover clipping is bypassed
+                    trigger: 'hover'
+                });
+            }
+        }
     });
 
     function resetScheduleForm() {
@@ -2446,6 +2497,8 @@ socket.on("upload_complete", function (data) {
         scheduleTimeInput.value = "";
         scheduleIntervalValueInput.value = 1;
         scheduleIntervalUnitSelect.value = "hours";
+        runNowLabel.classList.add("d-none");
+        runNowCheckbox.checked = true;
     }
 
     function editSchedule(s) {
@@ -2458,12 +2511,15 @@ socket.on("upload_complete", function (data) {
             scheduleTimeGroup.classList.remove("d-none");
             scheduleIntervalGroup.classList.add("d-none");
             scheduleTimeInput.value = s.time;
+            runNowLabel.classList.add("d-none");
         } else {
             scheduleTypeSelect.value = "interval";
             scheduleTimeGroup.classList.add("d-none");
             scheduleIntervalGroup.classList.remove("d-none");
             scheduleIntervalValueInput.value = s.interval_value;
             scheduleIntervalUnitSelect.value = s.interval_unit;
+            runNowLabel.classList.remove("d-none");
+            runNowCheckbox.checked = true;
         }
     }
 
@@ -2482,6 +2538,7 @@ socket.on("upload_complete", function (data) {
             if (!intervalValue || intervalValue < 1) return;
             payload.interval_value = intervalValue;
             payload.interval_unit = scheduleIntervalUnitSelect.value;
+            payload.run_now = runNowCheckbox.checked
         }
 
         socket.emit("add_schedule", payload);
@@ -2496,7 +2553,8 @@ socket.on("upload_complete", function (data) {
                         file: data.file,
                         time: data.time,
                         interval_value: data.interval_value,
-                        interval_unit: data.interval_unit
+                        interval_unit: data.interval_unit,
+                        next_run: data.next_run
                     });
                     updateSchedulerIcon();
                 }
@@ -2516,6 +2574,42 @@ socket.on("upload_complete", function (data) {
                 updateSchedulerIcon();
             }
         });
+    }
+
+    function formatNextRun(isoString) {
+        if (!isoString) return "";
+        
+        try {
+            const date = new Date(isoString);
+            if (isNaN(date.getTime())) return "";
+
+            const today = new Date();
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const isToday = date.toDateString() === today.toDateString();
+            const isTomorrow = date.toDateString() === tomorrow.toDateString();
+
+            // Format time as HH:MM
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const timeStr = `${hours}:${minutes}`;
+
+            if (isToday) {
+                return `Today at ${timeStr}`;
+            } else if (isTomorrow) {
+                return `Tomorrow at ${timeStr}`;
+            }
+
+            // Format date as "Aug 14, 23:58"
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const month = monthNames[date.getMonth()];
+            const day = date.getDate();
+
+            return `${month} ${day}, ${timeStr}`;
+        } catch (e) {
+            // Fallback: strip ISO microseconds and timezone if regex/date fails
+            return isoString.replace("T", " ").replace(/\.\d+/, "").slice(0, 16);
+        }
     }
 
     function renderScheduleList() {
@@ -2541,7 +2635,7 @@ socket.on("upload_complete", function (data) {
             if (isLast) item.classList.add("mb-2", "rounded-bottom");
 
             const label = document.createElement("span");
-            label.textContent = describeSchedule(s);
+            label.innerHTML = describeSchedule(s);
             label.setAttribute("role", "button");
             label.addEventListener("click", () => {
                 if (s.id != editingScheduleId) {

@@ -117,3 +117,7 @@ class RunOutcome(str, Enum):
 class WebhookSource(str, Enum):
     RADARR = "radarr"
     SONARR = "sonarr"
+
+class IntervalUnit(str, Enum):
+    DAYS = "days"
+    HOURS = "hours"
