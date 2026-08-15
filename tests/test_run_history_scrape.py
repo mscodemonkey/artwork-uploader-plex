@@ -54,15 +54,14 @@ def configured_plex():
 
 
 def _scrape(**counts):
-    """A stand-in for scrape_and_upload that moves the counters it is handed."""
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed=None,
-                    cached_counter=None, locked_counter=None, failed_counter=None):
-        counters = {
-            "assets": assets_processed, "success": success_counter,
-            "cached": cached_counter, "locked": locked_counter, "failed": failed_counter,
+    """A stand-in for scrape_and_upload that moves the counters on the tally it is handed."""
+    def fake_scrape(instance, url, options, bulk, tally=None):
+        movers = {
+            "assets": tally.assets, "success": tally.success, "cached": tally.cached,
+            "locked": tally.locked, "failed": tally.failed,
         }
         for name, count in counts.items():
-            counters[name][0] += count
+            movers[name](count)
         return "A Set", "someone"
     return fake_scrape
 

@@ -44,10 +44,10 @@ def test_successful_run_is_recorded_with_its_counters(history):
     globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
     globals.config = MagicMock(apprise_urls=[])
 
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed, cached_counter=None, locked_counter=None, failed_counter=None):
-        assets_processed[0] += 1
-        success_counter[0] += 1
-        cached_counter[0] += 1
+    def fake_scrape(instance, url, options, bulk, tally=None):
+        tally.assets(1)
+        tally.success(1)
+        tally.cached(1)
 
     with (
         patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape),
@@ -149,17 +149,18 @@ def test_no_filename_falls_back_to_the_default_bulk_file_name(history):
     assert runs[0]["label"] == "bulk_import.txt"
 
 
+# Both of these describe a bulk import from the Bulk Import tab, which used to work out its
+# own outcome and pass its own error count to the history. It counted a line that could not be
+# scraped, but not an upload that exhausted its retries, and it had no skipped branch at all.
+
 @pytest.mark.unit
 def test_an_upload_that_exhausted_its_retries_is_counted_as_an_error(history):
-    """The outcome and the summary line both count an upload that exhausted its retries,
-    so the stored row has to count it too."""
     globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
     globals.config = MagicMock(apprise_urls=[])
 
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed,
-                    cached_counter=None, locked_counter=None, failed_counter=None):
-        assets_processed[0] += 1
-        failed_counter[0] += 1
+    def fake_scrape(instance, url, options, bulk, tally=None):
+        tally.assets(1)
+        tally.failed(1)
 
     with (
         patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape),
@@ -174,3 +175,23 @@ def test_an_upload_that_exhausted_its_retries_is_counted_as_an_error(history):
     assert len(runs) == 1
     assert runs[0]["outcome"] == OUTCOME_PARTIAL
     assert runs[0]["error_count"] == 1
+
+
+@pytest.mark.unit
+def test_a_run_that_processes_nothing_is_recorded_as_skipped(history):
+    globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
+    globals.config = MagicMock(apprise_urls=[])
+
+    with (
+        patch("artwork_uploader.scrape_and_upload"),
+        patch("artwork_uploader.notify_web"),
+        patch("artwork_uploader.update_log"),
+        patch("artwork_uploader.update_status"),
+        patch("artwork_uploader.debug_me"),
+    ):
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "nothing.txt", scheduled=False)
+
+    runs = history.get_runs()
+    assert len(runs) == 1
+    assert runs[0]["outcome"] == OUTCOME_SKIPPED
+    assert runs[0]["assets_processed"] == 0

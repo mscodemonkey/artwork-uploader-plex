@@ -50,11 +50,10 @@ def _quiet():
 
 @pytest.mark.unit
 def test_successful_run_is_recorded_with_its_counters(history, bulk_file):
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed,
-                    cached_counter=None, locked_counter=None, failed_counter=None):
-        assets_processed[0] += 1
-        success_counter[0] += 1
-        cached_counter[0] += 1
+    def fake_scrape(instance, url, options, bulk, tally=None):
+        tally.assets(1)
+        tally.success(1)
+        tally.cached(1)
 
     quiet_log, quiet_debug = _quiet()
     with patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape), quiet_log, quiet_debug:
@@ -84,11 +83,10 @@ def test_the_label_is_the_file_name_not_the_whole_path(history, bulk_file):
 @pytest.mark.unit
 def test_counters_survive_the_whole_file(history, bulk_file):
     """Every line adds to the same counters, rather than each line starting from zero."""
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed,
-                    cached_counter=None, locked_counter=None, failed_counter=None):
-        assets_processed[0] += 2
-        success_counter[0] += 1
-        locked_counter[0] += 1
+    def fake_scrape(instance, url, options, bulk, tally=None):
+        tally.assets(2)
+        tally.success(1)
+        tally.locked(1)
 
     quiet_log, quiet_debug = _quiet()
     with patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape), quiet_log, quiet_debug:
@@ -116,10 +114,9 @@ def test_a_line_that_fails_to_scrape_is_recorded_as_partial(history, bulk_file):
 @pytest.mark.unit
 def test_an_upload_that_exhausted_its_retries_counts_as_an_error(history, bulk_file):
     """The line itself scraped fine, so only failed_counter says anything went wrong."""
-    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed,
-                    cached_counter=None, locked_counter=None, failed_counter=None):
-        assets_processed[0] += 1
-        failed_counter[0] += 1
+    def fake_scrape(instance, url, options, bulk, tally=None):
+        tally.assets(1)
+        tally.failed(1)
 
     quiet_log, quiet_debug = _quiet()
     with patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape), quiet_log, quiet_debug:
