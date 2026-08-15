@@ -498,21 +498,13 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             update_status(instance, message[2:], color=StatusColor.SUCCESS.value if total_errors == 0 else StatusColor.WARNING.value, sticky=False, spinner=False)
             outcome = RunOutcome.SUCCESS.value if total_errors == 0 else RunOutcome.PARTIAL.value
             if notify_enabled:
-                event = NotificationEvent.RUN_COMPLETED.value if errors == 0 else NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value
+                event = NotificationEvent.RUN_COMPLETED.value if total_errors == 0 else NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value
                 debug_me(f"Sending '{event}' notifications to {len(globals.config.apprise_urls)} configured notification channel(s).")
                 send_notification(instance, message, event=event)
         RunHistory().add_run(
-            run_type=RunType.BULK.value,
-            label=filename if filename else "bulk_import.txt",
-            started_at=started_at,
-            ended_at=datetime.now(timezone.utc).isoformat(),
-            trigger=trigger,
-            outcome=outcome,
-            assets_processed=assets_processed[0],
-            success_count=success_counter[0],
-            cached_count=cached_counter[0],
-            locked_count=locked_counter[0],
-            error_count=errors
+            RunType.BULK.value, filename if filename else "bulk_import.txt",
+            started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
+            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], total_errors
         )
         update_log(instance, message)
 
@@ -520,17 +512,10 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
         update_status(instance, f"Error during bulk import: {bulk_import_exception}", color=StatusColor.DANGER.value)
         RunHistory().add_run(
-            run_type=RunType.BULK.value,
-            label=filename if filename else "bulk_import.txt",
-            started_at=started_at,
-            ended_at=datetime.now(timezone.utc).isoformat(),
-            trigger=trigger,
-            outcome=RunOutcome.FAILED.value,
-            assets_processed=assets_processed[0],
-            success_count=success_counter[0],
-            cached_count=cached_counter[0],
-            locked_count=locked_counter[0],
-            error_count=errors
+            RunType.BULK.value, filename if filename else "bulk_import.txt",
+            started_at, datetime.now(timezone.utc).isoformat(), trigger, RunOutcome.FAILED.value,
+            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0],
+            errors + failed_counter[0]
         )
         if notify_enabled:
             # scrape_and_upload only shields the loop from ScraperException - a PlexConnectorException

@@ -147,3 +147,30 @@ def test_no_filename_falls_back_to_the_default_bulk_file_name(history):
     runs = history.get_runs()
     assert len(runs) == 1
     assert runs[0]["label"] == "bulk_import.txt"
+
+
+@pytest.mark.unit
+def test_an_upload_that_exhausted_its_retries_is_counted_as_an_error(history):
+    """The outcome and the summary line both count an upload that exhausted its retries,
+    so the stored row has to count it too."""
+    globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
+    globals.config = MagicMock(apprise_urls=[])
+
+    def fake_scrape(instance, url, options, bulk, success_counter, assets_processed,
+                    cached_counter=None, locked_counter=None, failed_counter=None):
+        assets_processed[0] += 1
+        failed_counter[0] += 1
+
+    with (
+        patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape),
+        patch("artwork_uploader.notify_web"),
+        patch("artwork_uploader.update_log"),
+        patch("artwork_uploader.update_status"),
+        patch("artwork_uploader.debug_me"),
+    ):
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "retries.txt", scheduled=False)
+
+    runs = history.get_runs()
+    assert len(runs) == 1
+    assert runs[0]["outcome"] == OUTCOME_PARTIAL
+    assert runs[0]["error_count"] == 1
