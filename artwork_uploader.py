@@ -1,5 +1,5 @@
 import uuid, os, re, threading, sys, time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from core import globals
 
 # plexapi builds its X-Plex-Client-Identifier from uuid.getnode(), which can be
@@ -52,12 +52,12 @@ from core.enums import InstanceMode, NotificationEvent, StatusColor, RunType, Ru
 from services import (
     BulkFileService,
     ImageService,
-    SchedulerService,
     WebhookService,
     UtilityService,
     RunHistory
 )
 from services.artwork_processor import ArtworkProcessor
+from services.scheduler_service import SchedulerService, BulkSchedule
 from models.callbacks import ProcessingCallbacks
 from services.update_service import UpdateService
 
@@ -137,8 +137,12 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
         print("File not found. Please enter a valid file path.")
         now = datetime.now(timezone.utc).isoformat()
         RunHistory().add_run(
-            RunType.BULK.value, display_filename, started_at, now,
-            RunTrigger.CLI.value, RunOutcome.FAILED.value
+            run_type=RunType.BULK.value,
+            label=display_filename,
+            started_at=started_at,
+            ended_at=now,
+            trigger=RunTrigger.CLI.value,
+            outcome=RunOutcome.FAILED.value
         )
         return
 
@@ -190,10 +194,17 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
 
     finally:
         RunHistory().add_run(
-            RunType.BULK.value, display_filename, started_at, datetime.now(timezone.utc).isoformat(),
-            RunTrigger.CLI.value, outcome,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0],
-            errors + failed_counter[0]
+            run_type=RunType.BULK.value,
+            label=display_filename,
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=RunTrigger.CLI.value,
+            outcome=outcome,
+            assets_processed=assets_processed[0],
+            success_count=success_counter[0],
+            cached_count=cached_counter[0],
+            locked_count=locked_counter[0],
+            error_count=errors + failed_counter[0]
         )
 
 # ---------------------- GUI FUNCTIONS ----------------------
@@ -282,9 +293,17 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         # makes the browser reload the history table, so a record written afterwards would
         # miss its own refresh and only appear the next time somebody opened the tab.
         RunHistory().add_run(
-            RunType.SCRAPE.value, label, started_at, datetime.now(timezone.utc).isoformat(),
-            RunTrigger.MANUAL.value, outcome,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], failed_counter[0]
+            run_type=RunType.SCRAPE.value,
+            label=label,
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=RunTrigger.MANUAL.value,
+            outcome=outcome,
+            assets_processed=assets_processed[0],
+            success_count=success_counter[0],
+            cached_count=cached_counter[0],
+            locked_count=locked_counter[0],
+            error_count=failed_counter[0]
         )
         globals.scrapes_running -= 1
         if globals.scrapes_running <= 0:
@@ -293,7 +312,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
             globals.scrape_type = "stopped"
 
-def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, scheduled: bool = False, notify: bool = False) -> None:
+def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, schedule_id: str = None, notify: bool = False) -> None:
 
     """Run the bulk import scrape in a separate thread."""
 
@@ -321,23 +340,27 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         now = datetime.now(timezone.utc).isoformat()
         RunHistory().add_run(
-            RunType.BULK.value, filename if filename else "bulk_import.txt", now, now,
-            RunTrigger.SCHEDULED.value if scheduled else RunTrigger.MANUAL.value, RunOutcome.SKIPPED.value
+            run_type=RunType.BULK.value,
+            label=filename if filename else "bulk_import.txt",
+            started_at=now,
+            ended_at=now,
+            trigger=RunTrigger.SCHEDULED.value if schedule_id else RunTrigger.MANUAL.value,
+            outcome=RunOutcome.SKIPPED.value
         )
-        if scheduled or notify:
-            prefix = "Scheduled b" if scheduled else "B"
+        if schedule_id or notify:
+            prefix = "Scheduled b" if schedule_id else "B"
             display_filename = filename if filename else "bulk_import.txt"
             send_notification(instance, f"⏭️ {prefix}ulk import of '{display_filename}' skipped • no valid entries found", event=NotificationEvent.RUN_SKIPPED.value)
         return
 
     # Pass the processing of the parsed URLs off to a thread
     try:
-        process_bulk_import_from_ui(instance, parsed_urls, filename, scheduled, notify)
+        process_bulk_import_from_ui(instance, parsed_urls, filename, schedule_id, notify)
     except Exception:
         raise
 
 
-def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None, scheduled: bool = False, notify: bool = False) -> None:
+def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None, schedule_id: str = None, notify: bool = False) -> None:
 
     """
     Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
@@ -360,14 +383,14 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         message = f"⚠️ Bulk import of '{display_filename}' refused - another bulk import is already running"
         update_log(instance, message)
         update_status(instance, "Bulk import refused: another bulk import is already running", color=StatusColor.WARNING.value)
-        if scheduled:
+        if schedule_id:
             send_notification(instance, message)
         return
 
-    if scheduled and filename:
+    if schedule_id and filename:
         # Stamp the run only once it holds the lock: a refused run has not run,
         # and stamping it would hide the miss from catch-up.
-        record_schedule_run(filename)
+        record_schedule_run(schedule_id)
 
     # Track successful poster uploads (those with ✅ or ♻️)
     success_counter = [0]
@@ -377,9 +400,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
     failed_counter = [0]  # Uploads that failed after exhausting their retries
     errors = 0
     started_at = datetime.now(timezone.utc).isoformat()
-    trigger = RunTrigger.SCHEDULED.value if scheduled else RunTrigger.MANUAL.value
-    notify_enabled = scheduled or notify
-    display_filename = filename if filename else "bulk_import.txt"
+    trigger = RunTrigger.SCHEDULED.value if schedule_id else RunTrigger.MANUAL.value
+    notify_enabled = schedule_id or notify
 
     try:
 
@@ -388,8 +410,12 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
             update_status(instance, "Plex setup incomplete. Please check the settings.", color=StatusColor.DANGER.value)
             now = datetime.now(timezone.utc).isoformat()
             RunHistory().add_run(
-                RunType.BULK.value, filename if filename else "bulk_import.txt",
-                started_at, now, trigger, RunOutcome.FAILED.value
+                run_type=RunType.BULK.value,
+                label=filename if filename else "bulk_import.txt",
+                started_at=started_at,
+                ended_at=now,
+                trigger=trigger,
+                outcome=RunOutcome.FAILED.value
             )
             if notify_enabled:
                 send_notification(instance, f"🔴 Bulk import of '{display_filename}' failed to start • Plex setup incomplete", event=NotificationEvent.RUN_FAILED_TO_START.value)
@@ -444,7 +470,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         if globals.cancel_scrape:
             message = (
                 "🛑 "
-                + ("Scheduled b" if scheduled else "B")
+                + ("Scheduled b" if schedule_id else "B")
                 + f"ulk import of '{display_filename}' stopped by user • "
                 + f"{assets_processed[0]} asset(s) processed • "
                 + (f"{cached_counter[0]} new in cache • " if cached_counter[0] else "")
@@ -460,7 +486,7 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         else:
             message = (
                 ("🏁 " if total_errors == 0 else "⚠️ ")
-                + ("Scheduled b" if scheduled else "B")
+                + ("Scheduled b" if schedule_id else "B")
                 + f"ulk import of '{display_filename}' completed "
                 + (f"successfully in {elapsed} • " if total_errors == 0 else f"with {total_errors} error(s) in {elapsed}, check logs for details • ")
                 + f"{assets_processed[0]} asset(s) processed • "
@@ -476,9 +502,17 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 debug_me(f"Sending '{event}' notifications to {len(globals.config.apprise_urls)} configured notification channel(s).")
                 send_notification(instance, message, event=event)
         RunHistory().add_run(
-            RunType.BULK.value, filename if filename else "bulk_import.txt",
-            started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], errors
+            run_type=RunType.BULK.value,
+            label=filename if filename else "bulk_import.txt",
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=trigger,
+            outcome=outcome,
+            assets_processed=assets_processed[0],
+            success_count=success_counter[0],
+            cached_count=cached_counter[0],
+            locked_count=locked_counter[0],
+            error_count=errors
         )
         update_log(instance, message)
 
@@ -486,9 +520,17 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
         update_status(instance, f"Error during bulk import: {bulk_import_exception}", color=StatusColor.DANGER.value)
         RunHistory().add_run(
-            RunType.BULK.value, filename if filename else "bulk_import.txt",
-            started_at, datetime.now(timezone.utc).isoformat(), trigger, RunOutcome.FAILED.value,
-            assets_processed[0], success_counter[0], cached_counter[0], locked_counter[0], errors
+            run_type=RunType.BULK.value,
+            label=filename if filename else "bulk_import.txt",
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=trigger,
+            outcome=RunOutcome.FAILED.value,
+            assets_processed=assets_processed[0],
+            success_count=success_counter[0],
+            cached_count=cached_counter[0],
+            locked_count=locked_counter[0],
+            error_count=errors
         )
         if notify_enabled:
             # scrape_and_upload only shields the loop from ScraperException - a PlexConnectorException
@@ -646,9 +688,17 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
             outcome = RunOutcome.SKIPPED.value
     finally:
         RunHistory().add_run(
-            RunType.UPLOAD.value, label, started_at, datetime.now(timezone.utc).isoformat(),
-            RunTrigger.MANUAL.value, outcome,
-            assets_processed[0], success_counter[0], 0, locked_counter[0], failed_counter[0]
+            run_type=RunType.UPLOAD.value,
+            label=label,
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=RunTrigger.MANUAL.value,
+            outcome=outcome,
+            assets_processed=assets_processed[0],
+            success_count=success_counter[0],
+            cached_count=0,
+            locked_count=locked_counter[0],
+            error_count=failed_counter[0]
         )
 
 
@@ -788,7 +838,7 @@ def get_latest_version():
     """Fetch the latest release version from GitHub."""
     return globals.update_service.get_latest_version() if globals.update_service else None
 
-def add_file_to_schedule_thread(instance: Instance, filename):
+def add_file_to_schedule_thread(instance: Instance, filename, schedule_id):
     if not instance:
         return
 
@@ -800,33 +850,41 @@ def add_file_to_schedule_thread(instance: Instance, filename):
         return
 
     try:
-        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename,)).start()
+        threading.Thread(target=process_bulk_file_on_schedule, args=(instance, filename, schedule_id,)).start()
     except Exception as e:
         # The guard must not leak, and an error here must not kill the scheduler thread
         if globals.scheduler_service:
             globals.scheduler_service.finish(filename)
         update_log(instance, f"🔴 Could not start scheduled bulk import for '{filename}' ({e})")
 
-def record_schedule_run(filename):
+def record_schedule_run(schedule_id):
     """Record that a scheduled run for this bulk file has just started, so a future
     restart can tell whether a run was missed.
 
     A run executes the whole file, so every schedule the file carries gets the
     stamp. Stamping only the first would leave the file's other daily schedules
     with no last_run, which disables catch-up for them."""
+
     if globals.config is None:
         return
     try:
         for each_schedule in globals.config.schedules:
-            if each_schedule.get("file") == filename:
+            if each_schedule.get("id") == schedule_id:
                 each_schedule["last_run"] = datetime.now().isoformat()
+                job = globals.scheduler_service.scheduled_jobs.get(schedule_id)
+                if job and hasattr(job, "next_run") and job.next_run:
+                    each_schedule["next_run"] = job.next_run.isoformat()
+                else:
+                    sched = BulkSchedule(**each_schedule)
+                    each_schedule["nex_trun"] = sched.compute_next_run()
+
         globals.config.save()
     except Exception as e:
         # A failed stamp costs one catch-up decision; letting it propagate would
         # kill the scheduler thread, which costs every future run.
-        debug_me(f"Could not record schedule run for '{filename}': {e}")
+        debug_me(f"Could not record schedule run for job ID '{schedule_id}': {e}")
 
-def process_bulk_file_on_schedule(instance: Instance, filename):
+def process_bulk_file_on_schedule(instance: Instance, filename, schedule_id):
 
     instance.broadcast = True
 
@@ -839,28 +897,56 @@ def process_bulk_file_on_schedule(instance: Instance, filename):
                 update_log(instance, f"🕘 Scheduled bulk import started for '{filename}'")
                 debug_me(f"Scheduled import started for instance {instance.id} mode {instance.mode}")
                 send_notification(instance, f"🕘 Scheduled bulk import started for '{filename}'", event=NotificationEvent.RUN_STARTED.value)
-                run_bulk_import_scrape_in_thread(instance, content, filename, scheduled=True)
+                run_bulk_import_scrape_in_thread(instance, content, filename, schedule_id=schedule_id)
             else:
                 update_log(instance, f"⏭️ Scheduled bulk import of '{filename}' skipped • file is empty")
                 now = datetime.now(timezone.utc).isoformat()
-                RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.SKIPPED.value)
+                RunHistory().add_run(
+                    run_type=RunType.BULK.value,
+                    label=filename,
+                    started_at=now,
+                    ended_at=now,
+                    trigger=RunTrigger.SCHEDULED.value,
+                    outcome=RunOutcome.SKIPPED.value
+                )
                 send_notification(instance, f"⏭️ Scheduled bulk import of '{filename}' skipped • file is empty", event=NotificationEvent.RUN_SKIPPED.value)
         else:
             update_log(instance, f"🔴 Bulk file does not exist: {filename}")
             now = datetime.now(timezone.utc).isoformat()
-            RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
+            RunHistory().add_run(
+                run_type=RunType.BULK.value,
+                label=filename,
+                started_at=now,
+                ended_at=now,
+                trigger=RunTrigger.SCHEDULED.value,
+                outcome=RunOutcome.FAILED.value
+            )
             send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • file does not exist", event=NotificationEvent.RUN_FAILED_TO_START.value)
             return
     except FileNotFoundError:
         update_log(instance, f"🔴 Scheduled bulk import failed due to missing file ({filename})")
         now = datetime.now(timezone.utc).isoformat()
-        RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
+        RunHistory().add_run(
+            run_type=RunType.BULK.value,
+            label=filename,
+            started_at=now,
+            ended_at=now,
+            trigger=RunTrigger.SCHEDULED.value,
+            outcome=RunOutcome.FAILED.value
+        )
         send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • file not found", event=NotificationEvent.RUN_FAILED_TO_START.value)
     except Exception as e:
         update_log(instance, f"🔴 Scheduled bulk import unexpectedly failed ({str(e)})")
         send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • {e}", event=NotificationEvent.RUN_FAILED_TO_START.value)
         now = datetime.now(timezone.utc).isoformat()
-        RunHistory().add_run(RunType.BULK.value, filename, now, now, RunTrigger.SCHEDULED.value, RunOutcome.FAILED.value)
+        RunHistory().add_run(
+            run_type=RunType.BULK.value,
+            label=filename,
+            started_at=now,
+            ended_at=now,
+            trigger=RunTrigger.SCHEDULED.value,
+            outcome=RunOutcome.FAILED.value
+        )
     finally:
         if globals.scheduler_service:
             globals.scheduler_service.finish(filename)
@@ -882,12 +968,12 @@ def setup_scheduler_on_first_load(instance: Instance):
     # If there are no scheduled jobs already...
     if not globals.scheduler_service.has_schedules():
         for each_schedule in globals.config.schedules:
-            schedule_id = each_schedule.get("id")
-            schedule_file = each_schedule.get("file")
+            new_schedule = BulkSchedule(**each_schedule)
+            new_schedule.compute_next_run()
 
             # Create the callback for this schedule
-            def schedule_callback(filename=schedule_file):
-                add_file_to_schedule_thread(instance, filename)
+            def schedule_callback(filename=new_schedule.file, schedule_id=new_schedule.id):
+                add_file_to_schedule_thread(instance, filename, schedule_id)
 
             # Add to scheduler service, reusing the id already stored in
             # config so the schedule keeps the same identity across reloads.
@@ -895,15 +981,15 @@ def setup_scheduler_on_first_load(instance: Instance):
             # config.json must not stop the app starting.
             try:
                 globals.scheduler_service.add_schedule(
-                    schedule_file,
-                    schedule_callback,
-                    schedule_id=schedule_id,
-                    time=each_schedule.get("time"),
-                    interval_value=each_schedule.get("interval_value"),
-                    interval_unit=each_schedule.get("interval_unit"),
+                    sched=new_schedule,
+                    callback=schedule_callback
                 )
+                if new_schedule.time:
+                    debug_me(f"Added schedule ID '{new_schedule.id}' for '{new_schedule.file}': Every day at {new_schedule.time} | Last run: {new_schedule.last_run} | Next run: {new_schedule.next_run}")
+                elif new_schedule.interval_value:
+                    debug_me(f"Added schedule ID '{new_schedule.id}' for '{new_schedule.file}': Every {new_schedule.interval_value} {new_schedule.interval_unit} | Last run: {new_schedule.last_run} | Next run: {new_schedule.next_run}")
             except ValueError as e:
-                update_log(instance, f"🔴 Skipping invalid schedule for '{schedule_file}': {e}")
+                update_log(instance, f"🔴 Skipping invalid schedule for '{new_schedule.file}': {e}")
                 debug_me(f"Skipping invalid schedule entry {each_schedule}: {e}")
 
 
@@ -912,10 +998,11 @@ def setup_scheduler_on_first_load(instance: Instance):
             debug_me("Scheduler started.")
 
         debug_me(globals.config.schedules)
+        debug_me(globals.scheduler_service.schedule_meta)
 
 
 def catch_up_missed_schedules(instance: Instance):
-    """Run any daily schedule that was due while the app was not running.
+    """Run any schedule (daily or interval) that was due while the app was not running.
 
     Called from main only after the Plex libraries are connected: a catch-up run
     fired before that point executes against empty libraries, fails every item,
@@ -923,10 +1010,13 @@ def catch_up_missed_schedules(instance: Instance):
     if globals.config is None:
         return
     for each_schedule in globals.config.schedules:
-        catch_up_missed_schedule(instance, each_schedule.get("file"), each_schedule.get("time"), each_schedule.get("last_run"))
+        catch_up_missed_schedule(
+            instance=instance,
+            sched=BulkSchedule(**each_schedule)
+        )
 
 
-def catch_up_missed_schedule(instance: Instance, filename, schedule_time, last_run):
+def catch_up_missed_schedule(instance: Instance, sched: BulkSchedule):
     """
     Run a scheduled bulk import that was due while the app was not running, if it falls
     inside the configured catch-up window. Otherwise, just log that it was skipped.
@@ -939,9 +1029,7 @@ def catch_up_missed_schedule(instance: Instance, filename, schedule_time, last_r
     """
     window_minutes = globals.config.catch_up_window_minutes if globals.config else 0
 
-    due, within_window = globals.scheduler_service.get_missed_run(
-        schedule_time, last_run, datetime.now(), window_minutes
-    )
+    due, within_window = globals.scheduler_service.get_missed_run(sched=sched, window=window_minutes)
 
     if due is None:
         return
@@ -949,12 +1037,12 @@ def catch_up_missed_schedule(instance: Instance, filename, schedule_time, last_r
     due_display = due.strftime("%Y-%m-%d %H:%M")
 
     if within_window:
-        update_log(instance, f"⏰ Catching up missed scheduled run for '{filename}' (was due {due_display})")
-        debug_me(f"Catch-up run for '{filename}', due {due.isoformat()}, window {window_minutes} minutes")
-        add_file_to_schedule_thread(instance, filename)
+        update_log(instance, f"⏰ Catching up missed scheduled run for '{sched.file}' (was due {due_display})")
+        debug_me(f"Catch-up run for '{sched.file}', due {due.isoformat()}, window {window_minutes} minutes")
+        add_file_to_schedule_thread(instance, sched.file, sched.id)
     else:
-        update_log(instance, f"⚠️ Scheduled run for '{filename}' was missed and is outside the catch-up window (was due {due_display})")
-        debug_me(f"Missed scheduled run for '{filename}', due {due.isoformat()}, outside catch-up window of {window_minutes} minutes")
+        update_log(instance, f"⚠️ Scheduled run for '{sched.file}' was missed and is outside the catch-up window (was due {due_display})")
+        debug_me(f"Missed scheduled run for '{sched.file}', due {due.isoformat()}, outside catch-up window of {window_minutes} minutes")
 
 
 # Kept as a hook for the "load_config" socket event. There is nothing to
@@ -987,18 +1075,20 @@ if __name__ == "__main__":
     cli_command = args.command
 
     # Store the options passed as arguments
-    cli_options = Options(add_posters=args.add_posters,
-                          add_sets=args.add_sets,
-                          force=args.force,
-                          skip_locked=args.skip_locked,
-                          allow_artist_updates=args.allow_artist_updates,
-                          filters=args.filters,
-                          exclude=args.exclude,
-                          year=args.year,
-                          kometa=args.kometa,
-                          stage=args.stage,
-                          temp=args.temp,
-                          no_cache=args.no_cache)  # Arguments per url to process
+    cli_options = Options(
+        add_posters=args.add_posters,
+        add_sets=args.add_sets,
+        force=args.force,
+        skip_locked=args.skip_locked,
+        allow_artist_updates=args.allow_artist_updates,
+        filters=args.filters,
+        exclude=args.exclude,
+        year=args.year,
+        kometa=args.kometa,
+        stage=args.stage,
+        temp=args.temp,
+        no_cache=args.no_cache
+    )  # Arguments per url to process
 
     # Create config as a global object
     config = Config()

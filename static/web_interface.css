@@ -937,3 +937,8 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 .wide-tooltip .tooltip-inner {
     max-width: 320px !important;
 }
+
+/* Custom z-index for all tooltips so they show in front of any other UI element */
+.tooltip {
+    z-index: 9999 !important;
+}

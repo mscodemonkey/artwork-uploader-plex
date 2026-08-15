@@ -3,11 +3,13 @@ config.json schedule migration, missed-run catch-up logic and the overlap guard.
 
 import json
 from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 import schedule
 
 from core.config import Config
+from models.bulk_schedule import BulkSchedule
 from services.scheduler_service import SchedulerService
 
 
@@ -34,7 +36,8 @@ def run_job(service, job_id):
 @pytest.mark.unit
 def test_daily_schedule_runs_with_its_filename(service):
     calls = []
-    job_id = service.add_schedule("bulk_a.txt", calls.append, time="02:00")
+    sched = BulkSchedule(file="bulk_a.txt", time="02:00")
+    job_id = service.add_schedule(sched, calls.append)
 
     run_job(service, job_id)
 
@@ -44,43 +47,53 @@ def test_daily_schedule_runs_with_its_filename(service):
 @pytest.mark.unit
 def test_interval_schedule_in_hours(service):
     calls = []
-    job_id = service.add_schedule("bulk_a.txt", calls.append, interval_value=6, interval_unit="hours")
+    sched = BulkSchedule(file="bulk_a.txt", interval_value=6, interval_unit="hours")
+    job_id = service.add_schedule(sched, calls.append)
 
     run_job(service, job_id)
 
     assert calls == ["bulk_a.txt"]
-    assert service.schedule_meta[job_id] == {"file": "bulk_a.txt", "interval_value": 6, "interval_unit": "hours"}
+    assert service.schedule_meta[job_id]["file"] == "bulk_a.txt"
+    assert service.schedule_meta[job_id]["interval_value"] == 6
+    assert service.schedule_meta[job_id]["interval_unit"] == "hours"
 
 
 @pytest.mark.unit
 def test_interval_schedule_in_days(service):
-    job_id = service.add_schedule("bulk_a.txt", lambda f: None, interval_value=2, interval_unit="days")
+    sched = BulkSchedule(file="bulk_a.txt", interval_value=2, interval_unit="days")
+    job_id = service.add_schedule(sched, lambda f: None)
     assert service.schedule_meta[job_id]["interval_unit"] == "days"
 
 
 @pytest.mark.unit
 def test_add_schedule_requires_a_time_or_a_valid_interval(service):
     with pytest.raises(ValueError):
-        service.add_schedule("bulk_a.txt", lambda f: None)
+        invalid_sched1 = BulkSchedule(file="bulk_a.txt")
+        service.add_schedule(invalid_sched1, lambda f: None)
 
     with pytest.raises(ValueError):
-        service.add_schedule("bulk_a.txt", lambda f: None, interval_value=3, interval_unit="fortnights")
+        invalid_sched2 = BulkSchedule(file="bulk_a.txt", interval_value=3, interval_unit="fortnights")
+        service.add_schedule(invalid_sched2, lambda f: None)
 
 
 @pytest.mark.unit
 def test_a_file_can_carry_more_than_one_schedule(service):
-    """The original bug: a bulk file could only ever hold one schedule."""
-    first = service.add_schedule("bulk_a.txt", lambda f: None, time="02:00")
-    second = service.add_schedule("bulk_a.txt", lambda f: None, interval_value=6, interval_unit="hours")
+    """A bulk file can carry multiple distinct schedules."""
+    sched1 = BulkSchedule(file="bulk_a.txt", time="02:00")
+    sched2 = BulkSchedule(file="bulk_a.txt", interval_value=6, interval_unit="hours")
+
+    first = service.add_schedule(sched1, lambda f: None)
+    second = service.add_schedule(sched2, lambda f: None)
 
     assert first != second
-    assert service.get_all_job_ids() == [first, second] or set(service.get_all_job_ids()) == {first, second}
+    assert set(service.get_all_job_ids()) == {first, second}
     assert set(service.get_jobs_for_file("bulk_a.txt")) == {first, second}
 
 
 @pytest.mark.unit
 def test_add_schedule_reuses_a_given_id(service):
-    job_id = service.add_schedule("bulk_a.txt", lambda f: None, schedule_id="my-id", time="02:00")
+    sched = BulkSchedule(id="my-id", file="bulk_a.txt", time="02:00")
+    job_id = service.add_schedule(sched, lambda f: None)
     assert job_id == "my-id"
     assert "my-id" in service.scheduled_jobs
 
@@ -89,8 +102,11 @@ def test_add_schedule_reuses_a_given_id(service):
 
 @pytest.mark.unit
 def test_remove_schedule_only_removes_the_one_job(service):
-    keep = service.add_schedule("bulk_a.txt", lambda f: None, time="02:00")
-    remove = service.add_schedule("bulk_a.txt", lambda f: None, time="12:30")
+    sched_keep = BulkSchedule(file="bulk_a.txt", time="02:00")
+    sched_remove = BulkSchedule(file="bulk_a.txt", time="12:30")
+
+    keep = service.add_schedule(sched_keep, lambda f: None)
+    remove = service.add_schedule(sched_remove, lambda f: None)
 
     assert service.remove_schedule(remove) is True
 
@@ -109,9 +125,9 @@ def test_remove_schedule_returns_false_when_not_found(service):
 @pytest.mark.unit
 def test_rename_file_moves_every_schedule_for_that_file(service):
     calls = []
-    a = service.add_schedule("old.txt", calls.append, time="02:00")
-    b = service.add_schedule("old.txt", calls.append, interval_value=6, interval_unit="hours")
-    other = service.add_schedule("unrelated.txt", calls.append, time="09:00")
+    a = service.add_schedule(BulkSchedule(file="old.txt", time="02:00"), calls.append)
+    b = service.add_schedule(BulkSchedule(file="old.txt", interval_value=6, interval_unit="hours"), calls.append)
+    other = service.add_schedule(BulkSchedule(file="unrelated.txt", time="09:00"), calls.append)
 
     renamed_ids = service.rename_file("old.txt", "new.txt")
 
@@ -124,7 +140,7 @@ def test_rename_file_moves_every_schedule_for_that_file(service):
 @pytest.mark.unit
 def test_rename_file_does_not_recreate_the_underlying_job(service):
     """Renaming should only touch metadata - the schedule library job stays the same object."""
-    job_id = service.add_schedule("old.txt", lambda f: None, time="02:00")
+    job_id = service.add_schedule(BulkSchedule(file="old.txt", time="02:00"), lambda f: None)
     job_before = service.scheduled_jobs[job_id]
 
     service.rename_file("old.txt", "new.txt")
@@ -135,7 +151,7 @@ def test_rename_file_does_not_recreate_the_underlying_job(service):
 @pytest.mark.unit
 def test_renamed_schedule_calls_back_with_the_new_filename(service):
     calls = []
-    job_id = service.add_schedule("old.txt", calls.append, time="02:00")
+    job_id = service.add_schedule(BulkSchedule(file="old.txt", time="02:00"), calls.append)
 
     service.rename_file("old.txt", "new.txt")
     run_job(service, job_id)
@@ -148,14 +164,14 @@ def test_renamed_schedule_calls_back_with_the_new_filename(service):
 @pytest.mark.unit
 def test_has_schedules(service):
     assert service.has_schedules() is False
-    service.add_schedule("bulk_a.txt", lambda f: None, time="02:00")
+    service.add_schedule(BulkSchedule(file="bulk_a.txt", time="02:00"), lambda f: None)
     assert service.has_schedules() is True
 
 
 @pytest.mark.unit
 def test_clear_all_schedules(service):
-    service.add_schedule("bulk_a.txt", lambda f: None, time="02:00")
-    service.add_schedule("bulk_b.txt", lambda f: None, interval_value=1, interval_unit="days")
+    service.add_schedule(BulkSchedule(file="bulk_a.txt", time="02:00"), lambda f: None)
+    service.add_schedule(BulkSchedule(file="bulk_b.txt", interval_value=1, interval_unit="days"), lambda f: None)
 
     service.clear_all_schedules()
 
@@ -202,10 +218,6 @@ def test_migration_keeps_an_existing_id_stable(tmp_path):
 
 @pytest.mark.unit
 def test_migrated_ids_are_written_back_to_disk_and_stay_stable(tmp_path):
-    """A minted id that only lives in memory is useless: every socket handler
-    calls config.load() again before matching by id, so if the id were not
-    persisted, a fresh (different) one would be minted on the next load and
-    nothing would ever match again."""
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({
         "schedules": [{"file": "bulk_a.txt", "time": "02:00"}],
@@ -225,9 +237,6 @@ def test_migrated_ids_are_written_back_to_disk_and_stay_stable(tmp_path):
 
 @pytest.mark.unit
 def test_deleting_a_migrated_schedule_stays_deleted_after_reload(tmp_path):
-    """Regression test for web_routes.delete_task_from_scheduler: it loads
-    config again and then filters by id, which only works if the id survives
-    that reload unchanged."""
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({
         "schedules": [{"file": "bulk_a.txt", "time": "02:00"}],
@@ -248,9 +257,6 @@ def test_deleting_a_migrated_schedule_stays_deleted_after_reload(tmp_path):
 
 @pytest.mark.unit
 def test_editing_a_migrated_schedule_updates_in_place_after_reload(tmp_path):
-    """Regression test for web_routes.update_or_add_schedule: matching an
-    existing entry by id has to actually find it, or an edit turns into a
-    second schedule alongside the original."""
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({
         "schedules": [{"file": "bulk_a.txt", "time": "02:00"}],
@@ -278,9 +284,6 @@ def test_editing_a_migrated_schedule_updates_in_place_after_reload(tmp_path):
 
 @pytest.mark.unit
 def test_renaming_a_migrated_schedules_file_survives_reload(tmp_path):
-    """Regression test for web_routes.rename_bulk_file: the ids handed back
-    by SchedulerService.rename_file only match config entries whose id is
-    still the same one the scheduler was built from."""
     config_path = tmp_path / "config.json"
     config_path.write_text(json.dumps({
         "schedules": [{"file": "old.txt", "time": "02:00"}],
@@ -326,73 +329,139 @@ def test_multiple_schedules_for_one_file_survive_a_save_and_reload(tmp_path):
     assert by_id["b"]["interval_unit"] == "hours"
 
 
-pytestmark = pytest.mark.unit
+# ------------------------------- get_missed_run -------------------------------
 
-
+@pytest.mark.unit
 def test_no_catch_up_when_never_run_before():
     """A schedule with no recorded last run is never treated as having missed one."""
-    now = datetime(2026, 8, 9, 7, 30)
-    due, within_window = SchedulerService.get_missed_run("02:00", None, now, window_minutes=60)
+    mock_now = datetime(2026, 8, 9, 7, 30)
+    sched = BulkSchedule(time="02:00", last_run=None)
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=60)
+
     assert due is None
     assert within_window is False
 
 
+@pytest.mark.unit
 def test_missed_run_within_the_catch_up_window():
-    now = datetime(2026, 8, 9, 2, 15)
+    mock_now = datetime(2026, 8, 9, 2, 15)
     last_run = datetime(2026, 8, 8, 2, 0).isoformat()
-    due, within_window = SchedulerService.get_missed_run("02:00", last_run, now, window_minutes=30)
+    sched = BulkSchedule(time="02:00", last_run=last_run)
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=30)
+
     assert due == datetime(2026, 8, 9, 2, 0)
     assert within_window is True
 
 
+@pytest.mark.unit
 def test_missed_run_outside_the_catch_up_window():
-    now = datetime(2026, 8, 9, 7, 30)
+    mock_now = datetime(2026, 8, 9, 7, 30)
     last_run = datetime(2026, 8, 8, 2, 0).isoformat()
-    due, within_window = SchedulerService.get_missed_run("02:00", last_run, now, window_minutes=60)
+    sched = BulkSchedule(time="02:00", last_run=last_run)
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=60)
+
     assert due == datetime(2026, 8, 9, 2, 0)
     assert within_window is False
 
 
+@pytest.mark.unit
 def test_zero_window_never_catches_up():
-    now = datetime(2026, 8, 9, 2, 5)
+    mock_now = datetime(2026, 8, 9, 2, 5)
     last_run = datetime(2026, 8, 8, 2, 0).isoformat()
-    due, within_window = SchedulerService.get_missed_run("02:00", last_run, now, window_minutes=0)
+    sched = BulkSchedule(time="02:00", last_run=last_run)
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=0)
+
     assert due == datetime(2026, 8, 9, 2, 0)
     assert within_window is False
 
 
+@pytest.mark.unit
 def test_already_ran_today_is_not_a_miss():
-    now = datetime(2026, 8, 9, 7, 30)
+    mock_now = datetime(2026, 8, 9, 7, 30)
     last_run = datetime(2026, 8, 9, 2, 0).isoformat()
-    due, within_window = SchedulerService.get_missed_run("02:00", last_run, now, window_minutes=60)
+    sched = BulkSchedule(time="02:00", last_run=last_run)
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=60)
+
     assert due is None
     assert within_window is False
 
 
+@pytest.mark.unit
 def test_due_time_is_still_ahead_today_uses_yesterdays_occurrence():
     """If it's not yet 02:00 today, the most recent due time was yesterday's run."""
-    now = datetime(2026, 8, 9, 1, 0)
+    mock_now = datetime(2026, 8, 9, 1, 0)
     last_run = datetime(2026, 8, 7, 2, 0).isoformat()
-    due, within_window = SchedulerService.get_missed_run("02:00", last_run, now, window_minutes=1440)
+    sched = BulkSchedule(time="02:00", last_run=last_run)
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=1440)
+
     assert due == datetime(2026, 8, 8, 2, 0)
     assert within_window is True
 
 
+@pytest.mark.unit
 def test_malformed_schedule_time_is_not_a_miss():
-    now = datetime(2026, 8, 9, 7, 30)
+    mock_now = datetime(2026, 8, 9, 7, 30)
     last_run = datetime(2026, 8, 8, 2, 0).isoformat()
-    due, within_window = SchedulerService.get_missed_run("not-a-time", last_run, now, window_minutes=60)
+    sched = BulkSchedule(time="not-a-time", last_run=last_run)
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=60)
+
     assert due is None
     assert within_window is False
 
 
-def test_malformed_last_run_is_treated_as_missed():
-    now = datetime(2026, 8, 9, 2, 5)
-    due, within_window = SchedulerService.get_missed_run("02:00", "not-a-timestamp", now, window_minutes=60)
-    assert due == datetime(2026, 8, 9, 2, 0)
-    assert within_window is True
+@pytest.mark.unit
+def test_malformed_last_run_is_not_a_miss():
+    mock_now = datetime(2026, 8, 9, 2, 5)
+    sched = BulkSchedule(time="02:00", last_run="not-a-timestamp")
+
+    with patch("services.scheduler_service.datetime") as mock_datetime:
+        mock_datetime.now.return_value = mock_now
+        mock_datetime.fromisoformat = datetime.fromisoformat
+
+        due, within_window = SchedulerService.get_missed_run(sched, window=60)
+
+    assert due is None
+    assert within_window is False
 
 
+# ------------------------------- overlap guard -------------------------------
+
+@pytest.mark.unit
 def test_overlap_guard_blocks_a_second_start_for_the_same_file():
     service = SchedulerService()
     assert service.try_start("bulk_import.txt") is True
@@ -402,6 +471,7 @@ def test_overlap_guard_blocks_a_second_start_for_the_same_file():
     assert service.try_start("bulk_import.txt") is True
 
 
+@pytest.mark.unit
 def test_overlap_guard_is_independent_per_file():
     service = SchedulerService()
     assert service.try_start("a.txt") is True
