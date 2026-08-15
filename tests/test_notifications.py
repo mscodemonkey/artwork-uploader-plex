@@ -407,3 +407,42 @@ def test_mid_run_crash_before_any_processing_is_reported_as_failed_to_start():
         globals.config = None
         globals.scrapes_running = 0
         globals.cancel_scrape = False
+
+
+@pytest.mark.unit
+def test_an_upload_that_exhausted_its_retries_sends_completed_with_errors():
+    """The summary line for such a run already reads "completed with 1 error(s)", but the
+    event picked on the scrape errors alone, so a channel subscribed to failures heard
+    nothing and a channel subscribed to clean runs got the warning."""
+    try:
+        globals.plex = MagicMock(tv_libraries=["TV Shows"], movie_libraries=["Movies"])
+        globals.config = MagicMock(apprise_urls=[])
+        globals.scrapes_running = 0
+        globals.cancel_scrape = False
+
+        events_sent = []
+
+        def fake_send_notification(inst, message, event=None):
+            events_sent.append(event)
+
+        def fake_scrape(instance, url, options, bulk, success_counter, assets_processed,
+                        cached_counter=None, locked_counter=None, failed_counter=None):
+            assets_processed[0] += 1
+            failed_counter[0] += 1
+
+        with (
+            patch("artwork_uploader.scrape_and_upload", side_effect=fake_scrape),
+            patch("artwork_uploader.send_notification", side_effect=fake_send_notification),
+            patch("artwork_uploader.update_log"),
+            patch("artwork_uploader.update_status"),
+            patch("artwork_uploader.notify_web"),
+            patch("artwork_uploader.debug_me"),
+        ):
+            process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "retries.txt", scheduled=True)
+
+        assert events_sent == [NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value]
+    finally:
+        globals.plex = None
+        globals.config = None
+        globals.scrapes_running = 0
+        globals.cancel_scrape = False
