@@ -109,7 +109,7 @@ def test_bulk_import_releases_the_lock_so_the_next_run_can_start():
     """A completed bulk import must release globals.bulk_import_lock, otherwise every
     run after the first would be refused forever."""
     try:
-        globals.bulk_import_lock = type(globals.bulk_import_lock)()  # fresh, unlocked lock
+        globals.bulk_import_lock = threading.Lock()  # fresh, unlocked lock
         globals.scrapes_running = 0
         globals.cancel_scrape = False
         globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
@@ -147,7 +147,7 @@ def test_bulk_import_releases_the_lock_when_plex_is_not_configured():
     if Plex is unreachable. It must still release the lock, or a single misconfigured run
     would permanently jam every bulk import after it."""
     try:
-        globals.bulk_import_lock = type(globals.bulk_import_lock)()  # fresh, unlocked lock
+        globals.bulk_import_lock = threading.Lock()  # fresh, unlocked lock
         globals.scrapes_running = 0
         globals.cancel_scrape = False
         globals.plex = MagicMock(tv_libraries=None, movie_libraries=None)
@@ -185,7 +185,7 @@ def test_lock_actually_serializes_concurrent_bulk_imports():
     increment where two threads can both pass the check - that is the exact bug this ticket
     is about, and a test that only pre-locks before calling would not catch it coming back."""
     try:
-        globals.bulk_import_lock = type(globals.bulk_import_lock)()  # fresh, unlocked lock
+        globals.bulk_import_lock = threading.Lock()  # fresh, unlocked lock
         globals.scrapes_running = 0
         globals.cancel_scrape = False
         globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
