@@ -12,7 +12,13 @@ permissions:
   pull-requests: read  # Required for --generate-notes to read PR metadata
 
 jobs:
+  # Publishing a tag with a failing suite is the one mistake a release workflow
+  # can make that nobody can undo, so the tests gate everything below.
+  test:
+    uses: ./.github/workflows/tests.yml
+
   create-release:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:

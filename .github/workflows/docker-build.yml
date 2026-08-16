@@ -1,0 +1,37 @@
+name: Docker build
+
+# The image is only built when a tag is pushed, so a Dockerfile that no longer
+# builds is found during a release rather than before one. This builds it on
+# the way in, and never pushes.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # amd64 only. The release builds arm64 as well, under QEMU, and that is
+      # slow enough that a check on every pull request would not be worth it.
+      - name: Build the image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
