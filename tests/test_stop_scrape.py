@@ -10,6 +10,7 @@ loop and ArtworkProcessor's upload loops must both stop, rather than letting a
 partial harvest reach Plex.
 """
 
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,6 +26,10 @@ from core.enums import RunOutcome
 from models.callbacks import ProcessingCallbacks
 
 OUTCOME_STOPPED = RunOutcome.STOPPED.value
+
+# A run counts as scheduled when it carries a schedule id. The value itself is
+# not read by anything under test here, only its presence.
+SCHEDULE_ID = str(uuid.uuid4())
 
 
 @pytest.mark.unit
@@ -119,7 +124,7 @@ def test_cancelled_bulk_run_reports_stopped_not_success(tmp_path, monkeypatch):
     finished run gets. This drives the real process_bulk_import_from_ui
     reporting branch (with the Plex-config check and the actual scrape
     stubbed out) so the assertions exercise real branch logic on
-    globals.cancel_scrape, not a mock of it. scheduled=True so the
+    globals.cancel_scrape, not a mock of it. schedule_id=SCHEDULE_ID so the
     notification branch runs too - a suppressed notification on a cancelled
     scheduled run would leave a dangling "started" with no terminal event.
 
@@ -158,7 +163,7 @@ def test_cancelled_bulk_run_reports_stopped_not_success(tmp_path, monkeypatch):
             patch("artwork_uploader.notify_web") as mock_notify_web,
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt", scheduled=True)
+            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt", schedule_id=SCHEDULE_ID)
 
         mock_scrape_and_upload.assert_not_called()
 

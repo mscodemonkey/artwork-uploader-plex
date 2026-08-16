@@ -56,7 +56,7 @@ def test_successful_run_is_recorded_with_its_counters(history):
         patch("artwork_uploader.update_status"),
         patch("artwork_uploader.debug_me"),
     ):
-        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "ok.txt", scheduled=False)
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "ok.txt")
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -81,7 +81,7 @@ def test_run_with_scraper_errors_is_recorded_as_partial(history):
         patch("artwork_uploader.update_status"),
         patch("artwork_uploader.debug_me"),
     ):
-        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "errors.txt", scheduled=False)
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "errors.txt")
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -98,7 +98,7 @@ def test_plex_not_configured_is_recorded_as_failed_without_scraping(history):
         patch("artwork_uploader.scrape_and_upload") as mock_scrape,
         patch("artwork_uploader.update_status"),
     ):
-        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "unconfigured.txt", scheduled=False)
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "unconfigured.txt")
 
     mock_scrape.assert_not_called()
     runs = history.get_runs()
@@ -120,7 +120,7 @@ def test_unexpected_exception_mid_run_is_recorded_as_failed(history):
         patch("artwork_uploader.debug_me"),
         patch("artwork_uploader.elapsed_time", side_effect=RuntimeError("boom")),
     ):
-        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "crash.txt", scheduled=False)
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "crash.txt")
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -130,7 +130,7 @@ def test_unexpected_exception_mid_run_is_recorded_as_failed(history):
 @pytest.mark.unit
 def test_no_valid_urls_in_the_file_is_recorded_as_skipped(history):
     with patch("artwork_uploader.update_status"):
-        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "no_urls.txt", scheduled=False)
+        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "no_urls.txt")
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -142,7 +142,7 @@ def test_no_valid_urls_in_the_file_is_recorded_as_skipped(history):
 def test_no_filename_falls_back_to_the_default_bulk_file_name(history):
     """A None filename must not land in the history (and the UI table) as the string 'null'."""
     with patch("artwork_uploader.update_status"):
-        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", None, scheduled=False)
+        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", None)
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -169,7 +169,7 @@ def test_an_upload_that_exhausted_its_retries_is_counted_as_an_error(history):
         patch("artwork_uploader.update_status"),
         patch("artwork_uploader.debug_me"),
     ):
-        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "retries.txt", scheduled=False)
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "retries.txt")
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -189,7 +189,7 @@ def test_a_run_that_processes_nothing_is_recorded_as_skipped(history):
         patch("artwork_uploader.update_status"),
         patch("artwork_uploader.debug_me"),
     ):
-        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "nothing.txt", scheduled=False)
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "nothing.txt")
 
     runs = history.get_runs()
     assert len(runs) == 1

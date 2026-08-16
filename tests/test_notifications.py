@@ -8,6 +8,7 @@ Covers:
 - utils.notifications.send_notification() only notifying channels subscribed to the given event.
 """
 
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,6 +20,11 @@ from core.constants import DEFAULT_NOTIFICATION_EVENTS
 from core.enums import NotificationEvent
 from models.instance import Instance
 from utils.notifications import send_notification
+
+
+# A run counts as scheduled when it carries a schedule id. The value itself is
+# not read by anything under test here, only its presence.
+SCHEDULE_ID = str(uuid.uuid4())
 
 
 @pytest.mark.unit
@@ -150,7 +156,7 @@ def test_scheduled_run_with_missing_bulk_file_fires_failed_to_start():
         patch("artwork_uploader.send_notification", side_effect=fake_send_notification),
         patch("artwork_uploader.update_log"),
     ):
-        process_bulk_file_on_schedule(Instance(mode="cli"), "missing.txt")
+        process_bulk_file_on_schedule(Instance(mode="cli"), "missing.txt", SCHEDULE_ID)
 
     assert events_sent == [NotificationEvent.RUN_FAILED_TO_START.value]
 
@@ -173,7 +179,7 @@ def test_scheduled_run_with_empty_bulk_file_fires_skipped(tmp_path):
         patch("artwork_uploader.update_log"),
         patch("artwork_uploader.run_bulk_import_scrape_in_thread") as mock_run,
     ):
-        process_bulk_file_on_schedule(Instance(mode="cli"), "empty.txt")
+        process_bulk_file_on_schedule(Instance(mode="cli"), "empty.txt", SCHEDULE_ID)
 
     assert events_sent == [NotificationEvent.RUN_SKIPPED.value]
     mock_run.assert_not_called()
@@ -187,14 +193,14 @@ def test_manual_run_with_no_valid_entries_stays_silent_unless_notify_opted_in():
         patch("artwork_uploader.send_notification") as mock_send_notification,
         patch("artwork_uploader.update_status"),
     ):
-        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "bulk.txt", scheduled=False, notify=False)
+        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "bulk.txt", notify=False)
     mock_send_notification.assert_not_called()
 
     with (
         patch("artwork_uploader.send_notification") as mock_send_notification,
         patch("artwork_uploader.update_status"),
     ):
-        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "bulk.txt", scheduled=False, notify=True)
+        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "bulk.txt", notify=True)
     mock_send_notification.assert_called_once()
     assert mock_send_notification.call_args.kwargs["event"] == NotificationEvent.RUN_SKIPPED.value
     # A manual run must not claim to be a scheduled one in the message it sends.
@@ -210,7 +216,7 @@ def test_scheduled_run_with_no_valid_entries_keeps_scheduled_wording():
         patch("artwork_uploader.send_notification") as mock_send_notification,
         patch("artwork_uploader.update_status"),
     ):
-        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "bulk.txt", scheduled=True, notify=False)
+        run_bulk_import_scrape_in_thread(Instance(mode="cli"), "# just a comment\n", "bulk.txt", schedule_id=SCHEDULE_ID, notify=False)
 
     mock_send_notification.assert_called_once()
     assert mock_send_notification.call_args.kwargs["event"] == NotificationEvent.RUN_SKIPPED.value
@@ -243,7 +249,7 @@ def test_clean_and_errored_completions_notify_different_events():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, [MagicMock()], "clean.txt", scheduled=True)
+            process_bulk_import_from_ui(instance, [MagicMock()], "clean.txt", schedule_id=SCHEDULE_ID)
 
         assert events_sent == [NotificationEvent.RUN_COMPLETED.value]
 
@@ -258,7 +264,7 @@ def test_clean_and_errored_completions_notify_different_events():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, [MagicMock()], "errored.txt", scheduled=True)
+            process_bulk_import_from_ui(instance, [MagicMock()], "errored.txt", schedule_id=SCHEDULE_ID)
 
         assert events_sent == [NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value]
     finally:
@@ -281,14 +287,14 @@ def test_plex_setup_incomplete_notifies_failed_to_start_only_when_notify_enabled
             patch("artwork_uploader.send_notification") as mock_send_notification,
             patch("artwork_uploader.update_status"),
         ):
-            process_bulk_import_from_ui(instance, [MagicMock()], "test.txt", scheduled=False, notify=False)
+            process_bulk_import_from_ui(instance, [MagicMock()], "test.txt", notify=False)
         mock_send_notification.assert_not_called()
 
         with (
             patch("artwork_uploader.send_notification") as mock_send_notification,
             patch("artwork_uploader.update_status"),
         ):
-            process_bulk_import_from_ui(instance, [MagicMock()], "test.txt", scheduled=True, notify=False)
+            process_bulk_import_from_ui(instance, [MagicMock()], "test.txt", schedule_id=SCHEDULE_ID, notify=False)
         mock_send_notification.assert_called_once_with(
             instance,
             "🔴 Bulk import of 'test.txt' failed to start • Plex setup incomplete",
@@ -318,7 +324,7 @@ def test_cancelled_run_notifies_run_cancelled_specifically():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, [MagicMock()], "cancelled.txt", scheduled=True)
+            process_bulk_import_from_ui(instance, [MagicMock()], "cancelled.txt", schedule_id=SCHEDULE_ID)
 
         mock_scrape_and_upload.assert_not_called()
         mock_send_notification.assert_called_once()
@@ -363,7 +369,7 @@ def test_mid_run_crash_after_processing_is_not_reported_as_failed_to_start():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, [MagicMock(), MagicMock()], "nightly.txt", scheduled=True)
+            process_bulk_import_from_ui(instance, [MagicMock(), MagicMock()], "nightly.txt", schedule_id=SCHEDULE_ID)
 
         mock_send_notification.assert_called_once()
         assert mock_send_notification.call_args.kwargs["event"] == NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value
@@ -398,7 +404,7 @@ def test_mid_run_crash_before_any_processing_is_reported_as_failed_to_start():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, [MagicMock()], "nightly.txt", scheduled=True)
+            process_bulk_import_from_ui(instance, [MagicMock()], "nightly.txt", schedule_id=SCHEDULE_ID)
 
         mock_send_notification.assert_called_once()
         assert mock_send_notification.call_args.kwargs["event"] == NotificationEvent.RUN_FAILED_TO_START.value
@@ -437,7 +443,7 @@ def test_an_upload_that_exhausted_its_retries_sends_completed_with_errors():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "retries.txt", scheduled=True)
+            process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "retries.txt", schedule_id=SCHEDULE_ID)
 
         assert events_sent == [NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value]
     finally:

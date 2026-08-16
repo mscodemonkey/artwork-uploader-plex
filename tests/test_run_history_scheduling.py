@@ -5,6 +5,7 @@ record. Otherwise the answer to "did last night's run do anything" stays "check 
 logs" for exactly the runs that did the least.
 """
 
+import uuid
 from unittest.mock import patch
 
 import pytest
@@ -18,6 +19,11 @@ OUTCOME_FAILED = RunOutcome.FAILED.value
 OUTCOME_SKIPPED = RunOutcome.SKIPPED.value
 
 
+# A run counts as scheduled when it carries a schedule id. The value itself is
+# not read by anything under test here, only its presence.
+SCHEDULE_ID = str(uuid.uuid4())
+
+
 @pytest.fixture
 def history(tmp_path, monkeypatch):
     real_history = RunHistory(str(tmp_path / "run_history.json"))
@@ -28,7 +34,7 @@ def history(tmp_path, monkeypatch):
 @pytest.mark.unit
 def test_missing_bulk_file_is_recorded_as_failed(history):
     with patch("artwork_uploader.find_bulk_file", return_value=None):
-        process_bulk_file_on_schedule(Instance(mode="cli"), "missing.txt")
+        process_bulk_file_on_schedule(Instance(mode="cli"), "missing.txt", SCHEDULE_ID)
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -43,7 +49,7 @@ def test_empty_bulk_file_is_recorded_as_skipped(history, tmp_path):
     empty_file.write_text("", encoding="utf-8")
 
     with patch("artwork_uploader.find_bulk_file", return_value=str(empty_file)):
-        process_bulk_file_on_schedule(Instance(mode="cli"), "empty.txt")
+        process_bulk_file_on_schedule(Instance(mode="cli"), "empty.txt", SCHEDULE_ID)
 
     runs = history.get_runs()
     assert len(runs) == 1
@@ -53,7 +59,7 @@ def test_empty_bulk_file_is_recorded_as_skipped(history, tmp_path):
 @pytest.mark.unit
 def test_unexpected_failure_before_parsing_is_recorded(history):
     with patch("artwork_uploader.find_bulk_file", side_effect=RuntimeError("boom")):
-        process_bulk_file_on_schedule(Instance(mode="cli"), "broken.txt")
+        process_bulk_file_on_schedule(Instance(mode="cli"), "broken.txt", SCHEDULE_ID)
 
     runs = history.get_runs()
     assert len(runs) == 1
