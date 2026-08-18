@@ -32,9 +32,12 @@ The application follows a layered architecture pattern to separate concerns and 
                  │
 ┌────────────────▼────────────────────────┐
 │         Service Layer                   │
-│  BulkFileService, ImageService,         │
-│  ArtworkProcessor, SchedulerService,    │
-│  UpdateService, UtilityService          │
+│  ArtworkProcessor, BulkFileService,     │
+│  SchedulerService, AssetIndex,          │
+│  RunHistory, WebhookService,            │
+│  AuthenticationService, NotifyService,  │
+│  UpdateService, ImageService,           │
+│  UtilityService                         │
 └────────────────┬────────────────────────┘
                  │
 ┌────────────────▼────────────────────────┐
@@ -56,68 +59,90 @@ The application follows a layered architecture pattern to separate concerns and 
 ## Project Structure
 
 ```
-plex-poster-set-helper/
-├── artwork_uploader.py          # Main application entry point (724 lines)
-├── web_routes.py                # Flask routes and Socket.IO handlers (568 lines)
-├── logging_config.py            # Logging configuration
-├── config.json                  # User configuration
-├── requirements.txt             # Python dependencies
+artwork-uploader-plex/
+├── artwork_uploader.py          # Entry point: CLI parsing, orchestration, scrape/bulk/schedule flows (~1200 lines)
+├── web_routes.py                # Flask routes and Socket.IO handlers (~1400 lines)
+├── logging_config.py            # Rotating file + console logging setup
+├── bump_version.py              # Version bump and git tag helper
+├── requirements.txt             # Runtime dependencies (pinned)
+├── requirements-dev.txt         # Test, lint and type-check dependencies
+├── pytest.ini                   # Pytest config (testpaths, pythonpath, markers)
+├── Dockerfile                   # Container image, exposes 4567
+├── docker-compose.example.yml   # Example compose file
+│
+├── config/                      # Config directory (config.json, asset_index.db and run_history.json live here at runtime)
+│   └── config.json.example      # Annotated config template
 │
 ├── core/                        # Core application modules
-│   ├── config.py               # Application configuration
-│   ├── constants.py            # Application constants
-│   ├── enums.py                # Enumerations
-│   ├── exceptions.py           # Custom exceptions
-│   ├── globals.py              # Global state
-│   └── __version__.py          # Version information
+│   ├── config.py               # Config class, loads/saves config/config.json
+│   ├── constants.py            # Application-wide constants
+│   ├── enums.py                # str-Enums: FilterType, MediaType, ScraperSource, RunType, RunTrigger, RunOutcome, ...
+│   ├── exceptions.py           # Exception hierarchy under ArtworkUploaderException
+│   ├── globals.py              # Module-level shared state (config, web_app, web_socket, plex, scheduler_service)
+│   ├── retry.py                # is_transient_error / call_with_retry for uploads and downloads
+│   └── __version__.py          # Version metadata
 │
 ├── models/                      # Data models
-│   ├── instance.py             # Instance/scraper classes
-│   ├── options.py              # Configuration and options
-│   ├── arguments.py            # Command-line arguments
-│   ├── artwork_types.py        # Artwork type definitions
-│   └── url_item.py             # URL item model
+│   ├── arguments.py            # argparse command-line definition
+│   ├── artwork_types.py        # TypedDicts: MovieArtwork, TVArtwork, CollectionArtwork, UploadedFileArtwork
+│   ├── bulk_schedule.py        # BulkSchedule: one scheduled bulk import (file, time or interval, next run)
+│   ├── callbacks.py            # ProcessingCallbacks: UI callbacks plus the run counters and outcome logic
+│   ├── instance.py             # Instance: identifies a CLI or web session
+│   ├── options.py              # Options: per-run scrape/upload flags and filters
+│   └── url_item.py             # URLItem: a URL with its own Options
 │
 ├── scrapers/                    # Website scrapers
-│   ├── scraper.py              # Base scraper class
+│   ├── scraper.py              # Picks the source from the URL and delegates
 │   ├── mediux_scraper.py       # MediUX scraper
-│   └── theposterdb_scraper.py  # ThePosterDB scraper
+│   └── theposterdb_scraper.py  # ThePosterDB scraper, including user crawls and the asset index
 │
 ├── processors/                  # Processing logic
-│   ├── bulk_import.py          # Bulk import processing
-│   ├── upload_processor.py     # Upload processing logic
-│   └── media_metadata.py       # Media metadata handling
+│   ├── upload_processor.py     # UploadProcessor: resolves media in Plex and drives the upload
+│   └── media_metadata.py       # parse_show / parse_movie / parse_title title-and-year parsing
 │
 ├── plex/                        # Plex-specific modules
-│   ├── plex_connector.py       # Plex server connection
-│   └── plex_uploader.py        # Plex artwork uploader
+│   ├── plex_connector.py       # PlexConnector: connection, library sections, media lookup
+│   ├── plex_uploader.py        # PlexUploader: posts artwork, label handling, retry
+│   └── library_index.py        # PlexLibraryIndex: cached normalised title index of the libraries
+│
+├── services/                    # Service layer (11 modules, ~2000 lines)
+│   ├── __init__.py             # Service exports
+│   ├── artwork_processor.py    # Coordinates scrape then upload
+│   ├── asset_index.py          # SQLite index of a ThePosterDB user's uploads
+│   ├── authentication_service.py # bcrypt hashing and login check for the web UI
+│   ├── bulk_file_service.py    # Bulk import file I/O
+│   ├── image_service.py        # Image orientation and dimensions
+│   ├── notify_service.py       # Thin Apprise wrapper
+│   ├── run_history.py          # JSON record of every run, with pruning
+│   ├── scheduler_service.py    # Scheduled bulk imports, catch-up, single-flight guard
+│   ├── update_service.py       # GitHub release check
+│   ├── utility_service.py      # Exe dir and artwork sort key
+│   └── webhook_service.py      # Radarr/Sonarr import webhook with retry queue
+│
+├── kometa/
+│   └── kometa_saver.py         # Writes artwork to a Kometa assets folder instead of Plex
 │
 ├── utils/                       # Utility modules
-│   ├── utils.py                # General utilities
-│   ├── soup_utils.py           # BeautifulSoup utilities
-│   └── notifications.py        # Notification handling
+│   ├── utils.py                # URL parsing, bulk file parsing, md5, elapsed time
+│   ├── soup_utils.py           # BeautifulSoup fetch/parse helper
+│   └── notifications.py        # update_log / debug_me / status plumbing and Apprise dispatch
 │
-├── services/                    # Service layer (831 lines total)
-│   ├── __init__.py             # Service exports
-│   ├── artwork_processor.py    # Core artwork processing logic (274 lines)
-│   ├── bulk_file_service.py    # Bulk file I/O operations (148 lines)
-│   ├── image_service.py        # Image utilities (56 lines)
-│   ├── scheduler_service.py    # Job scheduling (158 lines)
-│   ├── update_service.py       # GitHub update checking (110 lines)
-│   └── utility_service.py      # General utilities (62 lines)
-│
-├── static/                      # Web UI assets (CSS, JS, images)
-├── templates/                   # Flask HTML templates
-├── bulk_imports/                # Bulk import text files
+├── tests/                       # Pytest suite (26 files, 200+ tests), run with `pytest` from the repo root
+├── static/                      # Web UI assets (CSS, JS, favicons)
+├── templates/                   # Flask HTML templates (web_interface.html, login.html)
+├── assets/                      # README screenshots
+├── .github/workflows/           # Release workflow
+├── bulk_imports/                # Bulk import text files (created at runtime)
 └── .venv/                       # Virtual environment (not in git)
 ```
 
 ### Key Metrics
 
-- **Total codebase reduction**: 40% (1206 → 724 lines in main file)
-- **Service layer**: 831 lines across 7 modules
-- **Type hint coverage**: ~90%
-- **Number of Flask routes**: 3 HTTP routes + 17 Socket.IO handlers
+- **Main file**: ~1200 lines (artwork_uploader.py)
+- **Web layer**: ~1400 lines (web_routes.py)
+- **Service layer**: ~2000 lines across 11 modules
+- **Flask surface**: 8 HTTP routes + 27 Socket.IO handlers
+- **Tests**: 26 files, 200+ test functions
 
 ---
 
@@ -199,61 +224,51 @@ width, height = ImageService.get_dimensions("/path/to/image.jpg")
 
 **Location**: [services/artwork_processor.py](services/artwork_processor.py)
 
-**Key Classes**:
+**Key Methods**:
 ```python
-@dataclass
-class ProcessingCallbacks:
-    """Callbacks for UI updates during artwork processing."""
-    on_status_update: Optional[Callable[[str, str, bool, bool], None]] = None
-    on_log_update: Optional[Callable[[str], None]] = None
-    on_progress_update: Optional[Callable[[int, int], None]] = None
-    on_debug: Optional[Callable[[str, str], None]] = None
-
 class ArtworkProcessor:
-    def __init__(self, plex: PlexServer)
+    def __init__(self, plex: PlexConnector, callbacks: Optional[ProcessingCallbacks]) -> None
 
     def scrape_and_process(
         self,
         url: str,
-        options: Options,
-        callbacks: Optional[ProcessingCallbacks] = None
-    ) -> Optional[str]
+        bulk: bool,
+        options: Options
+    ) -> Tuple[Optional[str], Optional[str]]
 
     def process_uploaded_files(
         self,
         file_list: list[dict],
+        skipped: int,
+        zip_title: Optional[str],
+        zip_author: Optional[str],
+        zip_source: Optional[str],
         options: Options,
-        callbacks: Optional[ProcessingCallbacks] = None,
         override_title: Optional[str] = None
     ) -> None
 ```
 
+The callbacks are given to the constructor, not to the individual calls, and the processor takes the app's own `PlexConnector` rather than a raw plexapi `PlexServer`. `ProcessingCallbacks` lives in [models/callbacks.py](models/callbacks.py); see [Callback Pattern](#callback-pattern).
+
 **Usage Example**:
 ```python
-from services import ArtworkProcessor, ProcessingCallbacks
-from plexapi.server import PlexServer
-
-# Define callbacks for UI updates
-def on_status(msg, color, temp, important):
-    print(f"[{color}] {msg}")
-
-def on_log(msg):
-    print(f"LOG: {msg}")
+from services.artwork_processor import ArtworkProcessor
+from models.callbacks import ProcessingCallbacks
+from plex.plex_connector import PlexConnector
 
 callbacks = ProcessingCallbacks(
-    on_status_update=on_status,
-    on_log_update=on_log
+    on_status_update=my_status_callback,
+    on_log_update=my_log_callback,
 )
 
-# Initialize processor
-plex = PlexServer(base_url, token)
-processor = ArtworkProcessor(plex)
+plex = PlexConnector(base_url, token)
+processor = ArtworkProcessor(plex, callbacks)
 
-# Process artwork from URL
-result = processor.scrape_and_process(
+# Process artwork from URL. Returns (result, artwork_title).
+result, title = processor.scrape_and_process(
     url="https://mediux.pro/sets/9242",
+    bulk=False,
     options=options,
-    callbacks=callbacks
 )
 ```
 
@@ -261,7 +276,7 @@ result = processor.scrape_and_process(
 
 ### SchedulerService
 
-**Purpose**: Manage scheduled jobs for bulk imports
+**Purpose**: Manage scheduled bulk imports: daily and interval schedules, missed-run catch-up, and the single-flight guard that stops two runs of the same file overlapping
 
 **Location**: [services/scheduler_service.py](services/scheduler_service.py)
 
@@ -270,43 +285,110 @@ result = processor.scrape_and_process(
 class SchedulerService:
     def __init__(self, check_interval: int = 1)
 
-    def add_schedule(
-        self,
-        filename: str,
-        schedule_time: str,  # Format: "HH:MM"
-        callback: Callable[[str], None]
-    ) -> str  # Returns job_id
-
+    def add_schedule(self, sched: BulkSchedule, callback: Callable[[str], None]) -> str
     def remove_schedule(self, job_id: str) -> bool
+    def rename_file(self, old_name: str, new_name: str) -> None
+    def clear_all_schedules(self) -> None
+    def get_jobs_for_file(self, filename: str) -> List[str]
+    def get_all_job_ids(self) -> List[str]
+    def has_schedules(self) -> bool
     def start(self) -> bool
     def stop(self) -> None
-    def has_schedules(self) -> bool
-    def get_schedule_for_file(self, filename: str) -> Optional[str]
+
+    # Single-flight guard: a run calls try_start first and finish when done.
+    def try_start(self, filename: str) -> bool
+    def finish(self, filename: str) -> None
+
+    @staticmethod
+    def get_missed_run(sched: BulkSchedule, window_minutes: int) -> Optional[str]
 ```
+
+A schedule is described by a `BulkSchedule` ([models/bulk_schedule.py](models/bulk_schedule.py)): the bulk file it runs, either a daily `time` ("HH:MM") or an `interval_value`/`interval_unit` pair, and its computed `next_run`.
 
 **Usage Example**:
 ```python
 from services import SchedulerService
+from models.bulk_schedule import BulkSchedule
 
-# Initialize scheduler
 scheduler = SchedulerService(check_interval=1)
 
-# Add a scheduled job
 def run_bulk_import(filename):
     print(f"Running bulk import for {filename}")
 
-job_id = scheduler.add_schedule(
-    filename="bulk_import_movies.txt",
-    schedule_time="05:30",
-    callback=run_bulk_import
-)
+sched = BulkSchedule(file="bulk_import_movies.txt", time="05:30")
+job_id = scheduler.add_schedule(sched, callback=run_bulk_import)
 
-# Start the scheduler
 scheduler.start()
 
 # Later, remove the schedule
 scheduler.remove_schedule(job_id)
 ```
+
+---
+
+### AssetIndex
+
+**Purpose**: A SQLite index (in the config directory) of a ThePosterDB user's uploads, so a repeat scrape only fetches pages until it reaches assets it has already seen, and other features can look cached artwork up by title
+
+**Location**: [services/asset_index.py](services/asset_index.py)
+
+Module functions `normalize_title`, `page_is_fully_known` and `full_crawl_due` support the scraper's crawl decisions. The index is what makes `cache_user_scrapes` and the Sonarr/Radarr webhook work.
+
+---
+
+### RunHistory
+
+**Purpose**: A JSON record (in the config directory) of every run, whatever started it: a manual bulk run, a schedule, a single URL scrape, a ZIP upload, or a webhook apply. Pruned by count and age. Writes are serialized per file path so two runs finishing at once cannot clobber each other
+
+**Location**: [services/run_history.py](services/run_history.py)
+
+```python
+class RunHistory:
+    def add_run(self, run_type, label, started_at, ended_at, trigger, outcome,
+                assets_processed=0, success_count=0, cached_count=0,
+                locked_count=0, error_count=0) -> None
+    def get_runs(self) -> List[Dict[str, Any]]
+```
+
+The History tab in the web UI reads this file. `RunType`, `RunTrigger` and `RunOutcome` in [core/enums.py](core/enums.py) define the vocabulary.
+
+---
+
+### WebhookService
+
+**Purpose**: Handles Radarr/Sonarr "Download" import events: looks the imported title up in the asset index and applies the cached poster through the normal upload path, retrying on a delay schedule while Plex finishes scanning the new file
+
+**Location**: [services/webhook_service.py](services/webhook_service.py)
+
+`parse_event` turns the incoming JSON into a `WebhookEvent`; the service dedupes concurrent events per title and records each apply in the run history.
+
+---
+
+### AuthenticationService
+
+**Purpose**: bcrypt password hashing and login verification for the web UI's optional password protection
+
+**Location**: [services/authentication_service.py](services/authentication_service.py)
+
+```python
+class AuthenticationService:
+    @staticmethod
+    def hash_password(password: str) -> str
+    @staticmethod
+    def verify_password(password: str, password_hash: str) -> bool
+    @staticmethod
+    def authenticate(username: str, password: str) -> bool
+```
+
+---
+
+### NotifyService
+
+**Purpose**: Thin wrapper over [Apprise](https://github.com/caronc/apprise) for push notifications
+
+**Location**: [services/notify_service.py](services/notify_service.py)
+
+`add_url`, `clear_urls` and `send_notification`. Which events notify which channel is decided in [utils/notifications.py](utils/notifications.py) from the per-channel event selection in the config.
 
 ---
 
@@ -339,12 +421,13 @@ class UpdateService:
 
 **Usage Example**:
 ```python
-from services import UpdateService
+from services.update_service import UpdateService
+from core.constants import GITHUB_REPO
+from core.__version__ import __version__
 
-# Initialize update service
 update_service = UpdateService(
-    github_repo="martinjsteven/plex-poster-set-helper",
-    current_version="0.3.0",
+    github_repo=GITHUB_REPO,
+    current_version=__version__,
     check_interval=3600  # Check every hour
 )
 
@@ -376,7 +459,7 @@ class UtilityService:
     """Get project root directory (works with frozen executables)"""
 
     @staticmethod
-    def sort_key(item: dict) -> Tuple[str, float, float, str]
+    def sort_key(item: dict) -> Tuple[str, str, float, float, str]
     """Complex sorting logic for artwork items"""
 ```
 
@@ -395,6 +478,8 @@ artwork_list = [
 sorted_artwork = sorted(artwork_list, key=UtilityService.sort_key)
 ```
 
+**A note on imports**: `services/__init__.py` exports most services, but not all of them. `ArtworkProcessor` and `UpdateService` are imported by full path (`from services.artwork_processor import ArtworkProcessor`), and `ProcessingCallbacks` lives in `models.callbacks`, not in `services`. When in doubt, import by full module path.
+
 ---
 
 ## Web Routes
@@ -406,24 +491,46 @@ All Flask HTTP routes and Socket.IO event handlers are in [web_routes.py](web_ro
 ```python
 def setup_routes(web_app, config: Config):
     @web_app.route("/")
+    @login_required
     def home():
         """Main web interface"""
 
+    @web_app.route("/login", methods=["GET", "POST"])
+    def login():
+        """Login form, when password protection is enabled"""
+
+    @web_app.route("/logout")
+    def logout():
+        """End the session"""
+
+    @web_app.route("/api/browse", methods=["GET"])
+    def browse():
+        """Directory listing for the folder-picker in Settings"""
+
     @web_app.route('/downloads/<path:filename>')
+    @login_required
     def download_file(filename):
         """Download processed ZIP files"""
 
     @web_app.route('/uploads/<path:filename>')
+    @login_required
     def uploaded_file(filename):
         """Serve uploaded artwork files"""
+
+    @web_app.route("/webhook/radarr", methods=["POST"])
+    @web_app.route("/webhook/sonarr", methods=["POST"])
+    def webhook(source):
+        """Sonarr/Radarr import webhook (404 unless enable_webhooks is on)"""
 ```
+
+The main pages sit behind `@login_required`, which is a pass-through unless password protection is enabled in Settings. The webhook routes authenticate with the webhook token instead of the session.
 
 ### Socket.IO Event Handlers
 
-The application uses Socket.IO for real-time communication with the web UI. All handlers are defined in `setup_socket_handlers()`:
+The application uses Socket.IO for real-time communication with the web UI. All 27 handlers are defined in `setup_socket_handlers()`:
 
 ```python
-def setup_socket_handlers(config, scheduled_jobs, scheduled_jobs_by_file, filename_pattern):
+def setup_socket_handlers(config: Config, filename_pattern: re.Pattern):
     # Update checking
     @globals.web_socket.on("check_for_update")
     @globals.web_socket.on("update_app")
@@ -431,6 +538,8 @@ def setup_socket_handlers(config, scheduled_jobs, scheduled_jobs_by_file, filena
     # Artwork processing
     @globals.web_socket.on("start_scrape")
     @globals.web_socket.on("start_bulk_import")
+    @globals.web_socket.on("stop_scrape")
+    @globals.web_socket.on("get_scrape_state")
 
     # Bulk file management
     @globals.web_socket.on("save_bulk_import")
@@ -438,22 +547,35 @@ def setup_socket_handlers(config, scheduled_jobs, scheduled_jobs_by_file, filena
     @globals.web_socket.on("load_bulk_import")
     @globals.web_socket.on("rename_bulk_file")
     @globals.web_socket.on("delete_bulk_file")
+    @globals.web_socket.on("create_bulk_file")
 
     # Configuration
     @globals.web_socket.on("load_config")
     @globals.web_socket.on("save_config")
+    @globals.web_socket.on("get_plex_libraries")
+    @globals.web_socket.on("test_notifications")
+    @globals.web_socket.on("create_directory")
+    @globals.web_socket.on("detect_docker")
 
     # Scheduling
     @globals.web_socket.on("add_schedule")
     @globals.web_socket.on("delete_schedule")
+    @globals.web_socket.on("get_schedules")
+
+    # Run history
+    @globals.web_socket.on("load_run_history")
 
     # File uploads (chunked)
     @globals.web_socket.on("upload_artwork_chunk")
     @globals.web_socket.on("upload_complete")
 
-    # UI updates
+    # UI updates and session
     @globals.web_socket.on("display_message")
+    @globals.web_socket.on("debug_mode")
+    @globals.web_socket.on("disconnect")
 ```
+
+Scheduling state lives in `globals.scheduler_service`; the handlers no longer carry job dictionaries around.
 
 ### Adding New Routes
 
@@ -473,7 +595,7 @@ To add a new Socket.IO handler:
 
 1. Add the handler in `web_routes.py` inside `setup_socket_handlers()`:
 ```python
-def setup_socket_handlers(config, ...):
+def setup_socket_handlers(config, filename_pattern):
     # ... existing handlers ...
 
     @globals.web_socket.on("my_new_event")
@@ -494,49 +616,50 @@ The application uses a callback pattern to separate business logic from UI updat
 2. **Testability**: Services can be tested without UI dependencies
 3. **Flexibility**: Different UIs (CLI, web, API) can use the same services
 
-### ProcessingCallbacks Dataclass
+### ProcessingCallbacks
+
+**Location**: [models/callbacks.py](models/callbacks.py)
 
 ```python
 @dataclass
 class ProcessingCallbacks:
-    """Callbacks for UI updates during artwork processing.
+    """Callbacks for UI updates during artwork processing, plus the run counters."""
 
-    All callbacks are optional. If None, no update is sent.
-    """
     on_status_update: Optional[Callable[[str, str, bool, bool], None]] = None
-    # Args: message, color, temp, important
+    # Args: message, color, spinner, sticky
 
     on_log_update: Optional[Callable[[str], None]] = None
     # Args: message
 
-    on_progress_update: Optional[Callable[[int, int], None]] = None
-    # Args: current, total
+    on_progress_update: Optional[Callable[[int, int, str, str, str], None]] = None
+    # Args: current, total, title, bar_type, bar_speed
 
-    on_debug: Optional[Callable[[str, str], None]] = None
-    # Args: title, message
+    on_debug: Optional[Callable[[str, Optional[str]], None]] = None
+    # Args: message, context
+
+    # Run counters, shared with the caller as single-element lists
+    success_counter: list = field(default_factory=lambda: [0])
+    assets_processed: list = field(default_factory=lambda: [0])
+    cached_counter: list = field(default_factory=lambda: [0])
+    locked_counter: list = field(default_factory=lambda: [0])
+    failed_counter: list = field(default_factory=lambda: [0])
 ```
+
+It is more than a data holder: helper methods `status()`, `log()`, `debug()` and `progress()` call the callbacks and guard against `None` internally, `success()` / `assets()` / `cached()` / `locked()` / `failed()` / `record_result()` bump the counters, and `outcome()` is the single place a run's result (success, partial, failed, skipped, stopped) is decided from those counters. Run outcomes shown in the History tab all come from `outcome()`.
 
 ### Using Callbacks in Services
 
-Inside a service method:
+Inside a service method, call the helpers rather than the raw callback fields:
 
 ```python
-def process_something(self, data, callbacks: Optional[ProcessingCallbacks] = None):
-    # Notify UI of status change
-    if callbacks and callbacks.on_status_update:
-        callbacks.on_status_update("Processing started", "primary", False, False)
+def process_something(self, data):
+    self.callbacks.status("Processing started", "primary")
 
-    # Do work...
     for i, item in enumerate(data):
-        # Update progress
-        if callbacks and callbacks.on_progress_update:
-            callbacks.on_progress_update(i + 1, len(data))
-
+        self.callbacks.progress(i + 1, len(data), item.title, "scrape", "normal")
         # Process item...
 
-    # Log completion
-    if callbacks and callbacks.on_log_update:
-        callbacks.on_log_update("Processing completed")
+    self.callbacks.log("Processing completed")
 ```
 
 ### Implementing Callbacks in UI
@@ -544,15 +667,15 @@ def process_something(self, data, callbacks: Optional[ProcessingCallbacks] = Non
 In the main application or web routes:
 
 ```python
-from services import ProcessingCallbacks
+from models.callbacks import ProcessingCallbacks
 
-def my_status_callback(message, color, temp, important):
+def my_status_callback(message, color, spinner, sticky):
     # Update web UI via Socket.IO
     globals.web_socket.emit("status_update", {
         "message": message,
         "color": color,
-        "temp": temp,
-        "important": important
+        "spinner": spinner,
+        "sticky": sticky
     })
 
 def my_log_callback(message):
@@ -564,17 +687,33 @@ callbacks = ProcessingCallbacks(
     on_log_update=my_log_callback
 )
 
-# Use with service
-processor.scrape_and_process(url, options, callbacks)
+processor = ArtworkProcessor(plex, callbacks)
+result, title = processor.scrape_and_process(url, bulk=False, options=options)
 ```
 
 ---
 
 ## Testing
 
+### Running the Test Suite
+
+The repo carries a pytest suite: 26 files and over 200 tests under [tests/](tests/).
+
+```bash
+# Install the dev dependencies (pytest, pytest-cov, pytest-mock, pytest-asyncio, plus lint and type-check tools)
+pip install -r requirements-dev.txt
+
+# Run the suite from the repo root (pytest.ini sets testpaths and pythonpath, so the root matters)
+pytest
+```
+
+Three markers are registered in `pytest.ini`: `slow`, `integration` and `unit`. Tests are plain pytest functions; new tests should follow that style rather than `unittest.TestCase`.
+
+Run the suite before and after your change. A failure on an untouched checkout is worth reporting on its own.
+
 ### Manual Testing
 
-The application should be tested after any changes to ensure functionality is preserved.
+The application should also be exercised by hand after any change that touches the UI or the Plex path.
 
 #### Basic Startup Test
 
@@ -609,14 +748,14 @@ lsof -ti:4567  # Should return a process ID
 # Test home route
 curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:4567/
 
-# Should output: HTTP 200
+# HTTP 200, or a redirect to /login when password protection is enabled
 ```
 
 ### Testing After Refactoring
 
 When refactoring code:
 
-1. **Test after each logical change** - Don't make multiple changes before testing
+1. **Run the suite after each logical change** - Don't stack multiple changes before testing
 2. **Verify web UI loads** - Check http://localhost:4567
 3. **Check for Python errors** - Review console output for tracebacks
 4. **Test key features**:
@@ -624,27 +763,6 @@ When refactoring code:
    - Save configuration
    - Start a scrape operation
    - Check scheduled jobs
-
-### Unit Testing (Future)
-
-The service layer is designed to be easily unit-testable. Future contributions should include unit tests for service methods.
-
-Example test structure:
-
-```python
-import unittest
-from services import ImageService
-
-class TestImageService(unittest.TestCase):
-    def test_check_orientation_landscape(self):
-        # Create test image
-        orientation = ImageService.check_orientation("test_landscape.jpg")
-        self.assertEqual(orientation, "landscape")
-
-    def test_check_orientation_portrait(self):
-        orientation = ImageService.check_orientation("test_portrait.jpg")
-        self.assertEqual(orientation, "portrait")
-```
 
 ---
 
@@ -657,14 +775,15 @@ We welcome contributions! Here's how to get started:
 1. **Fork the repository** on GitHub
 2. **Clone your fork**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/plex-poster-set-helper.git
-   cd plex-poster-set-helper
+   git clone https://github.com/YOUR_USERNAME/artwork-uploader-plex.git
+   cd artwork-uploader-plex
    ```
 3. **Create a virtual environment**:
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate  # macOS/Linux
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt
    ```
 4. **Create a branch** for your feature:
    ```bash
@@ -680,7 +799,7 @@ We welcome contributions! Here's how to get started:
    - Use meaningful variable names
 
 2. **Test your changes**:
-   - Run the application and verify it starts correctly
+   - Run `pytest` and keep it green
    - Test the specific feature you added/modified
    - Check that existing features still work
 
@@ -722,8 +841,8 @@ def process_artwork_items(
 
     for item in items:
         if item.get("type") == filter_type:
-            if callbacks and callbacks.on_progress_update:
-                callbacks.on_progress_update(processed_count + 1, len(items))
+            if callbacks:
+                callbacks.progress(processed_count + 1, len(items), item.get("title", ""), "scrape", "normal")
 
             # Process item...
             processed_count += 1
@@ -747,9 +866,8 @@ def process(items, type, cbs=None):  # No type hints
 Here are some areas where contributions would be particularly valuable:
 
 1. **Testing**:
-   - Add unit tests for service layer
-   - Add integration tests for scrapers
-   - Create automated test suite
+   - Widen coverage of the scrapers and the upload path
+   - Add integration tests against a mock Plex server
 
 2. **Features**:
    - Add support for new artwork providers
@@ -768,7 +886,6 @@ Here are some areas where contributions would be particularly valuable:
 
 5. **UI/UX**:
    - Improve web interface design
-   - Add dark/light theme toggle
    - Better error messages for users
 
 ---
@@ -777,7 +894,7 @@ Here are some areas where contributions would be particularly valuable:
 
 ### Prerequisites
 
-- Python 3.10 or later
+- Python 3.12 or later (the app refuses to start on anything older)
 - pip (Python package installer)
 - Git
 
@@ -785,8 +902,8 @@ Here are some areas where contributions would be particularly valuable:
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/martinjsteven/plex-poster-set-helper.git
-   cd plex-poster-set-helper
+   git clone https://github.com/mscodemonkey/artwork-uploader-plex.git
+   cd artwork-uploader-plex
    ```
 
 2. **Create virtual environment**:
@@ -800,12 +917,14 @@ Here are some areas where contributions would be particularly valuable:
 3. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt
    ```
 
 4. **Configure the application**:
    ```bash
-   cp example_config.json config.json
-   # Edit config.json with your Plex server details
+   cp config/config.json.example config/config.json
+   # Edit config/config.json with your Plex server details
+   # (or skip this: the app creates one on first run and you can configure it in the web UI)
    ```
 
 5. **Run the application**:
@@ -818,9 +937,9 @@ Here are some areas where contributions would be particularly valuable:
 
 ### Development Tools
 
-Recommended tools for development:
+The dev tooling is pinned in `requirements-dev.txt`:
 
-- **IDE**: PyCharm, VS Code, or any Python IDE
+- **Tests**: pytest, pytest-cov, pytest-mock, pytest-asyncio
 - **Linter**: pylint or flake8 for code quality
 - **Formatter**: black for consistent code formatting
 - **Type Checker**: mypy for static type checking
@@ -844,7 +963,7 @@ Recommended tools for development:
            return True
    ```
 
-2. Export in `services/__init__.py`:
+2. Export in `services/__init__.py` (or import it by full path, which several existing services do):
    ```python
    from .my_new_service import MyNewService
 
@@ -864,6 +983,8 @@ Recommended tools for development:
    # Use
    result = my_service.do_something("parameter")
    ```
+
+4. Add a test file in `tests/` covering its behaviour.
 
 #### Adding a New Socket.IO Handler
 
@@ -935,7 +1056,7 @@ def my_function(param: str) -> str:
 
 ## Questions or Issues?
 
-- **GitHub Issues**: https://github.com/martinjsteven/plex-poster-set-helper/issues
+- **GitHub Issues**: https://github.com/mscodemonkey/artwork-uploader-plex/issues
 - **Discussions**: Use GitHub Discussions for questions and ideas
 - **Pull Requests**: Submit PRs for bug fixes and features
 
