@@ -689,16 +689,20 @@ def setup_socket_handlers(
         """ Gets the list of schedules from the config file and sends it to the frontend """
         instance = Instance(data.get("instance_id"), "web", broadcast=True)
 
+        schedules = []
         scheduled_jobs = globals.scheduler_service.scheduled_jobs
         for job_id, job in scheduled_jobs.items():
             debug_me(f"Job ID: {job_id}, Last run: {job.last_run}, next run: {job.next_run}")
-        
-        config.load()
-        schedules = config.schedules
-        for schedule in schedules:
-            next_run_at = getattr(scheduled_jobs.get(schedule["id"]), "next_run", None)
-            if next_run_at:
-                schedule["next_run"] = datetime.isoformat(next_run_at)
+            sched = {}
+            meta = globals.scheduler_service.schedule_meta.get(job_id)
+            sched["id"] = job_id
+            sched["file"] = meta.get("file")
+            sched["time"] = meta.get("time", None)
+            sched["interval_value"] = meta.get("interval_value", None)
+            sched["interval_unit"] = meta.get("interval_unit", None)
+            sched["next_run"] = job.next_run.isoformat()
+            schedules.append(sched)
+
         notify_web(
             instance=instance,
             event="get_schedules",
