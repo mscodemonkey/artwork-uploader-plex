@@ -10,6 +10,7 @@ queue) a second run while the lock is held.
 """
 
 import threading
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,6 +18,11 @@ import pytest
 import core.globals as globals
 from artwork_uploader import process_bulk_import_from_ui
 from models.instance import Instance
+
+
+# A run counts as scheduled when it carries a schedule id. The value itself is
+# not read by anything under test here, only its presence.
+SCHEDULE_ID = str(uuid.uuid4())
 
 
 @pytest.mark.unit
@@ -47,7 +53,7 @@ def test_second_bulk_import_is_refused_while_one_is_running():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt", scheduled=False)
+            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt")
 
         mock_scrape_and_upload.assert_not_called()
         mock_send_notification.assert_not_called()  # not scheduled, so no notification is sent
@@ -86,7 +92,7 @@ def test_refused_scheduled_bulk_import_sends_a_notification():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt", scheduled=True)
+            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt", schedule_id=SCHEDULE_ID)
 
         mock_scrape_and_upload.assert_not_called()
         mock_send_notification.assert_called_once()
@@ -103,7 +109,7 @@ def test_bulk_import_releases_the_lock_so_the_next_run_can_start():
     """A completed bulk import must release globals.bulk_import_lock, otherwise every
     run after the first would be refused forever."""
     try:
-        globals.bulk_import_lock = type(globals.bulk_import_lock)()  # fresh, unlocked lock
+        globals.bulk_import_lock = threading.Lock()  # fresh, unlocked lock
         globals.scrapes_running = 0
         globals.cancel_scrape = False
         globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
@@ -120,7 +126,7 @@ def test_bulk_import_releases_the_lock_so_the_next_run_can_start():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt", scheduled=False)
+            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt")
 
         mock_scrape_and_upload.assert_called_once()
         assert not globals.bulk_import_lock.locked(), "the lock must be released once the run ends"
@@ -141,7 +147,7 @@ def test_bulk_import_releases_the_lock_when_plex_is_not_configured():
     if Plex is unreachable. It must still release the lock, or a single misconfigured run
     would permanently jam every bulk import after it."""
     try:
-        globals.bulk_import_lock = type(globals.bulk_import_lock)()  # fresh, unlocked lock
+        globals.bulk_import_lock = threading.Lock()  # fresh, unlocked lock
         globals.scrapes_running = 0
         globals.cancel_scrape = False
         globals.plex = MagicMock(tv_libraries=None, movie_libraries=None)
@@ -157,7 +163,7 @@ def test_bulk_import_releases_the_lock_when_plex_is_not_configured():
             patch("artwork_uploader.notify_web"),
             patch("artwork_uploader.debug_me"),
         ):
-            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt", scheduled=False)
+            process_bulk_import_from_ui(instance, parsed_urls, "test_bulk.txt")
 
         mock_scrape_and_upload.assert_not_called()
         mock_update_status.assert_called_once()
@@ -179,7 +185,7 @@ def test_lock_actually_serializes_concurrent_bulk_imports():
     increment where two threads can both pass the check - that is the exact bug this ticket
     is about, and a test that only pre-locks before calling would not catch it coming back."""
     try:
-        globals.bulk_import_lock = type(globals.bulk_import_lock)()  # fresh, unlocked lock
+        globals.bulk_import_lock = threading.Lock()  # fresh, unlocked lock
         globals.scrapes_running = 0
         globals.cancel_scrape = False
         globals.plex = MagicMock(tv_libraries=MagicMock(), movie_libraries=MagicMock())
