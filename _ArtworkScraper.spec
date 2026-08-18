@@ -4,7 +4,7 @@ a = Analysis(
     ['artwork_scraper.py'],
     pathex=[],
     binaries=[],
-    datas=[('icons/Plex.ico', 'icons')],
+    datas=[('icons/artwork-uploader.ico', 'icons')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -34,5 +34,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icons\\Plex.ico'],
+    icon=['icons\\artwork-uploader.ico'],
 )
