@@ -1,3 +1,4 @@
+![Artwork Uploader for Plex](assets/banner.png)
 
 # Artwork Uploader for Plex 
 Adapted from a fork of plex-poster-set-helper by Brian Brown
