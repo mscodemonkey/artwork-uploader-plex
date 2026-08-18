@@ -24,6 +24,8 @@ h1 {
 
 .app-logo {
     flex-shrink: 0;
+    /* Brand gold, so the header mark matches the favicon and the app icon. */
+    color: #EBA43B;
     transition: transform 0.3s ease;
 }
 
