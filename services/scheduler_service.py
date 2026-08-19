@@ -59,6 +59,7 @@ class SchedulerService:
             ValueError: If neither a time nor a valid interval is given
         """
         job_id = sched.id
+        status = getattr(sched, "last_run_status", None) or "never_run"
 
         # The callback reads the filename from schedule_meta at run time
         # (rather than capturing it in the closure) so that renaming a
@@ -75,7 +76,8 @@ class SchedulerService:
                 "file": sched.file,
                 "time": sched.time,
                 "last_run": sched.last_run,
-                "next_run": sched.next_run
+                "next_run": sched.next_run,
+                "last_run_status": status
             }
 
         elif sched.interval_value and sched.interval_unit in [u.value for u in IntervalUnit]:
@@ -93,7 +95,8 @@ class SchedulerService:
                 "interval_value": sched.interval_value,
                 "interval_unit": sched.interval_unit,
                 "last_run": sched.last_run,
-                "next_run": sched.next_run
+                "next_run": sched.next_run,
+                "last_run_status": status
             }
 
         else:

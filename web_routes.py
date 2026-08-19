@@ -690,17 +690,21 @@ def setup_socket_handlers(
         instance = Instance(data.get("instance_id"), "web", broadcast=True)
 
         schedules = []
-        scheduled_jobs = globals.scheduler_service.scheduled_jobs
-        for job_id, job in scheduled_jobs.items():
+        jobs = globals.scheduler_service.scheduled_jobs
+        for job_id, job in jobs.items():
             debug_me(f"Job ID: {job_id}, Last run: {job.last_run}, next run: {job.next_run}")
             sched = {}
             meta = globals.scheduler_service.schedule_meta.get(job_id)
+            last_run_at = getattr(job, "last_run", None)
+            next_run_at = getattr(job, "next_run", None)
             sched["id"] = job_id
             sched["file"] = meta.get("file")
             sched["time"] = meta.get("time", None)
             sched["interval_value"] = meta.get("interval_value", None)
             sched["interval_unit"] = meta.get("interval_unit", None)
-            sched["next_run"] = job.next_run.isoformat()
+            sched["last_run"] = last_run_at.isoformat() if last_run_at else "never"
+            sched["next_run"] = next_run_at.isoformat() if next_run_at else ""
+            sched["last_run_status"] = meta.get("last_run_status", None)
             schedules.append(sched)
 
         notify_web(
@@ -756,7 +760,9 @@ def setup_socket_handlers(
                         "time": new_schedule.time,
                         "interval_value": new_schedule.interval_value,
                         "interval_unit": new_schedule.interval_unit,
-                        "next_run": new_schedule.next_run
+                        "last_run": new_schedule.last_run,
+                        "next_run": new_schedule.next_run,
+                        "last_run_status": new_schedule.last_run_status
                     })
                     update_log(instance, f"⏰ Scheduled task '{new_schedule.file}' {description}")
                     debug_me(f"Scheduled task '{new_schedule.file}' {description} with job ID '{new_schedule.id}'")
@@ -783,6 +789,7 @@ def setup_socket_handlers(
         if sched.last_run:
             entry["last_run"] = sched.last_run
         entry["next_run"] = sched.next_run
+        entry["last_run_status"] = getattr(sched, "last_run_status", None) or "never_run"
 
         for each_schedule in config.schedules:
             if each_schedule.get("id") == sched.id:
@@ -792,6 +799,7 @@ def setup_socket_handlers(
                 each_schedule.pop("interval_unit", None)
                 each_schedule.pop("last_run", None)
                 each_schedule.pop("next_run", None)
+                each_schedule.pop("las_run_status", None)
                 each_schedule.update(entry)
                 return sched.id
 

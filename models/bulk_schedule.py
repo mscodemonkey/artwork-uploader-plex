@@ -12,6 +12,7 @@ class BulkSchedule:
             interval_unit: Optional[str] = None,
             last_run: Optional[str] = None,
             next_run: Optional[str] = None,
+            last_run_status: Optional[str] = None,
             **kwargs
         ) -> None:
         self.id = id or str(uuid.uuid4())
@@ -21,6 +22,7 @@ class BulkSchedule:
         self.interval_unit = interval_unit
         self.last_run = last_run
         self.next_run = next_run
+        self.last_run_status = last_run_status
 
     def compute_next_run(self):
         """ Helper function to compute the next run time for any schedule """

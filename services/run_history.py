@@ -15,6 +15,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from core.enums import RunType, RunTrigger
+from core import globals
 
 from core.constants import RUN_HISTORY_PATH, RUN_HISTORY_MAX_ENTRIES, RUN_HISTORY_MAX_AGE_DAYS
 
@@ -111,6 +112,7 @@ class RunHistory:
         cached_count: int = 0,
         locked_count: int = 0,
         error_count: int = 0,
+        job_id: Optional[str] = None
     ) -> None:
         """Append a record for one completed (or skipped/failed) run.
 
@@ -132,6 +134,18 @@ class RunHistory:
                 "error_count": error_count,
             })
             self._save(self._prune(runs))
+        if job_id and globals.scheduler_service:
+            job_meta = globals.scheduler_service.schedule_meta.get(job_id)
+            if job_meta:
+                job_meta["last_run_status"] = outcome
+            if globals.config:
+                globals.config.load()
+                schedules = globals.config.schedules
+                if schedules:
+                    for schedule in schedules:
+                        if schedule["id"] == job_id:
+                            schedule["last_run_status"] = outcome
+                globals.config.save()
 
     @staticmethod
     def _normalise(run: Dict[str, Any]) -> Dict[str, Any]:

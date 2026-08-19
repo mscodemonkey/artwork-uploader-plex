@@ -1656,11 +1656,11 @@ function loadBulkFileList() {
 /* Loading the run history */
 
 const RUN_HISTORY_OUTCOME_LABELS = {
-    success: { text: "Completed", className: "text-success" },
-    partial: { text: "Completed with errors", className: "text-warning" },
-    stopped: { text: "Stopped", className: "text-warning" },
-    failed: { text: "Failed", className: "text-danger" },
-    skipped: { text: "Skipped", className: "text-muted" }
+    success: { text: "Completed", className: "text-success", badgeColor: "success" },
+    partial: { text: "Completed with errors", className: "text-warning", badgeColor: "warning" },
+    stopped: { text: "Stopped", className: "text-warning", badgeColor: "warning" },
+    failed: { text: "Failed", className: "text-danger", badgeColor: "danger" },
+    skipped: { text: "Skipped", className: "text-muted", badgeColor: "secondary" }
 };
 
 const RUN_HISTORY_TYPE_LABELS = {
@@ -2377,6 +2377,7 @@ socket.on("upload_complete", function (data) {
 // =====================
 
     let editingScheduleId = null; // Set while the form is editing an existing schedule rather than adding a new one
+    let editingScheduleLastRunStatus = null;
 
     function describeSchedule(s) {
         let text = "";
@@ -2388,9 +2389,20 @@ socket.on("upload_complete", function (data) {
         }
 
         if (s.next_run) {
-            const formattedNextRun = formatNextRun(s.next_run);
+            let status_badge = ""
+            const formattedNextRun = formatDateTime(s.next_run);
+            const formattedLastRun = formatDateTime(s.last_run)
             if (formattedNextRun){
-                return `${text} <span class="badge text-body-secondary bg-body-tertiary border ms-2 fw-normal fs-7">${formattedNextRun}</span>`;
+                text = `${text} <span class="badge text-body-secondary bg-body-tertiary border ms-2 fw-normal fs-7">${formattedNextRun}</span>`;
+            }
+            if (s.last_run_status) {
+                const outcome = RUN_HISTORY_OUTCOME_LABELS[s.last_run_status]
+                const colorClass = s.last_run_status === "never_run" 
+                    ? "bg-secondary" 
+                    : `bg-${outcome?.badgeColor || "secondary"}`;
+                const titleText = outcome ? `${outcome.text} (${formattedLastRun})` : "Never run";
+                const status_badge = `<span class="d-inline-block rounded-circle ${colorClass} ms-2 align-middle" style="width: 12px; height: 12px;" title="${titleText}"></span>`;
+                text = `${text}${status_badge}`
             }
         }
         return text;
@@ -2488,6 +2500,7 @@ socket.on("upload_complete", function (data) {
             };
         });
         editingScheduleId = null;
+        editingScheduleLastRunStatus = null;
         setTimeBtn.innerHTML = '<i class="bi bi-plus-lg"></i>';
         setTimeBtn.classList.add("btn-primary");
         setTimeBtn.classList.remove("btn-success");
@@ -2503,6 +2516,7 @@ socket.on("upload_complete", function (data) {
 
     function editSchedule(s) {
         editingScheduleId = s.id;
+        editingScheduleLastRunStatus = s.last_run_status;
         setTimeBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
         setTimeBtn.classList.remove("btn-primary");
         setTimeBtn.classList.add("btn-success");
@@ -2528,6 +2542,9 @@ socket.on("upload_complete", function (data) {
         const payload = { instance_id: instanceId, file: currentBulkImport };
         if (editingScheduleId) {
             payload.id = editingScheduleId;
+            payload.last_run_status = editingScheduleLastRunStatus;
+        } else {
+            payload.last_run_status = "never_run";
         }
 
         if (scheduleTypeSelect.value === "daily") {
@@ -2554,7 +2571,8 @@ socket.on("upload_complete", function (data) {
                         time: data.time,
                         interval_value: data.interval_value,
                         interval_unit: data.interval_unit,
-                        next_run: data.next_run
+                        next_run: data.next_run,
+                        last_run_status: data.last_run_status
                     });
                     updateSchedulerIcon();
                 }
@@ -2576,7 +2594,7 @@ socket.on("upload_complete", function (data) {
         });
     }
 
-    function formatNextRun(isoString) {
+    function formatDateTime(isoString) {
         if (!isoString) return "";
         
         try {
@@ -2584,10 +2602,16 @@ socket.on("upload_complete", function (data) {
             if (isNaN(date.getTime())) return "";
 
             const today = new Date();
+            
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
             const isToday = date.toDateString() === today.toDateString();
             const isTomorrow = date.toDateString() === tomorrow.toDateString();
+            const isYesterday = date.toDateString() === yesterday.toDateString();
 
             // Format time as HH:MM
             const hours = String(date.getHours()).padStart(2, '0');
@@ -2598,6 +2622,8 @@ socket.on("upload_complete", function (data) {
                 return `Today at ${timeStr}`;
             } else if (isTomorrow) {
                 return `Tomorrow at ${timeStr}`;
+            } else if (isYesterday) {
+                return `Yesterday at ${timeStr}`;
             }
 
             // Format date as "Aug 14, 23:58"

@@ -303,13 +303,16 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
     if len(parsed_urls) == 0:
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         now = datetime.now(timezone.utc).isoformat()
+        if schedule_id:
+            record_schedule_run(schedule_id)
         RunHistory().add_run(
             run_type=RunType.BULK.value,
             label=filename if filename else "bulk_import.txt",
             started_at=now,
             ended_at=now,
             trigger=RunTrigger.SCHEDULED.value if schedule_id else RunTrigger.MANUAL.value,
-            outcome=RunOutcome.SKIPPED.value
+            outcome=RunOutcome.SKIPPED.value,
+            job_id=schedule_id
         )
         if schedule_id or notify:
             prefix = "Scheduled b" if schedule_id else "B"
@@ -375,7 +378,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 started_at=started_at,
                 ended_at=now,
                 trigger=trigger,
-                outcome=RunOutcome.FAILED.value
+                outcome=RunOutcome.FAILED.value,
+                job_id=schedule_id
             )
             if notify_enabled:
                 send_notification(instance, f"🔴 Bulk import of '{display_filename}' failed to start • Plex setup incomplete", event=NotificationEvent.RUN_FAILED_TO_START.value)
@@ -460,10 +464,18 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 debug_me(f"Sending '{event}' notifications to {len(globals.config.apprise_urls)} configured notification channel(s).")
                 send_notification(instance, message, event=event)
         RunHistory().add_run(
-            RunType.BULK.value, filename if filename else "bulk_import.txt",
-            started_at, datetime.now(timezone.utc).isoformat(), trigger, outcome,
-            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
-            tally.locked_counter[0], total_errors
+            run_type=RunType.BULK.value,
+            label=filename if filename else "bulk_import.txt",
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=trigger,
+            outcome=outcome,
+            assets_processed=tally.assets_processed[0],
+            success_count=tally.success_counter[0],
+            cached_count=tally.cached_counter[0],
+            locked_count=tally.locked_counter[0],
+            error_count=total_errors,
+            job_id=schedule_id
         )
         update_log(instance, message)
 
@@ -471,10 +483,18 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         notify_web(instance, "progress_bar", { "percent": 100, "bar_type": "bulk" })
         update_status(instance, f"Error during bulk import: {bulk_import_exception}", color=StatusColor.DANGER.value)
         RunHistory().add_run(
-            RunType.BULK.value, filename if filename else "bulk_import.txt",
-            started_at, datetime.now(timezone.utc).isoformat(), trigger, RunOutcome.FAILED.value,
-            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
-            tally.locked_counter[0], tally.errors(errors)
+            run_type=RunType.BULK.value,
+            label=filename if filename else "bulk_import.txt",
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=trigger,
+            outcome=RunOutcome.FAILED.value,
+            assets_processed=tally.assets_processed[0],
+            success_count=tally.success_counter[0],
+            cached_count=tally.cached_counter[0],
+            locked_count=tally.locked_counter[0],
+            error_count=tally.errors(errors),
+            job_id=schedule_id
         )
         if notify_enabled:
             # scrape_and_upload only shields the loop from ScraperException - a PlexConnectorException
@@ -617,10 +637,17 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
         outcome = callbacks.outcome(stopped=globals.cancel_scrape)
     finally:
         RunHistory().add_run(
-            RunType.UPLOAD.value, label, started_at, datetime.now(timezone.utc).isoformat(),
-            RunTrigger.MANUAL.value, outcome,
-            callbacks.assets_processed[0], callbacks.success_counter[0], 0,
-            callbacks.locked_counter[0], callbacks.errors()
+            run_type=RunType.UPLOAD.value,
+            label=label,
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=RunTrigger.MANUAL.value,
+            outcome=outcome,
+            assets_processed=callbacks.assets_processed[0],
+            success_count=callbacks.success_counter[0],
+            cached_count=0,
+            locked_count=callbacks.locked_counter[0],
+            error_count=callbacks.errors()
         )
 
 
@@ -829,7 +856,8 @@ def process_bulk_file_on_schedule(instance: Instance, filename, schedule_id):
                     started_at=now,
                     ended_at=now,
                     trigger=RunTrigger.SCHEDULED.value,
-                    outcome=RunOutcome.SKIPPED.value
+                    outcome=RunOutcome.SKIPPED.value,
+                    job_id=schedule_id
                 )
                 send_notification(instance, f"⏭️ Scheduled bulk import of '{filename}' skipped • file is empty", event=NotificationEvent.RUN_SKIPPED.value)
         else:
@@ -841,7 +869,8 @@ def process_bulk_file_on_schedule(instance: Instance, filename, schedule_id):
                 started_at=now,
                 ended_at=now,
                 trigger=RunTrigger.SCHEDULED.value,
-                outcome=RunOutcome.FAILED.value
+                outcome=RunOutcome.FAILED.value,
+                job_id=schedule_id
             )
             send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • file does not exist", event=NotificationEvent.RUN_FAILED_TO_START.value)
             return
@@ -854,7 +883,8 @@ def process_bulk_file_on_schedule(instance: Instance, filename, schedule_id):
             started_at=now,
             ended_at=now,
             trigger=RunTrigger.SCHEDULED.value,
-            outcome=RunOutcome.FAILED.value
+            outcome=RunOutcome.FAILED.value,
+            job_id=schedule_id
         )
         send_notification(instance, f"🔴 Scheduled bulk import of '{filename}' failed to start • file not found", event=NotificationEvent.RUN_FAILED_TO_START.value)
     except Exception as e:
@@ -867,7 +897,8 @@ def process_bulk_file_on_schedule(instance: Instance, filename, schedule_id):
             started_at=now,
             ended_at=now,
             trigger=RunTrigger.SCHEDULED.value,
-            outcome=RunOutcome.FAILED.value
+            outcome=RunOutcome.FAILED.value,
+            job_id=schedule_id
         )
     finally:
         if globals.scheduler_service:
@@ -906,10 +937,11 @@ def setup_scheduler_on_first_load(instance: Instance):
                     sched=new_schedule,
                     callback=schedule_callback
                 )
+                last_run_message = "Never" if new_schedule.last_run_status == "never_run" else f"{new_schedule.last_run} ({new_schedule.last_run_status})"
                 if new_schedule.time:
-                    debug_me(f"Added schedule ID '{new_schedule.id}' for '{new_schedule.file}': Every day at {new_schedule.time} | Last run: {new_schedule.last_run} | Next run: {new_schedule.next_run}")
+                    debug_me(f"Added schedule ID '{new_schedule.id}' for '{new_schedule.file}': Every day at {new_schedule.time} | Last run: {last_run_message} | Next run: {new_schedule.next_run}")
                 elif new_schedule.interval_value:
-                    debug_me(f"Added schedule ID '{new_schedule.id}' for '{new_schedule.file}': Every {new_schedule.interval_value} {new_schedule.interval_unit} | Last run: {new_schedule.last_run} | Next run: {new_schedule.next_run}")
+                    debug_me(f"Added schedule ID '{new_schedule.id}' for '{new_schedule.file}': Every {new_schedule.interval_value} {new_schedule.interval_unit} | Last run: {last_run_message} | Next run: {new_schedule.next_run}")
             except ValueError as e:
                 update_log(instance, f"🔴 Skipping invalid schedule for '{new_schedule.file}': {e}")
                 debug_me(f"Skipping invalid schedule entry {each_schedule}: {e}")
@@ -918,10 +950,6 @@ def setup_scheduler_on_first_load(instance: Instance):
         # Start the scheduler
         if globals.scheduler_service.start():
             debug_me("Scheduler started.")
-
-        debug_me(globals.config.schedules)
-        debug_me(globals.scheduler_service.schedule_meta)
-
 
 def catch_up_missed_schedules(instance: Instance):
     """Run any schedule (daily or interval) that was due while the app was not running.
