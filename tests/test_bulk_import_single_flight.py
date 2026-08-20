@@ -150,7 +150,8 @@ def test_bulk_import_releases_the_lock_when_plex_is_not_configured():
         globals.bulk_import_lock = threading.Lock()  # fresh, unlocked lock
         globals.scrapes_running = 0
         globals.cancel_scrape = False
-        globals.plex = MagicMock(tv_libraries=None, movie_libraries=None)
+        globals.plex = MagicMock(tv_libraries=[], movie_libraries=[])
+        globals.plex.ensure_libraries.return_value = False
 
         instance = Instance(mode="cli")
         parsed_urls = [MagicMock()]

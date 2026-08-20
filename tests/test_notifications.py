@@ -280,7 +280,8 @@ def test_plex_setup_incomplete_notifies_failed_to_start_only_when_notify_enabled
     failed_to_start when notifications are enabled for it, and stay silent otherwise -
     this is the earliest exit point in the function, easy to forget when wiring events."""
     try:
-        globals.plex = MagicMock(tv_libraries=None, movie_libraries=None)
+        globals.plex = MagicMock(tv_libraries=[], movie_libraries=[])
+        globals.plex.ensure_libraries.return_value = False
         instance = Instance(mode="cli")
 
         with (

@@ -233,8 +233,8 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
     tally = ProcessingCallbacks()
 
     try:
-        # Check if the Plex TV and movie libraries are configured
-        if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
+        # Stop a run that has no Plex libraries, resolving them first if we're holding none
+        if not globals.plex.ensure_libraries():
             update_status(instance, "Plex setup incomplete. Please configure your settings.", color=StatusColor.WARNING.value)
             return
 
@@ -368,8 +368,8 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
 
     try:
 
-        # Check if plex setup returned valid values
-        if globals.plex.tv_libraries is None or globals.plex.movie_libraries is None:
+        # Stop a run that has no Plex libraries, resolving them first if we're holding none
+        if not globals.plex.ensure_libraries():
             update_status(instance, "Plex setup incomplete. Please check the settings.", color=StatusColor.DANGER.value)
             now = datetime.now(timezone.utc).isoformat()
             RunHistory().add_run(

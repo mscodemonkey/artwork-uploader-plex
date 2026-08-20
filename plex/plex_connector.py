@@ -130,6 +130,51 @@ class PlexConnector:
         return self.movie_libraries
 
 
+    def has_libraries(self) -> bool:
+        """
+        Checks whether any Plex library has been resolved.
+
+        Returns:
+            True if at least one movie or TV library is set.
+        """
+        return bool(self.movie_libraries or self.tv_libraries)
+
+
+    def ensure_libraries(self, config: Optional[Config] = None) -> bool:
+        """
+        Resolves the configured libraries if none are held, so that a run recovers from a Plex
+        that was unreachable at start-up instead of needing the app restarted.
+
+        An empty library list matches nothing, and it looks exactly like a library that doesn't
+        hold the title, so a run made on one finds nothing, raises nothing and reports success.
+
+        Args:
+            config: Where to read the library names from. Defaults to the loaded config.
+
+        Returns:
+            True if at least one library is set by the time this returns. Never raises, so the
+            caller decides what an empty result means.
+        """
+        if self.has_libraries():
+            return True
+
+        config = config if config is not None else globals.config
+        if config is None:
+            return False
+
+        try:
+            self.set_tv_libraries(config.tv_library)
+        except Exception as e:
+            debug_me(f"Could not resolve the TV libraries: {e}")
+
+        try:
+            self.set_movie_libraries(config.movie_library)
+        except Exception as e:
+            debug_me(f"Could not resolve the movie libraries: {e}")
+
+        return self.has_libraries()
+
+
     # Find a specific collection in the movies library
     def find_collection(self, collection_title: str, fuzzy: bool = False) -> Optional[List[Collection]]:
 
