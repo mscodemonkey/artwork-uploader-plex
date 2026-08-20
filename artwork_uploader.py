@@ -922,7 +922,8 @@ def setup_scheduler_on_first_load(instance: Instance):
     if not globals.scheduler_service.has_schedules():
         for each_schedule in globals.config.schedules:
             new_schedule = BulkSchedule(**each_schedule)
-            new_schedule.compute_next_run()
+            if new_schedule.last_run_status == "never_run":
+                new_schedule.compute_next_run()
 
             # Create the callback for this schedule
             def schedule_callback(filename=new_schedule.file, schedule_id=new_schedule.id):
