@@ -160,7 +160,8 @@ def test_a_scraper_error_is_recorded_as_failed(history, configured_plex):
 
 @pytest.mark.unit
 def test_plex_not_configured_is_recorded_as_failed_without_scraping(history):
-    globals.plex = MagicMock(tv_libraries=None, movie_libraries=None)
+    globals.plex = MagicMock(tv_libraries=[], movie_libraries=[])
+    globals.plex.ensure_libraries.return_value = False
 
     with (
         patch("artwork_uploader.scrape_and_upload") as mock_scrape,

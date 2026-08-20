@@ -91,7 +91,8 @@ def test_run_with_scraper_errors_is_recorded_as_partial(history):
 
 @pytest.mark.unit
 def test_plex_not_configured_is_recorded_as_failed_without_scraping(history):
-    globals.plex = MagicMock(tv_libraries=None, movie_libraries=None)
+    globals.plex = MagicMock(tv_libraries=[], movie_libraries=[])
+    globals.plex.ensure_libraries.return_value = False
     globals.config = MagicMock(apprise_urls=[])
 
     with (
@@ -105,6 +106,34 @@ def test_plex_not_configured_is_recorded_as_failed_without_scraping(history):
     assert len(runs) == 1
     assert runs[0]["outcome"] == OUTCOME_FAILED
     assert runs[0]["assets_processed"] == 0
+
+
+@pytest.mark.unit
+def test_a_run_proceeds_once_the_libraries_come_back(history):
+    """Plex was down at start-up and is up now, so the run resolves the libraries itself
+    rather than needing the container restarted."""
+    plex = MagicMock(tv_libraries=[], movie_libraries=[])
+
+    def _resolve():
+        plex.tv_libraries = ["TV Shows"]
+        return True
+
+    plex.ensure_libraries.side_effect = _resolve
+    globals.plex = plex
+    globals.config = MagicMock(apprise_urls=[])
+
+    with (
+        patch("artwork_uploader.scrape_and_upload") as mock_scrape,
+        patch("artwork_uploader.notify_web"),
+        patch("artwork_uploader.update_log"),
+        patch("artwork_uploader.update_status"),
+        patch("artwork_uploader.debug_me"),
+    ):
+        process_bulk_import_from_ui(Instance(mode="cli"), [MagicMock()], "recovered.txt")
+
+    plex.ensure_libraries.assert_called_once()
+    mock_scrape.assert_called_once()
+    assert history.get_runs()[0]["outcome"] != OUTCOME_FAILED
 
 
 @pytest.mark.unit

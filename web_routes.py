@@ -169,7 +169,7 @@ def setup_routes(web_app, config: Config):
             return {"status": "test ok"}, 200
         if event is None:
             return {"status": "ignored"}, 200
-        if globals.plex is None or not (globals.plex.movie_libraries or globals.plex.tv_libraries):
+        if globals.plex is None or not globals.plex.has_libraries():
             update_log(Instance(broadcast=True), "⛔ Webhook received but Plex libraries are not configured")
             return {"status": "plex not configured"}, 503
         if not globals.config.webhook_tpdb_users:
