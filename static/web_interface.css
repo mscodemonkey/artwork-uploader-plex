@@ -944,3 +944,7 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 .tooltip {
     z-index: 9999 !important;
 }
+
+.text-orange {
+    color: #fd7e14 !important; /* Standard Bootstrap orange shade */
+}

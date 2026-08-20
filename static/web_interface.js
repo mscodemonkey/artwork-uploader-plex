@@ -1656,11 +1656,11 @@ function loadBulkFileList() {
 /* Loading the run history */
 
 const RUN_HISTORY_OUTCOME_LABELS = {
-    success: { text: "Completed", className: "text-success", badgeColor: "success" },
-    partial: { text: "Completed with errors", className: "text-warning", badgeColor: "warning" },
-    stopped: { text: "Stopped", className: "text-warning", badgeColor: "warning" },
-    failed: { text: "Failed", className: "text-danger", badgeColor: "danger" },
-    skipped: { text: "Skipped", className: "text-muted", badgeColor: "secondary" }
+    success: { text: "Completed", className: "text-success", icon: "check-circle-fill", iconColor: "success" },
+    partial: { text: "Completed with errors", className: "text-warning", icon: "exclamation-circle-fill", iconColor: "warning" },
+    stopped: { text: "Stopped", className: "text-warning", icon: "stop-circle-fill", iconColor: "orange" },
+    failed: { text: "Failed", className: "text-danger", icon: "x-circle-fill", iconColor: "danger" },
+    skipped: { text: "Skipped", className: "text-muted", icon: "fast-forward-circle-fill", iconColor: "info" }
 };
 
 const RUN_HISTORY_TYPE_LABELS = {
@@ -2377,6 +2377,7 @@ socket.on("upload_complete", function (data) {
 // =====================
 
     let editingScheduleId = null; // Set while the form is editing an existing schedule rather than adding a new one
+    let editingScheduleLastRun = null;
     let editingScheduleLastRunStatus = null;
 
     function describeSchedule(s) {
@@ -2398,10 +2399,13 @@ socket.on("upload_complete", function (data) {
             if (s.last_run_status) {
                 const outcome = RUN_HISTORY_OUTCOME_LABELS[s.last_run_status]
                 const colorClass = s.last_run_status === "never_run" 
-                    ? "bg-secondary" 
-                    : `bg-${outcome?.badgeColor || "secondary"}`;
+                    ? "secondary" 
+                    : (outcome?.iconColor || "secondary");
+                const iconClass = s.last_run_status === "never_run"
+                    ? "bi bi-question-circle-fill"
+                    : `bi bi-${outcome?.icon || "bi bi-question-circle-fill"}`;
                 const titleText = outcome ? `${outcome.text} (${formattedLastRun})` : "Never run";
-                const status_badge = `<span class="d-inline-block rounded-circle ${colorClass} ms-2 align-middle" style="width: 12px; height: 12px;" title="${titleText}"></span>`;
+                const status_badge = `<i class="text-${colorClass} ${iconClass} ms-2 align-middle" title="${titleText}"></span>`;
                 text = `${text}${status_badge}`
             }
         }
@@ -2415,7 +2419,6 @@ socket.on("upload_complete", function (data) {
     socket.on("get_schedules", (data) => {
         if (validResponse(data, true)) {
             schedules = data.schedules
-            renderScheduleList();
             updateSchedulerIcon();
         } else {
             console.log("Unable to obtain schedules from backend")
@@ -2500,6 +2503,7 @@ socket.on("upload_complete", function (data) {
             };
         });
         editingScheduleId = null;
+        editingScheduleLastRun = null;
         editingScheduleLastRunStatus = null;
         setTimeBtn.innerHTML = '<i class="bi bi-plus-lg"></i>';
         setTimeBtn.classList.add("btn-primary");
@@ -2516,6 +2520,7 @@ socket.on("upload_complete", function (data) {
 
     function editSchedule(s) {
         editingScheduleId = s.id;
+        editingScheduleLastRun = s.last_run;
         editingScheduleLastRunStatus = s.last_run_status;
         setTimeBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
         setTimeBtn.classList.remove("btn-primary");
@@ -2542,6 +2547,7 @@ socket.on("upload_complete", function (data) {
         const payload = { instance_id: instanceId, file: currentBulkImport };
         if (editingScheduleId) {
             payload.id = editingScheduleId;
+            payload.last_run = editingScheduleLastRun;
             payload.last_run_status = editingScheduleLastRunStatus;
         } else {
             payload.last_run_status = "never_run";
