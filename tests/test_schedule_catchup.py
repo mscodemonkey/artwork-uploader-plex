@@ -251,10 +251,14 @@ def test_catch_up_missed_interval_schedule_does_nothing_for_never_run_schedule(s
 
 def test_setup_scheduler_aligns_next_run_on_startup(scheduler):
     """Verifies that starting up aligns job.next_run to the computed next run target 
-    instead of naively resetting to now + interval.
+    for never run before tasks instead of naively resetting to now + interval.
+    Tasks that were previously run should have a computed next_run attribute and it should
+    be respected.
     """
     schedule_interval_id = str(uuid.uuid4())
     schedule_daily_id = str(uuid.uuid4())
+    schedule_never_run_interval_id = str(uuid.uuid4())
+    schedule_never_run_daily_id = str(uuid.uuid4())
 
     globals.config = FakeConfig(schedules=[
         {
@@ -262,13 +266,30 @@ def test_setup_scheduler_aligns_next_run_on_startup(scheduler):
             "file": "interval_task.txt",
             "interval_value": 6,
             "interval_unit": "hours",
-            "last_run": "2026-08-09T02:00:00"
+            "last_run": "2026-08-09T02:00:00",
+            "next_run": "2026-08-09T08:00:00",
+            "last_run_status": "success"
         },
         {
             "id": schedule_daily_id,
             "file": "daily_task.txt",
             "time": "02:00",
-            "last_run": "2026-08-09T02:00:00"
+            "last_run": "2026-08-09T02:00:00",
+            "next_run": "2026-08-10T02:00:00",
+            "last_run_status": "stopped"
+        },
+        {
+            "id": schedule_never_run_interval_id,
+            "file": "never_run_interval_task.txt",
+            "interval_value": 2,
+            "interval_unit": "hours",
+            "last_run_status": "never_run"
+        },
+        {
+            "id": schedule_never_run_daily_id,
+            "file": "never_run_daily_task.txt",
+            "time": "05:30",
+            "last_run_status": "never_run"
         }
     ])
     instance = Instance(mode="cli")
@@ -297,6 +318,14 @@ def test_setup_scheduler_aligns_next_run_on_startup(scheduler):
             # 2. Daily task: time 02:00 (already passed at 05:00) -> expected 02:00 on 2026-08-10
             daily_job = scheduler.scheduled_jobs[schedule_daily_id]
             assert daily_job.next_run == real_datetime(2026, 8, 10, 2, 0, 0)
+
+            # 3. Never run before interval task: time should be now (05:00) plus interval (2h) -> expected 07:00 on 2026-08-09
+            never_run_interval_job = scheduler.scheduled_jobs[schedule_never_run_interval_id]
+            assert never_run_interval_job.next_run == real_datetime(2026, 8, 9, 7, 0, 0)
+
+            # 4. Never run before daily task: expected 05:30 on 2026-08-09
+            never_run_daily_job = scheduler.scheduled_jobs[schedule_never_run_daily_id]
+            assert never_run_daily_job.next_run == real_datetime(2026, 8, 9, 5, 30, 0)
 
         finally:
             scheduler.stop()

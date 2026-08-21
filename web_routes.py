@@ -705,7 +705,7 @@ def setup_socket_handlers(
             sched["next_run"] = next_run_at.isoformat() if next_run_at else ""
             sched["last_run_status"] = meta.get("last_run_status", None)
             schedules.append(sched)
-            debug_me(f"Job ID: {job_id} ({sched["file"]}) | Last run: {job.last_run} | Next run: {job.next_run}")
+            debug_me(f"Job ID: {job_id} ({sched["file"]}) | Last run: {job.last_run}{f' ({sched["last_run_status"]}) ' if sched['last_run_status'] != 'never_run' else ''} | Next run: {job.next_run}")
 
         notify_web(
             instance=instance,
