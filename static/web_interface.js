@@ -2405,7 +2405,7 @@ socket.on("upload_complete", function (data) {
                     ? "bi bi-question-circle-fill"
                     : `bi bi-${outcome?.icon || "bi bi-question-circle-fill"}`;
                 const titleText = outcome ? `${outcome.text} (${formattedLastRun})` : "Never run";
-                const status_badge = `<i class="text-${colorClass} ${iconClass} ms-2 align-middle" title="${titleText}"></span>`;
+                const status_badge = `<i class="text-${colorClass} ${iconClass} ms-2 align-middle" title="${titleText}"></i>`;
                 text = `${text}${status_badge}`
             }
         }
