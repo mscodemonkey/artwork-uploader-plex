@@ -368,8 +368,16 @@ class MediuxScraper:
                 
                 # If it's a collection set, we obtain movie title and year from the collection map we built earlier
                 elif collection_data:
-                    title = collection_map[movie_id]["title"]
-                    year = collection_map[movie_id]["year"]
+                    # A set can include artwork for a related movie that is not part of the
+                    # collection itself, in which case it won't be in the collection map
+                    movie_info = collection_map.get(movie_id)
+                    if movie_info is None:
+                        self.callbacks.debug(f"⏩ Skipping movie asset - movie {movie_id} is not part of this collection")
+                        self.callbacks.log(f"⚠️ {self.title} • {self.author} | Skipping movie asset - not part of this collection")
+                        self.errored += 1
+                        continue
+                    title = movie_info["title"]
+                    year = movie_info["year"]
 
                 else:
                     self.callbacks.debug(f"⏩ Skipping asset - missing metadata")
