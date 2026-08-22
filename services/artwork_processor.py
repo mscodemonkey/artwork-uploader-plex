@@ -34,8 +34,8 @@ class ArtworkProcessor:
     def scrape_and_process(
         self,
         url: str,
-        bulk: bool,
-        options: Options,
+        bulk: dict,
+        options: Options
     ) -> Tuple[Optional[str], Optional[str]]:
         """
         Scrape artwork from a URL and process it for upload to Plex.
@@ -94,11 +94,22 @@ class ArtworkProcessor:
         
         # Process collections
         n = 1
+        if bulk:
+            index = bulk.get("index", 0)
+            total = bulk.get("total", 0)
+            message = bulk.get("title", "")
+            bulk_start_percent = (index / total)
+            bulk_end_percent = ((index + 1) / total)
+
         title = f"for {scraper.title}" if scraper.title else ""
         for artwork in scraper.collection_artwork:
             if globals.cancel_scrape:
                 break
             self.callbacks.progress(n, scraper.total - scraper.skipped, f"{description} • {n} of {scraper.total - scraper.skipped}", "main")
+            if bulk:
+                this_percent = (n / (scraper.total - scraper.skipped))
+                bulk_percent = (bulk_start_percent + this_percent * (bulk_end_percent - bulk_start_percent)) * 100
+                self.callbacks.progress(bulk_percent, 100, message, bar_type="bulk")
             n += 1
             self._process_single_artwork(
                 artwork,
@@ -110,6 +121,10 @@ class ArtworkProcessor:
             if globals.cancel_scrape:
                 break
             self.callbacks.progress(n, scraper.total - scraper.skipped, f"{description} • {n} of {scraper.total - scraper.skipped}", "main")
+            if bulk:
+                this_percent = (n / (scraper.total - scraper.skipped))
+                bulk_percent = (bulk_start_percent + this_percent * (bulk_end_percent - bulk_start_percent)) * 100
+                self.callbacks.progress(bulk_percent, 100, message, bar_type="bulk")
             n += 1
             self._process_single_artwork(
                 artwork,
@@ -121,6 +136,10 @@ class ArtworkProcessor:
             if globals.cancel_scrape:
                 break
             self.callbacks.progress(n, scraper.total - scraper.skipped, f"{description} • {n} of {scraper.total - scraper.skipped}", "main")
+            if bulk:
+                this_percent = (n / (scraper.total - scraper.skipped))
+                bulk_percent = (bulk_start_percent + this_percent * (bulk_end_percent - bulk_start_percent)) * 100
+                self.callbacks.progress(bulk_percent, 100, message, bar_type="bulk")
             n += 1
             self._process_single_artwork(
                 artwork,
