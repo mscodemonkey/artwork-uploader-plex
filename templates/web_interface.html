@@ -1211,28 +1211,103 @@
                         <option value="upload">Uploads</option>
                         <option value="webhook">Webhook imports</option>
                     </select>
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-secondary border-0 p-1" 
+                            id="legendPopover" 
+                            data-bs-toggle="popover" 
+                            data-bs-html="true" 
+                            data-bs-content='
+                                <div class="small">
+                                <div class="fw-bold text-muted mb-1">Type</div>
+                                <div><i class="bi bi-journal-text me-1"></i> Bulk import</div>
+                                <div><i class="bi bi-arrow-repeat me-1"></i> Scrape</div>
+                                <div><i class="bi bi-cloud-arrow-up me-1"></i> Upload</div>
+                                <div><i class="bi bi-globe2 me-1"></i> Webhook</div>
+
+                                <div class="fw-bold text-muted mt-2">URL Type</div>
+                                <div><i class="bi bi-brush me-1"></i> Set</div>
+                                <div><i class="bi bi-file-image me-1"></i> Poster</div>
+                                <div><i class="bi bi-box-seam me-1"></i> Boxset</div>
+                                <div><i class="bi bi-person-circle me-1"></i> User</div>
+                                
+                                <div class="fw-bold text-muted mt-2 mb-1">Trigger</div>
+                                <div><i class="bi bi-hand-index-thumb me-1"></i> Manual</div>
+                                <div><i class="bi bi-alarm me-1"></i> Scheduled</div>
+                                <div><i class="bi bi-code-square me-1"></i> CLI</div>
+                                <div><i class="bi bi-film me-1"></i> Radarr</div>
+                                <div><i class="bi bi-tv me-1"></i> Sonarr</div>
+
+                                <div class="fw-bold text-muted mt-2 mb-1">Outcome</div>
+                                <div><i class="bi text-success bi-check-circle-fill me-1"></i> Completed</div>
+                                <div><i class="bi text-warning bi-exclamation-circle-fill me-1"></i> Completed with errors</div>
+                                <div><i class="bi text-orange bi-stop-circle-fill me-1"></i> Stopped</div>
+                                <div><i class="bi text-danger bi-x-circle-fill me-1"></i> Failed</div>
+                                <div><i class="bi text-info bi-fast-forward-circle-fill me-1"></i> Skipped</div>
+                                </div>
+                            '>
+                        <i class="bi bi-question-circle"></i>
+                    </button>
                 </div>
                 <div class="mt-3 table-responsive">
                     <table class="table table-sm align-middle">
                         <thead>
                             <tr>
                                 <th>Started</th>
-                                <th>Type</th>
+                                <th class="th-vertical text-center">Type</th>
                                 <th>Run</th>
-                                <th class="d-none d-md-table-cell">Trigger</th>
-                                <th>Outcome</th>
-                                <th class="d-none d-md-table-cell">Processed</th>
-                                <th class="d-none d-md-table-cell">Updated</th>
-                                <th class="d-none d-md-table-cell">Cached</th>
-                                <th class="d-none d-md-table-cell">Locked</th>
-                                <th>Errors</th>
-                                <th class="d-none d-md-table-cell">Duration</th>
+                                <th class="th-vertical text-center">Trigger</th>
+                                <th class="th-vertical text-center">Outcome</th>
+                                <th class="th-vertical text-center">Processed</th>
+                                <th class="th-vertical text-center">Updated</th>
+                                <th class="th-vertical text-center">Cached</th>
+                                <th class="th-vertical text-center">Locked</th>
+                                <th class="th-vertical text-center">Errors</th>
+                                <th class="th-vertical text-center">Duration</th>
                             </tr>
                         </thead>
                         <tbody id="run_history_body">
                             <tr><td colspan="11" class="text-muted">No runs recorded yet.</td></tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="sticky-bottom pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                    <div class="dropdown">
+                        <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
+                                id="bd-theme"
+                                type="button"
+                                aria-expanded="false"
+                                data-bs-toggle="dropdown"
+                                aria-label="Toggle theme (auto)">
+                            <svg class="bi my-1 theme-icon-active text-white" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                            <span class="caret-wrapper d-inline-flex align-items-center">
+                                <i class="bi bi-caret-down-fill" style="font-size: 0.65rem;"></i>
+                            </span>
+                            <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+                                    Light
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+                                    Dark
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                            <li>
+                                <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+                                    <svg class="bi me-2 opacity-50 theme-icon" width="1em" height="1em"><use href="#circle-half"></use></svg>
+                                    Auto
+                                    <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#check2"></use></svg>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 

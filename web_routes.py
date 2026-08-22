@@ -28,7 +28,7 @@ from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService, RunHistory
 from services.webhook_service import parse_event
-from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER
+from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER, URL_SOURCE_MAP, URL_TYPE_MAP
 
 def login_required(f):
     """Decorator to require authentication for routes."""
@@ -368,6 +368,24 @@ def setup_socket_handlers(
         if run_type not in RunType:
             run_type = None
         runs = RunHistory().get_runs(limit=50, run_type=run_type)
+        for run in runs:
+            label = run.get("label", "")
+            if label and "https" in label:
+                clean_url = label.replace("https://", "").strip()
+                parts = [p for p in clean_url.split("/") if p]
+                if len(parts) >= 3:
+                    domain, asset_type, id = parts[0], parts[1], parts[2]
+                    source = URL_SOURCE_MAP.get(domain, "Unknown")
+                    type = URL_TYPE_MAP.get(asset_type, { "icon": "question-circle", "label": "Unknown URL type" })
+                    run["label"] = (
+                        f'<a href="{label}" target="_blank" rel="noopener noreferrer" '
+                        f"class='text-decoration-none text-reset' title='{label}'>{source} "
+                        f"<i class='bi bi-{type.get("icon", "question-circle")}' title='{type.get("label", "Unknown URL type")}'></i> "
+                        f"<span class='input-monospace' style='font-size: 0.8rem;'>{id}</span></span>"
+                    )
+                else:
+                    run["label"] = f"<i class='bi bi-x-octagon text-danger' title='{label}'>&nbsp;Error parsing URL</i>"
+
         notify_web(instance, "load_run_history", {"runs": runs, "run_type": run_type or "all"})
 
     @globals.web_socket.on("load_bulk_import")

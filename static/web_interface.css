@@ -249,6 +249,10 @@ h1 {
     /* font-size: 0.875rem; Slightly smaller font size often looks cleaner for long token strings */
 }
 
+.text-monospace {
+    font-family: 'JetBrains Mono', "Courier New", "Liberation Mono", Consolas, Monaco, Menlo, SFMono-Regular, monospace !important;
+}
+
 /* Remove Bootstrap's validation checkmark icon on small numeric inputs */
 .was-validated .d-inline-block.form-control:valid,
 .was-validated .d-inline-block.form-control:invalid {
@@ -947,4 +951,17 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 
 .text-orange {
     color: #fd7e14 !important; /* Standard Bootstrap orange shade */
+}
+
+/* Apply vertical text mode only on mobile viewports below 768px */
+@media (max-width: 767.98px) {
+    th.th-vertical {
+        writing-mode: vertical-rl;
+        transform: rotate(180deg);
+        white-space: nowrap;
+        padding: 8px 0px !important;
+        height: 90px;
+        vertical-align: middle;
+        text-align: left !important;
+    }
 }
