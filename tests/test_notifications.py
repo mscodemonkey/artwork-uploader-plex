@@ -355,7 +355,7 @@ def test_mid_run_crash_after_processing_is_not_reported_as_failed_to_start():
 
         call_count = {"n": 0}
 
-        def flaky_scrape_and_upload(inst, url, options, bulk, tally=None):
+        def flaky_scrape_and_upload(instance, url, options, bulk=None, tally=None):
             call_count["n"] += 1
             if call_count["n"] == 1:
                 tally.assets(1)

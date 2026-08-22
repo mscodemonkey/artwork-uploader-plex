@@ -1186,7 +1186,12 @@ if __name__ == "__main__":
             cli_options.add_sets = False
             try:
                 tally = ProcessingCallbacks()
-                scrape_and_upload(cli_instance, cli_command, cli_options, False, tally)
+                scrape_and_upload(
+                    instance=cli_instance,
+                    url=cli_command,
+                    options=cli_options,
+                    tally=tally
+                )
                 debug_me(f"Finished scraping TPDb user URL from CLI with {tally.success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
                 debug_me(f"Error scraping TPDb user URL from CLI: {str(e)}", "__main__")
@@ -1196,7 +1201,12 @@ if __name__ == "__main__":
         else:
             try:
                 tally = ProcessingCallbacks()
-                scrape_and_upload(cli_instance, cli_command, cli_options, False, tally)
+                scrape_and_upload(
+                    instance=cli_instance,
+                    url=cli_command,
+                    options=cli_options,
+                    tally=tally
+                )
                 debug_me(f"Finished scraping URL from CLI with {tally.success_counter[0]} asset(s) updated", "__main__")
             except Exception as e:
                 debug_me(f"Error scraping URL from CLI: {str(e)}", "__main__")

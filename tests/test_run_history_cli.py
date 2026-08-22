@@ -50,7 +50,7 @@ def _quiet():
 
 @pytest.mark.unit
 def test_successful_run_is_recorded_with_its_counters(history, bulk_file):
-    def fake_scrape(instance, url, options, bulk, tally=None):
+    def fake_scrape(instance, url, options, bulk=None, tally=None):
         tally.assets(1)
         tally.success(1)
         tally.cached(1)
@@ -83,7 +83,7 @@ def test_the_label_is_the_file_name_not_the_whole_path(history, bulk_file):
 @pytest.mark.unit
 def test_counters_survive_the_whole_file(history, bulk_file):
     """Every line adds to the same counters, rather than each line starting from zero."""
-    def fake_scrape(instance, url, options, bulk, tally=None):
+    def fake_scrape(instance, url, options, bulk=None, tally=None):
         tally.assets(2)
         tally.success(1)
         tally.locked(1)
