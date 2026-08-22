@@ -167,7 +167,12 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
                     continue
 
                 try:
-                    scrape_and_upload(instance, parsed_url.url, parsed_url.options, False, tally)
+                    scrape_and_upload(
+                        instance=instance,
+                        url=parsed_url.url,
+                        options=parsed_url.options,
+                        tally=tally
+                    )
                 except ScraperException as e:
                     debug_me(f"ScraperException: Error processing {parsed_url.url}: {str(e)}")
                     errors += 1
@@ -247,7 +252,12 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         label = parsed_line.url
         update_status(instance, f"Scraping URL '{parsed_line.url}'", color=StatusColor.INFO.value, sticky=True, spinner=True)
 
-        title, author = scrape_and_upload(instance, parsed_line.url, parsed_line.options, False, tally)
+        title, author = scrape_and_upload(
+            instance=instance,
+            url=parsed_line.url,
+            options=parsed_line.options,
+            tally=tally
+        )
 
         # Read the cancel flag here, not in the finally below - that's where it gets cleared
         outcome = tally.outcome(stopped=globals.cancel_scrape)
@@ -276,7 +286,13 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
             globals.scrape_type = "stopped"
 
-def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filename = None, schedule_id: str = None, notify: bool = False) -> None:
+def run_bulk_import_scrape_in_thread(
+        instance: Instance,
+        web_list = None,
+        filename = None,
+        schedule_id: str = None,
+        notify: bool = False
+    ) -> None:
 
     """Run the bulk import scrape in a separate thread."""
 
@@ -322,12 +338,24 @@ def run_bulk_import_scrape_in_thread(instance: Instance, web_list = None, filena
 
     # Pass the processing of the parsed URLs off to a thread
     try:
-        process_bulk_import_from_ui(instance, parsed_urls, filename, schedule_id, notify)
+        process_bulk_import_from_ui(
+            instance=instance,
+            parsed_urls=parsed_urls,
+            filename=filename,
+            schedule_id=schedule_id,
+            notify=notify
+        )
     except Exception:
         raise
 
 
-def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename: str = None, schedule_id: str = None, notify: bool = False) -> None:
+def process_bulk_import_from_ui(
+        instance: Instance,
+        parsed_urls: list,
+        filename: str = None,
+        schedule_id: str = None,
+        notify: bool = False
+    ) -> None:
 
     """
     Process the bulk import scrape, based on the contents of the Bulk Import tab in the GUI.
@@ -406,7 +434,17 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
                 break
 
             try:
-                scrape_and_upload(instance, parsed_line.url, parsed_line.options, True, tally)
+                scrape_and_upload(
+                    instance=instance,
+                    url=parsed_line.url,
+                    options=parsed_line.options,
+                    bulk={
+                        "title": f"{display_filename} • {i-1} of {len(parsed_urls)}",
+                        "index": i-1,
+                        "total": len(parsed_urls)
+                    },
+                    tally=tally
+                )
                 #time.sleep(1)
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
@@ -516,7 +554,13 @@ def process_bulk_import_from_ui(instance: Instance, parsed_urls: list, filename:
         globals.bulk_import_lock.release()
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
-def scrape_and_upload(instance: Instance, url, options, bulk=False, tally: ProcessingCallbacks = None):
+def scrape_and_upload(
+        instance: Instance,
+        url: str,
+        options: Options,
+        bulk: dict = None,
+        tally: ProcessingCallbacks = None
+    ):
     """
     Scrape artwork from a URL and upload to Plex.
 
@@ -578,7 +622,18 @@ def scrape_and_upload(instance: Instance, url, options, bulk=False, tally: Proce
         raise
 
 
-def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, zip_author, zip_source, options, filters, plex_title = None, plex_year = None):
+def process_uploaded_artwork(
+        instance: Instance,
+        file_list,
+        skipped,
+        zip_title,
+        zip_author,
+        zip_source,
+        options,
+        filters,
+        plex_title = None,
+        plex_year = None
+    ):
     """
     Process uploaded artwork files and upload to Plex or save to Kometa asset directory.
 
@@ -633,7 +688,15 @@ def process_uploaded_artwork(instance: Instance, file_list, skipped, zip_title, 
     label = plex_title or zip_title or "Uploaded artwork"
     outcome = RunOutcome.FAILED.value
     try:
-        processor.process_uploaded_files(file_list, skipped, zip_title, zip_author, zip_source, opts, override_title=plex_title)
+        processor.process_uploaded_files(
+            file_list=file_list,
+            skipped=skipped,
+            zip_title=zip_title,
+            zip_author=zip_author,
+            zip_source=zip_source,
+            options=opts,
+            override_title=plex_title
+        )
         outcome = callbacks.outcome(stopped=globals.cancel_scrape)
     finally:
         RunHistory().add_run(
