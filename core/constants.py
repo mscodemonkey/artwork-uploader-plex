@@ -207,3 +207,31 @@ DEFAULT_NOTIFICATION_EVENTS = [
     NotificationEvent.RUN_COMPLETED_WITH_ERRORS.value,
     NotificationEvent.RUN_CANCELLED.value,
 ]
+
+# RunHistory URL source and type maps for RunHistory UI
+URL_SOURCE_MAP = {
+    "mediux.pro": "MediUX",
+    "theposterdb.com": "TPDb"
+}
+URL_TYPE_MAP = {
+    "set": {
+        "icon": "brush",
+        "label": "Set"
+    },
+    "sets": {
+        "icon": "brush",
+        "label": "Set"
+    },
+    "boxsets": {
+        "icon": "box-seam",
+        "label": "Boxset"
+    },
+    "user": {
+        "icon": "person-circle",
+        "label": "User"
+    },
+    "poster": {
+        "icon": "file-image",
+        "label": "Poster"
+    }
+}

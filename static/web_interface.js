@@ -1670,6 +1670,13 @@ const RUN_HISTORY_TYPE_LABELS = {
     webhook: "Webhook"
 };
 
+const RUN_HISTORY_TYPE_ICONS = {
+    bulk: "journal-text",
+    scrape: "arrow-repeat",
+    upload: "cloud-arrow-up",
+    webhook: "globe2"
+};
+
 const RUN_HISTORY_TRIGGER_LABELS = {
     manual: "Manual",
     scheduled: "Scheduled",
@@ -1677,6 +1684,14 @@ const RUN_HISTORY_TRIGGER_LABELS = {
     radarr: "Radarr",
     sonarr: "Sonarr"
 };
+
+const RUN_HISTORY_TRIGGER_ICONS = {
+    manual: "hand-index-thumb",
+    scheduled: "alarm",
+    cli: "code-square",
+    radarr: "film",
+    sonarr: "tv"
+}
 
 function formatRunDuration(startedAt, endedAt) {
     const start = new Date(startedAt);
@@ -1692,6 +1707,26 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeFilter) {
         typeFilter.addEventListener("change", loadRunHistory);
     }
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+    const popoverBtn = document.getElementById("legendPopover");
+    if (!popoverBtn) return;
+
+    const popover = new bootstrap.Popover(popoverBtn, { 
+        trigger: "click",
+        container: "body"
+    });
+
+    // Dismiss when tapping/clicking anywhere outside the popover or button
+    document.addEventListener("click", (e) => {
+        const isBtn = popoverBtn.contains(e.target);
+        const isPopover = e.target.closest(".popover");
+
+        if (!isBtn && !isPopover) {
+            popover.hide();
+        }
+    });
 });
 
 function loadRunHistory() {
@@ -1723,28 +1758,34 @@ function loadRunHistory() {
         runs.forEach((run) => {
             const row = document.createElement("tr");
             const outcome = RUN_HISTORY_OUTCOME_LABELS[run.outcome] || { text: run.outcome, className: "" };
+            const triggerIcon = RUN_HISTORY_TRIGGER_ICONS[run.trigger] || "question-circle";
+            const triggerLabel = RUN_HISTORY_TRIGGER_LABELS[run.trigger] || "unknown";
+            const typeIcon = RUN_HISTORY_TYPE_ICONS[run.run_type] || "question-circle";
+            const typeLabel = RUN_HISTORY_TYPE_LABELS[run.run_type] || "unknown";
 
             const cells = [
-                new Date(run.started_at).toLocaleString(),
-                RUN_HISTORY_TYPE_LABELS[run.run_type] || run.run_type,
+                formatDateTime(run.started_at),
+                `<i class="bi bi-${typeIcon}" title="${typeLabel}"></i>`, // Run Type
                 run.label,
-                RUN_HISTORY_TRIGGER_LABELS[run.trigger] || run.trigger,
-                outcome.text,
-                run.assets_processed,
-                run.success_count,
-                run.cached_count,
-                run.locked_count,
-                run.error_count,
-                formatRunDuration(run.started_at, run.ended_at)
+                `<i class="bi bi-${triggerIcon}" title="${triggerLabel}"></i>`, // Run Trigger
+                `<i class="bi bi-${outcome.icon}" title="${outcome.text}"></i>`, // Run Outcome
+                `<span class="text-monospace">${run.assets_processed}</span>`,
+                `<span class="text-monospace">${run.success_count}</span>`,
+                `<span class="text-monospace">${run.cached_count}</span>`,
+                `<span class="text-monospace">${run.locked_count}</span>`,
+                `<span class="text-monospace">${run.error_count}</span>`,
+                `<span class="text-monospace">${formatRunDuration(run.started_at, run.ended_at)}</span>`,
             ];
 
             // Indexes match the header row: detail columns collapse on narrow screens
-            const narrowHidden = [3, 5, 6, 7, 8, 10];
+            const centeredIndexes = [1, 3, 4, 5, 6, 7, 8, 9, 10];
             cells.forEach((value, index) => {
                 const cell = document.createElement("td");
-                cell.textContent = value;
-                if (index === 4) { cell.className = outcome.className; }
-                if (narrowHidden.includes(index)) { cell.classList.add("d-none", "d-md-table-cell"); }
+                cell.innerHTML = value;
+                if (index === 4) { cell.className = `text-${outcome.iconColor}`; }
+                if (centeredIndexes.includes(index)) {
+                    cell.classList.add("text-center");
+                }
                 row.appendChild(cell);
             });
 
