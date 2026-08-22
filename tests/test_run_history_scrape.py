@@ -55,7 +55,7 @@ def configured_plex():
 
 def _scrape(**counts):
     """A stand-in for scrape_and_upload that moves the counters on the tally it is handed."""
-    def fake_scrape(instance, url, options, bulk, tally=None):
+    def fake_scrape(instance, url, options, bulk=None, tally=None):
         movers = {
             "assets": tally.assets, "success": tally.success, "cached": tally.cached,
             "locked": tally.locked, "failed": tally.failed,
