@@ -511,8 +511,21 @@ function detectEnvironment() {
     socket.emit("check_for_update", { instance_id: instanceId });
 }
 
+// Backend version this page was loaded against, learned from the first version_check
+let knownBackendVersion = null;
+
 socket.on("version_check", function(data) {
     if(validResponse(data, true)){
+        if (knownBackendVersion === null) {
+            knownBackendVersion = data.current_version;
+        } else if (data.current_version !== knownBackendVersion) {
+            // The backend was updated while this page was open, so this JS is stale
+            updateStatus("Backend updated, refreshing frontend too...", "warning", true, true, "arrow-counterclockwise")
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+            return;
+        }
         if (data.new_version) {
             // Show update notifier
             document.getElementById("latest_version").innerText = data.new_version;
@@ -2774,6 +2787,13 @@ socket.on("backend_restarting", function() {
     setTimeout(() => {
         location.reload();  // Reload the page
     }, 3000);  // Delay for 3 seconds to ensure restart
+});
+
+// After a reconnect the backend may have been updated while this page was open
+socket.on("connect", function() {
+    if (knownBackendVersion !== null) {
+        socket.emit("check_for_update", { instance_id: instanceId });
+    }
 });
 
 // Detect when the WebSocket connection is lost
