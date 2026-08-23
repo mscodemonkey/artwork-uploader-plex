@@ -356,7 +356,7 @@ h1 {
 
 /* Input with 2 trailing action buttons (Eye + Generate) */
 .form-control.has-two-inline-btns {
-    padding-right: 4rem !important;
+    padding-right: 3.5rem !important;
 }
 
 /* Folder Browse Icon Hover Styling (FIXED: Preserved translateY centering) */
@@ -492,6 +492,41 @@ h1 {
     transition: opacity 0.15s ease-in-out, transform 0.15s ease-in-out, color 0.15s ease-in-out;
 }
 
+/* Custom Apprise Events Panel */
+.apprise-events-panel {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 1050;
+    background-color: var(--bs-body-bg);
+    min-width: 220px;
+}
+
+.apprise-events-panel.show {
+    display: block !important;
+}
+
+/* Base caret arrow setup */
+.apprise-events-panel::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    width: 10px;
+    height: 10px;
+    background-color: var(--bs-body-bg);
+    border-top: 1px solid var(--bs-border-color);
+    border-left: 1px solid var(--bs-border-color);
+    transform: rotate(45deg);
+    z-index: 1051;
+}
+
+/* Caret offset for rows with 2 inline buttons (Wrench + Cross) */
+.apprise-url-input-wrap:has(.has-two-inline-btns) .apprise-events-panel::before,
+.apprise-url-input-wrap:has(.has-three-inline-btns) .apprise-events-panel::before {
+    right: 38px;
+}
+
 /* Hover effect: Scale without breaking vertical alignment */
 @media (hover: hover) {
     .apprise-row-actions .btn-inline-icon:hover {
@@ -530,13 +565,13 @@ h1 {
     display: inline-flex !important;
 }
 
-/* Right padding management for inputs */
-.apprise-url-row:last-child .apprise-url-input {
-    padding-right: 4rem !important; /* Space for both icons */
+/* Apprise URL Input Right Padding for Inline Action Buttons */
+.apprise-url-row .apprise-url-input.has-two-inline-btns {
+    padding-right: 3.5rem !important; /* Fits Wrench + Cross with breathing room */
 }
 
-.apprise-url-row:not(:last-child) .apprise-url-input {
-    padding-right: 2.25rem !important; /* Space for X icon only */
+.apprise-url-row .apprise-url-input.has-three-inline-btns {
+    padding-right: 5rem !important; /* Fits Wrench + Plus + Cross cleanly */
 }
 
 /* Hover color for delete icon (HIGH SPECIFICITY to beat dark mode defaults) */

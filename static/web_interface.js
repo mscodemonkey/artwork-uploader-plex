@@ -1387,6 +1387,24 @@ function toggleConfigButtons() {
         disableElement(["save_config_button", "restore_config"], false);
 
     }
+    
+    const rows = document.querySelectorAll(".apprise-url-row");
+
+    rows.forEach((row, index) => {
+        const isLast = index === rows.length - 1;
+        const input = row.querySelector(".apprise-url-input");
+        const panel = row.querySelector(".apprise-events-panel");
+        
+        if (input) {
+            input.classList.toggle("has-three-inline-btns", isLast);
+            input.classList.toggle("has-two-inline-btns", !isLast);
+        }
+        
+        if (panel) {
+            panel.classList.toggle("caret-three-btn", isLast);
+            panel.classList.toggle("caret-two-btn", !isLast);
+        }
+    });
 }
 
 // ==================================================
@@ -1656,7 +1674,7 @@ function loadBulkFileList() {
 /* Loading the run history */
 
 const RUN_HISTORY_OUTCOME_LABELS = {
-    success: { text: "Completed", className: "text-success", icon: "check-circle-fill", iconColor: "success" },
+    success: { text: "Completed successfully", className: "text-success", icon: "check-circle-fill", iconColor: "success" },
     partial: { text: "Completed with errors", className: "text-warning", icon: "exclamation-circle-fill", iconColor: "warning" },
     stopped: { text: "Stopped", className: "text-warning", icon: "stop-circle-fill", iconColor: "orange" },
     failed: { text: "Failed", className: "text-danger", icon: "x-circle-fill", iconColor: "danger" },
@@ -3060,7 +3078,7 @@ function toggleUserCacheExpiryField() {
 // Notification events a channel can be subscribed to, mirrors core/enums.py NotificationEvent
 const NOTIFICATION_EVENTS = [
     { value: "run_started", label: "Started" },
-    { value: "run_completed", label: "Completed cleanly" },
+    { value: "run_completed", label: "Completed successfully" },
     { value: "run_completed_with_errors", label: "Completed with errors" },
     { value: "run_failed_to_start", label: "Failed to start" },
     { value: "run_skipped", label: "Skipped" },
@@ -3082,17 +3100,17 @@ function createAppriseUrlRow(channel = {}, last = false) {
     const row = document.createElement("div");
     row.className = "apprise-url-row";
 
-    const eventChecks = NOTIFICATION_EVENTS.map(event => `
-            <div class="form-check form-check-inline">
-                <input class="form-check-input apprise-event-checkbox" type="checkbox" value="${event.value}"
-                       id="apprise_event_${rowId}_${event.value}" ${events.includes(event.value) ? "checked" : ""}>
-                <label class="form-check-label small" for="apprise_event_${rowId}_${event.value}">${event.label}</label>
-            </div>`).join("");
-
+    const eventChecksHtml = NOTIFICATION_EVENTS.map(event => `
+        <div class="form-check form-switch mb-1">
+            <input class="form-check-input apprise-event-checkbox" type="checkbox" value="${event.value}"
+                   id="apprise_event_${rowId}_${event.value}" ${events.includes(event.value) ? "checked" : ""}>
+            <label class="form-check-label small" for="apprise_event_${rowId}_${event.value}">${event.label}</label>
+        </div>`).join("");
+        
     row.innerHTML = `
         <div class="position-relative apprise-url-input-wrap">
             <input type="text"
-                   class="form-control input-monospace apprise-url-input ${last ? 'has-two-inline-btns' : 'has-inline-btn'}"
+                   class="form-control input-monospace apprise-url-input ${last ? 'has-three-inline-btns' : 'has-two-inline-btns'}"
                    placeholder="discord://{botname}@{WebhookID}/{WebhookToken}"
                    spellcheck="false"
                    autocomplete="off"
@@ -3102,13 +3120,48 @@ function createAppriseUrlRow(channel = {}, last = false) {
                 <button type="button" class="btn-inline-icon add-apprise-url-btn" title="Add another URL">
                     <i class="bi bi-plus-circle"></i>
                 </button>
+                <button type="button" class="btn-inline-icon config-apprise-events-btn" title="Notification events">
+                    <i class="bi bi-wrench-adjustable-circle"></i>
+                </button>               
                 <button type="button" class="btn-inline-icon remove-apprise-url-btn" title="Remove URL">
                     <i class="bi bi-x-circle"></i>
                 </button>
             </div>
+            <!-- Custom Dropdown Panel -->
+            <div class="apprise-events-panel shadow-sm rounded-3 border p-2">
+                <div class="fw-bold text-muted small mb-2 border-bottom pb-1">Subscribed Events</div>
+                ${eventChecksHtml}
+            </div>
         </div>
-        <div class="apprise-event-checks d-flex flex-wrap mb-2">${eventChecks}</div>
     `;
+
+    container.appendChild(row);
+    
+    const configBtn = row.querySelector(".config-apprise-events-btn");
+    const panel = row.querySelector(".apprise-events-panel");
+
+    configBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // Close any other open panels first
+        document.querySelectorAll(".apprise-events-panel.show").forEach(p => {
+            if (p !== panel) p.classList.remove("show");
+        });
+        panel.classList.toggle("show");
+    });
+
+    // Prevent clicking inside the panel from closing it
+    panel.addEventListener("click", (e) => {
+        e.stopPropagation();
+    });
+
+    // Global listener to close panel on click outside
+    const dismissHandler = (e) => {
+        if (!panel.contains(e.target) && !configBtn.contains(e.target)) {
+            panel.classList.remove("show");
+        }
+    };
+
+    document.addEventListener("click", dismissHandler);
 
     // Event listener to add a row
     row.querySelector(".add-apprise-url-btn").addEventListener("click", () => {
@@ -3120,6 +3173,7 @@ function createAppriseUrlRow(channel = {}, last = false) {
 
     // Event listener to remove this row
     row.querySelector(".remove-apprise-url-btn").addEventListener("click", () => {
+        document.removeEventListener("click", dismissHandler);
         row.remove();
         // Keep at least one empty row if all are deleted
         if (container.children.length === 0) {
@@ -3132,7 +3186,6 @@ function createAppriseUrlRow(channel = {}, last = false) {
     // URL would truncate the attribute and corrupt the channel on next save.
     row.querySelector(".apprise-url-input").value = url;
 
-    container.appendChild(row);
     toggleConfigButtons();
 }
 
@@ -3141,7 +3194,7 @@ function collectAppriseChannels() {
     return Array.from(document.querySelectorAll(".apprise-url-row"))
         .map(row => {
             const url = row.querySelector(".apprise-url-input").value.trim();
-            const events = Array.from(row.querySelectorAll(".apprise-event-checkbox:checked")).map(checkbox => checkbox.value);
+            const events = Array.from(row.querySelectorAll(".apprise-event-checkbox:checked")).map(cb => cb.value);
             return { url, events };
         })
         .filter(channel => channel.url !== "");
