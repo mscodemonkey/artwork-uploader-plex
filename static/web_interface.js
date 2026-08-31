@@ -1179,7 +1179,9 @@ function saveConfig() {
 
     // Process every possible condition of auth enable/disable and same/different username and password/no password provided
     // If auth is enabled and a password is NOT provided
-    if (save_config.auth_enabled && !save_config.auth_password) {
+    if (save_config.auth_enabled && !save_config.auth_username) {
+        updateStatus("A username must be provided to enable authentication", "danger", false, false, "x-circle");
+    } else if (save_config.auth_enabled && !save_config.auth_password) {
         // If the username provided is the same, proceed saving the configuration
         if (save_config.auth_username === config.auth_username) {
             socket.emit("save_config", { instance_id: instanceId, config: save_config });
