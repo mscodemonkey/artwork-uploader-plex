@@ -881,7 +881,7 @@ def log_to_file(label: str):
             source = URL_SOURCE_MAP.get(domain, "unknown_source")
             type = URL_TYPE_MAP.get(asset_type, "Unknown_type")
             url_type = type.get("label", "unknown_url_type")
-            log_label = f"{source}_{url_type}_{id}"
+            log_label = f"scrape_{source}_{url_type}_{id}"
     else:
         log_label = label
 
@@ -1233,7 +1233,9 @@ if __name__ == "__main__":
             cli_options.add_posters = False
             cli_options.add_sets = False
             try:
+                log_to_file(cli_command)
                 tally = ProcessingCallbacks()
+                started_at = datetime.now(timezone.utc).isoformat()
                 scrape_and_upload(
                     instance=cli_instance,
                     url=cli_command,
@@ -1241,14 +1243,37 @@ if __name__ == "__main__":
                     tally=tally
                 )
                 debug_me(f"Finished scraping TPDb user URL from CLI with {tally.success_counter[0]} asset(s) updated", "__main__")
+                RunHistory().add_run(
+                    run_type=RunType.SCRAPE.value,
+                    label=cli_command,
+                    started_at=started_at,
+                    ended_at=datetime.now(timezone.utc).isoformat(),
+                    trigger=RunTrigger.CLI.value,
+                    outcome=tally.outcome(),
+                    assets_processed=tally.assets_processed[0],
+                    success_count=tally.success_counter[0],
+                    cached_count=tally.cached_counter[0],
+                    locked_count=tally.locked_counter[0],
+                    error_count=tally.errors()
+                )
             except Exception as e:
                 debug_me(f"Error scraping TPDb user URL from CLI: {str(e)}", "__main__")
                 update_status(cli_instance, str(e), color=StatusColor.DANGER.value)
+                RunHistory.add_run(
+                    run_type=RunType.SCRAPE.value,
+                    label=cli_command,
+                    started_at=started_at,
+                    ended_at=datetime.now(timezone.utc).isoformat(),
+                    trigger=RunTrigger.CLI.value,
+                    outcome=RunOutcome.FAILED.value
+                )
 
         # User passed in a poster or set URL, so let's process that
         else:
             try:
+                log_to_file(cli_command)
                 tally = ProcessingCallbacks()
+                started_at = datetime.now(timezone.utc).isoformat()
                 scrape_and_upload(
                     instance=cli_instance,
                     url=cli_command,
@@ -1256,9 +1281,31 @@ if __name__ == "__main__":
                     tally=tally
                 )
                 debug_me(f"Finished scraping URL from CLI with {tally.success_counter[0]} asset(s) updated", "__main__")
+                RunHistory().add_run(
+                    run_type=RunType.SCRAPE.value,
+                    label=cli_command,
+                    started_at=started_at,
+                    ended_at=datetime.now(timezone.utc).isoformat(),
+                    trigger=RunTrigger.CLI.value,
+                    outcome=tally.outcome(),
+                    assets_processed=tally.assets_processed[0],
+                    success_count=tally.success_counter[0],
+                    cached_count=tally.cached_counter[0],
+                    locked_count=tally.locked_counter[0],
+                    error_count=tally.errors()
+                )
             except Exception as e:
                 debug_me(f"Error scraping URL from CLI: {str(e)}", "__main__")
                 update_status(cli_instance, str(e),color=StatusColor.DANGER.value)
+                RunHistory.add_run(
+                    run_type=RunType.SCRAPE.value,
+                    label=cli_command,
+                    started_at=started_at,
+                    ended_at=datetime.now(timezone.utc).isoformat(),
+                    trigger=RunTrigger.CLI.value,
+                    outcome=RunOutcome.FAILED.value
+                )
+
     else:
 
         # If no CLI arguments, proceed with UI creation (if not in interactive CLI mode)
