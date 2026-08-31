@@ -235,8 +235,9 @@ class MediuxScraper:
             
             show_id_backdrop_data = poster.get("show_id_backdrop", None)
             is_show_backdrop = show_id_backdrop_data is not None
-            
-            season_id_data = poster.get("season_id", None)
+
+            tvdb_season_id = poster.get("tvdb_season_id", None)
+            season_id_data = poster.get("season_id", None) or tvdb_season_id
             is_season_cover = season_id_data is not None
             season_id = season_id_data.get("id", None) if season_id_data else None
             
@@ -282,10 +283,15 @@ class MediuxScraper:
 
                 elif is_season_cover: # This is a season cover
                     file_type = FileType.SEASON_COVER.value
+                    episode = "Cover"
                     if season_id in show_map["seasons"]:
                         season = show_map["seasons"][season_id]
-                        episode = "Cover"
                         self.callbacks.debug(f"Detected season cover for S{season:02}")
+                    elif tvdb_season_id: # Fallback for MediUX sets that use TVDb metadata
+                        poster_title = poster.get("title", None)
+                        if poster_title and "Season" in poster_title:
+                            season = int(poster_title.split("Season")[-1].strip())
+                            self.callbacks.debug(f"Detected season cover for {season} S{season:02}")
                     else:
                         self.callbacks.debug(f"⏩ Skipping season cover - incorrect season metadata")
                         self.callbacks.log(f"⚠️ {show_name} ({year}) • {self.author} | Skipping season cover - incorrect season metadata")
