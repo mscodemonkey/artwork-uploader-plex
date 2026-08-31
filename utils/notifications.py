@@ -3,7 +3,7 @@ from datetime import datetime
 from core import globals
 from pprint import pprint
 from models.instance import Instance
-from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD
+from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD, DEFAULT_LOG_PATH
 from services.notify_service import NotifyService
 
 # For backwards compatibility
@@ -99,8 +99,21 @@ def update_log(instance: Instance, update_text: str, broadcast: bool = False) ->
     """
     try:
         timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+        log_message = f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{timestamp}]{ANSI_RESET} {update_text}"
+        log_file_message = f"[{timestamp}] {update_text}\n"
         with print_lock:
-            print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('info').get('ansi')}[{timestamp}]{ANSI_RESET} {update_text}")
+            print(log_message)
+        if globals.log_to_file:
+            try:
+                if not os.path.exists(globals.log_to_file):
+                    os.makedirs(DEFAULT_LOG_PATH, exist_ok=True)
+                    with open(globals.log_to_file, mode="xt", encoding="utf-8") as log_file:
+                        log_file.write("-"*40 + f" {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} " + "-"*40 + "\n")
+                with open(globals.log_to_file, mode="at", buffering=1, encoding="utf-8") as log_file:
+                    log_file.write(f"{log_file_message}")
+            except Exception as e:
+                debug_me(f"Unable to initialize log file {globals.log_to_file}: {str(e)}")
+                pass
         if instance.mode == "web":
             if not instance.broadcast and broadcast:
                 instance.broadcast = broadcast

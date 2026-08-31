@@ -20,6 +20,7 @@ scrapes_running: int = 0      # How many scrapes are in flight; the flag clears 
 scrape_type: Literal['scrape', 'bulk', 'upload', 'stopped'] = 'stopped'
 main_bar: dict = {}
 bulk_bar: dict = {}
+log_to_file: str = None
 
 # Single-flight guard for bulk imports (scheduled or manual). A second bulk import that starts
 # while one is already running is refused rather than queued - see process_bulk_import_from_ui.

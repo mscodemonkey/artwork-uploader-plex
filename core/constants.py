@@ -24,6 +24,7 @@ ASSET_INDEX_PATH = "config/asset_index.db"
 DEFAULT_BULK_IMPORTS_DIR = "bulk_imports"
 DEFAULT_BULK_IMPORT_FILE = "bulk_import.txt"
 RUN_HISTORY_PATH = "config/run_history.json"
+DEFAULT_LOG_PATH = "logs"
 
 # Run history retention (whichever limit is hit first prunes the record).
 # The entry cap is per run type, so frequent webhook imports can't crowd out bulk runs.

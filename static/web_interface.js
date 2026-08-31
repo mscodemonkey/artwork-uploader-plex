@@ -1795,13 +1795,14 @@ function loadRunHistory() {
             const triggerLabel = RUN_HISTORY_TRIGGER_LABELS[run.trigger] || "unknown";
             const typeIcon = RUN_HISTORY_TYPE_ICONS[run.run_type] || "question-circle";
             const typeLabel = RUN_HISTORY_TYPE_LABELS[run.run_type] || "unknown";
+            const logFileName = run.log_file
 
             const cells = [
                 formatDateTime(run.started_at),
                 `<i class="bi bi-${typeIcon}" title="${typeLabel}"></i>`, // Run Type
                 run.label,
                 `<i class="bi bi-${triggerIcon}" title="${triggerLabel}"></i>`, // Run Trigger
-                `<i class="bi bi-${outcome.icon}" title="${outcome.text}"></i>`, // Run Outcome
+                `<i class="bi bi-${outcome.icon} cursor-pointer" style="cursor: pointer;" title="${outcome.text}" onclick="showLogsforRun('${logFileName}')"></i>`, // Run Outcome
                 `<span class="text-monospace">${run.assets_processed}</span>`,
                 `<span class="text-monospace">${run.success_count}</span>`,
                 `<span class="text-monospace">${run.cached_count}</span>`,
@@ -1825,6 +1826,40 @@ function loadRunHistory() {
             body.appendChild(row);
         });
     });
+}
+
+function showLogsforRun(logFileName) {
+    if (!logFileName) return;
+
+    socket.emit("get_log_file", { instance_id: instanceId, log_file_name: logFileName });
+
+    socket.once("get_log_file", data => {
+        if (validResponse(data)) {
+            if (data.success) {
+                const logText = data.contents;
+                const modalEl = document.getElementById("run_log_modal");
+                const contentEl = document.getElementById("run_log_content");
+                const modalTitleEl = document.getElementById("runLogModalLabel");
+
+                // Update modal header title & content
+                if (modalTitleEl) {
+                    modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${logFileName}</span>`;
+                }
+                
+                if (contentEl) {
+                    contentEl.textContent = logText;
+                }
+
+                // Show modal safely
+                const logModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                logModal.show();
+
+            } else {
+                console.warn("Unable to display log file contents")
+            }
+        }
+    })
+
 }
 
 function saveBulkImport(filename, nowLoad = null) {

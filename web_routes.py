@@ -28,7 +28,7 @@ from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me
 from services import UtilityService, AuthenticationService, RunHistory
 from services.webhook_service import parse_event
-from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER, URL_SOURCE_MAP, URL_TYPE_MAP
+from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER, URL_SOURCE_MAP, URL_TYPE_MAP, DEFAULT_LOG_PATH
 
 def login_required(f):
     """Decorator to require authentication for routes."""
@@ -360,6 +360,31 @@ def setup_socket_handlers(
             debug_me(f"Error loading bulk import file list: {e}")
         notify_web(instance, "load_bulk_filelist", {"bulk_files": bulk_files})
 
+    @globals.web_socket.on("get_log_file")
+    def get_log_file(data):
+        """Get the contents of a log file and send them back to the frontend"""
+        instance = Instance(data.get("instance_id"), "web")
+        log_file_name = data.get("log_file_name")
+        full_path = os.path.join(DEFAULT_LOG_PATH, log_file_name)
+        log_file_contents = ""
+
+        try:
+            with open(full_path, "r", encoding="utf-8") as log_file:
+                log_file_contents = log_file.read()
+            debug_me(f"Successfully obtained contents of log file '{log_file_name}'")
+        except Exception as e:
+            debug_me(f"Unable to read contents of log file '{log_file_name}': {str(e)}")
+
+        notify_web(
+            instance=instance,
+            event="get_log_file",
+            data_to_include={
+                "success": True if log_file_contents else False,
+                "contents": log_file_contents
+            },
+            silent=True
+        )
+
     @globals.web_socket.on("load_run_history")
     def load_run_history(data):
         """Load recent run history, optionally narrowed to one run type."""
@@ -386,7 +411,15 @@ def setup_socket_handlers(
                 else:
                     run["label"] = f"<i class='bi bi-x-octagon text-danger' title='{label}'>&nbsp;Error parsing URL</i>"
 
-        notify_web(instance, "load_run_history", {"runs": runs, "run_type": run_type or "all"})
+        notify_web(
+            instance=instance,
+            event="load_run_history",
+            data_to_include={
+                "runs": runs,
+                "run_type": run_type or "all"
+            },
+            silent=True
+        )
 
     @globals.web_socket.on("load_bulk_import")
     def load_bulk_import(data):
