@@ -43,11 +43,14 @@ from core.constants import (
     GITHUB_REPO,
     DEFAULT_WEB_PORT,
     DEFAULT_WEB_HOST,
+    DEFAULT_LOG_PATH,
     SCHEDULER_CHECK_INTERVAL,
     UPDATE_CHECK_INTERVAL,
     MIN_PYTHON_MAJOR,
     MIN_PYTHON_MINOR,
-    VALID_FILENAME_PATTERN
+    VALID_FILENAME_PATTERN,
+    URL_SOURCE_MAP,
+    URL_TYPE_MAP
 )
 from core.enums import InstanceMode, NotificationEvent, StatusColor, RunType, RunTrigger, RunOutcome
 from services import (
@@ -144,6 +147,8 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
         return
 
     start_time = time.time()
+
+    log_to_file(display_filename)
     update_log(instance, f"🎬 Bulk process started for '{display_filename}'")
 
     try:
@@ -191,10 +196,17 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
 
     finally:
         RunHistory().add_run(
-            RunType.BULK.value, display_filename, started_at, datetime.now(timezone.utc).isoformat(),
-            RunTrigger.CLI.value, outcome,
-            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
-            tally.locked_counter[0], tally.errors(errors)
+            run_type=RunType.BULK.value,
+            label=display_filename,
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=RunTrigger.CLI.value,
+            outcome=outcome,
+            assets_processed=tally.assets_processed[0],
+            success_count=tally.success_counter[0],
+            cached_count=tally.cached_counter[0],
+            locked_count=tally.locked_counter[0],
+            error_count=tally.errors(errors)
         )
 
 # ---------------------- GUI FUNCTIONS ----------------------
@@ -250,6 +262,7 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         # Process the URL and options passed from the GUI or website
         parsed_line = parse_url_and_options(url)
         label = parsed_line.url
+        log_to_file(label)
         update_status(instance, f"Scraping URL '{parsed_line.url}'", color=StatusColor.INFO.value, sticky=True, spinner=True)
 
         title, author = scrape_and_upload(
@@ -274,10 +287,17 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         # makes the browser reload the history table, so a record written afterwards would
         # miss its own refresh and only appear the next time somebody opened the tab.
         RunHistory().add_run(
-            RunType.SCRAPE.value, label, started_at, datetime.now(timezone.utc).isoformat(),
-            RunTrigger.MANUAL.value, outcome,
-            tally.assets_processed[0], tally.success_counter[0], tally.cached_counter[0],
-            tally.locked_counter[0], tally.errors()
+            run_type=RunType.SCRAPE.value,
+            label=label,
+            started_at=started_at,
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=RunTrigger.MANUAL.value,
+            outcome=outcome,
+            assets_processed=tally.assets_processed[0],
+            success_count=tally.success_counter[0],
+            cached_count=tally.cached_counter[0],
+            locked_count=tally.locked_counter[0],
+            error_count=tally.errors()
         )
         globals.scrapes_running -= 1
         if globals.scrapes_running <= 0:
@@ -303,6 +323,8 @@ def run_bulk_import_scrape_in_thread(
 
     # Loop through the import file and build a list of URLs and options
     # Ignoring any lines containing comments using # or //
+    if filename:
+        log_to_file(filename)
     update_log(instance, f"🎬 Bulk process started for '{filename}'")
 
     for n, line in enumerate(bulk_import_list, 1):
@@ -376,6 +398,7 @@ def process_bulk_import_from_ui(
     # collide repeatedly; the caller (a schedule or the user) simply tries again later.
     if not globals.bulk_import_lock.acquire(blocking=False):
         message = f"⚠️ Bulk import of '{display_filename}' refused - another bulk import is already running"
+        log_to_file(display_filename)
         update_log(instance, message)
         update_status(instance, "Bulk import refused: another bulk import is already running", color=StatusColor.WARNING.value)
         if schedule_id:
@@ -844,6 +867,30 @@ def sort_key(item):
     """Sort key for artwork items - uses UtilityService."""
     return UtilityService.sort_key(item)
 
+def log_to_file(label: str):
+    if globals.log_to_file:
+        debug_me(f"Logging is already active for another run")
+        return
+    if ".txt" in label:
+        log_label = f"bulk_{label.split(".txt")[0]}"
+    elif "https" in label:
+        clean_url = label.replace("https://", "").strip()
+        parts = [p for p in clean_url.split("/") if p]
+        if len(parts) >= 3:
+            domain, asset_type, id = parts[0], parts[1], parts[2]
+            source = URL_SOURCE_MAP.get(domain, "unknown_source")
+            type = URL_TYPE_MAP.get(asset_type, "Unknown_type")
+            url_type = type.get("label", "unknown_url_type")
+            log_label = f"{source}_{url_type}_{id}"
+    else:
+        log_label = label
+
+    log_label = log_label.lower()
+    timestamp = datetime.now()
+    log_filename = f"{timestamp.strftime('%Y-%m-%d_%H-%M-%S')}_{log_label}"
+    globals.log_to_file = os.path.join(DEFAULT_LOG_PATH, f"{log_filename}.log")
+    debug_me(f"Setting log file for this run to '{globals.log_to_file}'")
+
 # Autoupdate functions
 
 def get_latest_version():
@@ -906,6 +953,7 @@ def process_bulk_file_on_schedule(instance: Instance, filename, schedule_id):
             with open(bulk_import_file, "r", encoding="utf-8") as file:
                 content = file.read()
             if content:
+                log_to_file(filename)
                 update_log(instance, f"🕘 Scheduled bulk import started for '{filename}'")
                 debug_me(f"Scheduled import started for instance {instance.id} mode {instance.mode}")
                 send_notification(instance, f"🕘 Scheduled bulk import started for '{filename}'", event=NotificationEvent.RUN_STARTED.value)

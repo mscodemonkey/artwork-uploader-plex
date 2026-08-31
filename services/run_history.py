@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 from core.enums import RunType, RunTrigger
 from core import globals
 
-from core.constants import RUN_HISTORY_PATH, RUN_HISTORY_MAX_ENTRIES, RUN_HISTORY_MAX_AGE_DAYS
+from core.constants import RUN_HISTORY_PATH, RUN_HISTORY_MAX_ENTRIES, RUN_HISTORY_MAX_AGE_DAYS, DEFAULT_LOG_PATH
 
 # A new RunHistory() is created per call rather than shared, so the read-modify-write in
 # add_run needs a lock keyed by file path (not an instance lock) to stop two runs finishing
@@ -81,8 +81,10 @@ class RunHistory:
                 pass  # nothing to tidy up, or the same problem that stopped the write
 
     def _prune(self, runs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        pruned_runs = []
         if self.max_age_days:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=self.max_age_days)).isoformat()
+            pruned_runs = [run for run in runs if run.get("started_at", "") < cutoff]
             runs = [run for run in runs if run.get("started_at", "") >= cutoff]
         if self.max_entries:
             # The count cap is per run type. A busy library can take dozens of webhook
@@ -93,10 +95,23 @@ class RunHistory:
             for run in reversed(runs):
                 run_type = run.get("run_type", RunType.BULK.value)
                 if kept_per_type[run_type] >= self.max_entries:
+                    pruned_runs.append(run)
                     continue
                 kept_per_type[run_type] += 1
                 kept.append(run)
             runs = list(reversed(kept))
+        # Delete the log files for the pruned runs
+        for run in pruned_runs:
+            log_file = run.get("log_file", "")
+            if log_file:
+                full_path = os.path.join(DEFAULT_LOG_PATH, log_file)
+                try:
+                    os.remove(full_path)
+                    debug_me(f"Deleted log file '{log_file}'")
+                except Exception as e:
+                    from utils.notifications import debug_me
+                    debug_me(f"Unable to remove log file '{log_file}': {str(e)}")
+                    pass
         return runs
 
     def add_run(
@@ -132,8 +147,10 @@ class RunHistory:
                 "cached_count": cached_count,
                 "locked_count": locked_count,
                 "error_count": error_count,
+                "log_file": os.path.basename(globals.log_to_file) if globals.log_to_file else ""
             })
             self._save(self._prune(runs))
+        globals.log_to_file = None # Stop persistent logging after a run is recorded
         if job_id and globals.scheduler_service:
             job_meta = globals.scheduler_service.schedule_meta.get(job_id)
             if job_meta:

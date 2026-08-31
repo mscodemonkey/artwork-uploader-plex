@@ -1406,6 +1406,23 @@
     <script src="/static/dark_mode.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 
+    <!-- Run History Log Viewer Modal -->
+    <div class="modal fade" id="run_log_modal" tabindex="-1" aria-labelledby="runLogModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="runLogModalLabel">
+                        <i class="bi bi-file-earmark-text"></i>&ensp;Execution Log
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body bg-dark text-light p-3">
+                    <pre id="run_log_content" class="text-monospace mb-0" style="white-space: pre-wrap; font-size: 0.825rem; max-height: 60vh; overflow-y: auto;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Folder Browser Modal -->
     <div class="modal fade" id="folderBrowserModal" tabindex="-1" aria-labelledby="folderBrowserModalLabel">
         <div class="modal-dialog modal-dialog-scrollable">

@@ -8,8 +8,7 @@ authoritative TMDb resolution, artwork-ID skips, locked-artwork skips, Kometa mo
 code a normal scrape uses, so the webhook inherits all of it without re-implementing any of it.
 """
 
-import threading
-import time
+import threading, time, re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import FrozenSet, List, Optional, Union
@@ -39,6 +38,10 @@ def _debug(message: str) -> None:
     from utils.notifications import debug_me
     debug_me(message, "WebhookService")
 
+def _clean_title(title: str) -> str:
+    """Removes year in parenthesis from title"""
+    return re.sub(r'\s*\(\d{4}\)$', '', title.strip())
+
 
 @dataclass(frozen=True)
 class WebhookEvent:
@@ -52,7 +55,9 @@ class WebhookEvent:
     source: str                    # "radarr" or "sonarr"
 
     def label(self) -> str:
-        return f"{self.title} ({self.year})" if self.year else self.title
+        # Remove the year from the title if the title contains it to avoid duplicating it
+        clean_title = _clean_title(self.title)
+        return f"{clean_title} ({self.year})" if self.year else self.title # Keeps the year in the title if the year is not present in the event
 
 
 def _int_or_none(value) -> Optional[int]:
@@ -153,6 +158,10 @@ class WebhookService:
         from processors.upload_processor import UploadProcessor
         outcome = RunOutcome.FAILED.value
         try:
+            from artwork_uploader import log_to_file
+            clean_title = _clean_title(event.title)
+            log_Label = f"webhook_{clean_title}_{event.year}" if event.year else f"webhook_{_clean_title(clean_title)}"
+            log_to_file(log_Label)
             if artwork is None:
                 artwork = self._collect_artwork(event)
                 if not artwork:
@@ -223,11 +232,17 @@ class WebhookService:
         """Record the run and let the next event for this title through."""
         try:
             RunHistory().add_run(
-                RunType.WEBHOOK.value, event.label(), started_at,
-                datetime.now(timezone.utc).isoformat(),
-                _TRIGGER_BY_SOURCE.get(event.source, event.source), outcome,
-                tally.assets_processed[0], tally.success_counter[0], 0,
-                tally.locked_counter[0], tally.failed_counter[0],
+                run_type=RunType.WEBHOOK.value,
+                label=event.label(),
+                started_at=started_at,
+                ended_at=datetime.now(timezone.utc).isoformat(),
+                trigger=_TRIGGER_BY_SOURCE.get(event.source, event.source),
+                outcome=outcome,
+                assets_processed=tally.assets_processed[0],
+                success_count=tally.success_counter[0],
+                cached_count=0,
+                locked_count=tally.locked_counter[0],
+                error_count=tally.failed_counter[0]
             )
             # Nothing else tells an open History tab that this happened. A scrape and a
             # bulk import both end with a scrape_state broadcast the browser reacts to;
