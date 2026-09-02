@@ -1231,7 +1231,7 @@ if __name__ == "__main__":
             except Exception as e:
                 debug_me(f"Error scraping TPDb user URL from CLI: {str(e)}", "__main__")
                 update_status(cli_instance, str(e), color=StatusColor.DANGER.value)
-                RunHistory.add_run(
+                RunHistory().add_run(
                     run_type=RunType.SCRAPE.value,
                     label=cli_command,
                     started_at=started_at,
@@ -1269,7 +1269,7 @@ if __name__ == "__main__":
             except Exception as e:
                 debug_me(f"Error scraping URL from CLI: {str(e)}", "__main__")
                 update_status(cli_instance, str(e),color=StatusColor.DANGER.value)
-                RunHistory.add_run(
+                RunHistory().add_run(
                     run_type=RunType.SCRAPE.value,
                     label=cli_command,
                     started_at=started_at,
