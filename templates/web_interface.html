@@ -1410,7 +1410,7 @@
 
     <!-- Run History Log Viewer Modal -->
     <div class="modal fade" id="run_log_modal" tabindex="-1" aria-labelledby="runLogModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl modal-dialog-scrollable custom-log-modal-pos">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="runLogModalLabel">
@@ -1418,8 +1418,29 @@
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+                <div class="px-3 py-2 bg-body-tertiary border-bottom border-secondary-subtle d-flex flex-wrap align-items-center gap-3 gap-y-2">
+                    <span class="text-nowrap small fw-bold text-secondary d-flex align-items-center gap-1">
+                        <i class="bi bi-filter-circle"></i> Filter:
+                    </span>
+                    <div class="form-check filter-log-item mb-0">
+                        <input class="form-check-input" type="checkbox" id="log_filter-updated"/>
+                        <label for="log_filter-updated" class="form-check-label text-nowrap small">Updated</label>
+                    </div>
+                    <div class="form-check filter-log-item mb-0">
+                        <input class="form-check-input" type="checkbox" id="log_filter-skipped"/>
+                        <label for="log_filter-skipped" class="form-check-label text-nowrap small">Skipped</label>
+                    </div>
+                    <div class="form-check filter-log-item mb-0">
+                        <input class="form-check-input" type="checkbox" id="log_filter-warning"/>
+                        <label for="log_filter-warning" class="form-check-label text-nowrap small">Warning</label>
+                    </div>
+                    <div class="form-check filter-log-item mb-0">
+                        <input class="form-check-input" type="checkbox" id="log_filter-error"/>
+                        <label for="log_filter-error" class="form-check-label text-nowrap small">Error</label>
+                    </div>
+                </div>
                 <div class="modal-body bg-dark text-light p-3">
-                    <pre id="run_log_content" class="text-monospace mb-0" style="white-space: pre-wrap; font-size: 0.825rem; max-height: 60vh; overflow-y: auto;"></pre>
+                    <pre id="run_log_content" class="text-monospace mb-0" style="white-space: pre-wrap; font-size: 0.825rem; overflow-y: auto;"></pre>
                 </div>
             </div>
         </div>

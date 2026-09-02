@@ -293,6 +293,7 @@ document.addEventListener("DOMContentLoaded", function () {
         updatePickerLabel(moviePicker);     // Updates your "(X available)" placeholder label
     });
 
+    configLogModalProperties();
     loadConfig();
     toggleThePosterDBElements();
     toggleWebhookSettings();
@@ -530,7 +531,6 @@ socket.on("version_check", function(data) {
             // Show update notifier
             document.getElementById("latest_version").innerText = data.new_version;
             document.getElementById("version_notifier").classList.remove("d-none");
-            //document.getElementById("check-update-btn").classList.add("d-none");
         }
         // Display current version in the About tab
         document.getElementById("app_version").innerText = data.current_version;
@@ -1876,6 +1876,8 @@ function deleteRun(timestamp, label) {
     };
 }
 
+let logText = "";
+
 function showLogsforRun(logFileName, runLabel) {
     if (logFileName === "undefined") {
         updateStatus(`No associated log file for ${runLabel}`, "warning", false, false, "exclamation-triangle")
@@ -1887,32 +1889,127 @@ function showLogsforRun(logFileName, runLabel) {
     socket.once("get_log_file", data => {
         if (validResponse(data)) {
             if (data.success) {
-                const logText = data.contents;
+                logText = data.contents;
                 const modalEl = document.getElementById("run_log_modal");
                 const contentEl = document.getElementById("run_log_content");
                 const modalTitleEl = document.getElementById("runLogModalLabel");
 
-                // Update modal header title & content
-                if (modalTitleEl) {
-                    modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${runLabel}</span>`;
-                }
+                const logFilterCheckboxes = document.querySelectorAll('[id^=log_filter-]');
                 
-                if (contentEl) {
-                    contentEl.textContent = logText;
-                }
+                logFilterCheckboxes.forEach((cb) => {
+                    cb.checked = false;
+                    cb.addEventListener("change", onFilterChange)
+                })
+
+                // Update modal header title & content
+                modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${runLabel}</span>`;
+                contentEl.textContent = logText;
 
                 // Show modal safely
                 const logModal = bootstrap.Modal.getOrCreateInstance(modalEl);
                 logModal.show();
-
             } else {
-                updateStatus(`Unable to load log file ${runLabel} for run`, "danger", false, false, "x-octagon")
+                updateStatus(`Unable to load log file for ${runLabel}`, "danger", false, false, "x-octagon")
                 console.warn(`Unable to display log file contents for ${runLabel}`)
             }
         }
     })
-
 }
+
+function onFilterChange() {
+    const contentEl = document.getElementById("run_log_content");
+    if (!contentEl) return;
+    
+    const updated_cb = document.getElementById("log_filter-updated")?.checked;
+    const skipped_cb = document.getElementById("log_filter-skipped")?.checked;
+    const warning_cb = document.getElementById("log_filter-warning").checked;
+    const error_cb = document.getElementById("log_filter-error").checked;
+
+    if (!updated_cb && !skipped_cb && !warning_cb && !error_cb) {
+        contentEl.textContent = logText;
+    } else {
+        contentEl.textContent = filterLogContent(logText, updated_cb, skipped_cb, warning_cb, error_cb);
+    }
+}
+
+function filterLogContent(content, updated, skipped, warning, error) {
+    if (!content) return;
+
+    return content
+        .split("\n")
+        .filter(line => 
+            line.includes("-----") ||
+            updated && (line.includes("✅") || line.includes("♻️")) ||
+            skipped && line.includes("⏩") ||
+            warning && line.includes("⚠️") ||
+            error && line.includes("❌")
+        )
+        .join("\n")
+}
+
+function configLogModalProperties() {
+    const modalEl = document.getElementById("run_log_modal");
+    if (!modalEl) return;
+
+    const dialog = modalEl.querySelector(".modal-dialog");
+    const header = modalEl.querySelector(".modal-header");
+    const content = modalEl.querySelector(".modal-content");
+
+    let isDragging = false;
+    let startX, startY, initialLeft, initialTop;
+
+    header.addEventListener("mousedown", (e) => {
+        if (e.target.closest(".btn-close")) return;
+
+        const dialogRect = dialog.getBoundingClientRect();
+
+        dialog.classList.add("is-dragging");
+
+        // Convert centered transform to explicit pixel coordinates ONLY when dragging starts
+        dialog.style.transform = "none";
+        dialog.style.left = `${dialogRect.left}px`;
+        dialog.style.top = `${dialogRect.top}px`;
+
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        initialLeft = dialogRect.left;
+        initialTop = dialogRect.top;
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+    });
+
+    function onMouseMove(e) {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        dialog.style.left = `${initialLeft + dx}px`;
+        dialog.style.top = `${initialTop + dy}px`;
+    }
+
+    function onMouseUp() {
+        isDragging = false;
+        dialog.classList.remove("is-dragging");
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    // Wipe all custom inline position/size overrides on modal hide
+    modalEl.addEventListener("hidden.bs.modal", () => {
+        isDragging = false;
+        dialog.classList.remove("is-dragging");
+        dialog.removeAttribute("style");
+        if (content) {
+            content.removeAttribute("style");
+        }
+        const logFilterCheckboxes = document.querySelectorAll('[id^=log_filter-]');
+        logFilterCheckboxes.forEach((cb) => {
+            cb.removeEventListener("change", onFilterChange);
+        });
+    });
+};
 
 function saveBulkImport(filename, nowLoad = null) {
 
