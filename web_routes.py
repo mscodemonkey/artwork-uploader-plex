@@ -11,7 +11,7 @@ The routes are organized into:
 """
 
 import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading, uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
@@ -23,9 +23,9 @@ from utils.utils import calculate_file_md5, get_host_path
 from models.instance import Instance
 from models.bulk_schedule import BulkSchedule
 from core.config import Config, normalize_notification_channels
-from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, IntervalUnit
+from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, RunTrigger, RunOutcome, IntervalUnit
 from processors.media_metadata import parse_title
-from utils.notifications import update_log, update_status, notify_web, debug_me
+from utils.notifications import update_log, update_status, notify_web, debug_me, log_to_file
 from services import UtilityService, AuthenticationService, RunHistory
 from services.webhook_service import parse_event
 from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER, URL_SOURCE_MAP, URL_TYPE_MAP, DEFAULT_LOG_PATH
@@ -385,6 +385,40 @@ def setup_socket_handlers(
             silent=True
         )
 
+    @globals.web_socket.on("delete_run")
+    def delete_run(data):
+        """Deletes a single run from the run history"""
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
+        timestamp = data.get("timestamp", None)
+        if timestamp:
+            try:
+                RunHistory().delete_run(timestamp)
+                notify_web(
+                    instance=instance,
+                    event="run_deleted",
+                    data_to_include={ "success": True }
+                )
+                update_status(
+                    instance=instance,
+                    message="Successfully deleted run",
+                    color="success",
+                    icon="check-circle"
+                )
+
+            except Exception as e:
+                debug_me(f"WTF: {e}")
+                notify_web(
+                    instance=instance,
+                    event="run_deleted",
+                    data_to_include={ "success": False }
+                )
+                update_status(
+                    instance=instance,
+                    message="Unable to delete run",
+                    color="danger",
+                    icon="x-circle"
+                )
+
     @globals.web_socket.on("load_run_history")
     def load_run_history(data):
         """Load recent run history, optionally narrowed to one run type."""
@@ -392,9 +426,11 @@ def setup_socket_handlers(
         run_type = data.get("run_type") or None
         if run_type not in RunType:
             run_type = None
-        runs = RunHistory().get_runs(limit=50, run_type=run_type)
+        runs = RunHistory().get_runs(run_type=run_type)
         for run in runs:
             label = run.get("label", "")
+            timestamp = run.get("started_at", "")
+            onclick = f"""onclick="deleteRun('{timestamp}', '{label}')" """
             if label and "https" in label:
                 clean_url = label.replace("https://", "").strip()
                 parts = [p for p in clean_url.split("/") if p]
@@ -402,14 +438,17 @@ def setup_socket_handlers(
                     domain, asset_type, id = parts[0], parts[1], parts[2]
                     source = URL_SOURCE_MAP.get(domain, "Unknown")
                     type = URL_TYPE_MAP.get(asset_type, { "icon": "question-circle", "label": "Unknown URL type" })
-                    run["label"] = (
-                        f'<a href="{label}" target="_blank" rel="noopener noreferrer" '
+                    run["html_label"] = (
+                        f"<a href='{label}' target='_blank' rel='noopener noreferrer' "
                         f"class='text-decoration-none text-reset' title='{label}'>{source} "
-                        f"<i class='bi bi-{type.get("icon", "question-circle")}' title='{type.get("label", "Unknown URL type")}'></i> "
-                        f"<span class='input-monospace' style='font-size: 0.8rem;'>{id}</span></span>"
+                        f"<i class='bi bi-{type.get('icon', 'question-circle')}' title='{type.get('label', 'Unknown URL type')}'></i> "
+                        f"<span class='input-monospace' style='font-size: 0.8rem;'>{id}</span></a> "
+                        f"<i class='bi bi-x-circle inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i>"
                     )
                 else:
-                    run["label"] = f"<i class='bi bi-x-octagon text-danger' title='{label}'>&nbsp;Error parsing URL</i>"
+                    run["html_label"] = f"<i class='bi bi-x-octagon text-danger' title='{label}'>&nbsp;Error parsing URL</i>"
+            elif label:
+                run["html_label"] = f"<span class='text-nowrap'>{label} <i class='bi bi-x-circle inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i></span>"
 
         notify_web(
             instance=instance,
@@ -952,12 +991,24 @@ def setup_socket_handlers(
         bar_speed = "fast"
         progress_MB = ((chunk_index * UPLOAD_CHUNK_SIZE ) / 1000000).__round__(2)
         start_time = data["startTime"]
+        run_start = datetime.fromtimestamp(start_time / 1000.0, tz=timezone.utc).isoformat()
         current_time = data["currentTime"]
 
         if chunk_index == 0:
             globals.cancel_scrape = False
             globals.scrapes_running += 1
             globals.scrape_type = "upload"
+
+            globals.upload_run_metadata = {}
+            run_label = file_name.split(".zip")[0].strip()
+            clean_file_name = run_label.replace(" (", "_").replace(")", "").replace(" - ", "_").replace(" • ", "_").replace(" ", "_")
+            log_label = f"upload_{clean_file_name}"
+            globals.upload_run_metadata["run_label"] = run_label
+            globals.upload_run_metadata["start_time"] = run_start
+            log_to_file(log_label)
+
+            update_log(instance, f"📤 {file_name} • Upload initiated")
+            debug_me(f"Uploading '{file_name}")
             notify_web(instance, "scrape_state", { "running": True, "type": globals.scrape_type })
 
         if globals.cancel_scrape:
@@ -965,13 +1016,25 @@ def setup_socket_handlers(
             update_log(instance, f"🛑 {file_name} • File upload canceled by user")
             update_status(instance, f"File upload canceled by user", color=StatusColor.WARNING.value)
             if file_name in upload_chunks:
+                if upload_chunks[file_name].get("watchdog"):
+                    upload_chunks[file_name]["watchdog"].cancel()
                 try:
                     upload_chunks[file_name]["temp_file"].close()
                     if os.path.exists(upload_chunks[file_name]["temp_path"]):
                         os.remove(upload_chunks[file_name]["temp_path"])
                 except Exception:
                     pass
-                del upload_chunks[file_name]            
+                del upload_chunks[file_name]
+
+                RunHistory().add_run(
+                    run_type=RunType.UPLOAD.value,
+                    label=globals.upload_run_metadata.get("run_label", "unknown"),
+                    started_at=globals.upload_run_metadata.get("start_time", datetime.now(timezone.utc).isoformat()),
+                    ended_at=datetime.now(timezone.utc).isoformat(),
+                    trigger=RunTrigger.MANUAL.value,
+                    outcome=RunOutcome.STOPPED.value
+                )
+
             globals.scrapes_running -= 1
             if globals.scrapes_running <= 0:
                 globals.scrapes_running = 0
@@ -1165,6 +1228,14 @@ def save_uploaded_file(
         globals.main_bar["active"] = False
         update_log(instance, f"🛑 {os.path.basename(temp_zip_path)} • ZIP file parsing canceled by user")
         update_status(instance, f"ZIP file parsing canceled by user", color=StatusColor.WARNING.value)
+        RunHistory().add_run(
+            run_type=RunType.UPLOAD.value,
+            label=globals.upload_run_metadata.get("run_label", "unknown"),
+            started_at=globals.upload_run_metadata.get("start_time", datetime.now(timezone.utc).isoformat()),
+            ended_at=datetime.now(timezone.utc).isoformat(),
+            trigger=RunTrigger.MANUAL.value,
+            outcome=RunOutcome.STOPPED.value
+        )
         globals.scrapes_running -= 1
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0

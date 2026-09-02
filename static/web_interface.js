@@ -11,10 +11,10 @@ let bulkTextAsLoaded = '';      // File contents when loaded, to determine chang
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
 let tvPicker, moviePicker, tpdbUserPicker;
-let validationTimeout
+let validationTimeout;
 let currentBrowseTargetInput = null;
 let currentDirectoryPath = "/";
-let initialConfig = ''
+let initialConfig = '';
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -1436,7 +1436,9 @@ function saveBulkChangesModal(filename) {
 
         // Update buttons with choices
         document.getElementById("yesButton").innerHTML = '<i class="bi bi-floppy2"></i>&ensp;Save&nbsp;'
+        document.getElementById("yesButton").classList.remove("btn-danger")
         document.getElementById("noButton").innerHTML = '<i class="bi bi-trash3"></i>&ensp;Discard&nbsp;'
+        document.getElementById("cancelButton").classList.remove("d-none")
         document.getElementById("cancelButton").innerHTML = '<i class="bi bi-x-circle"></i>&ensp;Cancel&nbsp;'
 
         // Show modal
@@ -1798,17 +1800,17 @@ function loadRunHistory() {
             const logFileName = run.log_file
 
             const cells = [
-                formatDateTime(run.started_at),
-                `<i class="bi bi-${typeIcon}" title="${typeLabel}"></i>`, // Run Type
-                run.label,
-                `<i class="bi bi-${triggerIcon}" title="${triggerLabel}"></i>`, // Run Trigger
-                `<i class="bi bi-${outcome.icon} cursor-pointer" style="cursor: pointer;" title="${outcome.text}" onclick="showLogsforRun('${logFileName}')"></i>`, // Run Outcome
-                `<span class="text-monospace">${run.assets_processed}</span>`,
-                `<span class="text-monospace">${run.success_count}</span>`,
-                `<span class="text-monospace">${run.cached_count}</span>`,
-                `<span class="text-monospace">${run.locked_count}</span>`,
-                `<span class="text-monospace">${run.error_count}</span>`,
-                `<span class="text-monospace">${formatRunDuration(run.started_at, run.ended_at)}</span>`,
+                `<span title="${run.started_at}">${formatDateTime(run.started_at)}</span>`, // Started time
+                `<i class="bi bi-${typeIcon}" title="${typeLabel}"></i>`, // Type
+                run.html_label, // Label
+                `<i class="bi bi-${triggerIcon}" title="${triggerLabel}"></i>`, // Trigger
+                `<i class="bi bi-${outcome.icon} cursor-pointer inline-run-btn" style="cursor: pointer;" title="${outcome.text}" onclick="showLogsforRun('${logFileName}', '${run.label}')"></i>`, // Outcome
+                `<span class="text-monospace">${run.assets_processed}</span>`, // Processed assets
+                `<span class="text-monospace">${run.success_count}</span>`, // Updated assets
+                `<span class="text-monospace">${run.cached_count}</span>`, // Cached assets
+                `<span class="text-monospace">${run.locked_count}</span>`, // Locked assets
+                `<span class="text-monospace">${run.error_count}</span>`, // Errors encountered
+                `<span class="text-monospace">${formatRunDuration(run.started_at, run.ended_at)}</span>`, // Run duration
             ];
 
             // Indexes match the header row: detail columns collapse on narrow screens
@@ -1828,8 +1830,57 @@ function loadRunHistory() {
     });
 }
 
-function showLogsforRun(logFileName) {
-    if (!logFileName) return;
+function deleteRun(timestamp, label) {
+    if (!timestamp || !label) return;
+
+    const modalElement = document.getElementById("yesNoCancelModal");
+
+    // Update modal message and title
+    document.getElementById("yesNoCancelModalLabel").innerText = "Delete run from history";
+    document.getElementById("yesNoCancelModalMessage").innerHTML = `You are about to delete run <span class="text-monospace">${label}</span> from ${formatDateTime(timestamp)}. <br><br>Are you sure?`;
+
+    // Update buttons with choices
+    document.getElementById("yesButton").innerHTML = '<i class="bi bi-trash"></i>&ensp;Delete&nbsp;'
+    document.getElementById("yesButton").classList.add("btn-danger")
+    document.getElementById("noButton").innerHTML = '<i class="bi bi-x-lg"></i>&ensp;Cancel&nbsp;'
+    document.getElementById("cancelButton").classList.add("d-none")
+
+    // Show modal
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+
+    // Handle button clicks
+    document.getElementById("yesButton").onclick = () => {
+        document.getElementById("yesButton").onclick = null; // Remove listener to prevent duplicate clicks
+
+        modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
+            modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
+            socket.emit("delete_run", { instance_id: instanceId, timestamp: timestamp, label: label });
+        
+            socket.once("run_deleted", data => {
+                if (validResponse(data)) {
+                    if (data.success) {
+                        loadRunHistory();
+                        console.log(`Run with label '${label}' and timestamp ${timestamp} successfully deleted`);
+                    } else {
+                        console.warn(`Unable to delete run with label '${label}' and timestamp ${timestamp}`);
+                    }
+                }
+            });
+        }, { once: true });
+        modal.hide();
+    };
+
+    document.getElementById("noButton").onclick = () => {
+        modal.hide();
+    };
+}
+
+function showLogsforRun(logFileName, runLabel) {
+    if (logFileName === "undefined") {
+        updateStatus(`No associated log file for ${runLabel}`, "warning", false, false, "exclamation-triangle")
+        return;
+    }
 
     socket.emit("get_log_file", { instance_id: instanceId, log_file_name: logFileName });
 
@@ -1843,7 +1894,7 @@ function showLogsforRun(logFileName) {
 
                 // Update modal header title & content
                 if (modalTitleEl) {
-                    modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${logFileName}</span>`;
+                    modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${runLabel}</span>`;
                 }
                 
                 if (contentEl) {
@@ -1855,7 +1906,8 @@ function showLogsforRun(logFileName) {
                 logModal.show();
 
             } else {
-                console.warn("Unable to display log file contents")
+                updateStatus(`Unable to load log file ${runLabel} for run`, "danger", false, false, "x-octagon")
+                console.warn(`Unable to display log file contents for ${runLabel}`)
             }
         }
     })
@@ -2363,18 +2415,6 @@ dropArea.addEventListener("click", () => {
 });
 
 function uploadFile(file) {
-    socket.emit("display_message", {
-        "instance_id": instanceId,
-        "message": `Uploading '${file.name}'...`,
-        "title": "uploadFile",
-        "level": "debug"
-    });
-    socket.emit("display_message", {
-        "instance_id": instanceId,
-        "message": `📤 ${file.name} • Upload initiated`,
-        "level": "log",
-        "broadcast": true
-    });
 
     const reader = new FileReader();
 
@@ -2384,7 +2424,7 @@ function uploadFile(file) {
     reader.onload = function (event) {
         const arrayBuffer = event.target.result;
         const totalChunks = Math.ceil(arrayBuffer.byteLength / CHUNK_SIZE);
-        let startTime = performance.now();
+        let startTime = performance.timeOrigin + performance.now();
 
         function arrayBufferToBase64(buffer) {
             return new Promise((resolve) => {
@@ -2438,7 +2478,7 @@ function uploadFile(file) {
             arrayBufferToBase64(chunk).then(base64Chunk => {
                 if (isAborted) return;
                 
-                let currentTime = performance.now();
+                let currentTime = performance.timeOrigin + performance.now();
                 let totalSize = arrayBuffer.byteLength / 1000000;
                 socket.emit("upload_artwork_chunk", {
                     instance_id: instanceId,
