@@ -859,6 +859,10 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
     min-width: 11rem; /* ~176px - keeps switches perfectly aligned in columns */
     flex-shrink: 0;
 }
+.filter-log-item {
+    min-width: 6rem; /* ~176px - keeps switches perfectly aligned in columns */
+    flex-shrink: 0;
+}
 
 /* ==========================================================================
    Generic Collapsible Floating Action Buttons (FAB)
@@ -1017,9 +1021,54 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 }
 
 /* Push the modals down slightly so the navbar/title remains visible */
-.custom-log-modal-pos {
-    margin-top: 8rem !important; /* Adjust value (e.g., 4rem - 6rem) as needed */
-}
+/*.custom-log-modal-pos {
+    margin-top: 8rem !important; /* Adjust value (e.g., 4rem - 6rem) as needed 
+} */
 .yes-no-cancel-modal {
     margin-top: 12rem !important; /* Adjust value (e.g., 4rem - 6rem) as needed */
+}
+
+/* Resizable & Centered Log Modal */
+#run_log_modal .modal-dialog {
+    margin: 0 !important;
+    position: fixed;
+    top: 5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 95vw;
+    z-index: 1055;
+}
+
+#run_log_modal .modal-content {
+    resize: both;
+    overflow: auto !important; /* CRITICAL: Enables the bottom-right resize grip */
+    width: 85vw;                /* Default wide layout */
+    min-width: 350px;
+    min-height: 250px;
+    max-width: 95vw;
+    max-height: 80vh;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Ensure modal body and code block fill the container as it resizes */
+#run_log_modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#run_log_modal #run_log_content {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* Drag Handle */
+#run_log_modal .modal-header {
+    cursor: move;
+    user-select: none;
+}
+
+/* Prevent animation glitches during active dragging */
+#run_log_modal .modal-dialog.is-dragging {
+    transition: none !important;
 }

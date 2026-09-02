@@ -260,7 +260,6 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
         parsed_line = parse_url_and_options(url)
         label = parsed_line.url
         log_to_file(label)
-        update_status(instance, f"Scraping URL '{parsed_line.url}'", color=StatusColor.INFO.value, sticky=True, spinner=True)
 
         title, author = scrape_and_upload(
             instance=instance,
