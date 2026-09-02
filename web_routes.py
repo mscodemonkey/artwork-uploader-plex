@@ -443,12 +443,12 @@ def setup_socket_handlers(
                         f"class='text-decoration-none text-reset' title='{label}'>{source} "
                         f"<i class='bi bi-{type.get('icon', 'question-circle')}' title='{type.get('label', 'Unknown URL type')}'></i> "
                         f"<span class='input-monospace' style='font-size: 0.8rem;'>{id}</span></a> "
-                        f"<i class='bi bi-x-circle inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i>"
+                        f"<i class='bi bi-trash3 inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i>"
                     )
                 else:
                     run["html_label"] = f"<i class='bi bi-x-octagon text-danger' title='{label}'>&nbsp;Error parsing URL</i>"
             elif label:
-                run["html_label"] = f"<span class='text-nowrap'>{label} <i class='bi bi-x-circle inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i></span>"
+                run["html_label"] = f"<span class='text-nowrap'>{label} <i class='bi bi-trash3 inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i></span>"
 
         notify_web(
             instance=instance,
