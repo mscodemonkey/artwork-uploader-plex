@@ -9,7 +9,7 @@ services:
       - ./config:/artwork-uploader/config:rw
       - ./logs:/artwork-uploader/logs:rw
       - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw
-      - <HOST_TEMP_PATH>:/Temp/assets:/temp:rw
+      - <HOST_TEMP_PATH>:/temp:rw
     environment:
       - TZ=Europe/London
       - RUNNING_IN_DOCKER=1
