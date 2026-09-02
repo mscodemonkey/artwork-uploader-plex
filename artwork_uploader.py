@@ -32,7 +32,7 @@ _ensure_stable_plex_identifier()
 
 from models import arguments
 from models.instance import Instance
-from utils.notifications import update_log, update_status, notify_web, debug_me, send_notification
+from utils.notifications import update_log, update_status, notify_web, debug_me, send_notification, log_to_file
 from core.config import Config
 from core.exceptions import ConfigLoadError, PlexConnectorException, ScraperException, InvalidUrl, InvalidFlag
 from utils.utils import is_not_comment, parse_url_and_options, elapsed_time
@@ -43,14 +43,11 @@ from core.constants import (
     GITHUB_REPO,
     DEFAULT_WEB_PORT,
     DEFAULT_WEB_HOST,
-    DEFAULT_LOG_PATH,
     SCHEDULER_CHECK_INTERVAL,
     UPDATE_CHECK_INTERVAL,
     MIN_PYTHON_MAJOR,
     MIN_PYTHON_MINOR,
     VALID_FILENAME_PATTERN,
-    URL_SOURCE_MAP,
-    URL_TYPE_MAP
 )
 from core.enums import InstanceMode, NotificationEvent, StatusColor, RunType, RunTrigger, RunOutcome
 from services import (
@@ -707,8 +704,8 @@ def process_uploaded_artwork(
 
     # An uploaded ZIP is a run too, so it lands in the history alongside the scrapes and
     # the bulk imports. There is no cache crawl behind an upload, so cached stays at zero.
-    started_at = datetime.now(timezone.utc).isoformat()
-    label = plex_title or zip_title or "Uploaded artwork"
+    # started_at = datetime.now(timezone.utc).isoformat()
+    # label = plex_title or zip_title or "Uploaded artwork"
     outcome = RunOutcome.FAILED.value
     try:
         processor.process_uploaded_files(
@@ -724,8 +721,8 @@ def process_uploaded_artwork(
     finally:
         RunHistory().add_run(
             run_type=RunType.UPLOAD.value,
-            label=label,
-            started_at=started_at,
+            label=globals.upload_run_metadata.get("run_label", zip_title if zip_title else "Uploaded artwork"),
+            started_at=globals.upload_run_metadata.get("start_time", datetime.now(timezone.utc).isoformat()),
             ended_at=datetime.now(timezone.utc).isoformat(),
             trigger=RunTrigger.MANUAL.value,
             outcome=outcome,
@@ -866,30 +863,6 @@ def check_image_orientation(image_path):
 def sort_key(item):
     """Sort key for artwork items - uses UtilityService."""
     return UtilityService.sort_key(item)
-
-def log_to_file(label: str):
-    if globals.log_to_file:
-        debug_me(f"Logging is already active for another run")
-        return
-    if ".txt" in label:
-        log_label = f"bulk_{label.split(".txt")[0]}"
-    elif "https" in label:
-        clean_url = label.replace("https://", "").strip()
-        parts = [p for p in clean_url.split("/") if p]
-        if len(parts) >= 3:
-            domain, asset_type, id = parts[0], parts[1], parts[2]
-            source = URL_SOURCE_MAP.get(domain, "unknown_source")
-            type = URL_TYPE_MAP.get(asset_type, "Unknown_type")
-            url_type = type.get("label", "unknown_url_type")
-            log_label = f"scrape_{source}_{url_type}_{id}"
-    else:
-        log_label = label
-
-    log_label = log_label.lower()
-    timestamp = datetime.now()
-    log_filename = f"{timestamp.strftime('%Y-%m-%d_%H-%M-%S')}_{log_label}"
-    globals.log_to_file = os.path.join(DEFAULT_LOG_PATH, f"{log_filename}.log")
-    debug_me(f"Setting log file for this run to '{globals.log_to_file}'")
 
 # Autoupdate functions
 

@@ -305,25 +305,34 @@ h1 {
     color: #0d6efe;
 }
 
+.inline-run-btn {
+    display: inline-block !important;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
 /* Hover effects */
 @media (hover: hover) {
     .delete-schedule-btn:hover,
+    .inline-run-btn:hover,
     .btn-inline-icon:hover {
         opacity: 1;
     }
 
     .delete-schedule-btn:hover,
+    .inline-run-btn:hover,
     .btn-inline-icon:hover i {
         transform: scale(1.15); /* Scales the icon cleanly without affecting position */
     }
 }
 
 .delete-schedule-btn:active,
+.inline-run-btn:active,
 .btn-inline-icon:active {
     opacity: 1;
 }
 
 .delete-schedule-btn:active,
+.inline-run-btn:active,
 .btn-inline-icon:active i {
     transform: scale(0.90) !important;
     transition: transform 0.1s ease, opacity 0.1s ease;
@@ -995,8 +1004,22 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
         transform: rotate(180deg);
         white-space: nowrap;
         padding: 8px 0px !important;
-        height: 90px;
+        height: 95px;
         vertical-align: middle;
         text-align: left !important;
     }
+    th.th-vertical i {
+        display: inline-block !important;
+        transform: rotate(90deg); /* Adjusts icon axis to match vertical text flow */
+        vertical-align: bottom;
+        margin-bottom: 2px;
+    }
+}
+
+/* Push the modals down slightly so the navbar/title remains visible */
+.custom-log-modal-pos {
+    margin-top: 8rem !important; /* Adjust value (e.g., 4rem - 6rem) as needed */
+}
+.yes-no-cancel-modal {
+    margin-top: 12rem !important; /* Adjust value (e.g., 4rem - 6rem) as needed */
 }

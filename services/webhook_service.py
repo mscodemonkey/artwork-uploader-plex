@@ -158,7 +158,7 @@ class WebhookService:
         from processors.upload_processor import UploadProcessor
         outcome = RunOutcome.FAILED.value
         try:
-            from artwork_uploader import log_to_file
+            from utils.notifications import log_to_file
             clean_title = _clean_title(event.title)
             log_Label = f"webhook_{clean_title}_{event.year}" if event.year else f"webhook_{_clean_title(clean_title)}"
             log_to_file(log_Label)
@@ -247,8 +247,6 @@ class WebhookService:
             # Nothing else tells an open History tab that this happened. A scrape and a
             # bulk import both end with a scrape_state broadcast the browser reacts to;
             # an import applied in the background raises no such event.
-            from utils.notifications import notify_web
-            notify_web(Instance(broadcast=True), "run_history_updated", silent=True)
         except Exception as error:
             # A history write must never cost an in-flight key, which would deadlock every
             # future import of this title behind the dedupe guard.

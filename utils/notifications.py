@@ -3,7 +3,7 @@ from datetime import datetime
 from core import globals
 from pprint import pprint
 from models.instance import Instance
-from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD, DEFAULT_LOG_PATH
+from core.constants import BOOTSTRAP_COLORS, ANSI_RESET, ANSI_BOLD, DEFAULT_LOG_PATH, URL_SOURCE_MAP, URL_TYPE_MAP
 from services.notify_service import NotifyService
 
 # For backwards compatibility
@@ -138,8 +138,7 @@ def notify_web(instance: Instance, event, data_to_include = None, silent=False):
         }
         payload = data_to_include or {}
         merged_arguments = payload | instance_data
-        if not silent:
-            debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('secondary').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments}")
+        debug_me(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('secondary').get('ansi')}[{event}]{ANSI_RESET} {merged_arguments if not silent else instance_data}")
         globals.web_socket.emit(event, merged_arguments)
 
 def send_notification(instance: Instance, message: str, event: str = None) -> None:
@@ -187,3 +186,27 @@ def send_notification(instance: Instance, message: str, event: str = None) -> No
     except Exception as e:
         debug_me(f"🚨 Error sending notification: {str(e)}")
         update_log(instance, f"🚨 Error sending notification: {str(e)}")
+
+def log_to_file(label: str):
+    if globals.log_to_file:
+        debug_me(f"Logging is already active for another run")
+        return
+    if ".txt" in label:
+        log_label = f"bulk_{label.split(".txt")[0]}"
+    elif "https" in label:
+        clean_url = label.replace("https://", "").strip()
+        parts = [p for p in clean_url.split("/") if p]
+        if len(parts) >= 3:
+            domain, asset_type, id = parts[0], parts[1], parts[2]
+            source = URL_SOURCE_MAP.get(domain, "unknown_source")
+            type = URL_TYPE_MAP.get(asset_type, "Unknown_type")
+            url_type = type.get("label", "unknown_url_type")
+            log_label = f"scrape_{source}_{url_type}_{id}"
+    else:
+        log_label = label
+
+    log_label = log_label.lower()
+    timestamp = datetime.now()
+    log_filename = f"{timestamp.strftime('%Y-%m-%d_%H-%M-%S')}_{log_label}"
+    globals.log_to_file = os.path.join(DEFAULT_LOG_PATH, f"{log_filename}.log")
+    debug_me(f"Setting log file for this run to '{globals.log_to_file}'")

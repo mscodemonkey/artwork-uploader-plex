@@ -8,13 +8,12 @@ import applied by the webhook. Container logs rotate; this is what answers "did 
 night's run actually do anything" without needing them.
 """
 
-import json
-import os
-import threading
+import json, os, threading
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from core.enums import RunType, RunTrigger
+from models.instance import Instance
 from core import globals
 
 from core.constants import RUN_HISTORY_PATH, RUN_HISTORY_MAX_ENTRIES, RUN_HISTORY_MAX_AGE_DAYS, DEFAULT_LOG_PATH
@@ -25,6 +24,20 @@ from core.constants import RUN_HISTORY_PATH, RUN_HISTORY_MAX_ENTRIES, RUN_HISTOR
 # each loading the same list and one overwriting the other's record.
 _write_locks: Dict[str, threading.Lock] = defaultdict(threading.Lock)
 
+def _debug(message: str) -> None:
+    from utils.notifications import debug_me
+    debug_me(message)
+
+def _notify(event: str, data: Dict = None) -> None:
+    ws = getattr(globals, "web_socket", None)
+    if not ws or not callable(getattr(ws, "emit", None)):
+        return
+    from utils.notifications import notify_web
+    notify_web(
+        instance=Instance(broadcast=True),
+        event=event,
+        data_to_include=data
+    )
 
 class RunHistory:
     """
@@ -54,8 +67,7 @@ class RunHistory:
         except (OSError, json.JSONDecodeError) as e:
             # Lazily imported: utils.notifications pulls in the services package, and this
             # module is imported from services/__init__.py, so a top-level import would cycle.
-            from utils.notifications import debug_me
-            debug_me(f"Run history at '{self.path}' could not be read, starting fresh: {e}")
+            _debug(f"Run history at '{self.path}' could not be read, starting fresh: {e}")
             return []
 
     def _save(self, runs: List[Dict[str, Any]]) -> None:
@@ -73,12 +85,12 @@ class RunHistory:
                 json.dump(runs, history_file, indent=4)
             os.replace(temp_path, self.path)
         except OSError as e:
-            from utils.notifications import debug_me
-            debug_me(f"Run history could not be saved to '{self.path}': {e}")
+            _debug(f"Run history could not be saved to '{self.path}': {e}")
             try:
                 os.remove(temp_path)
             except OSError:
                 pass  # nothing to tidy up, or the same problem that stopped the write
+            raise Exception from e
 
     def _prune(self, runs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         pruned_runs = []
@@ -101,17 +113,19 @@ class RunHistory:
                 kept.append(run)
             runs = list(reversed(kept))
         # Delete the log files for the pruned runs
+        _debug(f"Identified {len(pruned_runs)} log files from pruned runs")
+        deleted_log_files = 0
         for run in pruned_runs:
             log_file = run.get("log_file", "")
             if log_file:
                 full_path = os.path.join(DEFAULT_LOG_PATH, log_file)
                 try:
                     os.remove(full_path)
-                    debug_me(f"Deleted log file '{log_file}'")
+                    _debug(f"Deleted log file '{log_file}'")
+                    deleted_log_files += 1
                 except Exception as e:
-                    from utils.notifications import debug_me
-                    debug_me(f"Unable to remove log file '{log_file}': {str(e)}")
-                    pass
+                    _debug(f"Unable to remove log file '{log_file}': {str(e)}")
+        _debug(f"Successfully deleted {deleted_log_files} log file(s)")
         return runs
 
     def add_run(
@@ -163,6 +177,35 @@ class RunHistory:
                         if schedule["id"] == job_id:
                             schedule["last_run_status"] = outcome
                 globals.config.save()
+        _notify("run_history_updated")
+
+    def delete_run(self, timestamp: str) -> None:
+        try:
+            with _write_locks[os.path.abspath(self.path)]:
+                runs = self._load()
+                remaining_runs = []
+                log_file = None
+                run_label = ""
+                for run in runs:
+                    if run["started_at"] == timestamp:
+                        log_file = run.get("log_file", None)
+                        run_label = run.get("label", "unknown")
+                    else:
+                        remaining_runs.append(run)
+                self._save(remaining_runs)
+        except Exception as e:
+            _debug(f"Error trying to delete run: {str(e)}")
+            raise Exception from e
+
+        if log_file:
+            try:
+                full_path = os.path.join(DEFAULT_LOG_PATH, log_file)
+                os.remove(full_path)
+                _debug(f"Deleted log file '{log_file}' for '{run_label}'")
+            except Exception as e:
+                _debug(f"Unable to delete log file '{log_file}' for '{run_label}': {str(e)}")
+
+        _notify("run_history_updated")
 
     @staticmethod
     def _normalise(run: Dict[str, Any]) -> Dict[str, Any]:
