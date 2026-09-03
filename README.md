@@ -156,7 +156,10 @@ Per provider, tick the artwork types you want uploaded by default: show covers, 
 
 ### Authentication settings
 
-- **Enable password protection**: puts the web UI behind a username and password. Worth turning on if the app is reachable beyond your own machine.
+Artwork Uploader for Plex support two forms of autentication, and you can enable either type or both (or none, although we highly recommend enabling authentication if you plan to access the server from the outside world through a reverse proxy).
+
+- **Basic authentication**: Provides basic authentication via username/password combination. Enable the setting and provide a username and password to this form of authentication.
+- **OIDC authentication**: Enables single-sign-on (SSO) via an Open ID Connect (OIDC) provider such as Pocket ID, Authelia, Authentik and others. Based on standard OIDC and OAuth, it should work with any OIDC provider but it has only been tested with [Pocket ID](https://pocket-id.org/). It supports OIDC authentication as well as group-based authorization if a list of allowed groups is provided (otherwise any user authenticated by the OIDC provider can access the app). It also supports logout callback URI to provide a fully-integrated solutions, logging users out of the OIDC provider when they log out of Artwork Uploader for Plex. Consult your OIDC provider's documentation on how to set up Artwork Uploader for Plex as an OIDC client and how to obtain all the necessary parameters (client ID, client secret, etc.) to enable OIDC authenticaion.
 
 ### Webhook settings
 
@@ -175,7 +178,7 @@ Per provider, tick the artwork types you want uploaded by default: show covers, 
 
 ### Web UI
 
-The web UI is a full interface for the app: configure any setting, launch scrapes, run bulk imports, upload Zip files and watch the log and run history. It supports multiple browser instances against the same server, keeps every instance updated on the state of a running operation, guards against launching two scrapes at once, and lets you cancel an operation that's taking too long. There's a debug mode too, in case you run into issues and want to open a GitHub issue for our inspection.
+The web UI is a full interface for the app: configure any setting, launch scrapes, run bulk imports, upload Zip files, consult the run history and view the live log or the archived persistent per-run logs. It supports multiple browser instances against the same server, keeps every instance updated on the state of a running operation, guards against launching two scrapes at once, and lets you cancel an operation that's taking too long. There's a debug mode too, in case you run into issues and want to open a GitHub issue for our inspection.
 
 It's fully responsive, so it works just as well from your phone. See [Screenshots](#screenshots).
 
@@ -269,7 +272,7 @@ On an import, the title is looked up in the cached index. If one of your configu
 Kometa support comes in two flavours:
 
 1. **Overlay reset** (the simple one): turn on **Reset the Overlay tag for Kometa if artwork updated** and the app removes Kometa's overlay label when it uploads new artwork, so the next Kometa run reapplies the overlay.
-2. **Asset directory mode**: turn on **Save artwork to Kometa asset directory** and artwork is saved to Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) instead of being applied to Plex. Whenever Kometa next runs, it applies all new or updated artwork with its overlays. Set **Kometa Asset Directory** to your base asset directory.
+2. **Asset directory mode**: turn on **Save artwork to Kometa asset directory** and artwork is saved to Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) instead of being applied to Plex. Whenever Kometa runs next, it applies all new or updated artwork with its overlays. Set **Kometa Asset Directory** to your base asset directory.
 
 Asset directory mode assumes:
 
@@ -322,7 +325,7 @@ settings:
 
 ```
   path/to/base/asset/directory
-  ├── Movies
+  ├── Movies                         # This folder name must match the library name in Kometa's config.yml as seen above
   │   ├── Death in Venice (1971)
   │   │   ├── poster.jpg
   │   │   └── background.jpg

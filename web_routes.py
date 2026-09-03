@@ -10,12 +10,13 @@ The routes are organized into:
 - Helper functions for file uploads and processing
 """
 
-import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading, uuid
+import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading, uuid, requests
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from packaging import version
 from plexapi.server import PlexServer
 from flask import render_template, send_from_directory, request, redirect, url_for, session, jsonify
+from requests_oauthlib import OAuth2Session
 from functools import wraps
 from core import globals
 from services.notify_service import NotifyService
@@ -23,12 +24,19 @@ from utils.utils import calculate_file_md5, get_host_path
 from models.instance import Instance
 from models.bulk_schedule import BulkSchedule
 from core.config import Config, normalize_notification_channels
-from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, RunTrigger, RunOutcome, IntervalUnit
+from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, RunTrigger, RunOutcome, IntervalUnit, AuthType
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me, log_to_file
 from services import UtilityService, AuthenticationService, RunHistory
 from services.webhook_service import parse_event
-from core.constants import UPLOAD_CHUNK_SIZE, UPLOAD_CHUNK_TIMEOUT, WEBHOOK_TOKEN_HEADER, URL_SOURCE_MAP, URL_TYPE_MAP, DEFAULT_LOG_PATH
+from core.constants import (
+    UPLOAD_CHUNK_SIZE,
+    UPLOAD_CHUNK_TIMEOUT,
+    WEBHOOK_TOKEN_HEADER,
+    URL_SOURCE_MAP,
+    URL_TYPE_MAP,
+    DEFAULT_LOG_PATH
+)
 
 def login_required(f):
     """Decorator to require authentication for routes."""
@@ -38,7 +46,11 @@ def login_required(f):
         config = globals.config if hasattr(globals, 'config') and globals.config else None
 
         # If auth not enabled, allow access
-        if not config or not config.auth_enabled:
+        must_login = False
+        if config:
+            must_login = config.auth_enabled or config.oidc_enabled
+
+        if not config or not must_login:
             return f(*args, **kwargs)
 
         # Check if user is logged in
@@ -48,6 +60,12 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def get_oidc_redirect_uri(config):
+    if config.external_url:
+        base_url = config.external_url.rstrip("/")
+        return f"{base_url}/login/oidc/callback"
+    
+    return url_for("oidc_callback", _external=True)
 
 def setup_routes(web_app, config: Config):
     """
@@ -57,11 +75,26 @@ def setup_routes(web_app, config: Config):
         web_app: Flask application instance
         config: Configuration object
     """
+
+    @web_app.route("/api/auth/status", methods=["GET"])
+    def auth_status():
+        """Public endpoint to check which authentication methods are enabled."""
+        return jsonify({
+            "basic_enabled": getattr(config, "auth_enabled", False),
+            "oidc_enabled": getattr(config, "oidc_enabled", False),
+            "oidc_label": getattr(config, "oidc_label", "OIDC")
+        })
+
     @web_app.route("/login", methods=["GET", "POST"])
     def login():
         """Handle user login."""
+
+        if request.method == "GET":
+            error = session.pop("oidc_error", None)
+            return render_template("login.html", error=error)
+        
         # If auth not enabled, redirect to home
-        if not config.auth_enabled:
+        if not config.auth_enabled and not config.oidc_enabled:
             return redirect(url_for('home'))
 
         # Already logged in
@@ -71,27 +104,167 @@ def setup_routes(web_app, config: Config):
         error = None
 
         if request.method == "POST":
-            username = request.form.get('username', '')
-            password = request.form.get('password', '')
-            remember = request.form.get('remember') == 'on'
 
-            # Authenticate
-            if AuthenticationService.authenticate(username, password, config.auth_username, config.auth_password_hash):
-                session['authenticated'] = True
-                session.permanent = remember  # Set to 7 days if remember is checked
-                update_log(Instance(broadcast=True), f"👤 User {username} logged in successfully")
-                return redirect(url_for('home'))
-            else:
-                error = "Invalid username or password"
-                update_log(Instance(broadcast=True), f"⛔ Invalid username or password provided")
+            oidc_login = request.form.get("oidc-login", None)
+            basic_Login = request.form.get('username', None)
+
+            if basic_Login:
+                debug_me(f"Logging in with basic authentication")
+
+                username = request.form.get('username', '')
+                password = request.form.get('password', '')
+                remember = request.form.get('remember') == 'on'
+
+                # Authenticate
+                if AuthenticationService.authenticate(username, password, config.auth_username, config.auth_password_hash):
+                    session['authenticated'] = True
+                    session['auth_type'] = AuthType.BASIC.value
+                    session.permanent = remember  # Set to 7 days if remember is checked
+                    update_log(Instance(broadcast=True), f"👤 User {username} logged in successfully")
+                    return redirect(url_for('home'))
+                else:
+                    error = "Invalid username or password"
+                    update_log(Instance(broadcast=True), f"⛔ Invalid username or password provided")
+
+            elif oidc_login:
+                debug_me(f"Logging in with OIDC")
+                scopes = config.oidc_scopes
+                if "openid" not in scopes:
+                    scopes.append("openid")
+
+                redirect_uri = get_oidc_redirect_uri(config)
+
+                oauth = OAuth2Session(
+                    client_id=config.oidc_client_id,
+                    redirect_uri=redirect_uri,
+                    scope=scopes
+                )
+
+                discovery_url = f"{config.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
+                try:
+                    disc_res = oauth.get(discovery_url)
+                    authorization_endpoint = disc_res.json()["authorization_endpoint"]
+                except Exception as e:
+                    debug_me(f"OIDC Discovery Error: {e}")
+                    return render_template("login.html", error="Could not reach OIDC provider.")
+
+                authorization_url, state = oauth.authorization_url(authorization_endpoint)
+                
+                # Store OAuth state in session for CSRF validation during callback
+                session["oauth_state"] = state
+                session["auth_type"] = AuthType.OIDC.value
+                return redirect(authorization_url)
 
         return render_template("login.html", error=error)
 
+    @web_app.route("/login/oidc/callback", methods=["GET"])
+    def oidc_callback():
+
+        state = session.pop("oauth_state", None)
+        if not state or state != request.args.get("state"):
+            return render_template("login.html", error="Invalid OIDC state session parameter.")
+
+        redirect_uri = get_oidc_redirect_uri(config)
+        debug_me(f"Obtained redirect URI as {redirect_uri}")
+
+        scopes = config.oidc_scopes
+
+        oauth = OAuth2Session(
+            client_id=config.oidc_client_id,
+            state=state,
+            redirect_uri=redirect_uri,
+            scope=scopes
+        )
+
+        try:
+            discovery_url = f"{config.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
+            disc_res = oauth.get(discovery_url).json()
+            token_endpoint = disc_res["token_endpoint"]
+            userinfo_endpoint = disc_res.get("userinfo_endpoint")
+            end_session_endpoint = disc_res.get("end_session_endpoint")
+
+            query_str = request.query_string.decode("utf-8")
+            auth_response_url = f"{redirect_uri}?{query_str}" if query_str else redirect_uri
+            debug_me(f"Constructing auth response URL as {auth_response_url}")
+            oauth.fetch_token(
+                token_url=token_endpoint,
+                authorization_response=auth_response_url,
+                client_secret=config.oidc_client_secret
+            )
+
+            # Retrieve user information
+            user_info = oauth.get(userinfo_endpoint).json() if userinfo_endpoint else {}
+
+            username = user_info.get("preferred_username") or user_info.get("sub") or "OIDC User"
+            groups_claim = config.oidc_groups_claim or "groups"
+            user_groups = user_info.get(groups_claim, [])
+
+            token_data = oauth.token
+            if "id_token" in token_data:
+                session["id_token"] = token_data["id_token"]
+            
+            # Validate allowed groups if configured
+            if config.oidc_allowed_groups:
+                allowed_set = set(config.oidc_allowed_groups)
+                user_set = set(user_groups) if isinstance(user_groups, list) else {user_groups}
+                
+                if not allowed_set.intersection(user_set):
+                    update_log(Instance(broadcast=True), f"⛔ OIDC login denied for {username}: Missing required group permissions")
+                    session.clear()
+                    session["oidc_error"] = "Access Denied: Your account does not belong to an allowed group."
+                    if end_session_endpoint:
+                        post_logout_uri = f"{redirect_uri.rsplit('/', 3)[0]}/login"
+                        id_token = token_data.get("id_token")
+                        logout_url = (
+                            f"{end_session_endpoint}?"
+                            f"post_logout_redirect_uri={post_logout_uri}&"
+                            f"client_id={config.oidc_client_id}"
+                        )
+                        if id_token:
+                            logout_url += f"&id_token_hint={id_token}"
+                        return redirect(logout_url)                        
+
+                    return render_template("login.html", error="Access Denied: You do not belong to an allowed group.")
+
+            # Authenticate session
+            session["authenticated"] = True
+            session["username"] = username
+            update_log(Instance(broadcast=True), f"👤 User {username} logged in successfully via OIDC")
+            return redirect(url_for("home"))
+
+        except Exception as e:
+            debug_me(f"OIDC Callback Error: {e}")
+            return render_template("login.html", error=f"OIDC authentication failed: {e}.")
+        
     @web_app.route("/logout")
     def logout():
         """Handle user logout."""
-        update_log(Instance(broadcast=True), f"👋🏻 Logout successful")
+        id_token = session.get("id_token")
+        auth_type = session.pop("auth_type", None)
         session.clear()
+        update_log(Instance(broadcast=True), f"👋🏻 Logout successful")
+
+        if config.oidc_enabled and config.oidc_issuer and auth_type == AuthType.OIDC.value:
+            post_logout_uri = f"{get_oidc_redirect_uri(config).rsplit('/', 3)[0]}/login"
+            try:
+                discovery_url = f"{config.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
+
+                disc_res = requests.get(discovery_url).json()
+                end_session_endpoint = disc_res.get("end_session_endpoint")
+                
+                if end_session_endpoint:
+                    logout_url = (
+                       f"{end_session_endpoint}?"
+                        f"post_logout_redirect_uri={post_logout_uri}&"
+                        f"client_id={config.oidc_client_id}"
+                    )
+                    if id_token:
+                        logout_url += f"&id_token_hint={id_token}"
+                    return redirect(logout_url)
+                    
+            except Exception as e:
+                debug_me(f"Error fetching OIDC end_session_endpoint: {e}")
+
         return redirect(url_for('login'))
 
     @web_app.route("/")

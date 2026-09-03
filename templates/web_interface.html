@@ -168,12 +168,13 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="plex_token" class="form-label"><i class="bi bi-key"></i>&ensp;Authentication <span class="text-nowrap">token
-                                    &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true" data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i></span></label>
+                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true"
+                                        data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i></span></label>
                                     <div class="position-relative">
                                         <input type="password" id="plex_token" name="plex_token" class="form-control input-monospace pe-5 has-inline-btn" required pattern="[A-Za-z0-9_\-]{20,40}"
                                             title="Plex token should be a 20+ character string with letters, digits, dashes or underscores."
                                             spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" 
-                                            data-1p-ignore data-bwignoredata-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
+                                            data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
                                         <button type="button" class="btn-inline-icon toggle-password-btn" data-target="plex_token" title="Show token">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -207,7 +208,8 @@
                                     <div class="form-check form-switch mt-2">
                                         <input class="form-check-input" type="checkbox" value="stage_assets" id="stage_assets"/>
                                         <label for="stage_assets" class="form-check-label">Stage <span class="text-nowrap">assets
-                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Saves assets for seasons and episodes not yet in Plex (excluding specials)"></i></span></label>
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="Saves assets for seasons and episodes not yet in Plex (excluding specials)"></i></span></label>
                                     </div>
                                     <div class="mt-3">
                                         <label for="kometa_base" class="form-label"><i class="bi bi-folder"></i>&ensp;Kometa Asset Directory</label>
@@ -234,7 +236,8 @@
                                     </div>
                                     <div class="mt-3">
                                         <label for="temp_dir" class="form-label"><i class="bi bi-clock-history"></i>&ensp;Temp <span class="text-nowrap">Directory
-                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Temp directory for Kometa operations (optional)"></i></span></label>
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="Temp directory for Kometa operations (optional)"></i></span></label>
                                         <div class="position-relative">
                                             <input type="text" 
                                                 id="temp_dir" 
@@ -266,7 +269,7 @@
                                 <h5 class="mb-3"><i class="bi bi-shield-check"></i>&ensp;Authentication settings</h5>
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="auth_enabled"/>
-                                    <label for="auth_enabled" class="form-check-label">Enable password protection</label>
+                                    <label for="auth_enabled" class="form-check-label">Basic authentication</label>
                                 </div>
                                 <div id="auth_settings" class="mt-3 mb-0" style="display: none;">
                                     <div class="mb-3">
@@ -278,8 +281,92 @@
                                         <input type="password" id="auth_password" name="auth_password" class="form-control" placeholder="Enter new password">
                                         <small class="form-text text-muted">Leave blank to keep existing password</small>
                                     </div>
-                                    <div class="alert alert-info mt-3 mb-0" role="alert">
+                                    <div class="alert alert-info mt-3 mb-4" role="alert">
                                         <i class="bi bi-info-circle"></i> You will need to log in with these credentials after saving. Sessions last 7 days with "Remember me" enabled.
+                                    </div>
+                                </div>
+                                <div class="form-check form-switch mb-0 mt-2">
+                                    <input class="form-check-input" type="checkbox" id="oidc_enabled"/>
+                                    <label for="oidc_enabled" class="form-check-label">Single Sign-On (OIDC)</label>
+                                </div>
+                                <div id="oidc_settings" class="mt-3 mb-0" style="display: none;">
+
+                                    <div class="mb-3">
+                                        <label for="oidc_issuer" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Issuer URL</label>
+                                        <input type="url" id="oidc_issuer" name="oidc_issuer" class="form-control" required
+                                            placeholder="https://auth.example.com"
+                                            pattern="https?:\/\/([a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?"
+                                            title="Please enter a valid URL (e.g., https://auth.example.com)"
+                                            spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
+                                        <div class="invalid-feedback">
+                                            Please provide a valid issuer URL
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="external_url" class="form-label"><i class="bi bi-globe2"></i>&ensp;External application <span class="text-nowrap">URL
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true"
+                                            data-bs-title="Used to construct the callback URI that must be added to the OIDC client in the OIDC provider configuration (must use <strong>https</strong>)"></span></i></span></label>
+                                        <input type="url" id="external_url" name="external_url" class="form-control" required
+                                            placeholder="https://artwork-uploader.example.com"
+                                            pattern="https:\/\/([a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?"
+                                            title="Please enter a valid URL (e.g., https://artwork-uploader.example.com)"
+                                            spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
+                                        <div class="invalid-feedback">
+                                            Please provide a valid external HTTPS URL
+                                        </div>
+                                        <div id="callback_alert" class="alert alert-info mt-3 mb-4 alert-dismissible fade show" style="display: none;" role="alert">
+                                            <i class="bi bi-info-circle"></i>&ensp;Placeholder text
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="oidc_label" class="form-label"><i class="bi bi-textarea-t"></i>&ensp;OIDC provider <span class="text-nowrap">name
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="Used to customize the login button with the name of the OIDC provider"></i></span></label>
+                                        <input type="text" id="oidc_label" name="oidc_label" class="form-control" placeholder="Pocket ID">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="oidc_client_id" class="form-label"><i class="bi bi-person-vcard"></i>&ensp;Client <span class="text-nowrap">ID
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="Generated by the OIDC provider when defining the OIDC client"></i></span></label>
+                                        <input type="text" id="oidc_client_id" name="oidc_client_id" class="form-control input-monospace" placeholder="my-client-id"
+                                                spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" required
+                                                data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
+                                        <div class="invalid-feedback">
+                                            You must provide a client ID
+                                        </div>
+                                    </div>
+                                    <div class="mb-3>
+                                        <label for="oidc_client_secret" class="form-label"><i class="bi bi-fingerprint"></i>&ensp;Client <span class="text-nowrap">secret
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="Generated by the OIDC provider when defining the OIDC client"></i></span></label>
+                                        <div class="position-relative mt-2">
+                                            <input type="password" id="oidc_client_secret" name="oidc_client_secret" class="form-control input-monospace pe-5 has-inline-btn" required
+                                                title="The client secret is generated by the OIDC provider" placeholder="my-client-secret"
+                                                spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" 
+                                                data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
+                                            <button type="button" class="btn-inline-icon toggle-password-btn" data-target="oidc_client_secret" title="Show secret">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                        </div>
+                                        <div class="invalid-feedback">
+                                            You must provide a client secret
+                                        </div>
+                                    </div>
+                                    <div class="mt-3">
+                                        <label for="oidc_scopes" class="form-label"><i class="bi bi-crosshair"></i>&ensp;Scopes</label>
+                                        <select id="oidc_scopes" name="oidc_scopes" multiple placeholder="Enter scopes"></select>
+                                    </div>
+                                    <div class="mt-3">
+                                        <label for="oidc_groups_claim" class="form-label"><i class="bi bi-people"></i>&ensp;Groups <span class="text-nowrap">claim
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="The OIDC claim that carries the group membership information for a user"></i></span></label>
+                                        <input type="text" id="oidc_groups_claim" name="oidc_groups_claim" class="form-control" placeholder="groups / roles">
+                                    </div>
+                                    <div class="mt-3">
+                                        <label for="oidc_allowed_groups" class="form-label"><i class="bi bi-door-open"></i>&ensp;Allowed <span class="text-nowrap">groups
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="Defines the list of groups that are authorized to log in. If none are defined, any authenticade user can log in."></i></span></label>
+                                        <select id="oidc_allowed_groups" name="oidc_allowed_groups" multiple placeholder="plex_admins"></select>
                                     </div>
                                 </div>
                             </div>
@@ -289,22 +376,23 @@
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="enable_webhooks"/>
                                     <label for="enable_webhooks" class="form-check-label">Enable Sonarr/Radarr <span class="text-nowrap">webhook
-                                    &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Allows TPDb artwork from cached user pages to be applied to items 
-                                    or downloaded to the Kometa asset directory immediately after they are imported in Sonarr or Radarr"></i></span></label>
+                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle"
+                                        data-bs-toggle="tooltip" data-bs-title="Allows TPDb artwork from cached user pages to be applied to items 
+                                        or downloaded to the Kometa asset directory immediately after they are imported in Sonarr or Radarr"></i></span></label>
                                 </div>
                                 <div id="webhook_settings" style="display: none;">
                                     <div class="mb-3 mt-3">
                                         <label for="webhook_token" class="form-label"><i class="bi bi-key"></i>&ensp;Webhook <span class="text-nowrap">token</span>
-                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
-                                        data-bs-title="In Sonarr/Radarr go to Settings &rarr; Connect &rarr; <i class='bi bi-plus-square'></i> &rarr; Webhook. Set the URL to 
-                                        <code>/webhook/sonarr</code> or <code>/webhook/radarr</code> on this server, method POST, and tick only the 'On File Import' 
-                                        trigger. Send this token either as the connection's Password, or as a header: click the <span class='text-nowrap'><strong>Advanced</strong> 
-                                        (<i class='bi bi-gear-fill'></i>)</span> button on the webhook connection and add a Header with Key <span class='text-nowrap'>
-                                        <code>X-Webhook-Token</code></span> and Value set to this token."></i></span></label></span></label>
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
+                                            data-bs-title="In Sonarr/Radarr go to Settings &rarr; Connect &rarr; <i class='bi bi-plus-square'></i> &rarr; Webhook. Set the URL to 
+                                            <code>/webhook/sonarr</code> or <code>/webhook/radarr</code> on this server, method POST, and tick only the 'On File Import' 
+                                            trigger. Send this token either as the connection's Password, or as a header: click the <span class='text-nowrap'><strong>Advanced</strong> 
+                                            (<i class='bi bi-gear-fill'></i>)</span> button on the webhook connection and add a Header with Key <span class='text-nowrap'>
+                                            <code>X-Webhook-Token</code></span> and Value set to this token."></i></span></label></span></label>
                                         <div class="position-relative">
                                             <input type="password" id="webhook_token" name="webhook_token" class="form-control input-monospace has-two-inline-btns" placeholder="Enter token or click to generate"
                                             spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" required
-                                            data-1p-ignore data-bwignoredata-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
+                                            data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
                                             <div class="input-inline-actions">
                                                 <button type="button" class="btn-inline-icon toggle-password-btn" data-target="webhook_token" title="Show token">
                                                     <i class="bi bi-eye"></i>
@@ -320,9 +408,9 @@
                                     </div>
                                     <div class="mb-3">
                                         <label for="webhook_tpdb_users" class="form-label"><i class="bi bi-people"></i>&ensp;ThePosterDB <span class="text-nowrap">users
-                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
-                                        data-bs-title="List of TPDb users, searched in this order (first match wins). Requires <strong>Cache ThePosterDB user pages</strong> enabled, and a scrape 
-                                        of these users needs to have run at least once, so their artwork is cacehd and ca be looked up.)"></i></span></label>
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
+                                            data-bs-title="List of TPDb users, searched in this order (first match wins). Requires <strong>Cache ThePosterDB user pages</strong> enabled, and a scrape 
+                                            of these users needs to have run at least once, so their artwork is cacehd and ca be looked up.)"></i></span></label>
                                         <select id="webhook_tpdb_users" name="webhook_tpdb_users" multiple placeholder="Enter usernames"></select>
                                     </div>
                                     <div class="mb-0">
@@ -337,7 +425,8 @@
                                             style="width: 60px;" 
                                             required />
                                         seconds before <span class="text-nowrap">applying
-                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="How long to wait after an import before applying artwork, 
+                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                            data-bs-title="How long to wait after an import before applying artwork, 
                                         giving Plex time to scan the new item. If it is still not ready, the apply retries for a few minutes."></i></span></label>
                                     </div>
                                 </div>
@@ -452,33 +541,37 @@
                                         <div class="form-check form-switch mt-2" style="display: none;">
                                             <input class="form-check-input" type="checkbox" value="--force" id="track_artwork_ids"/>
                                             <label for="track_artwork_ids" class="form-check-label">Track artwork ID in Plex <span class="text-nowrap">labels
-                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="(Recommended) Tracks artwork IDs through Plex labels, avoiding having to download assets that have already been downloaded and set"></i></span></label>
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                data-bs-title="(Recommended) Tracks artwork IDs through Plex labels, avoiding having to download assets that have already been downloaded and set"></i></span></label>
                                         </div>
                                         <div class="form-check form-switch mt-2">
                                             <input class="form-check-input" type="checkbox" value="skip_locked_artwork" id="skip_locked_artwork"/>
                                             <label for="skip_locked_artwork" class="form-check-label">Skip locked <span class="text-nowrap">artwork
-                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Skips artwork that is locked in Plex, so scheduled runs only update default artwork"></i></span></label>
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                data-bs-title="Skips artwork that is locked in Plex, so scheduled runs only update default artwork"></i></span></label>
                                         </div>
                                         <div class="form-check form-switch mt-2">
                                             <input class="form-check-input" type="checkbox" value="allow_artist_updates" id="allow_artist_updates"/>
                                             <label for="allow_artist_updates" class="form-check-label">Allow artist <span class="text-nowrap">updates
-                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="ThePosterDB only: Lets a run replace artwork it applied earlier when the same artist has posted a newer
-                                            version of it. Artwork you set by hand and artwork from a different artist are left alone, and it only ever moves forward to a newer upload. Needs
-                                            skip locked artwork and track artwork IDs enabled. (NOTE: Does not apply to uploaded ZIP files.)"></i></span></label>
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                data-bs-title="ThePosterDB only: Lets a run replace artwork it applied earlier when the same artist has posted a newer
+                                                version of it. Artwork you set by hand and artwork from a different artist are left alone, and it only ever moves forward to a newer upload. Needs
+                                                skip locked artwork and track artwork IDs enabled. (NOTE: Does not apply to uploaded ZIP files.)"></i></span></label>
                                         </div>
                                         <div class="form-check form-switch mt-2">
                                             <input class="form-check-input" type="checkbox" value="local_library_matching" id="local_library_matching"/>
                                             <label for="local_library_matching" class="form-check-label">Local library <span class="text-nowrap">matching
-                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
-                                            data-bs-title="ThePosterDB only: Tries to match artwork by title against local libraries for faster 
-                                            scrapes of very large user pages. Skips fetching individual poster pages from TPDb to get the TMDB ID of each item for the most accurate
-                                            matching so it is much faster but it can reduce match accuracy."></i></span></label>
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
+                                                data-bs-title="ThePosterDB only: Tries to match artwork by title against local libraries for faster 
+                                                scrapes of very large user pages. Skips fetching individual poster pages from TPDb to get the TMDB ID of each item for the most accurate
+                                                matching so it is much faster but it can reduce match accuracy."></i></span></label>
                                         </div>
                                         <div class="form-check form-switch mt-2">
                                             <input class="form-check-input" type="checkbox" value="cache_user_scrapes" id="cache_user_scrapes"/>
                                             <label for="cache_user_scrapes" class="form-check-label">Cache ThePosterDB user <span class="text-nowrap">pages
-                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="ThePosterDB only: Keeps a persistent cache in a SQLite database of TPDb user 
-                                            page scrapes so that periodic scrapes of large user portfolios are much faster"></i></span></label>
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                data-bs-title="ThePosterDB only: Keeps a persistent cache in a SQLite database of TPDb user 
+                                                page scrapes so that periodic scrapes of large user portfolios are much faster"></i></span></label>
                                         </div>
                                         <div id="cache_expiry_container" class="mt-2 d-flex align-items-center" style="display: d-none;">
                                             <label for="user_cache_refresh_days" class="form-label me-2 mb-0"><i class="bi bi-recycle""></i>&ensp; Refresh user cache every
@@ -505,7 +598,9 @@
                                                 style="width: 60px;"
                                                 required />
                                             <span class="text-nowrap">minutes
-                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="If the app was not running when a scheduled bulk import was due, run it on startup as long as it's within this many minutes of when it was due. Set to 0 to leave missed runs skipped, as before."></i></span></label>
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                data-bs-title="If the app was not running when a scheduled bulk import was due, run it on startup as long as it's within this many minutes of when it was due. 
+                                                Set to 0 to leave missed runs skipped, as before."></i></span></label>
                                         </div>
 
                                     </div>
@@ -535,7 +630,8 @@
                                             <i class="bi bi-arrow-counterclockwise"></i>&ensp;Max <span id="upload_retry_label">upload</span> attempts:
                                             <span class="text-nowrap"><input type="number" class="form-control form-control-sm text-center d-inline-block me-0 input-monospace"
                                                 id="upload_retry_attempts" name="upload_retry_attempts" min="1" max="10" value="2" style="width: 60px;" required />
-                                            <i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Including the original attempt. Only transient failures are retried: a timeout or a server error."></i></span></label>
+                                            <i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                data-bs-title="Including the original attempt. Only transient failures are retried: a timeout or a server error."></i></span></label>
                                         </div>
                                         <div class="mt-2 d-flex align-items-center">
                                             <label for="upload_retry_backoff_seconds" class="form-label me-2 mb-0">
@@ -543,7 +639,8 @@
                                                 <input type="number" class="form-control form-control-sm text-center d-inline-block me-0 input-monospace"
                                                 id="upload_retry_backoff_seconds" name="upload_retry_backoff_seconds" min="0" max="60" step="0.5" value="1" style="width: 60px;" required />
                                             <span class="text-nowrap">seconds
-                                            &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-title="Waits this amount of seconds before first retry. Doubles every subsequent retry."></i></span></label>
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                data-bs-title="Waits this amount of seconds before first retry. Doubles every subsequent retry."></i></span></label>
                                         </div>
                                     </div>
                                 </div> 
@@ -557,7 +654,8 @@
                                             <div>
                                                 <label class="form-label">
                                                     <i class="bi bi-link-45deg"></i>&ensp;Apprise URLs to <span class="text-nowrap">notify
-                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true" data-bs-title='Enter Apprise URLs. See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.'></i></span></label>
+                                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true"
+                                                        data-bs-title='Enter Apprise URLs. See <a href="https://appriseit.com/services/" target="_blank" rel="noopener noreferrer">the Apprise services list</a> for details.'></i></span></label>
                                                 
                                                 <!-- Dynamic URL Rows Container -->
                                                 <div id="apprise_urls_container" class="d-flex flex-column gap-2"></div>
@@ -813,7 +911,7 @@
                                 <input type="text" id="scrape_url" name="scrape_url" class="form-control"
                                     value="" required
                                     spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" 
-                                    data-1p-ignore data-bwignoredata-lpignore="true" data-dashlane-ignore="true"
+                                    data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true"
                                     placeholder="theposterdb.com (poster/set/user) or mediux.pro (sets/boxsets) URL"
                                     pattern="https://(theposterdb\.com/(poster/\d+|set/\d+|user/[A-Za-z0-9]+)|mediux\.pro/(sets|boxsets)/\d+)"
                                     title="Please enter a valid URL (e.g., https://theposterdb.com/set/12345 or https://mediux.pro/sets/12345 or https://mediux.pro/boxsets/1153)">
@@ -1222,7 +1320,7 @@
                                 <div><i class="bi bi-journal-text me-1"></i> Bulk import</div>
                                 <div><i class="bi bi-arrow-repeat me-1"></i> Scrape</div>
                                 <div><i class="bi bi-cloud-arrow-up me-1"></i> Upload</div>
-                                <div><i class="bi bi-globe2 me-1"></i> Webhook</div>
+                                <div><i class="bi bi-broadcast-pin me-1"></i> Webhook</div>
 
                                 <div class="fw-bold text-muted mt-2">URL Type</div>
                                 <div><i class="bi bi-brush me-1"></i> Set</div>

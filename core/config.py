@@ -70,9 +70,18 @@ class Config:
         reset_overlay: Whether to reset Kometa overlay labels on upload
         schedules: List of scheduled bulk import jobs
         catch_up_window_minutes: How late a missed scheduled run can be and still run on startup, in minutes (0 disables catch-up)
-        auth_enabled: Whether authentication is enabled for the web server
+        auth_enabled: Whether basic authentication is enabled for the web server
         auth_username: Username for web server authentication
         auth_password_hash: Hashed password for web server authentication
+        oidc_enabled: Whether OIDC authentication is enabled for the web server
+        oidc_label: Name of the OIDC provider, used to customize the login button
+        oidc_issuer: Base URL for the OIDC providor (must be https)
+        oidc_client_id: Client ID for the app in the OIDC provider
+        oidc_client_secret: Client secret for the app in the OIDC provider
+        oidc_scopes: List of OIDC scopes for the authentication session
+        oidc_groups_claim: OIDC claim containing the group memberships for users
+        oidc_allowed_groups: Only authorize login for members of selected groups, or any authenticated user if none specified
+        external_url: External URL for the Artwork-Uploader app, used to construct the OIDC callback URI (must be https)
         apprise_urls: List of notification channels, each {"url": Apprise URL, "events": list of event names the channel is subscribed to}
         enable_webhooks: Whether the Sonarr/Radarr import webhook endpoint is enabled
         webhook_token: Shared secret required on webhook requests
@@ -110,6 +119,15 @@ class Config:
         self.auth_enabled: bool = False
         self.auth_username: str = ""
         self.auth_password_hash: str = ""
+        self.oidc_enabled: bool = False
+        self.oidc_label: str = ""
+        self.oidc_issuer: str = ""
+        self.oidc_client_id: str = ""
+        self.oidc_client_secret: str = ""
+        self.oidc_scopes: str = ""
+        self.oidc_groups_claim: str = ""
+        self.oidc_allowed_groups: List[str] = []
+        self.external_url: str = ""
         self.apprise_urls: List[Dict[str, Any]] = []
         self.enable_webhooks: bool = False
         self.webhook_token: str = ""
@@ -161,6 +179,15 @@ class Config:
             self.auth_enabled = config.get("auth_enabled", False)
             self.auth_username = config.get("auth_username", "")
             self.auth_password_hash = config.get("auth_password_hash", "")
+            self.oidc_enabled = config.get("oidc_enabled", False)
+            self.oidc_label = config.get("oidc_label", "")
+            self.oidc_issuer = config.get("oidc_issuer", "")
+            self.oidc_client_id = config.get("oidc_client_id", "")
+            self.oidc_client_secret = config.get("oidc_client_secret", "")
+            self.oidc_scopes = config.get("oidc_scopes", "")
+            self.oidc_groups_claim = config.get("oidc_groups_claim", "")
+            self.oidc_allowed_groups = config.get("oidc_allowed_groups", [])
+            self.external_url = config.get("external_url", "")
             self.apprise_urls = normalize_notification_channels(config.get("apprise_urls", []))
             self.enable_webhooks = config.get("enable_webhooks", False)
             self.webhook_token = config.get("webhook_token", "")
@@ -225,6 +252,17 @@ class Config:
             "reset_overlay": True,
             "schedules": [],
             "catch_up_window_minutes": 0,
+            "auth_enabled": False,
+            "auth_username": "",
+            "oidc_enabled": False,
+            "oidc_label": "",
+            "oidc_issuer": "",
+            "oidc_client_id": "",
+            "oidc_client_secret": "",
+            "oidc_scopes": "",
+            "oidc_groups_claim": "",
+            "oidc_allowed_groups": [],
+            "external_url": "",
             "apprise_urls": [],
             "enable_webhooks": False,
             "webhook_token": "",
@@ -282,6 +320,15 @@ class Config:
             "auth_enabled": self.auth_enabled,
             "auth_username": self.auth_username,
             "auth_password_hash": self.auth_password_hash,
+            "oidc_enabled": self.oidc_enabled,
+            "oidc_label": self.oidc_label,
+            "oidc_issuer": self.oidc_issuer,
+            "oidc_client_id": self.oidc_client_id,
+            "oidc_client_secret": self.oidc_client_secret,
+            "oidc_scopes": self.oidc_scopes,
+            "oidc_groups_claim": self.oidc_groups_claim,
+            "oidc_allowed_groups": self.oidc_allowed_groups,
+            "external_url": self.external_url,
             "apprise_urls": self.apprise_urls,
             "enable_webhooks": self.enable_webhooks,
             "webhook_token": self.webhook_token,
