@@ -10,7 +10,7 @@ let currentBulkImport = '';     // Current bulk import file
 let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
-let tvPicker, moviePicker, tpdbUserPicker;
+let tvPicker, moviePicker, tpdbUserPicker, oidcScopesPicker, oidcAllowedGroupsPicker;
 let validationTimeout;
 let currentBrowseTargetInput = null;
 let currentDirectoryPath = "/";
@@ -248,28 +248,70 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // Initialize TomSelect Pickers
-    tpdbUserPicker = new TomSelect('#webhook_tpdb_users', {
-            create: true,
-            createOnBlur: true,
-            delimiter: ',',
-            persist: true,
-            plugins: {
-                'clear_button': {
-                    html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
-                },
-                'remove_button': {}
+    oidcScopesPicker = new TomSelect("#oidc_scopes", {
+        inputTypes: [],
+        controlInput: null,
+        options: [
+            { value: "openid", text: "openid"},
+            { value: "profile", text: "profile"},
+            { value: "email", text: "email"},
+            { value: "groups", text: "groups"}
+        ],
+        plugins: {
+            'clear_button': {
+                html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
+            },
+            'remove_button': {}
+        },
+        onChange: () => updatePickerLabel(oidcScopesPicker)
+    })
+    
+    oidcAllowedGroupsPicker = new TomSelect("#oidc_allowed_groups", {
+        create: true,
+        createOnBlur: true,
+        delimiter: ',',
+        persist: true,
+        plugins: {
+            'clear_button': {
+                html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
+            },
+            'remove_button': {}
+        },
+        onInitialize: function() {
+            // Apply autocomplete/password manager ignore attributes directly to the input node
+            if (this.control_input) {
+                this.control_input.setAttribute('spellcheck', 'false');
+                this.control_input.setAttribute('autocomplete', 'off');
+                this.control_input.setAttribute('data-1p-ignore', '');
+                this.control_input.setAttribute('data-lpignore', 'true');
             }
-        });
+        },
+        onChange: () => updatePickerLabel(oidcAllowedGroupsPicker),
+    });
+    
+    tpdbUserPicker = new TomSelect('#webhook_tpdb_users', {
+        create: true,
+        createOnBlur: true,
+        delimiter: ',',
+        persist: true,
+        plugins: {
+            'clear_button': {
+                html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
+            },
+            'remove_button': {}
+        },
+        onChange: () => updatePickerLabel(tpdbUserPicker)
+    });
     
     tvPicker = new TomSelect('#tv_library', {
         inputTypes: [],
         controlInput: '<input readonly>',
         plugins: {
-        'clear_button': {
-            html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
+            'clear_button': {
+                html: (data) => `<div class="${data.className}" title="${data.title}"><i class="bi bi-x-circle"></i></div>`
+            },
+            'remove_button': {}
         },
-        'remove_button': {}
-    },
         onChange: () => updatePickerLabel(tvPicker)
     });
     tvPicker.on('clear', () => {
@@ -661,9 +703,23 @@ function setPickerPlaceholder(instance, text) {
 function updatePickerLabel(picker, message = '') {
     if (!picker) return;
 
+    const pickerID = picker.input.id;
     const totalOptions = Object.keys(picker.options).length;
     const selectedCount = picker.getValue().length;
-    if (totalOptions == 0) {
+    
+    if (pickerID.includes("oidc") || pickerID.includes("tpdb")) {
+        if (selectedCount == 0) {
+            if (pickerID === "oidc_scopes") {
+                setPickerPlaceholder(picker, "Select OIDC scopes");
+            } else if (pickerID === "oidc_allowed_groups") {
+                setPickerPlaceholder(picker, "plex_admins");
+            } else {
+                setPickerPlaceholder(picker, "Add TPDb users");
+            }
+        } else {
+            setPickerPlaceholder(picker, "");
+        }
+    } else if (totalOptions == 0) {
         message ? setPickerPlaceholder(picker, message) : setPickerPlaceholder(picker, "No libraries available");
     } else if (selectedCount === 0) {
         setPickerPlaceholder(picker, `(${totalOptions} available)`);
@@ -1164,6 +1220,17 @@ function getCurrentConfigForm() {
     current_form.auth_username = document.getElementById("auth_username").value.trim();
     current_form.auth_password = document.getElementById("auth_password").value;
 
+    // OIDC settings
+    current_form.oidc_enabled = document.getElementById("oidc_enabled").checked;
+    current_form.oidc_issuer = document.getElementById("oidc_issuer").value;
+    current_form.oidc_label = document.getElementById("oidc_label").value;
+    current_form.oidc_client_id = document.getElementById("oidc_client_id").value;
+    current_form.oidc_client_secret = document.getElementById("oidc_client_secret").value;
+    current_form.oidc_scopes = oidcScopesPicker ? oidcScopesPicker.getValue() : [];
+    current_form.oidc_groups_claim = document.getElementById("oidc_groups_claim").value;
+    current_form.oidc_allowed_groups = oidcAllowedGroupsPicker ? oidcAllowedGroupsPicker.getValue() : [];
+    current_form.external_url = document.getElementById("external_url").value;
+    
     // Webhook settings
     current_form.enable_webhooks = document.getElementById("enable_webhooks").checked;
     current_form.webhook_token = document.getElementById("webhook_token").value.trim();
@@ -1303,6 +1370,26 @@ function updateConfigUI(config) {
     // Load authentication settings
     document.getElementById("auth_enabled").checked = config.auth_enabled || false;
     document.getElementById("auth_username").value = config.auth_username || "";
+
+    // Load OIDC settings
+    document.getElementById("oidc_enabled").checked = config.oidc_enabled || false;
+    document.getElementById("oidc_label").value = config.oidc_label || "";
+    document.getElementById("oidc_issuer").value = config.oidc_issuer || "";
+    document.getElementById("oidc_client_id").value = config.oidc_client_id || "";
+    document.getElementById("oidc_client_secret").value = config.oidc_client_secret || "";
+    document.getElementById("oidc_scopes").value = config.oidc_scopes || "";
+    if (Array.isArray(config.oidc_scopes) && oidcScopesPicker) {
+        oidcScopesPicker.setValue(config.oidc_scopes, true);
+    }
+    document.getElementById("oidc_groups_claim").value = config.oidc_groups_claim || "";
+    if (Array.isArray(config.oidc_allowed_groups) && oidcAllowedGroupsPicker) {
+        oidcAllowedGroupsPicker.clearOptions();
+        config.oidc_allowed_groups.forEach(group => oidcAllowedGroupsPicker.addOption({ value: group, text: group }));
+        oidcAllowedGroupsPicker.setValue(config.oidc_allowed_groups, true);
+    }
+    updatePickerLabel(oidcScopesPicker);
+    updatePickerLabel(oidcAllowedGroupsPicker);
+    document.getElementById("external_url").value = config.external_url || "",
     
     // Load webhook settings
     document.getElementById("enable_webhooks").checked = config.enable_webhooks || false;
@@ -1315,6 +1402,7 @@ function updateConfigUI(config) {
         // Set active values (chips)
         tpdbUserPicker.setValue(config.webhook_tpdb_users, true);
     };
+    updatePickerLabel(tpdbUserPicker);
     document.getElementById("webhook_apply_delay").value = config.webhook_apply_delay ?? 30;
     
     // Toggle Kometa settings visibility
@@ -1325,6 +1413,9 @@ function updateConfigUI(config) {
     
     // Toggle auth settings visibility
     toggleAuthSettings();
+
+    // Toggle OIDC settings visibility
+    toggleOIDCSettings();
     
     // Toggle webhook settings visibility
     toggleWebhookSettings();
@@ -1345,7 +1436,7 @@ function updateConfigUI(config) {
     toggleUserCacheExpiryField();
     
     // Show/hide logout button based on auth enabled
-    if (config.auth_enabled) {
+    if (config.auth_enabled || config.oidc_enabled) {
         document.getElementById("logout-link").style.display = "block";
     } else {
         document.getElementById("logout-link").style.display = "none";
@@ -1400,7 +1491,6 @@ function toggleConfigButtons() {
         disableElement(["save_config_button", "restore_config"], true);
     } else {
         disableElement(["save_config_button", "restore_config"], false);
-
     }
     
     const rows = document.querySelectorAll(".apprise-url-row");
@@ -1709,7 +1799,7 @@ const RUN_HISTORY_TYPE_ICONS = {
     bulk: "journal-text",
     scrape: "arrow-repeat",
     upload: "cloud-arrow-up",
-    webhook: "globe2"
+    webhook: "broadcast-pin"
 };
 
 const RUN_HISTORY_TRIGGER_LABELS = {
@@ -3005,15 +3095,51 @@ socket.on("disconnect", function() {
 function toggleAuthSettings() {
     const authEnabled = document.getElementById("auth_enabled").checked;
     const authSettings = document.getElementById("auth_settings");
-    if (authEnabled) {
-        authSettings.style.display = "block";
+
+    authSettings.style.display = authEnabled ? "block" : "none";
+}
+
+function updateCallbackAlert () {
+    const callbackAlert = document.getElementById("callback_alert");
+    const externalURL = document.getElementById("external_url");
+
+    if (externalURL.value.includes("https://")) {
+        callbackAlert.innerHTML = `<i class="bi bi-info-circle"></i>&ensp;Add <code>${externalURL.value}/login/oidc/callback</code> as an allowed callback URL in your OIDC provider. Optionally, you can add <code>${externalURL.value}/login</code> as a logout callback URL if supported by your provider.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`
+        callbackAlert.style.display = "block";
     } else {
-        authSettings.style.display = "none";
+        callbackAlert.style.display = "none";
+    }
+}
+
+function toggleOIDCSettings() {
+    const oidcEnabled = document.getElementById("oidc_enabled").checked;
+    const oidcSettings = document.getElementById("oidc_settings");
+    const issuerURL = document.getElementById("oidc_issuer");
+    const clientID = document.getElementById("oidc_client_id");
+    const clientSecret = document.getElementById("oidc_client_secret");
+    const externalURL = document.getElementById("external_url");
+
+    updateCallbackAlert();
+
+    if (oidcEnabled) {
+        oidcSettings.style.display = "block";
+        issuerURL.setAttribute("required", "");
+        clientID.setAttribute("required", "");
+        clientSecret.setAttribute("required", "");
+        externalURL.setAttribute("required", "");
+        externalURL.addEventListener("input", updateCallbackAlert)
+    } else {
+        oidcSettings.style.display = "none";
+        issuerURL.removeAttribute("required");
+        clientID.removeAttribute("required");
+        clientSecret.removeAttribute("required");
+        externalURL.removeAttribute("required");
     }
 }
 
 // Add event listener for auth_enabled checkbox
 document.getElementById("auth_enabled").addEventListener("change", toggleAuthSettings);
+document.getElementById("oidc_enabled").addEventListener("change", toggleOIDCSettings)
 
 // ==================================================
 // Webhook Settings Toggle

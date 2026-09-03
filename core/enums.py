@@ -121,3 +121,7 @@ class WebhookSource(str, Enum):
 class IntervalUnit(str, Enum):
     DAYS = "days"
     HOURS = "hours"
+
+class AuthType(str, Enum):
+    BASIC = "basic"
+    OIDC = "oidc"
