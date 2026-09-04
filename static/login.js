@@ -41,10 +41,15 @@ async function getAuthStatus() {
         const basicAuthEnabled = data.basic_enabled;
         const oidcAuthEnabled = data.oidc_enabled;
         const oidcLabel = data.oidc_label;
+        const version = data.version;
 
         basicAuth.style.display = basicAuthEnabled ? "block" : "none";
         oidcBtn.style.display = oidcAuthEnabled ? "block" : "none";
         oidcBtn.textContent = `Sign In with ${oidcLabel != "" ? oidcLabel : "OIDC"}`
+
+        versionElement = document.getElementById("app-version");
+        versionElement.textContent = `v${version}`;
+
 
         if (basicAuthEnabled && oidcAuthEnabled) {
             separator.classList.remove("d-none");

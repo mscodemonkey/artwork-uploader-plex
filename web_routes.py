@@ -25,6 +25,7 @@ from models.instance import Instance
 from models.bulk_schedule import BulkSchedule
 from core.config import Config, normalize_notification_channels
 from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, RunTrigger, RunOutcome, IntervalUnit, AuthType
+from core.__version__ import __version__
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me, log_to_file
 from services import UtilityService, AuthenticationService, RunHistory
@@ -82,7 +83,8 @@ def setup_routes(web_app, config: Config):
         return jsonify({
             "basic_enabled": getattr(config, "auth_enabled", False),
             "oidc_enabled": getattr(config, "oidc_enabled", False),
-            "oidc_label": getattr(config, "oidc_label", "OIDC")
+            "oidc_label": getattr(config, "oidc_label", "OIDC"),
+            "version": __version__
         })
 
     @web_app.route("/login", methods=["GET", "POST"])
