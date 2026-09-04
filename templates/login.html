@@ -28,6 +28,7 @@
             background: rgba(255, 255, 255, 0.95);
             border-radius: 15px;
             padding: 40px;
+            padding-bottom: 10px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         }
         .login-card h1 {
@@ -74,6 +75,12 @@
         #auth-separator {
             color: #333;
             justify-content: center;
+            font-size: small;
+        }
+        #app-version {
+            color: #333;
+            justify-content: center;
+            font-size: x-small;
         }
     </style>
 </head>
@@ -106,11 +113,12 @@
                 </div>
                 <button type="submit" class="btn btn-primary btn-login rounded-pill">Sign In</button>
             </form>
-            <span class="mt-2 mb-2 d-flex" id="auth-separator">- or -</span>
+            <span class="mt-2 mb-2 d-flex" id="auth-separator">— or —</span>
             <form method="POST" action="/login">
                 <input name="oidc-login" value="true" class="d-none">
                 <button type="submit" id="oidc-btn" style="display: none;" class="btn btn-primary btn-login rounded-pill">Sign In with OIDC</button>
             </form>
+            <span id="app-version" class="mb-0 mt-2 d-flex">v1.2.1</span>
         </div>
     </div>
 
