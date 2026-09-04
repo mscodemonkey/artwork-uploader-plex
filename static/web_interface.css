@@ -879,10 +879,6 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
     min-width: 11rem; /* ~176px - keeps switches perfectly aligned in columns */
     flex-shrink: 0;
 }
-.filter-log-item {
-    min-width: 6rem; /* ~176px - keeps switches perfectly aligned in columns */
-    flex-shrink: 0;
-}
 
 /* ==========================================================================
    Generic Collapsible Floating Action Buttons (FAB)

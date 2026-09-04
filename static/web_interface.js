@@ -1967,6 +1967,28 @@ function deleteRun(timestamp, label) {
 }
 
 let logText = "";
+let logFilterToggles = {
+    updated: {
+        state: false,
+        iconOff: "bi-check-circle",
+        iconOn: "bi-check-circle-fill"
+    },
+    skipped: {
+        state: false,
+        iconOff: "bi-fast-forward-circle",
+        iconOn: "bi-fast-forward-circle-fill"
+    },
+    warning: {
+        state: false,
+        iconOff: "bi-exclamation-circle",
+        iconOn: "bi-exclamation-circle-fill"
+    },
+    error: {
+        state: false,
+        iconOff: "bi-x-circle",
+        iconOn: "bi-x-circle-fill"
+    }
+}
 
 function showLogsforRun(logFileName, runLabel) {
     if (logFileName === "undefined") {
@@ -1984,12 +2006,15 @@ function showLogsforRun(logFileName, runLabel) {
                 const contentEl = document.getElementById("run_log_content");
                 const modalTitleEl = document.getElementById("runLogModalLabel");
 
-                const logFilterCheckboxes = document.querySelectorAll('[id^=log_filter-]');
-                
-                logFilterCheckboxes.forEach((cb) => {
-                    cb.checked = false;
-                    cb.addEventListener("change", onFilterChange)
-                })
+                Object.keys(logFilterToggles).forEach(toggle => {
+                    logFilterToggles[toggle].state = false;
+                    const config = logFilterToggles[toggle]
+                    const toggleElement = document.querySelector(`i[data-filter="${toggle}"]`);
+                    toggleElement.classList.add(config.state ? config.iconOn : config.iconOff);
+                    toggleElement.classList.remove(config.state ? config.iconOff : config.iconOn);
+                });
+
+                document.getElementById("log-filters").addEventListener("click", onFilterChange);
 
                 // Update modal header title & content
                 modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${runLabel}</span>`;
@@ -2006,33 +2031,40 @@ function showLogsforRun(logFileName, runLabel) {
     })
 }
 
-function onFilterChange() {
+function onFilterChange(event) {
+    const toggleElement = event.target.closest("[data-filter]");
+    if (!toggleElement) return;
+
+    const toggle = toggleElement.dataset.filter;
+    if (!toggle) return;
+
     const contentEl = document.getElementById("run_log_content");
     if (!contentEl) return;
     
-    const updated_cb = document.getElementById("log_filter-updated")?.checked;
-    const skipped_cb = document.getElementById("log_filter-skipped")?.checked;
-    const warning_cb = document.getElementById("log_filter-warning").checked;
-    const error_cb = document.getElementById("log_filter-error").checked;
+    logFilterToggles[toggle].state = !logFilterToggles[toggle].state;
+    
+    const config = logFilterToggles[toggle]
+    toggleElement.classList.add(config.state ? config.iconOn : config.iconOff);
+    toggleElement.classList.remove(config.state ? config.iconOff : config.iconOn);
 
-    if (!updated_cb && !skipped_cb && !warning_cb && !error_cb) {
+    if (Object.values(logFilterToggles).every(tg => !tg.state)) {
         contentEl.textContent = logText;
     } else {
-        contentEl.textContent = filterLogContent(logText, updated_cb, skipped_cb, warning_cb, error_cb);
+        contentEl.textContent = filterLogContent(logText, logFilterToggles);
     }
 }
 
-function filterLogContent(content, updated, skipped, warning, error) {
-    if (!content) return;
+function filterLogContent(logContent, logFilterToggles) {
+    if (!logContent) return;
 
-    return content
+    return logContent
         .split("\n")
         .filter(line => 
             line.includes("-----") ||
-            updated && (line.includes("✅") || line.includes("♻️")) ||
-            skipped && line.includes("⏩") ||
-            warning && line.includes("⚠️") ||
-            error && line.includes("❌")
+            logFilterToggles.updated.state && (line.includes("✅") || line.includes("♻️")) ||
+            logFilterToggles.skipped.state && line.includes("⏩") ||
+            logFilterToggles.warning.state && line.includes("⚠️") ||
+            logFilterToggles.error.state && line.includes("❌")
         )
         .join("\n")
 }
@@ -2094,10 +2126,6 @@ function configLogModalProperties() {
         if (content) {
             content.removeAttribute("style");
         }
-        const logFilterCheckboxes = document.querySelectorAll('[id^=log_filter-]');
-        logFilterCheckboxes.forEach((cb) => {
-            cb.removeEventListener("change", onFilterChange);
-        });
     });
 };
 

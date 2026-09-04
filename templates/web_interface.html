@@ -1518,23 +1518,13 @@
                 </div>
                 <div class="px-3 py-2 bg-body-tertiary border-bottom border-secondary-subtle d-flex flex-wrap align-items-center gap-3 gap-y-2">
                     <span class="text-nowrap small fw-bold text-secondary d-flex align-items-center gap-1">
-                        <i class="bi bi-filter-circle"></i> Filter:
+                        <i class="bi bi-filter-circle"></i>Click to filter
                     </span>
-                    <div class="form-check filter-log-item mb-0">
-                        <input class="form-check-input" type="checkbox" id="log_filter-updated"/>
-                        <label for="log_filter-updated" class="form-check-label text-nowrap small">Updated</label>
-                    </div>
-                    <div class="form-check filter-log-item mb-0">
-                        <input class="form-check-input" type="checkbox" id="log_filter-skipped"/>
-                        <label for="log_filter-skipped" class="form-check-label text-nowrap small">Skipped</label>
-                    </div>
-                    <div class="form-check filter-log-item mb-0">
-                        <input class="form-check-input" type="checkbox" id="log_filter-warning"/>
-                        <label for="log_filter-warning" class="form-check-label text-nowrap small">Warning</label>
-                    </div>
-                    <div class="form-check filter-log-item mb-0">
-                        <input class="form-check-input" type="checkbox" id="log_filter-error"/>
-                        <label for="log_filter-error" class="form-check-label text-nowrap small">Error</label>
+                    <div id="log-filters" class="d-flex gap-3">
+                        <i data-filter="updated" class="bi text-success inline-run-btn bi-check-circle me-1" title="Updated""></i>
+                        <i data-filter="skipped" class="bi text-info inline-run-btn bi-fast-forward-circle me-1" title="Skipped""></i>
+                        <i data-filter="warning" class="bi text-warning inline-run-btn bi-exclamation-circle me-1" title="Warning""></i>
+                        <i data-filter="error" class="bi text-danger inline-run-btn bi-x-circle me-1" title="Error""></i>
                     </div>
                 </div>
                 <div class="modal-body bg-dark text-light p-3">
