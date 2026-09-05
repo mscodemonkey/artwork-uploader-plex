@@ -1,5 +1,6 @@
 """Unit tests for the Sonarr/Radarr import webhook (services/webhook_service.py)."""
 
+import os
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -312,6 +313,44 @@ def test_a_retry_does_not_record_a_run_of_its_own(monkeypatch, history):
                      attempt=0, artwork=[{"id": 1, "file_type": "movie_poster"}])
 
     assert history.get_runs() == []
+
+
+@pytest.mark.unit
+def test_a_retry_carries_the_log_file_the_first_attempt_opened(monkeypatch, history, tmp_path):
+    """Each attempt runs on its own Timer thread, and a thread starts with no log file. The
+    first attempt hands its file to the retry, and the retry records that file, so one import
+    is one log the way it is one history row."""
+    import utils.notifications as notifications
+    from core import globals as app_globals
+
+    monkeypatch.setattr(notifications, "DEFAULT_LOG_PATH", str(tmp_path / "logs"))
+    app_globals.run_log.path = None
+    scheduled = {}
+
+    class _FakeTimer:
+        def __init__(self, interval, function, args=()):
+            scheduled["args"] = args
+            self.daemon = False
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(webhook_service_module.threading, "Timer", _FakeTimer)
+    pending = _applying_service(monkeypatch, ["Poster not available on Plex"])
+    pending._attempt(_dune(), ("movie", 438631), _now(), _tally(),
+                     attempt=0, artwork=[{"id": 1, "file_type": "movie_poster"}])
+
+    log_file = scheduled["args"][-1]
+    assert log_file and log_file == notifications.current_log_file()
+    app_globals.run_log.path = None       # the retry lands on a fresh thread
+
+    applied = _applying_service(monkeypatch, ["✅ Poster uploaded"])
+    applied._attempt(*scheduled["args"])
+
+    runs = history.get_runs()
+    assert len(runs) == 1
+    assert runs[0]["log_file"] == os.path.basename(log_file)
+    assert notifications.current_log_file() is None
 
 
 @pytest.mark.unit

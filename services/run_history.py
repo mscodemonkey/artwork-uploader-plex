@@ -147,6 +147,10 @@ class RunHistory:
 
         `label` is what the run was about: the bulk file name, the scraped URL, the
         uploaded ZIP name, or the title the webhook imported."""
+        # The file this thread's run has been logging to. It is read here rather than passed
+        # in so every path that records a run picks it up, and it is per thread so a run
+        # finishing while another is still going records its own file, not the other's.
+        log_file = getattr(globals.run_log, "path", None)
         with _write_locks[os.path.abspath(self.path)]:
             runs = self._load()
             runs.append({
@@ -161,10 +165,10 @@ class RunHistory:
                 "cached_count": cached_count,
                 "locked_count": locked_count,
                 "error_count": error_count,
-                "log_file": os.path.basename(globals.log_to_file) if globals.log_to_file else ""
+                "log_file": os.path.basename(log_file) if log_file else ""
             })
             self._save(self._prune(runs))
-        globals.log_to_file = None # Stop persistent logging after a run is recorded
+        globals.run_log.path = None # This run is recorded, so its thread stops logging to the file
         if job_id and globals.scheduler_service:
             job_meta = globals.scheduler_service.schedule_meta.get(job_id)
             if job_meta:

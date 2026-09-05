@@ -152,16 +152,22 @@ class WebhookService:
             self._inflight.discard(key)
 
     def _attempt(self, event: WebhookEvent, key, started_at: str, tally: ProcessingCallbacks,
-                 attempt: int = 0, artwork: Optional[List[dict]] = None) -> None:
+                 attempt: int = 0, artwork: Optional[List[dict]] = None,
+                 log_file: Optional[str] = None) -> None:
         # UploadProcessor pulls in the processors -> plex chain; import it here so the services
         # package does not drag that in at start-up (mirrors the app's own lazy-import pattern).
         from processors.upload_processor import UploadProcessor
         outcome = RunOutcome.FAILED.value
         try:
-            from utils.notifications import log_to_file
-            clean_title = _clean_title(event.title)
-            log_Label = f"webhook_{clean_title}_{event.year}" if event.year else f"webhook_{_clean_title(clean_title)}"
-            log_to_file(log_Label)
+            from utils.notifications import log_to_file, resume_log_file
+            if log_file:
+                # A retry runs on a fresh Timer thread. Keep the whole ladder in the file the
+                # first attempt opened, the same way it keeps one history record.
+                resume_log_file(log_file)
+            else:
+                clean_title = _clean_title(event.title)
+                log_Label = f"webhook_{clean_title}_{event.year}" if event.year else f"webhook_{_clean_title(clean_title)}"
+                log_file = log_to_file(log_Label)
             if artwork is None:
                 artwork = self._collect_artwork(event)
                 if not artwork:
@@ -206,7 +212,7 @@ class WebhookService:
                 delay = WEBHOOK_RETRY_DELAYS[attempt]
                 _debug(f"{event.label()} not in Plex yet, retrying in {delay}s")
                 timer = threading.Timer(
-                    delay, self._attempt, args=(event, key, started_at, tally, attempt + 1, pending)
+                    delay, self._attempt, args=(event, key, started_at, tally, attempt + 1, pending, log_file)
                 )
                 timer.daemon = True
                 timer.start()

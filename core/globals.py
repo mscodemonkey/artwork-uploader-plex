@@ -20,7 +20,12 @@ scrapes_running: int = 0      # How many scrapes are in flight; the flag clears 
 scrape_type: Literal['scrape', 'bulk', 'upload', 'stopped'] = 'stopped'
 main_bar: dict = {}
 bulk_bar: dict = {}
-log_to_file: str = None
+# The log file for the run on the current thread, set by utils.notifications.log_to_file and
+# cleared when RunHistory records the run. A run and everything it logs happen on one thread,
+# so the thread is what keeps one run's lines apart from another's when two overlap. One
+# shared path could not: a webhook import finishing mid bulk import would record the bulk
+# run's file as its own and switch that run's logging off underneath it.
+run_log = threading.local()
 upload_run_metadata = {}
 
 # Single-flight guard for bulk imports (scheduled or manual). A second bulk import that starts
