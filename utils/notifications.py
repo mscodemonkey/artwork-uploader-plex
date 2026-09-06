@@ -1,5 +1,6 @@
 import threading, inspect, os
 from datetime import datetime
+from typing import Optional
 from core import globals
 from pprint import pprint
 from models.instance import Instance
@@ -103,16 +104,17 @@ def update_log(instance: Instance, update_text: str, broadcast: bool = False) ->
         log_file_message = f"[{timestamp}] {update_text}\n"
         with print_lock:
             print(log_message)
-        if globals.log_to_file:
+        run_log_file = current_log_file()
+        if run_log_file:
             try:
-                if not os.path.exists(globals.log_to_file):
+                if not os.path.exists(run_log_file):
                     os.makedirs(DEFAULT_LOG_PATH, exist_ok=True)
-                    with open(globals.log_to_file, mode="xt", encoding="utf-8") as log_file:
+                    with open(run_log_file, mode="xt", encoding="utf-8") as log_file:
                         log_file.write("-"*40 + f" {datetime.now().strftime("%Y-%m-%d %H:%M:%S")} " + "-"*40 + "\n")
-                with open(globals.log_to_file, mode="at", buffering=1, encoding="utf-8") as log_file:
+                with open(run_log_file, mode="at", buffering=1, encoding="utf-8") as log_file:
                     log_file.write(f"{log_file_message}")
             except Exception as e:
-                debug_me(f"Unable to initialize log file {globals.log_to_file}: {str(e)}")
+                debug_me(f"Unable to initialize log file {run_log_file}: {str(e)}")
                 pass
         if instance.mode == "web":
             if not instance.broadcast and broadcast:
@@ -187,10 +189,28 @@ def send_notification(instance: Instance, message: str, event: str = None) -> No
         debug_me(f"🚨 Error sending notification: {str(e)}")
         update_log(instance, f"🚨 Error sending notification: {str(e)}")
 
-def log_to_file(label: str):
-    if globals.log_to_file:
-        debug_me(f"Logging is already active for another run")
-        return
+def current_log_file() -> Optional[str]:
+    """The log file the run on this thread is writing to, or None outside a run."""
+    return getattr(globals.run_log, "path", None)
+
+def resume_log_file(path: Optional[str]) -> None:
+    """
+    Carry a run's log file onto the thread that continues the run.
+
+    A run and its log normally share one thread. Two kinds of run continue on another: a
+    webhook's retry ladder, where every attempt is a new Timer thread, and a chunked ZIP
+    upload, where every chunk arrives on its own socket handler thread. They pass the path
+    across the hop and call this on the far side, so the whole run lands in one file.
+    """
+    globals.run_log.path = path or None
+
+def log_to_file(label: str) -> Optional[str]:
+    """Open a log file for the run on this thread, named from `label`, and return its path.
+    A run that already has one keeps it."""
+    current = current_log_file()
+    if current:
+        debug_me(f"Logging is already active for this run")
+        return current
     if ".txt" in label:
         log_label = f"bulk_{label.split(".txt")[0]}"
     elif "https" in label:
@@ -208,5 +228,6 @@ def log_to_file(label: str):
     log_label = log_label.lower()
     timestamp = datetime.now()
     log_filename = f"{timestamp.strftime('%Y-%m-%d_%H-%M-%S')}_{log_label}"
-    globals.log_to_file = os.path.join(DEFAULT_LOG_PATH, f"{log_filename}.log")
-    debug_me(f"Setting log file for this run to '{globals.log_to_file}'")
+    globals.run_log.path = os.path.join(DEFAULT_LOG_PATH, f"{log_filename}.log")
+    debug_me(f"Setting log file for this run to '{globals.run_log.path}'")
+    return globals.run_log.path

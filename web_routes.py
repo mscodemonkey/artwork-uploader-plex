@@ -27,7 +27,7 @@ from core.config import Config, normalize_notification_channels
 from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, RunTrigger, RunOutcome, IntervalUnit, AuthType
 from core.__version__ import __version__
 from processors.media_metadata import parse_title
-from utils.notifications import update_log, update_status, notify_web, debug_me, log_to_file
+from utils.notifications import update_log, update_status, notify_web, debug_me, log_to_file, resume_log_file
 from services import UtilityService, AuthenticationService, RunHistory
 from services.webhook_service import parse_event
 from core.constants import (
@@ -1130,6 +1130,7 @@ def setup_socket_handlers(
             globals.main_bar["active"] = False
 
             if instance:
+                resume_log_file(globals.upload_run_metadata.get("log_file"))   # the watchdog fires on its own thread
                 update_log(instance, f"⚠️ {file_name} • Upload timed out after {UPLOAD_CHUNK_TIMEOUT} seconds (connection lost)")
                 update_status(instance, "Upload timed out", color=StatusColor.DANGER.value)
                 notify_web(instance, "scrape_state", {
@@ -1180,11 +1181,14 @@ def setup_socket_handlers(
             log_label = f"upload_{clean_file_name}"
             globals.upload_run_metadata["run_label"] = run_label
             globals.upload_run_metadata["start_time"] = run_start
-            log_to_file(log_label)
+            globals.upload_run_metadata["log_file"] = log_to_file(log_label)
 
             update_log(instance, f"📤 {file_name} • Upload initiated")
             debug_me(f"Uploading '{file_name}")
             notify_web(instance, "scrape_state", { "running": True, "type": globals.scrape_type })
+        else:
+            # Every chunk arrives on its own handler thread, so pick the run's log file back up
+            resume_log_file(globals.upload_run_metadata.get("log_file"))
 
         if globals.cancel_scrape:
             debug_me(f"File upload canceled by user")
@@ -1280,6 +1284,8 @@ def setup_socket_handlers(
         """Finalize the upload once all chunks are received."""
         instance = Instance(data.get("instance_id"), "web", broadcast=True)
         file_name = data.get("fileName")
+        # This handler runs on its own thread too, and the processing that follows records the run
+        resume_log_file(globals.upload_run_metadata.get("log_file"))
 
         notify_web(instance, "progress_bar", { "percent": 100, "message": f"{file_name} • Upload complete!", "bar_speed": "fast"} )
 

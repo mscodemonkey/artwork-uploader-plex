@@ -1991,7 +1991,7 @@ let logFilterToggles = {
 }
 
 function showLogsforRun(logFileName, runLabel) {
-    if (logFileName === "undefined") {
+    if (!logFileName || logFileName === "undefined") {
         updateStatus(`No associated log file for ${runLabel}`, "warning", false, false, "exclamation-triangle")
         return;
     }
