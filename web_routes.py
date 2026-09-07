@@ -91,17 +91,19 @@ def setup_routes(web_app, config: Config):
     def login():
         """Handle user login."""
 
-        if request.method == "GET":
-            error = session.pop("oidc_error", None)
-            return render_template("login.html", error=error)
-        
         # If auth not enabled, redirect to home
         if not config.auth_enabled and not config.oidc_enabled:
+            debug_me("Auth is disabled, redirecting to the app")
             return redirect(url_for('home'))
 
         # Already logged in
         if session.get('authenticated'):
+            debug_me(f"User {session.get('username')} is already authenticated, redirecting to the app")
             return redirect(url_for('home'))
+
+        if request.method == "GET":
+            error = session.pop("oidc_error", None)
+            return render_template("login.html", error=error)
 
         error = None
 
@@ -121,6 +123,7 @@ def setup_routes(web_app, config: Config):
                 if AuthenticationService.authenticate(username, password, config.auth_username, config.auth_password_hash):
                     session['authenticated'] = True
                     session['auth_type'] = AuthType.BASIC.value
+                    session['username'] = username
                     session.permanent = remember  # Set to 7 days if remember is checked
                     update_log(Instance(broadcast=True), f"👤 User {username} logged in successfully")
                     return redirect(url_for('home'))
@@ -797,6 +800,24 @@ def setup_socket_handlers(
                 update_status(instance, "All test notifications failed to send", "danger", False, False, "x-circle")
         notify_web(instance, "add_spinner", { "element": "test_notif_btn", "mode": False })
 
+    @globals.web_socket.on("get_auth_status")
+    def get_auth_status(data):
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
+        auth_enabled = getattr(globals.config, "auth_enabled", False) or getattr(globals.config, "oidc_enabled", False)
+        username = session.get("username", None)
+        auth_type = session.get("auth_type", None)
+        debug_me(session)
+
+        notify_web(
+            instance=instance,
+            event="get_auth_status",
+            data_to_include={
+                "auth_enabled": auth_enabled,
+                "auth_type": auth_type,
+                "username": username
+            }
+        )
+
     @globals.web_socket.on("save_config")
     def save_config_web(data):
         """Save configuration from web UI."""
@@ -822,6 +843,14 @@ def setup_socket_handlers(
             if "apprise_urls" in new_config_dict:
                 new_config_dict["apprise_urls"] = normalize_notification_channels(new_config_dict["apprise_urls"])
 
+            # Auth status before and after
+            basic_before = current_config_dict["auth_enabled"]
+            oidc_before = current_config_dict["oidc_enabled"]
+
+            basic_after = new_config_dict["auth_enabled"]
+            oidc_after = new_config_dict["oidc_enabled"]
+
+            current_auth_type = session.get("auth_type", "auth_disabled")
 
             # Prepare configurations to be compared
             new_config_dict.pop("auth_password")
@@ -854,17 +883,22 @@ def setup_socket_handlers(
                 notify_web(instance, "toggle_config_buttons")
                 return
             
-            if new_config_dict["auth_enabled"] and password:
+            if basic_after and password:
                 if new_config_dict["auth_username"] == current_config_dict["auth_username"] and password_change:
                     update_log(instance, f"🔐 Password changed for user {new_config_dict["auth_username"]}")
                 elif new_config_dict["auth_username"] != current_config_dict["auth_username"]:
-                    update_log(instance, f"🔐 Authentication enabled for user {new_config_dict["auth_username"]}")
+                    update_log(instance, f"🔐 Basic authentication disabled for user {current_config_dict["auth_username"]} and enabled for user {new_config_dict["auth_username"]}")
                 password_hash = AuthenticationService.hash_password(password)
                 new_config_dict["auth_password_hash"] = password_hash
 
-            if not new_config_dict["auth_enabled"]:
-                if current_config_dict["auth_enabled"]:
-                    update_log(instance, f"🔓 Authentication disabled for user {globals.config.auth_username}")
+            if oidc_after and not oidc_before:
+                update_log(instance, f"🫆 OIDC Authentication enabled")
+            if not oidc_after and oidc_before:
+                update_log(instance, "🫆 OIDC Authentication disabled")
+
+            if not basic_after:
+                if basic_before:
+                    update_log(instance, f"🔓 Basic authentication disabled for user {globals.config.auth_username}")
                 new_config_dict["auth_username"] = ""
                 new_config_dict["auth_password_hash"] = ""
 
@@ -880,8 +914,24 @@ def setup_socket_handlers(
             instance.broadcast = True
             update_log(instance, "💾 Configuration saved")
             globals.plex.reconnect(config)
+
+            should_log_in_again = (
+                (current_auth_type == "oidc" and not oidc_after and oidc_before) or
+                (current_auth_type == "basic" and not basic_after and basic_before) or
+                (current_auth_type == "auth_disabled" and (basic_after or oidc_after))
+            )
+                                    
+            if should_log_in_again:
+                debug_me("Active authentication method has been disabled or auth has been enabled, logging user out")
+                notify_web(
+                    instance=instance,
+                    event="logout"
+                )
+                return
+            
             notify_web(instance, "save_config", {"saved": True, "config": vars(config)})
             notify_web(instance, "update_ui", {"config": vars(config)})
+
         except Exception as config_error:
             update_status(instance, str(config_error), color=StatusColor.WARNING.value)
 
