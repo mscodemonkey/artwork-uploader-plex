@@ -65,6 +65,57 @@ document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
     initInteractiveTooltip(el);
 });
 
+function configTabProperties() {
+    const wrappers = document.querySelectorAll('.nav-tabs-wrapper');
+
+    wrappers.forEach(wrapper => {
+        const container = wrapper.querySelector('.nav-tabs-scrollable');
+        if (!container) return;
+
+        const updateScrollFades = () => {
+            if (container.clientWidth === 0) return;
+
+            const scrollLeft = Math.ceil(container.scrollLeft);
+            const maxScrollLeft = Math.floor(container.scrollWidth - container.clientWidth);
+
+            wrapper.classList.toggle('can-scroll-left', scrollLeft > 2);
+            wrapper.classList.toggle('no-scroll-right', maxScrollLeft - scrollLeft <= 2);
+        };
+
+        // Attach scroll listener to this container
+        container.addEventListener('scroll', updateScrollFades, { passive: true });
+
+        // Initial fade calculation for this container
+        setTimeout(updateScrollFades, 200);
+    });
+
+    // Attach smooth centering to all main tabs and sub-tabs globally
+    const allTabLinks = document.querySelectorAll('a[data-bs-toggle="tab"], button[data-bs-toggle="pill"]');
+    allTabLinks.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', (event) => {
+            event.target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'center'
+            });
+
+            // Trigger fade recalculation for the wrapper containing this specific tab
+            const parentWrapper = event.target.closest('.nav-tabs-wrapper');
+            if (parentWrapper) {
+                const parentContainer = parentWrapper.querySelector('.nav-tabs-scrollable');
+                if (parentContainer) {
+                    setTimeout(() => {
+                        const scrollLeft = Math.ceil(parentContainer.scrollLeft);
+                        const maxScrollLeft = Math.floor(parentContainer.scrollWidth - parentContainer.clientWidth);
+                        parentWrapper.classList.toggle('can-scroll-left', scrollLeft > 2);
+                        parentWrapper.classList.toggle('no-scroll-right', maxScrollLeft - scrollLeft <= 2);
+                    }, 150);
+                }
+            }
+        });
+    });
+}
+
 // UI References
 const scrapeUrlInput = document.getElementById("scrape_url");
 const dropArea = document.getElementById("drop-area");
@@ -336,6 +387,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     configLogModalProperties();
+    configTabProperties();
     loadConfig();
     toggleThePosterDBElements();
     toggleWebhookSettings();
@@ -552,7 +604,21 @@ function detectEnvironment() {
     socket.emit("detect_docker", { instance_id: instanceId });
     socket.emit("debug_mode", { instance_id: instanceId, action: "get" });
     socket.emit("check_for_update", { instance_id: instanceId });
+    socket.emit("get_auth_status", { instance_id: instanceId });
 }
+
+socket.on("get_auth_status", function(data) {
+    if (validResponse(data)) {
+        warning = document.getElementById("auth-info");
+        if (data.auth_enabled) {
+            message = `<i class="bi bi-info-circle"></i>&ensp;Signed is as <code>${data.username}</code>${data.auth_type === "oidc" ? ' via OIDC' : ' via basic authentication'}`;
+            warning.innerHTML = message
+            warning.classList.toggle("d-none", !data.auth_enabled)
+        } else {
+            warning.classList.toggle("d-none", !data.auth_enabled);
+        }
+    }
+});
 
 // Backend version this page was loaded against, learned from the first version_check
 let knownBackendVersion = null;
@@ -563,10 +629,7 @@ socket.on("version_check", function(data) {
             knownBackendVersion = data.current_version;
         } else if (data.current_version !== knownBackendVersion) {
             // The backend was updated while this page was open, so this JS is stale
-            updateStatus("Backend updated, refreshing frontend too...", "warning", true, true, "arrow-counterclockwise")
-            setTimeout(() => {
-                location.reload();
-            }, 3000);
+            reload("Backend updated, refreshing frontend too...", "warning", 3000)
             return;
         }
         if (data.new_version) {
@@ -3091,12 +3154,28 @@ socket.on("update_failed", function(data) {
 });
 
 
+function logout(message, severity, timeout) {
+    updateStatus(message, severity, true, true, "arrow-counterclockwise");
+    setTimeout(() => {
+        location.replace("/logout");
+    }, timeout);
+}
+
+socket.on("logout", function() {
+    console.log("Auth settings changed, you must log in again...");
+    logout("Authentication settings changed, you must log in again. Reloading...", "warning", 2000);
+});
+
+function reload(message, severity, timeout) {
+    updateStatus(message, severity, true, true, "arrow-counterclockwise");
+    setTimeout(() => {
+        location.reload();
+    }, timeout);
+}
+
 socket.on("backend_restarting", function() {
     console.log("Backend restarting, refreshing frontend too...");
-    updateStatus("Backend restarting, refreshing frontend too...", "warning", true, true, "arrow-counterclockwise")
-    setTimeout(() => {
-        location.reload();  // Reload the page
-    }, 3000);  // Delay for 3 seconds to ensure restart
+    reload("Backend restarting, refreshing frontend too...", "warning", 3000);
 });
 
 // After a reconnect the backend may have been updated while this page was open
@@ -3109,12 +3188,9 @@ socket.on("connect", function() {
 // Detect when the WebSocket connection is lost
 socket.on("disconnect", function() {
     console.log("WebSocket disconnected, attempting to reconnect...");
-    updateStatus("Connection to server lost, reconnecting...", "warning", true, true, "arrow-counterclockwise")
-    // Refresh the page to reconnect to the WebSocket
-    setTimeout(() => {
-        location.reload();  // Reload to attempt reconnection
-    }, 3000);  // Delay for 3 seconds before refresh to allow connection retry
+    reload("Connection to server lost, reconnecting...", "warning", 3000);
 });
+
 
 // ==================================================
 // Authentication Settings Toggle
@@ -3588,3 +3664,15 @@ function toggleNotification() {
         tooltip.hide();
     }, 1000);    
 }
+
+document.getElementById("option-force").addEventListener("change", () => {
+    warning = document.getElementById("force-warning");
+    checked = document.getElementById("option-force").checked;
+    warning.classList.toggle("d-none", !checked);
+})
+
+document.getElementById("upload-option-force").addEventListener("change", () => {
+    warning = document.getElementById("force-warning-upload");
+    checked = document.getElementById("upload-option-force").checked;
+    warning.classList.toggle("d-none", !checked);
+})

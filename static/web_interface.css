@@ -1088,3 +1088,95 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 #run_log_modal .modal-dialog.is-dragging {
     transition: none !important;
 }
+
+/* ==========================================================================
+   Tab scrolling and fading
+   ========================================================================== */
+
+@property --fade-left {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0rem;
+}
+
+@property --fade-right {
+    syntax: '<length>';
+    inherits: false;
+    initial-value: 0rem;
+}
+
+.nav-tabs-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+/* Base scrollable container */
+.nav-tabs-scrollable {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap !important;
+    scrollbar-width: none;
+}
+
+.nav-tabs-scrollable::-webkit-scrollbar {
+    display: none;
+}
+
+.nav-tabs-scrollable .nav-link {
+    flex: 0 0 auto !important;
+}
+
+/* Fade Overlay Base Styles */
+.nav-tabs-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 4.5rem;
+    pointer-events: none; /* Allows clicks to pass through to underlying tabs */
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.25s ease-in-out;
+}
+
+.nav-tabs-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 4.5rem;
+    background: linear-gradient(to left, var(--bs-body-bg, #212529), transparent);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 1; /* Default to visible on cold load */
+    transition: opacity 0.2s ease-in-out;
+}
+
+.nav-tabs-wrapper.no-scroll-right::after {
+    opacity: 0;
+}
+
+/* Left Fade Gradient */
+.nav-tabs-wrapper::before {
+    left: 0;
+    background: linear-gradient(to right, var(--bs-body-bg, #212529), transparent);
+}
+
+/* Right Fade Gradient */
+.nav-tabs-wrapper::after {
+    right: 0;
+    background: linear-gradient(to left, var(--bs-body-bg, #212529), transparent);
+}
+
+/* Toggle opacity via wrapper state classes */
+.nav-tabs-wrapper.can-scroll-left::before {
+    opacity: 1;
+}
+
+.nav-tabs-wrapper.can-scroll-right::after {
+    opacity: 1;
+}
