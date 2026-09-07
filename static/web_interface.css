@@ -1180,3 +1180,37 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 .nav-tabs-wrapper.can-scroll-right::after {
     opacity: 1;
 }
+
+
+/* Mobile First: Single Column Stack */
+.settings-grid {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Desktop View (992px / lg breakpoint and above) */
+@media (min-width: 992px) {
+    .settings-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 1.5rem;
+        align-items: start; /* Prevents height stretching across rows */
+    }
+
+    /* Assign grid column placements explicitly */
+    .card-plex {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .card-webhook {
+        grid-column: 1;
+        grid-row: 2;
+        margin-top: 1rem;
+    }
+
+    .card-kometa {
+        grid-column: 2;
+        grid-row: 1 / span 2; /* Occupies the entire right column */
+    }
+}

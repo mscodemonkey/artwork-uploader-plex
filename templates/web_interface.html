@@ -176,10 +176,10 @@
                     <div class="tab-content" id="settingsSubTabsContent">
                         <!-- General Tab -->
                         <div class="tab-pane fade show active" id="subtab-plex" role="tabpanel">
-                            <div class="row">
-                                <div class="col-lg-6 mb-3">
+                            <div class="settings-grid">
+                                <div class="card-plex">
                                     <!-- Plex settings -->
-                                    <div class="p-3 border rounded-4 shadow-sm">
+                                    <div class="p-3 border rounded-4 shadow-sm mb-3 mb-lg-0">
                                         <h5 class="mb-3"><i class="bi bi-film"></i>&ensp;Plex Server Settings</h5>
                                         <div class="mb-3">
                                             <label for="plex_base_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Base URL</label>
@@ -213,16 +213,15 @@
                                             <label for="tv_library" class="form-label"><i class="bi bi-tv"></i>&ensp;TV Libraries</label>
                                             <select id="tv_library" name="tv_library" multiple placeholder="Click to add..."></select>
                                         </div>
-
                                         <div class="mb-0">
                                             <label for="movie_library" class="form-label"><i class="bi bi-camera-reels"></i>&ensp;Movie Libraries</label>
                                             <select id="movie_library" name="movie_library" multiple placeholder="Click to add..."></select>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-6 mb-3">
+                                <div class="card-kometa">
                                     <!-- Kometa settings -->
-                                    <div class="p-3 border mt-0 rounded-4 shadow-sm">
+                                    <div class="p-3 border mt-0 rounded-4 shadow-sm mb-3 mb-lg-0">
                                         <h5 class="mb-3"><i class="bi bi-download"></i>&ensp;Kometa Settings</h5>
                                         <div class="form-check form-switch">
                                             <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
@@ -293,7 +292,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-lg-6 mb-0">
+                                <div class="card-webhook">
                                     <!-- Webhook settings -->
                                     <div class="p-3 border mt-0 rounded-4 shadow-sm">
                                         <h5 class="mb-3"><i class="bi bi-broadcast-pin"></i>&ensp;Webhook Settings</h5>
