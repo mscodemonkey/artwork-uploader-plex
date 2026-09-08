@@ -2029,7 +2029,8 @@ function deleteRun(timestamp, label) {
     };
 }
 
-let logText = "";
+let logData = {};
+
 let logFilterToggles = {
     updated: {
         state: false,
@@ -2064,7 +2065,8 @@ function showLogsforRun(logFileName, runLabel) {
     socket.once("get_log_file", data => {
         if (validResponse(data)) {
             if (data.success) {
-                logText = data.contents;
+                logData = filterLogContent(data.contents);
+                // logData.content = data.contents;
                 const modalEl = document.getElementById("run_log_modal");
                 const contentEl = document.getElementById("run_log_content");
                 const modalTitleEl = document.getElementById("runLogModalLabel");
@@ -2073,15 +2075,18 @@ function showLogsforRun(logFileName, runLabel) {
                     logFilterToggles[toggle].state = false;
                     const config = logFilterToggles[toggle]
                     const toggleElement = document.querySelector(`i[data-filter="${toggle}"]`);
+                    toggleElement.innerHTML = `&ensp;<span class="text-monospace text-muted">${logData[toggle]}</span>`;
                     toggleElement.classList.add(config.state ? config.iconOn : config.iconOff);
                     toggleElement.classList.remove(config.state ? config.iconOff : config.iconOn);
                 });
+                const filterSummary = document.getElementById("filter-summary");
+                filterSummary.textContent = '';
 
                 document.getElementById("log-filters").addEventListener("click", onFilterChange);
 
                 // Update modal header title & content
                 modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${runLabel}</span>`;
-                contentEl.textContent = logText;
+                contentEl.textContent = logData.content;
 
                 // Show modal safely
                 const logModal = bootstrap.Modal.getOrCreateInstance(modalEl);
@@ -2110,26 +2115,70 @@ function onFilterChange(event) {
     toggleElement.classList.add(config.state ? config.iconOn : config.iconOff);
     toggleElement.classList.remove(config.state ? config.iconOff : config.iconOn);
 
+    const filterSummary = document.getElementById("filter-summary");
     if (Object.values(logFilterToggles).every(tg => !tg.state)) {
-        contentEl.textContent = logText;
+        contentEl.textContent = logData.content;
+        filterSummary.textContent = ``;
     } else {
-        contentEl.textContent = filterLogContent(logText, logFilterToggles);
+        filteredLog = filterLogContent(logData.content, logFilterToggles);
+        contentEl.textContent = filteredLog.content;
+        filterSummary.textContent = `Filtered ${filteredLog.filtered} of ${filteredLog.lines} results`;
     }
 }
 
-function filterLogContent(logContent, logFilterToggles) {
+function filterLogContent(logContent, logFilterToggles=null) {
     if (!logContent) return;
 
-    return logContent
-        .split("\n")
-        .filter(line => 
-            line.includes("-----") ||
-            logFilterToggles.updated.state && (line.includes("✅") || line.includes("♻️")) ||
-            logFilterToggles.skipped.state && line.includes("⏩") ||
-            logFilterToggles.warning.state && line.includes("⚠️") ||
-            logFilterToggles.error.state && line.includes("❌")
-        )
-        .join("\n")
+    function isValidLine(line) {
+        const assetRegex = /\b(Poster|Season|Show|Square|Error|Background)\b/i;
+        return assetRegex.test(line);
+    }
+
+    let result = {
+        content: '',
+        lines: 0,
+        updated: 0,
+        skipped: 0,
+        warning: 0,
+        error: 0,
+        filtered: 0
+    };
+
+    logContent.split("\n").forEach(line => {
+        if (!logFilterToggles) result.content += line + "\n";
+        if (logFilterToggles && line.includes("-----")) result.content += line + "\n";
+
+        if (isValidLine(line)) {
+            result.lines += 1;
+            if (line.includes("✅") || line.includes("♻️")) {
+                result.updated += 1;
+                if (logFilterToggles && logFilterToggles.updated.state) {
+                    result.content += line + "\n";
+                    result.filtered += 1;
+                }
+            } else if (line.includes("⏩")) {
+                result.skipped += 1;
+                if (logFilterToggles && logFilterToggles.skipped.state) {
+                    result.content += line + "\n";
+                    result.filtered += 1;
+                }
+            } else if (line.includes("⚠️")) {
+                result.warning += 1;
+                if (logFilterToggles && logFilterToggles.warning.state) {
+                    result.content += line + "\n";
+                    result.filtered += 1;
+                }
+            } else if (line.includes("❌")) {
+                result.error += 1;
+                if (logFilterToggles && logFilterToggles.error.state) {
+                    result.content += line + "\n";
+                    result.filtered += 1;
+                }
+            }
+        }
+    });
+    result.total = result.updated + result.skipped + result.warning + result.error
+    return result;
 }
 
 function configLogModalProperties() {
