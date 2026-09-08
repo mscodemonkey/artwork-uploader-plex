@@ -120,11 +120,8 @@
                 <a class="nav-link collapse" id="run-history-tab" data-bs-toggle="tab" data-bs-target="#run-history" type="button"
                 role="tab" aria-controls="run-history" aria-selected="false"><i class="bi bi-clock-history"></i>&ensp;History</a>
                 
-                <a class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab"
+                <a class="nav-link active" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab"
                 aria-controls="config" aria-selected="false"><i class="bi bi-sliders"></i>&ensp;Settings</a>
-
-                <a class="nav-link collapse" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab"
-                aria-controls="config" aria-selected="false"><i class="bi bi-shield-shaded"></i>&ensp;Authentication</a>
 
                 <a class="nav-link collapse" id="about-tab" data-bs-toggle="tab" data-bs-target="#about" type="button"
                 role="tab" aria-controls="about" aria-selected="false"><i class="bi bi-code-slash"></i>&ensp;About</a>
@@ -154,12 +151,12 @@
 
         <div class="tab-content" id="myTabContent">
             <!-- Settings Tab -->
-            <div class="tab-pane fade show active pb-5" id="config" role="tabpanel" aria-labelledby="config-tab" tabindex="0">
+            <div class="tab-pane fade show active pb-5" id="settings" role="tabpanel" aria-labelledby="settings-tab" tabindex="0">
                 <form id="config_form" class="needs-validation" novalidate>
                     <!-- Sub-Tabs Navigation -->
                     <div class="nav-tabs-wrapper mb-4">
                         <nav class="nav nav-tabs nav-tabs-scrollable" id="settingsSubTabs" role="tablist">
-                            <button class="nav-link active" id="subtab-plex-tab" data-bs-toggle="pill" data-bs-target="#subtab-plex" type="button" role="tab">
+                            <button class="nav-link active" id="subtab-general-tab" data-bs-toggle="pill" data-bs-target="#subtab-general" type="button" role="tab">
                                 <i class="bi bi-gear me-1"></i>&ensp;General
                             </button>
                             <button class="nav-link" id="subtab-artwork-tab" data-bs-toggle="pill" data-bs-target="#subtab-artwork" type="button" role="tab">
@@ -175,7 +172,7 @@
                     </div>
                     <div class="tab-content" id="settingsSubTabsContent">
                         <!-- General Tab -->
-                        <div class="tab-pane fade show active" id="subtab-plex" role="tabpanel">
+                        <div class="tab-pane fade show active" id="subtab-general" role="tabpanel">
                             <div class="settings-grid">
                                 <div class="card-plex">
                                     <!-- Plex settings -->
@@ -482,7 +479,7 @@
                         <div class="tab-pane fade" id="subtab-artwork" role="tabpanel">
                             <!-- TPDb Card -->
                             <div class="row mb-3">
-                                <div class="col-lg-6 mb-3">
+                                <div class="col-xl-5 col-xxl-6 mb-3">
                                     <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3">
                                             <i class="bi bi-card-image"></i>&ensp;TPDb&thinsp;
@@ -522,7 +519,7 @@
                                     </div>
                                 </div>
                                 <!-- MediUX Card -->
-                                <div class="col-lg-6 mb-0">
+                                <div class="col-xl-7 col-xxl-6 mb-0">
                                     <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3">
                                             <i class="bi bi-card-image"></i>&ensp;MediUX&thinsp;
@@ -1043,6 +1040,7 @@
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" checked value="inherit" name="filter" id="scraper-filters-global"/>
                                     <label for="scraper-filters-global" class="form-check-label">As set by global filters</label>
+                                    <a role="button" class="bi bi-link-45deg link-to-filters"></a>
                                 </div>
                                 <div id="scraper-filters" class="collapse">
                                     <!-- TV Shows -->
@@ -1219,6 +1217,7 @@
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" checked value="inherit" name="filter" id="upload-filters-global"/>
                                 <label for="upload-filters-global" class="form-check-label">As set by global filters</label>
+                                <a role="button" class="bi bi-link-45deg link-to-filters"></a>
                             </div>
                             <div id="upload-filters" class="collapse">
                                 <!-- TV Shows -->

@@ -1726,8 +1726,8 @@ function configureTabs(afterSave = false) {
             document.getElementById('scraper-tab').classList.add("show");
             document.getElementById('uploader-tab').classList.add("show");
             if (!afterSave) {
-                document.getElementById('config').classList.remove("show","active");
-                document.getElementById('config-tab').classList.remove("active");
+                document.getElementById('settings').classList.remove("show","active");
+                document.getElementById('settings-tab').classList.remove("active");
                 document.getElementById('scraper').classList.add("show","active");
                 document.getElementById('scraper-tab').classList.add("active");
             }
@@ -3676,3 +3676,10 @@ document.getElementById("upload-option-force").addEventListener("change", () => 
     checked = document.getElementById("upload-option-force").checked;
     warning.classList.toggle("d-none", !checked);
 })
+
+document.querySelectorAll(".link-to-filters").forEach(el => el.addEventListener("click", () => {
+    const mainTab = document.querySelector("#myTab a[data-bs-target='#settings']");
+    const subTab = document.querySelector("#settingsSubTabs button[data-bs-target='#subtab-artwork']");
+    bootstrap.Tab.getOrCreateInstance(mainTab).show();
+    bootstrap.Tab.getOrCreateInstance(subTab).show();
+}));
