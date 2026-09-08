@@ -261,7 +261,6 @@ def _dune():
 def test_an_applied_import_is_recorded_as_a_successful_webhook_run(monkeypatch, history):
     service = _applying_service(monkeypatch, ["✅ Dune (2021) • someone | Poster updated in Movies"])
     tally = _tally()
-    tally.assets(1)
 
     service._attempt(_dune(), ("movie", 438631), _now(), tally,
                      artwork=[{"id": 1, "file_type": "movie_poster"}])

@@ -175,7 +175,6 @@ class WebhookService:
                     self._finish(event, key, started_at, tally, RunOutcome.SKIPPED.value)
                     return
                 _log(f"📥 Webhook | {event.source.title()} import: {event.label()}")
-                tally.assets(len(artwork))
             globals.plex.connect()
             processor = UploadProcessor(globals.plex)
             processor.set_options(Options())

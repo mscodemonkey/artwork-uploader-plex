@@ -66,6 +66,7 @@ class ProcessingCallbacks:
         The uploader and the Kometa saver both report what happened as a prefixed
         string, so the prefixes are the only record of an item's fate. Every caller
         that tallies a run reads them here, so they are written down once."""
+        self.assets(1)
         if result.startswith('✅') or result.startswith('♻️'):
             self.success(1)
             return "success"
