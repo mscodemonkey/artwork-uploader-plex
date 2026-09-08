@@ -154,7 +154,6 @@ class ArtworkProcessor:
             if not bulk:
                 self.callbacks.status(f"Process canceled {f'{title} by {scraper.author}' if title else f"for {scraper.author}'s TPDb portfolio"}", "warning")
         else:
-            self.callbacks.assets(count=(scraper.total - scraper.skipped))
             failed_note = f" • {self.callbacks.failed_counter[0]} asset(s) failed" if self.callbacks.failed_counter and self.callbacks.failed_counter[0] else ""
             self.callbacks.log(f"✔️ {description} | {scraper.total - scraper.skipped} asset(s) processed in {elapsed} • {self.callbacks.success_counter[0]} asset(s) updated{failed_note}")
             if not bulk:
@@ -365,7 +364,6 @@ class ArtworkProcessor:
             except OSError:
                 pass
         # Final progress update
-        self.callbacks.assets(count=processed_files)
         failed_note = f" • {failed_counter} asset(s) failed" if failed_counter else ""
         if globals.cancel_scrape:
             self.callbacks.progress(1, 1, "", "main")
