@@ -1018,7 +1018,7 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
 }
 
 /* Apply vertical text mode only on mobile viewports below 768px */
-@media (max-width: 767.98px) {
+@media (max-width: 1200px) {
     th.th-vertical {
         writing-mode: vertical-rl;
         transform: rotate(180deg);
@@ -1033,13 +1033,11 @@ Theme Switcher Dropdown Icons (Fix dark mode SVG fills)
         transform: rotate(90deg); /* Adjusts icon axis to match vertical text flow */
         vertical-align: bottom;
         margin-bottom: 2px;
+        padding: 4px 0px !important;
     }
 }
 
 /* Push the modals down slightly so the navbar/title remains visible */
-/*.custom-log-modal-pos {
-    margin-top: 8rem !important; /* Adjust value (e.g., 4rem - 6rem) as needed 
-} */
 .yes-no-cancel-modal {
     margin-top: 12rem !important; /* Adjust value (e.g., 4rem - 6rem) as needed */
 }
