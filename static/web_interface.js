@@ -136,7 +136,7 @@ const bulkFileSwitcher = document.getElementById("switch_bulk_file");
 // Event listeners
 document.addEventListener("DOMContentLoaded", function () {
     updateLog("📍 New session started with ID: " + instanceId)
-
+    console.log("📍 New session started with ID: " + instanceId)
 
     const stickyContainers = document.querySelectorAll(".sticky-bottom");
 
@@ -542,11 +542,11 @@ socket.on("scrape_state", (data) => {
 });
 
 // A webhook import finishes without a scrape_state change, so it says so itself
-socket.on("run_history_updated", () => {
-    loadRunHistory();
+socket.on("run_history_updated", (data) => {
+    if (validResponse(data, true)) {
+        loadRunHistory();
+    }
 });
-
-
 
 function updateLibraryPickers() {
     const baseUrl = document.getElementById("plex_base_url").value;
@@ -625,6 +625,8 @@ let knownBackendVersion = null;
 
 socket.on("version_check", function(data) {
     if(validResponse(data, true)){
+        versionEl = document.getElementById("app-version");
+        if (versionEl) versionEl.textContent = data.current_version;
         if (knownBackendVersion === null) {
             knownBackendVersion = data.current_version;
         } else if (data.current_version !== knownBackendVersion) {
@@ -1588,15 +1590,15 @@ function saveBulkChangesModal(filename) {
         document.getElementById("yesNoCancelModalMessage").innerText = "Do you want to save changes to " + currentBulkImport + " first?";
 
         // Update buttons with choices
-        document.getElementById("yesButton").innerHTML = '<i class="bi bi-floppy2"></i>&ensp;Save&nbsp;'
-        document.getElementById("yesButton").classList.remove("btn-danger")
+        document.getElementById("yesButton").innerHTML = '&thinsp;<i class="bi bi-floppy2"></i>&ensp;Save&nbsp;'
         document.getElementById("noButton").innerHTML = '<i class="bi bi-trash3"></i>&ensp;Discard&nbsp;'
-        document.getElementById("cancelButton").classList.remove("d-none")
         document.getElementById("cancelButton").innerHTML = '<i class="bi bi-x-circle"></i>&ensp;Cancel&nbsp;'
 
         // Show modal
         const modal = new bootstrap.Modal(modalElement);
         modal.show();
+
+        modalElement.addEventListener('hidden.bs.modal', resetYesNoCancelModal);
 
         // Handle button clicks
         document.getElementById("yesButton").onclick = () => {
@@ -1647,6 +1649,25 @@ function startScrape() {
         form.classList.add('was-validated');
     }
 }
+
+document.querySelectorAll('.nav-link[data-bs-target]').forEach(tabEl => {
+    tabEl.addEventListener('click', (e) => {
+        // Check if the click originated on or inside a cancel icon
+        const cancelBtn = e.target.closest('#scrape-cancel, #bulk-import-cancel, #upload-cancel');
+        
+        if (cancelBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            tabEl.blur();
+            stopScrape();
+            return; // Exit early so Bootstrap never activates the clicked tab
+        }
+
+        // Standard tab click: switch active tab programmatically
+        const tab = bootstrap.Tab.getOrCreateInstance(tabEl);
+        tab.show();
+    });
+});
 
 function stopScrape() {
     socket.emit("display_message", {
@@ -1921,6 +1942,7 @@ function loadRunHistory() {
 
     const typeFilter = document.getElementById("run_history_type");
     const runType = typeFilter ? typeFilter.value : "";
+    const runHistoryCount = document.getElementById("run-history-count");
 
     socket.emit("load_run_history", { instance_id: instanceId, run_type: runType });
 
@@ -1931,6 +1953,7 @@ function loadRunHistory() {
         body.innerHTML = "";
 
         const runs = data.runs || [];
+        const clearButton = document.getElementById("clear-history-btn");
 
         if (runs.length === 0) {
             const row = document.createElement("tr");
@@ -1940,9 +1963,18 @@ function loadRunHistory() {
             cell.textContent = runType ? "No runs of this type recorded yet." : "No runs recorded yet.";
             row.appendChild(cell);
             body.appendChild(row);
+            clearButton.classList.add("disabled");
+            runHistoryCount.classList.add("d-none");
             return;
         }
-
+        
+        runHistoryCount.classList.remove("d-none");
+        if (runs.length < data.total) {
+            runHistoryCount.textContent = `${runs.length} of ${data.total} run${runs.length > 1 ? 's' : ''}`;
+        } else {
+            runHistoryCount.textContent = `${runs.length} ${runs.length > 1 ? 'runs' : 'run'}`;
+        }
+        clearButton.classList.remove("disabled");
         runs.forEach((run) => {
             const row = document.createElement("tr");
             const outcome = RUN_HISTORY_OUTCOME_LABELS[run.outcome] || { text: run.outcome, className: "" };
@@ -1987,15 +2019,19 @@ function deleteRun(timestamp, label) {
     if (!timestamp || !label) return;
 
     const modalElement = document.getElementById("yesNoCancelModal");
+    const modalLabel = document.getElementById("yesNoCancelModalLabel");
+    const modalMessage = document.getElementById("yesNoCancelModalMessage");
+    const yesButton = document.getElementById("yesButton");
+    const noButton = document.getElementById("noButton");
 
     // Update modal message and title
-    document.getElementById("yesNoCancelModalLabel").innerText = "Delete run from history";
-    document.getElementById("yesNoCancelModalMessage").innerHTML = `You are about to delete run <span class="text-monospace">${label}</span> from ${formatDateTime(timestamp)}. <br><br>Are you sure?`;
+    modalLabel.innerText = "Delete run from history";
+    modalMessage.innerHTML = `You are about to delete run <span class="text-monospace">${label}</span> from ${formatDateTime(timestamp)}. <br><br>Are you sure?`;
 
     // Update buttons with choices
-    document.getElementById("yesButton").innerHTML = '<i class="bi bi-trash"></i>&ensp;Delete&nbsp;'
-    document.getElementById("yesButton").classList.add("btn-danger")
-    document.getElementById("noButton").innerHTML = '<i class="bi bi-x-lg"></i>&ensp;Cancel&nbsp;'
+    yesButton.innerHTML = '<i class="bi bi-trash"></i>&ensp;Delete&nbsp;'
+    yesButton.classList.add("btn-danger")
+    noButton.innerHTML = '<i class="bi bi-x-lg"></i>&ensp;Cancel&nbsp;'
     document.getElementById("cancelButton").classList.add("d-none")
 
     // Show modal
@@ -2003,23 +2039,28 @@ function deleteRun(timestamp, label) {
     modal.show();
 
     // Handle button clicks
-    document.getElementById("yesButton").onclick = () => {
-        document.getElementById("yesButton").onclick = null; // Remove listener to prevent duplicate clicks
+    yesButton.onclick = () => {
+        yesButton.onclick = null; // Disable button to prevent duplicate clicks
 
         modalElement.addEventListener('hidden.bs.modal', function onModalHidden() {
             modalElement.removeEventListener('hidden.bs.modal', onModalHidden);
-            socket.emit("delete_run", { instance_id: instanceId, timestamp: timestamp, label: label });
-        
+            
             socket.once("run_deleted", data => {
-                if (validResponse(data)) {
-                    if (data.success) {
-                        loadRunHistory();
-                        console.log(`Run with label '${label}' and timestamp ${timestamp} successfully deleted`);
-                    } else {
-                        console.warn(`Unable to delete run with label '${label}' and timestamp ${timestamp}`);
+                if (validResponse(data, true)) {
+                    loadRunHistory();
+                    if (data.result === "success") {
+                        updateStatus(data.message, "success", false, false, "check2-circle");
+                    } else if (data.result === "warning") {
+                        updateStatus(data.message, "warning", false, false, "exclamation-triangle");
+                    } else if (data.result === "error") {
+                        updateStatus(data.message, "danger", false, false, "x-octagon");
                     }
                 }
             });
+            
+            socket.emit("delete_run", { instance_id: instanceId, timestamp: timestamp, label: label });
+            
+            resetYesNoCancelModal();
         }, { once: true });
         modal.hide();
     };
@@ -2027,6 +2068,107 @@ function deleteRun(timestamp, label) {
     document.getElementById("noButton").onclick = () => {
         modal.hide();
     };
+}
+
+function clearHistory() {
+    const modalElement = document.getElementById("yesNoCancelModal");
+    const modalDialog = document.querySelector("#yesNoCancelModal .modal-dialog");
+    const runType = document.getElementById("run_history_type").value;
+    const yesButton = document.getElementById("yesButton");
+    const noButton = document.getElementById("noButton");
+    const cancelButton = document.getElementById("cancelButton");
+    const modalMessage = document.getElementById("yesNoCancelModalMessage");
+    const modalLabel = document.getElementById("yesNoCancelModalLabel");
+    const modalCloseBtn = document.getElementById("yesNoModalCloseBtn");
+
+    // Update modal message and title
+    modalLabel.innerText = "Clear run history";
+    modalMessage.innerHTML = `You are about to clear all ${runType ? RUN_HISTORY_TYPE_LABELS[runType].toLowerCase() : ''} runs from the history. This action cannot be undone. <br><br>Are you sure?`;
+
+    // Update buttons with choices
+    yesButton.innerHTML = '<i class="bi bi-radioactive"></i>&ensp;Clear&nbsp;'
+    yesButton.classList.add("btn-danger")
+    noButton.innerHTML = '<i class="bi bi-x-lg"></i>&ensp;Cancel&nbsp;'
+    cancelButton.classList.add("d-none")
+
+    // Instantiate Modal with backdrop static so user can't click outside while deleting
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+    
+    modalElement.addEventListener('hidden.bs.modal', resetYesNoCancelModal);
+    
+    // Handle button clicks
+    yesButton.onclick = () => {
+        modal._config.backdrop = 'static';
+        modal._config.keyboard = false;
+        modalCloseBtn.classList.add("d-none");
+        yesButton.disabled = true;
+        noButton.disabled = true;
+        yesButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>&ensp;Clearing...';
+        modalLabel.innerText = "Summary";
+        
+        socket.once("history_cleared", (data) => {
+            modalCloseBtn.classList.remove("d-none");
+            if (validResponse(data, true)) {
+                yesButton.classList.add("d-none");
+                modal._config.backdrop = true;
+                modal._config.keyboard = true;
+                noButton.disabled = false;
+                noButton.innerHTML = '<i class="bi bi-check-lg"></i>&ensp;Accept&nbsp;';
+                noButton.classList.remove("btn-secondary");
+                noButton.classList.add("btn-primary");
+                loadRunHistory();
+                if (data.result === "success") {
+                    modalMessage.innerHTML = `Successfully deleted ${data.deleted} run${data.deleted > 1 ? 's' : ''}.`
+                } else if (data.result === "partial") {
+                    modalMessage.innerHTML = `Unable to delete all runs (deleted ${data.deleted} of ${data.total} runs).`
+                } else if (data.result === "failed") {
+                    modalMessage.innerHTML = `Unable to delete any runs.`
+                }
+                if (data.remaining_logs.length > 0) {
+                    modalMessage.innerHTML += `<br>The following log files could not be deleted:<br>`;
+                    modalDialog.classList.add("modal-lg");
+                    let logTable = '<table class="table"><thead><tr><th class="fw-bold">Log File</th><th class="fw-bold">Reason</th></tr></thead><tbody>';
+                    data.remaining_logs.forEach(log => {
+                        logTable += `<tr><td class="text-monospace" style="font-size: 0.95rem;">${log.file_name}</td><td>${log.reason}</td></tr>`;
+                    });
+                    logTable += '</tbody>';
+                    modalMessage.innerHTML += logTable;
+                }                
+            }
+        });
+        
+        socket.emit("clear_history", { instance_id: instanceId, run_type: runType });
+    };
+
+    noButton.onclick = () => {
+        modal.hide();
+    };
+}
+
+document.getElementById("clear-history-btn").addEventListener("click", clearHistory);
+
+function resetYesNoCancelModal() {
+    const yesButton = document.getElementById("yesButton");
+    const noButton = document.getElementById("noButton");
+    const cancelButton = document.getElementById("cancelButton");
+    const modalCloseBtn = document.getElementById("yesNoModalCloseBtn");
+    const modalDialog = document.querySelector("#yesNoCancelModal .modal-dialog");
+
+    yesButton.disabled = false;
+    yesButton.innerHTML = '<i class="bi bi-check-lg"></i>&ensp;Yes&ensp;</button>'
+    yesButton.classList.remove("btn-primary", "btn-danger", "btn-success", "btn-secondary", "d-none");
+    yesButton.classList.add("btn-primary");
+    noButton.disabled = false;
+    noButton.innerHTML = '<i class="bi bi-x-lg"></i>&ensp;No&ensp;</button>'
+    noButton.classList.remove("btn-primary", "btn-danger", "btn-success", "btn-secondary", "d-none");
+    noButton.classList.add("btn-secondary");
+    cancelButton.disabled = false;
+    cancelButton.innerHTML = '<i class="bi bi-x-circle"></i>&ensp;Cancel&ensp;</button>'
+    cancelButton.classList.remove("btn-primary", "btn-danger", "btn-success", "btn-secondary", "d-none");
+    cancelButton.classList.add("btn-danger");
+    modalCloseBtn.classList.remove("d-none");
+    modalDialog.classList.remove("modal-sm", "modal-lg", "modal-xl");
 }
 
 let logData = {};
@@ -2092,7 +2234,7 @@ function showLogsforRun(logFileName, runLabel) {
                 const logModal = bootstrap.Modal.getOrCreateInstance(modalEl);
                 logModal.show();
             } else {
-                updateStatus(`Unable to load log file for ${runLabel}`, "danger", false, false, "x-octagon")
+                updateStatus(`Unable to load log file for ${runLabel} (${data.error})`, "danger", false, false, "x-octagon")
                 console.warn(`Unable to display log file contents for ${runLabel}`)
             }
         }

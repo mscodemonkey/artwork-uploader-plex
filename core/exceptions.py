@@ -120,3 +120,25 @@ class InvalidUrl (ParseError):
 
 class InvalidFlag (ParseError):
     pass
+
+# ============================================================================
+# Run History errors
+# ============================================================================
+
+class RunHistoryException(ArtworkUploaderException):
+    """Base class for Run History Exceptions"""
+    pass
+
+class HistorySaveError(RunHistoryException):
+    pass
+
+class RunDeleteError(RunHistoryException):
+    def __init__(self, message:str, run_label:str=None) -> None:
+        super().__init__(message)
+        self.run_label = run_label
+
+class LogDeleteError(RunHistoryException):
+    def __init__(self, message:str, log_file:str=None, run_label:str=None) -> None:
+        super().__init__(message)
+        self.log_file = log_file
+        self.run_label = run_label

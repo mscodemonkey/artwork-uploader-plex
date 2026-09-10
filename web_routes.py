@@ -25,6 +25,7 @@ from models.instance import Instance
 from models.bulk_schedule import BulkSchedule
 from core.config import Config, normalize_notification_channels
 from core.enums import FileType, MediaType, ScraperSource, StatusColor, RunType, RunTrigger, RunOutcome, IntervalUnit, AuthType
+from core.exceptions import RunDeleteError, LogDeleteError
 from core.__version__ import __version__
 from processors.media_metadata import parse_title
 from utils.notifications import update_log, update_status, notify_web, debug_me, log_to_file, resume_log_file
@@ -545,22 +546,73 @@ def setup_socket_handlers(
         log_file_name = data.get("log_file_name")
         full_path = os.path.join(DEFAULT_LOG_PATH, log_file_name)
         log_file_contents = ""
+        error = ""
 
         try:
             with open(full_path, "r", encoding="utf-8") as log_file:
                 log_file_contents = log_file.read()
             debug_me(f"Successfully obtained contents of log file '{log_file_name}'")
-        except Exception as e:
-            debug_me(f"Unable to read contents of log file '{log_file_name}': {str(e)}")
+        except OSError as e:
+            debug_me(f"Unable to read contents of log file '{log_file_name}': {e.strerror}")
+            error = e.strerror
 
         notify_web(
             instance=instance,
             event="get_log_file",
             data_to_include={
                 "success": True if log_file_contents else False,
-                "contents": log_file_contents
+                "contents": log_file_contents,
+                "error": error
             },
             silent=True
+        )
+
+    @globals.web_socket.on("clear_history")
+    def clear_run_history(data):
+        """Clears the entire Run History"""
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
+        run_type = data.get("run_type")
+        deleted_runs = 0
+        failed_logs = []
+        result = "unknown"
+
+        runs = RunHistory().get_runs(run_type=run_type)
+
+        for run in runs:
+            try:
+                timestamp = run.get("started_at")
+                if timestamp:
+                    RunHistory().delete_run(timestamp, refresh_frontend=False)
+                    deleted_runs += 1
+
+            except RunDeleteError as e:
+                debug_me(f"Unable to delete run '{e.run_label}': {str(e)}")
+            except LogDeleteError as e:
+                deleted_runs += 1
+                failed_logs.append({
+                    "file_name": e.log_file,
+                    "reason": str(e)
+                })
+                debug_me(f"Error deleting log file '{e.log_file}' for run '{e.run_label}': {str(e)}")
+            except Exception as e:
+                debug_me(f"Generic error deleting run: {str(e)}")
+
+        if deleted_runs == len(runs):
+            result = "success"
+        elif deleted_runs == 0:
+            result = "failed"
+        elif deleted_runs < len(runs):
+            result = "partial"
+
+        notify_web(
+            instance=instance,
+            event="history_cleared",
+            data_to_include={
+                "result": result,
+                "deleted": deleted_runs,
+                "total": len(runs),
+                "remaining_logs": failed_logs
+            }
         )
 
     @globals.web_socket.on("delete_run")
@@ -568,72 +620,68 @@ def setup_socket_handlers(
         """Deletes a single run from the run history"""
         instance = Instance(data.get("instance_id"), "web", broadcast=True)
         timestamp = data.get("timestamp", None)
+        result = "success"
+
         if timestamp:
             try:
                 RunHistory().delete_run(timestamp)
-                notify_web(
-                    instance=instance,
-                    event="run_deleted",
-                    data_to_include={ "success": True }
-                )
-                update_status(
-                    instance=instance,
-                    message="Successfully deleted run",
-                    color="success",
-                    icon="check-circle"
-                )
+                message = "Successfully deleted run"
 
-            except Exception as e:
-                debug_me(f"WTF: {e}")
-                notify_web(
-                    instance=instance,
-                    event="run_deleted",
-                    data_to_include={ "success": False }
-                )
-                update_status(
-                    instance=instance,
-                    message="Unable to delete run",
-                    color="danger",
-                    icon="x-circle"
-                )
+            except LogDeleteError as e:
+                result = "warning"
+                message = f"Run '{e.run_label}' deleted, but could not delete log file '{e.log_file}' ({str(e)})"
+
+            except RunDeleteError as e:
+                result = "error"
+                message = f"Unable to delete run '{e.run_label}' ({str(e)})"
+
+            notify_web(
+                instance=instance,
+                event="run_deleted",
+                data_to_include={ "result": result, "message": message }
+            )
 
     @globals.web_socket.on("load_run_history")
     def load_run_history(data):
         """Load recent run history, optionally narrowed to one run type."""
-        instance = Instance(data.get("instance_id"), "web")
+        instance = Instance(data.get("instance_id"), "web", broadcast=True)
         run_type = data.get("run_type") or None
         if run_type not in RunType:
             run_type = None
-        runs = RunHistory().get_runs(run_type=run_type)
-        for run in runs:
-            label = run.get("label", "")
-            timestamp = run.get("started_at", "")
-            onclick = f"""onclick="deleteRun('{timestamp}', '{label}')" """
-            if label and "https" in label:
-                clean_url = label.replace("https://", "").strip()
-                parts = [p for p in clean_url.split("/") if p]
-                if len(parts) >= 3:
-                    domain, asset_type, id = parts[0], parts[1], parts[2]
-                    source = URL_SOURCE_MAP.get(domain, "Unknown")
-                    type = URL_TYPE_MAP.get(asset_type, { "icon": "question-circle", "label": "Unknown URL type" })
-                    run["html_label"] = (
-                        f"<a href='{label}' target='_blank' rel='noopener noreferrer' "
-                        f"class='text-decoration-none text-reset' title='{label}'>{source} "
-                        f"<i class='bi bi-{type.get('icon', 'question-circle')}' title='{type.get('label', 'Unknown URL type')}'></i> "
-                        f"<span class='input-monospace' style='font-size: 0.8rem;'>{id}</span></a> "
-                        f"<i class='bi bi-trash3 inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i>"
-                    )
-                else:
-                    run["html_label"] = f"<i class='bi bi-x-octagon text-danger' title='{label}'>&nbsp;Error parsing URL</i>"
-            elif label:
-                run["html_label"] = f"<span class='text-nowrap'>{label} <i class='bi bi-trash3 inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i></span>"
+        runs = []
+        all_runs = RunHistory().get_runs()
+        for run in all_runs:
+            if not run_type or run_type and run.get("run_type") == run_type:
+                runs.append(run)
+                label = run.get("label", "")
+                timestamp = run.get("started_at", "")
+                onclick = f"""onclick="deleteRun('{timestamp}', '{label}')" """
+                if label and "https" in label:
+                    clean_url = label.replace("https://", "").strip()
+                    parts = [p for p in clean_url.split("/") if p]
+                    if len(parts) >= 3:
+                        domain, asset_type, id = parts[0], parts[1], parts[2]
+                        source = URL_SOURCE_MAP.get(domain, "Unknown")
+                        type = URL_TYPE_MAP.get(asset_type, { "icon": "question-circle", "label": "Unknown URL type" })
+                        run["html_label"] = (
+                            f"<a href='{label}' target='_blank' rel='noopener noreferrer' "
+                            f"class='text-decoration-none text-reset' title='{label}'>{source} "
+                            f"<i class='bi bi-{type.get('icon', 'question-circle')}' title='{type.get('label', 'Unknown URL type')}'></i> "
+                            f"<span class='input-monospace' style='font-size: 0.8rem;'>{id}</span></a> "
+                            f"<i class='bi bi-trash3 inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i>"
+                        )
+                    else:
+                        run["html_label"] = f"<i class='bi bi-x-octagon text-danger' title='{label}'>&nbsp;Error parsing URL</i>"
+                elif label:
+                    run["html_label"] = f"<span class='text-nowrap'>{label} <i class='bi bi-trash3 inline-run-btn text-danger cursor-pointer' style='cursor: pointer; font-size: 0.8rem;' title='Delete run' {onclick}></i></span>"
 
         notify_web(
             instance=instance,
             event="load_run_history",
             data_to_include={
                 "runs": runs,
-                "run_type": run_type or "all"
+                "run_type": run_type or "all",
+                "total": len(all_runs)
             },
             silent=True
         )

@@ -45,7 +45,7 @@
     <div class="container mt-4">
         <div class="mb-4 row">
             <div class="col">
-                <h1>
+                <h1 class="d-inline-flex gap-1">
                     <svg class="app-logo" width="50" height="50" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                         <!-- Film strip frame -->
                         <rect x="10" y="20" width="80" height="60" rx="4" fill="none" stroke="currentColor" stroke-width="3"/>
@@ -70,7 +70,7 @@
                             <path d="M 0,-12 L -8,0 L -3,0 L -3,12 L 3,12 L 3,0 L 8,0 Z" fill="currentColor"/>
                         </g>
                     </svg>
-                    <span class="app-title">Artwork Uploader for Plex</span>
+                    <span class="app-title text-nowrap">Artwork Uploader for Plex&nbsp;<span id="app-version" style="font-size: x-small;"></span></span>
                 </h1>
             </div>
         </div>
@@ -102,17 +102,17 @@
         <!-- Bootstrap Tabs -->
         <div class="nav-tabs-wrapper">
             <nav class="nav nav-tabs nav-tabs-scrollable" id="myTab">
-                <a class="nav-link collapse" id="scraper-tab" data-bs-toggle="tab" data-bs-target="#scraper" type="button"
+                <a class="nav-link collapse" id="scraper-tab" data-bs-target="#scraper" type="button"
                 role="tab" aria-controls="scraper" aria-selected="true"><i class="bi bi-arrow-repeat"></i>&ensp;Scraper
-                <i class="bi bi-stop-circle text-danger ms-2 d-none" id="scrape-cancel" onclick="stopScrape()" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
+                <i class="bi bi-stop-circle text-danger ms-2 d-none" id="scrape-cancel" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
                 
-                <a class="nav-link collapse" id="bulk-import-tab" data-bs-toggle="tab" data-bs-target="#bulk-import" type="button"
+                <a class="nav-link collapse" id="bulk-import-tab" data-bs-target="#bulk-import" type="button"
                 role="tab" aria-controls="bulk-import" aria-selected="false"><i class="bi bi-text-left"></i>&ensp;Bulk Import
-                <i class="bi bi-stop-circle text-danger ms-2 d-none" id="bulk-import-cancel" onclick="stopScrape()" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
+                <i class="bi bi-stop-circle text-danger ms-2 d-none" id="bulk-import-cancel" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
                 
-                <a class="nav-link collapse" id="uploader-tab" data-bs-toggle="tab" data-bs-target="#uploader" type="button"
+                <a class="nav-link collapse" id="uploader-tab" data-bs-target="#uploader" type="button"
                 role="tab" aria-controls="uploader" aria-selected="true"><i class="bi bi-cloud-arrow-up"></i>&ensp;Uploader
-                <i class="bi bi-stop-circle text-danger ms-2 d-none" id="upload-cancel" onclick="stopScrape()" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
+                <i class="bi bi-stop-circle text-danger ms-2 d-none" id="upload-cancel" title="Cancel operation" style="cursor: pointer; opacity: 0.8;"></i> </a>
                 
                 <a class="nav-link collapse" id="scraping-log-tab" data-bs-toggle="tab" data-bs-target="#scraping-log" type="button"
                 role="tab" aria-controls="scraping-log" aria-selected="false"><span class="d-none d-sm-inline-block"></span><i class="bi bi-activity"></i>&ensp;Log</a>
@@ -1353,51 +1353,54 @@
 
             <!-- Run History Tab -->
             <div class="tab-pane fade" id="run-history" role="tabpanel" aria-labelledby="run-history-tab" tabindex="0">
-                <div class="mt-3 d-flex align-items-center gap-2">
-                    <label for="run_history_type" class="col-form-label">Show</label>
-                    <select class="form-select form-select-sm w-auto" id="run_history_type" aria-label="Filter run history by type">
-                        <option value="" selected>All runs</option>
-                        <option value="bulk">Bulk imports</option>
-                        <option value="scrape">Scrapes</option>
-                        <option value="upload">Uploads</option>
-                        <option value="webhook">Webhook imports</option>
-                    </select>
-                    <button type="button" 
-                            class="btn btn-sm btn-outline-secondary border-0 p-1" 
-                            id="legendPopover" 
-                            data-bs-toggle="popover" 
-                            data-bs-html="true" 
-                            data-bs-content='
-                                <div class="small">
-                                <div class="fw-bold text-muted">Type</div>
-                                <div><i class="bi bi-journal-text me-1"></i> Bulk import</div>
-                                <div><i class="bi bi-arrow-repeat me-1"></i> Scrape</div>
-                                <div><i class="bi bi-cloud-arrow-up me-1"></i> Upload</div>
-                                <div><i class="bi bi-broadcast-pin me-1"></i> Webhook</div>
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <div class="d-flex align-items-center gap-2">
+                        <label for="run_history_type" class="col-form-label">Show</label>
+                        <select class="form-select form-select-sm w-auto" id="run_history_type" aria-label="Filter run history by type">
+                            <option value="" selected>All runs</option>
+                            <option value="bulk">Bulk imports</option>
+                            <option value="scrape">Scrapes</option>
+                            <option value="upload">Uploads</option>
+                            <option value="webhook">Webhook imports</option>
+                        </select>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-secondary border-0 p-1" 
+                                id="legendPopover" 
+                                data-bs-toggle="popover" 
+                                data-bs-html="true" 
+                                data-bs-content='
+                                    <div class="small">
+                                    <div class="fw-bold text-muted">Type</div>
+                                    <div><i class="bi bi-journal-text me-1"></i> Bulk import</div>
+                                    <div><i class="bi bi-arrow-repeat me-1"></i> Scrape</div>
+                                    <div><i class="bi bi-cloud-arrow-up me-1"></i> Upload</div>
+                                    <div><i class="bi bi-broadcast-pin me-1"></i> Webhook</div>
 
-                                <div class="fw-bold text-muted mt-2">URL Type</div>
-                                <div><i class="bi bi-brush me-1"></i> Set</div>
-                                <div><i class="bi bi-file-image me-1"></i> Poster</div>
-                                <div><i class="bi bi-box-seam me-1"></i> Boxset</div>
-                                <div><i class="bi bi-person-circle me-1"></i> User</div>
-                                
-                                <div class="fw-bold text-muted mt-2">Trigger</div>
-                                <div><i class="bi bi-hand-index-thumb me-1"></i> Manual</div>
-                                <div><i class="bi bi-alarm me-1"></i> Scheduled</div>
-                                <div><i class="bi bi-code-square me-1"></i> CLI</div>
-                                <div><i class="bi bi-film me-1"></i> Radarr</div>
-                                <div><i class="bi bi-tv me-1"></i> Sonarr</div>
+                                    <div class="fw-bold text-muted mt-2">URL Type</div>
+                                    <div><i class="bi bi-brush me-1"></i> Set</div>
+                                    <div><i class="bi bi-file-image me-1"></i> Poster</div>
+                                    <div><i class="bi bi-box-seam me-1"></i> Boxset</div>
+                                    <div><i class="bi bi-person-circle me-1"></i> User</div>
+                                    
+                                    <div class="fw-bold text-muted mt-2">Trigger</div>
+                                    <div><i class="bi bi-hand-index-thumb me-1"></i> Manual</div>
+                                    <div><i class="bi bi-alarm me-1"></i> Scheduled</div>
+                                    <div><i class="bi bi-code-square me-1"></i> CLI</div>
+                                    <div><i class="bi bi-film me-1"></i> Radarr</div>
+                                    <div><i class="bi bi-tv me-1"></i> Sonarr</div>
 
-                                <div class="fw-bold text-muted mt-2">Outcome</div>
-                                <div><i class="bi text-success bi-check-circle-fill me-1"></i> Completed successfully</div>
-                                <div><i class="bi text-warning bi-exclamation-circle-fill me-1"></i> Completed with errors</div>
-                                <div><i class="bi text-orange bi-stop-circle-fill me-1"></i> Stopped</div>
-                                <div><i class="bi text-danger bi-x-circle-fill me-1"></i> Failed</div>
-                                <div><i class="bi text-info bi-fast-forward-circle-fill me-1"></i> Skipped</div>
-                                </div>
-                            '>
-                        <i class="bi bi-question-circle"></i>
-                    </button>
+                                    <div class="fw-bold text-muted mt-2">Outcome</div>
+                                    <div><i class="bi text-success bi-check-circle-fill me-1"></i> Completed successfully</div>
+                                    <div><i class="bi text-warning bi-exclamation-circle-fill me-1"></i> Completed with errors</div>
+                                    <div><i class="bi text-orange bi-stop-circle-fill me-1"></i> Stopped</div>
+                                    <div><i class="bi text-danger bi-x-circle-fill me-1"></i> Failed</div>
+                                    <div><i class="bi text-info bi-fast-forward-circle-fill me-1"></i> Skipped</div>
+                                    </div>
+                                '>
+                            <i class="bi bi-question-circle"></i>
+                        </button>
+                    </div>
+                    <div class="text-muted small" id="run-history-count">X of Y runs</div>
                 </div>
                 <div class="mt-3 table-responsive">
                     <table class="table table-sm align-middle">
@@ -1423,7 +1426,12 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="sticky-bottom pb-3 z-3 d-flex justify-content-end align-items-center gap-2">
+                <div class="sticky-bottom pb-3 z-3 d-flex justify-content-between align-items-center gap-2">
+                    <!-- <button id="clear-history" class="btn btn-danger btn-sm shadow rounded-pill text-center"><i class="bi bi-trash3"></i>&ensp;Clear&nbsp;</button> -->
+                    <button type="button" id="clear-history-btn" class="btn btn-danger shadow d-flex align-items-center gap-2 rounded-pill fab-collapse collapsed">
+                        <i class="bi bi-trash3"></i>
+                        <span>Clear</span>
+                    </button>
                     <div class="dropdown">
                         <button class="btn btn-secondary shadow rounded-pill d-flex align-items-center gap-2 dropdown-toggle fab-collapse collapsed"
                                 id="bd-theme"
@@ -1535,9 +1543,9 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="yesNoCancelModalLabel">Please choose</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button id="yesNoModalCloseBtn" type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body">
+                <div id="yesNoCancelBody" class="modal-body">
                     <p id="yesNoCancelModalMessage"></p>
                 </div>
                 <div class="modal-footer">
