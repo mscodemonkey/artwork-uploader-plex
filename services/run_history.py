@@ -13,6 +13,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from core.enums import RunType, RunTrigger
+from core.exceptions import HistorySaveError, LogDeleteError, RunDeleteError
 from models.instance import Instance
 from core import globals
 
@@ -90,7 +91,7 @@ class RunHistory:
                 os.remove(temp_path)
             except OSError:
                 pass  # nothing to tidy up, or the same problem that stopped the write
-            raise Exception from e
+            raise HistorySaveError(f"Failed to save run history to '{self.path}': {e}") from e
 
     def _prune(self, runs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         pruned_runs = []
@@ -113,19 +114,20 @@ class RunHistory:
                 kept.append(run)
             runs = list(reversed(kept))
         # Delete the log files for the pruned runs
-        _debug(f"Identified {len(pruned_runs)} log files from pruned runs")
-        deleted_log_files = 0
-        for run in pruned_runs:
-            log_file = run.get("log_file", "")
-            if log_file:
-                full_path = os.path.join(DEFAULT_LOG_PATH, log_file)
-                try:
-                    os.remove(full_path)
-                    _debug(f"Deleted log file '{log_file}'")
-                    deleted_log_files += 1
-                except Exception as e:
-                    _debug(f"Unable to remove log file '{log_file}': {str(e)}")
-        _debug(f"Successfully deleted {deleted_log_files} log file(s)")
+        if pruned_runs:
+            _debug(f"Identified {len(pruned_runs)} log files from pruned runs")
+            deleted_log_files = 0
+            for run in pruned_runs:
+                log_file = run.get("log_file", "")
+                if log_file:
+                    full_path = os.path.join(DEFAULT_LOG_PATH, log_file)
+                    try:
+                        os.remove(full_path)
+                        _debug(f"Deleted log file '{log_file}'")
+                        deleted_log_files += 1
+                    except Exception as e:
+                        _debug(f"Unable to remove log file '{log_file}': {str(e)}")
+            _debug(f"Successfully deleted {deleted_log_files} log file(s)")
         return runs
 
     def add_run(
@@ -151,24 +153,32 @@ class RunHistory:
         # in so every path that records a run picks it up, and it is per thread so a run
         # finishing while another is still going records its own file, not the other's.
         log_file = getattr(globals.run_log, "path", None)
-        with _write_locks[os.path.abspath(self.path)]:
-            runs = self._load()
-            runs.append({
-                "run_type": run_type,
-                "label": label,
-                "started_at": started_at,
-                "ended_at": ended_at,
-                "trigger": trigger,
-                "outcome": outcome,
-                "assets_processed": assets_processed,
-                "success_count": success_count,
-                "cached_count": cached_count,
-                "locked_count": locked_count,
-                "error_count": error_count,
-                "log_file": os.path.basename(log_file) if log_file else ""
-            })
-            self._save(self._prune(runs))
-        globals.run_log.path = None # This run is recorded, so its thread stops logging to the file
+
+        try:
+            with _write_locks[os.path.abspath(self.path)]:
+                runs = self._load()
+                runs.append({
+                    "run_type": run_type,
+                    "label": label,
+                    "started_at": started_at,
+                    "ended_at": ended_at,
+                    "trigger": trigger,
+                    "outcome": outcome,
+                    "assets_processed": assets_processed,
+                    "success_count": success_count,
+                    "cached_count": cached_count,
+                    "locked_count": locked_count,
+                    "error_count": error_count,
+                    "log_file": os.path.basename(log_file) if log_file else ""
+                })
+                self._save(self._prune(runs))
+
+        except HistorySaveError as e:
+            _debug(str(e))
+
+        finally:
+            globals.run_log.path = None # This run is recorded, so its thread stops logging to the file
+
         if job_id and globals.scheduler_service:
             job_meta = globals.scheduler_service.schedule_meta.get(job_id)
             if job_meta:
@@ -183,33 +193,35 @@ class RunHistory:
                 globals.config.save()
         _notify("run_history_updated")
 
-    def delete_run(self, timestamp: str) -> None:
+    def delete_run(self, timestamp: str, refresh_frontend: bool=True) -> None:
+        run_label = None
         try:
             with _write_locks[os.path.abspath(self.path)]:
                 runs = self._load()
                 remaining_runs = []
                 log_file = None
-                run_label = ""
                 for run in runs:
                     if run["started_at"] == timestamp:
                         log_file = run.get("log_file", None)
                         run_label = run.get("label", "unknown")
                     else:
                         remaining_runs.append(run)
-                self._save(remaining_runs)
+                self._save(self._prune(remaining_runs))
         except Exception as e:
             _debug(f"Error trying to delete run: {str(e)}")
-            raise Exception from e
+            raise RunDeleteError(f"Failed to update run history file: {e}", run_label=run_label) from e
 
         if log_file:
             try:
                 full_path = os.path.join(DEFAULT_LOG_PATH, log_file)
                 os.remove(full_path)
                 _debug(f"Deleted log file '{log_file}' for '{run_label}'")
-            except Exception as e:
+            except OSError as e:
                 _debug(f"Unable to delete log file '{log_file}' for '{run_label}': {str(e)}")
+                raise LogDeleteError(e.strerror, log_file=log_file, run_label=run_label) from e
 
-        _notify("run_history_updated")
+        if refresh_frontend:
+            _notify("run_history_updated")
 
     @staticmethod
     def _normalise(run: Dict[str, Any]) -> Dict[str, Any]:
