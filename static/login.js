@@ -4,10 +4,12 @@
 
 const instanceId = getInstanceId();
 const bootstrapColors = ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'];
-let basicAuth = null;
-let oidcAuth = null;
-let oidcBtn = null;
-let separator = null;
+const basicAuth = document.getElementById("auth-form");
+const oidcAuth = document.getElementById("oidc-container");
+const oidcBtn = document.getElementById("oidc-btn");
+const separator = document.getElementById("auth-separator");
+const versionElement = document.getElementById("app-version");
+
 
 function getInstanceId() {
     // Fallback for browsers that don't support crypto.randomUUID()
@@ -25,11 +27,6 @@ function getInstanceId() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    basicAuth = document.getElementById("auth-form");
-    oidcAuth = document.getElementById("oidc-container");
-    oidcBtn = document.getElementById("oidc-btn");
-    separator = document.getElementById("auth-separator");
-
     getAuthStatus();
 });
 
@@ -47,15 +44,9 @@ async function getAuthStatus() {
         oidcBtn.style.display = oidcAuthEnabled ? "block" : "none";
         oidcBtn.textContent = `Sign In with ${oidcLabel != "" ? oidcLabel : "OIDC"}`
 
-        versionElement = document.getElementById("app-version");
         versionElement.textContent = `v${version}`;
 
-
-        if (basicAuthEnabled && oidcAuthEnabled) {
-            separator.classList.remove("d-none");
-        } else {
-            separator.classList.add("d-none");
-        }
+        separator.classList.toggle("d-none", !basicAuthEnabled || !oidcAuthEnabled);
     } catch (err) {
         console.error("Failed to fetch auth status:", err);
     }
