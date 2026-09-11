@@ -113,12 +113,12 @@
                 </div>
                 <button type="submit" class="btn btn-primary btn-login rounded-pill">Sign In</button>
             </form>
-            <span class="mt-2 mb-2 d-flex" id="auth-separator">— or —</span>
+            <span class="mt-2 mb-2 d-flex d-none" id="auth-separator">— or —</span>
             <form method="POST" action="/login">
                 <input name="oidc-login" value="true" class="d-none">
                 <button type="submit" id="oidc-btn" style="display: none;" class="btn btn-primary btn-login rounded-pill">Sign In with OIDC</button>
             </form>
-            <span id="app-version" class="mb-0 mt-2 d-flex">v1.2.1</span>
+            <span id="app-version" class="mb-0 mt-2 d-flex"></span>
         </div>
     </div>
 
