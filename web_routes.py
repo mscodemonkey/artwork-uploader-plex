@@ -295,7 +295,22 @@ def setup_routes(web_app, config: Config):
 
     @web_app.route('/api/browse', methods=['GET'])
     def browse_directory():
-        req_path = request.args.get('path', '.')
+        req_path = request.args.get('path', '').strip()
+        debug_me(f"Received browse request for path: {req_path}")
+
+        if not req_path and os.name == 'nt':
+            import string, ctypes
+            drives = []
+            try:
+                bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+                for letter in string.ascii_uppercase:
+                    if bitmask & 1:
+                        drives.append({"name": f"Drive {letter}:", "path": f"{letter}:\\"})
+                    bitmask >>= 1
+            except Exception:
+                pass
+            return jsonify({"current_path": req_path, "folders": drives})
+
         abs_path = os.path.abspath(req_path)
         
         if not os.path.exists(abs_path) or not os.path.isdir(abs_path):
