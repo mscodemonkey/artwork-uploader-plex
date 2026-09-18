@@ -208,7 +208,7 @@ document.addEventListener("DOMContentLoaded", function () {
             currentBrowseTargetInput = document.getElementById(targetId);
 
             // Start browsing at current field value if present, or root
-            const initialPath = currentBrowseTargetInput.value.trim() || "/";
+            const initialPath = currentBrowseTargetInput.value.trim() || "";
             loadDirectory(initialPath);
             folderModal.show();
         });
@@ -216,10 +216,42 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Up directory navigation button
     document.getElementById("folder_nav_up").addEventListener("click", () => {
-        const parts = currentDirectoryPath.split("/").filter(Boolean);
+        if (!currentDirectoryPath) return;
+
+        // Standardize separators to forward slashes for uniform processing
+        let normalized = currentDirectoryPath.replace(/\\/g, "/");
+
+        // Remove trailing slash unless it's a drive root (e.g. "C:/")
+        if (normalized.length > 3 && normalized.endsWith("/")) {
+            normalized = normalized.slice(0, -1);
+        }
+
+        const parts = normalized.split("/").filter(Boolean);
+
+        // Windows Drive Root (e.g., "C:" or "C:/") -> Go up to system root drives
+        if (parts.length === 1 && parts[0].includes(":")) {
+            loadDirectory("");
+            return;
+        }
+
+        // Standard directory pop
         parts.pop();
-        const parentPath = "/" + parts.join("/");
-        loadDirectory(parentPath || "/");
+
+        if (parts.length === 0) {
+            // POSIX Root
+            loadDirectory("/");
+        } else {
+            // Preserve Windows drive prefix vs POSIX leading slash
+            let parentPath = parts.join("/");
+            if (normalized.startsWith("/") && !parentPath.startsWith("/")) {
+                parentPath = "/" + parentPath;
+            }
+            // Retain drive trailing slash if popped down to drive root (e.g., "C:")
+            if (parentPath.endsWith(":")) {
+                parentPath += "/";
+            }
+            loadDirectory(parentPath);
+        }
     });
 
     // Confirm selection button
@@ -236,17 +268,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const newFolderField = document.getElementById("new_folder_name");
         const newFolderName = newFolderField.value;
-        const newFolderButton = document.getElementById("add_folder");
         
-        if (newFolderName) {
-            newFolderButton.classList.remove("btn-secondary");
-            newFolderButton.classList.add("btn-success");
-            newFolderButton.disabled = false;
-        } else {
-            newFolderButton.disabled = true;
-            newFolderButton.classList.add("btn-secondary");
-            newFolderButton.classList.remove("btn-success");
-        }
+        enableNewFolderButton(newFolderName.trim() !== "");
     });
 
     // Add folder button listener
@@ -256,15 +279,13 @@ document.addEventListener("DOMContentLoaded", function () {
         const currentPath = document.getElementById("folder_current_path").textContent;
         const newFolderButton = document.getElementById("add_folder");
         
-        socket.on("folder_created", (data) => {
-            if (validResponse(data)) {
-                if (data.success) {
-                    newFolderField.value = '';
-                    newFolderButton.disabled = true
-                    newFolderButton.classList.add("btn-secondary");
-                    newFolderButton.classList.remove("btn-success");
-                    loadDirectory(data.path)
-                }
+        socket.once("folder_created", (data) => {
+            if (validResponse(data) && data.success) {
+                newFolderField.value = '';
+                newFolderButton.disabled = true
+                newFolderButton.classList.add("btn-secondary");
+                newFolderButton.classList.remove("btn-success");
+                loadDirectory(data.path)
             }
         })
         
@@ -433,11 +454,30 @@ document.addEventListener('touchend', (e) => {
 // General helper functions
 // ==================================================
 
+
+function enableNewFolderButton(enabled) {
+    const newFolderButton = document.getElementById("add_folder");
+
+    newFolderButton.classList.toggle("btn-success", enabled);
+    newFolderButton.classList.toggle("btn-secondary", !enabled);
+    newFolderButton.disabled = !enabled;
+}
+
+
+
 // Function to fetch and render directory contents from backend
 async function loadDirectory(path = "/") {
     const folderList = document.getElementById("folder_list");
     const currentPathSpan = document.getElementById("folder_current_path");
-    
+    const newFolderField = document.getElementById("new_folder_name");
+
+    if (path === "") {
+        enableNewFolderButton(false);
+    }
+    disableElement(["select_folder_confirm"], path === ""); // Disable confirm if at list of drives in Windows
+    newFolderField.disabled = (path === ""); // Disable if at list of drives in Windows
+    newFolderField.value = (path === "") ? "" : newFolderField.value; // Clear if at list of drives in Windows
+
     folderList.innerHTML = `<div class="p-3 text-center text-muted"><span class="spinner-border spinner-border-sm"></span> Loading...</div>`;
 
     try {
