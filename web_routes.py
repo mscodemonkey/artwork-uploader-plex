@@ -37,7 +37,8 @@ from core.constants import (
     WEBHOOK_TOKEN_HEADER,
     URL_SOURCE_MAP,
     URL_TYPE_MAP,
-    DEFAULT_LOG_PATH
+    DEFAULT_LOG_PATH,
+    OIDC_REQUEST_TIMEOUT
 )
 
 def login_required(f):
@@ -148,7 +149,7 @@ def setup_routes(web_app, config: Config):
 
                 discovery_url = f"{config.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
                 try:
-                    disc_res = oauth.get(discovery_url)
+                    disc_res = oauth.get(discovery_url, timeout=OIDC_REQUEST_TIMEOUT)
                     authorization_endpoint = disc_res.json()["authorization_endpoint"]
                 except Exception as e:
                     debug_me(f"OIDC Discovery Error: {e}")
@@ -184,7 +185,7 @@ def setup_routes(web_app, config: Config):
 
         try:
             discovery_url = f"{config.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
-            disc_res = oauth.get(discovery_url).json()
+            disc_res = oauth.get(discovery_url, timeout=OIDC_REQUEST_TIMEOUT).json()
             token_endpoint = disc_res["token_endpoint"]
             userinfo_endpoint = disc_res.get("userinfo_endpoint")
             end_session_endpoint = disc_res.get("end_session_endpoint")
@@ -195,11 +196,12 @@ def setup_routes(web_app, config: Config):
             oauth.fetch_token(
                 token_url=token_endpoint,
                 authorization_response=auth_response_url,
-                client_secret=config.oidc_client_secret
+                client_secret=config.oidc_client_secret,
+                timeout=OIDC_REQUEST_TIMEOUT
             )
 
             # Retrieve user information
-            user_info = oauth.get(userinfo_endpoint).json() if userinfo_endpoint else {}
+            user_info = oauth.get(userinfo_endpoint, timeout=OIDC_REQUEST_TIMEOUT).json() if userinfo_endpoint else {}
 
             username = user_info.get("preferred_username") or user_info.get("sub") or "OIDC User"
             groups_claim = config.oidc_groups_claim or "groups"
@@ -255,7 +257,7 @@ def setup_routes(web_app, config: Config):
             try:
                 discovery_url = f"{config.oidc_issuer.rstrip('/')}/.well-known/openid-configuration"
 
-                disc_res = requests.get(discovery_url).json()
+                disc_res = requests.get(discovery_url, timeout=OIDC_REQUEST_TIMEOUT).json()
                 end_session_endpoint = disc_res.get("end_session_endpoint")
                 
                 if end_session_endpoint:

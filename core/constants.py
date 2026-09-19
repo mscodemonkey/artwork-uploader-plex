@@ -155,6 +155,7 @@ UPLOAD_CHUNK_TIMEOUT = 10 # seconds
 # Network timeouts (seconds)
 DEFAULT_PLEX_CONNECT_TIMEOUT = 10  # PlexConnector.connect()
 DEFAULT_KOMETA_DOWNLOAD_TIMEOUT = 10  # Downloading artwork to save to the Kometa asset directory
+OIDC_REQUEST_TIMEOUT = 10  # Discovery, token exchange and userinfo calls to the identity provider
 
 # Upload retry behaviour: a transient failure (timeout, connection error, 5xx) is retried this many
 # times in total, waiting backoff seconds and doubling that wait after each attempt. A 401 or 404
