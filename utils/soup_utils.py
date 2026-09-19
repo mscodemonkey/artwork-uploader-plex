@@ -34,7 +34,12 @@ def cook_soup(url):
         return soup
 
     elif ".html" in url:
-        with open(url, 'r', encoding='utf-8') as file:
-            html_content = file.read()
-            soup = BeautifulSoup(html_content, 'html.parser')
+        try:
+            with open(url, 'r', encoding='utf-8') as file:
+                html_content = file.read()
+        except OSError as e:
+            raise ScraperException(f"Could not read local HTML file '{url}': {e}") from e
+        return BeautifulSoup(html_content, 'html.parser')
+
+    raise ScraperException(f"Not a URL and not a local HTML file: {url}")
 
