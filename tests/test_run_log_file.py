@@ -126,3 +126,36 @@ def test_resume_carries_a_run_onto_the_thread_that_continues_it(log_dir, history
 def test_a_run_recorded_with_no_log_file_records_an_empty_name(history):
     _record(history, "bulk", "bulk_import.txt")
     assert history.get_runs()[0]["log_file"] == ""
+
+
+@pytest.mark.unit
+def test_a_scrape_url_short_of_three_parts_still_opens_a_log(log_dir):
+    """A URL with two path parts, the kind you get from trimming the id off the end, used to
+    raise a NameError here. That landed inside the run, after the scrape had been counted as
+    running, so a mistyped URL took the run down rather than being reported as a bad URL."""
+    path = log_to_file("https://theposterdb.com/poster")
+
+    assert current_log_file() == path
+    assert os.path.dirname(path) == str(log_dir), "the log belongs in the log directory, not under a path built out of the URL"
+
+    update_log(Instance(mode="cli"), "short url line")
+    assert "short url line" in (log_dir / os.path.basename(path)).read_text(encoding="utf-8")
+    assert "theposterdb.com_poster" in os.path.basename(path), "the parts the URL does have still name the run"
+
+
+@pytest.mark.unit
+def test_a_full_scrape_url_is_named_after_its_source_type_and_id(log_dir):
+    """The naming the short URL above falls back from: a whole URL reads as a source, a type
+    and an id, so the log is recognisable in the directory without opening it."""
+    path = log_to_file("https://theposterdb.com/set/12345")
+    assert os.path.basename(path).endswith("_scrape_tpdb_set_12345.log")
+
+@pytest.mark.unit
+def test_a_scrape_url_with_an_unknown_asset_type_still_opens_a_log(log_dir):
+    """An asset type the URL map does not carry, an artist page or a MediUX collection, used to
+    crash three lines below the short URL case: the fallback was a string and the next line
+    called .get on it. Same place inside the run, same lost run."""
+    path = log_to_file("https://theposterdb.com/artist/123")
+
+    assert current_log_file() == path
+    assert os.path.basename(path).endswith("_scrape_tpdb_unknown_url_type_123.log")
