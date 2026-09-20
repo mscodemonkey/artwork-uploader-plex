@@ -498,7 +498,8 @@ async function loadDirectory(path = "/") {
             const item = document.createElement("button");
             item.type = "button";
             item.className = "list-group-item list-group-item-action d-flex align-items-center gap-2 py-2 input-monospace small";
-            item.innerHTML = `<i class="bi bi-folder text-primary"></i> <span>${folder.name}</span>`;
+            item.innerHTML = `<i class="bi bi-folder text-primary"></i> <span></span>`;
+            item.querySelector("span").textContent = folder.name;
             
             item.addEventListener("click", () => {
                 loadDirectory(folder.path);
@@ -651,8 +652,8 @@ socket.on("get_auth_status", function(data) {
     if (validResponse(data)) {
         warning = document.getElementById("auth-info");
         if (data.auth_enabled) {
-            message = `<i class="bi bi-info-circle"></i>&ensp;Signed is as <code>${data.username}</code>${data.auth_type === "oidc" ? ' via OIDC' : ' via basic authentication'}`;
-            warning.innerHTML = message
+            warning.innerHTML = `<i class="bi bi-info-circle"></i>&ensp;Signed is as <code></code>${data.auth_type === "oidc" ? ' via OIDC' : ' via basic authentication'}`;
+            warning.querySelector("code").textContent = data.username;
             warning.classList.toggle("d-none", !data.auth_enabled)
         } else {
             warning.classList.toggle("d-none", !data.auth_enabled);
@@ -2066,7 +2067,10 @@ function deleteRun(timestamp, label) {
 
     // Update modal message and title
     modalLabel.innerText = "Delete run from history";
-    modalMessage.innerHTML = `You are about to delete run <span class="text-monospace">${label}</span> from ${formatDateTime(timestamp)}. <br><br>Are you sure?`;
+    modalMessage.innerHTML = `You are about to delete run <span class="text-monospace"></span> from <span></span>. <br><br>Are you sure?`;
+    const [runLabelEl, runTimestampEl] = modalMessage.querySelectorAll("span");
+    runLabelEl.textContent = label;
+    runTimestampEl.textContent = formatDateTime(timestamp);
 
     // Update buttons with choices
     yesButton.innerHTML = '<i class="bi bi-trash"></i>&ensp;Delete&nbsp;'
@@ -2267,7 +2271,8 @@ function showLogsforRun(logFileName, runLabel) {
                 document.getElementById("log-filters").addEventListener("click", onFilterChange);
 
                 // Update modal header title & content
-                modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small">${runLabel}</span>`;
+                modalTitleEl.innerHTML = `<i class="bi bi-file-earmark-text"></i>&ensp;<span class="text-monospace small"></span>`;
+                modalTitleEl.querySelector("span").textContent = runLabel;
                 contentEl.textContent = logData.content;
 
                 // Show modal safely
@@ -3439,7 +3444,10 @@ function updateCallbackAlert () {
     const externalURL = document.getElementById("external_url");
 
     if (externalURL.value.includes("https://")) {
-        callbackAlert.innerHTML = `<i class="bi bi-info-circle"></i>&ensp;Add <code>${externalURL.value}/login/oidc/callback</code> as an allowed callback URL in your OIDC provider. Optionally, you can add <code>${externalURL.value}/login</code> as a logout callback URL if supported by your provider.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`
+        callbackAlert.innerHTML = `<i class="bi bi-info-circle"></i>&ensp;Add <code></code> as an allowed callback URL in your OIDC provider. Optionally, you can add <code></code> as a logout callback URL if supported by your provider.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`
+        const callbackCodes = callbackAlert.querySelectorAll("code");
+        callbackCodes[0].textContent = `${externalURL.value}/login/oidc/callback`;
+        callbackCodes[1].textContent = `${externalURL.value}/login`;
         callbackAlert.style.display = "block";
     } else {
         callbackAlert.style.display = "none";
