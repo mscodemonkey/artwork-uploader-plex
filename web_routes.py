@@ -10,7 +10,7 @@ The routes are organized into:
 - Helper functions for file uploads and processing
 """
 
-import os, logging, flask.cli, sys, re, base64, hmac, tempfile, zipfile, subprocess, threading, uuid, requests
+import os, logging, flask.cli, sys, re, base64, hmac, shutil, tempfile, zipfile, subprocess, threading, uuid, requests
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from packaging import version
@@ -1496,73 +1496,83 @@ def save_uploaded_file(
     temp_upload_path = upload_chunks[file_name]["temp_path"]
     debug_me(f"Processing uploaded file {file_name} from temp path: {temp_upload_path}")
 
-    # Move to a proper file location with correct filename for processing
+    # Both directories belong to this call. The artwork dictionaries hold paths into extract_dir,
+    # so it has to survive extract_and_list_zip and can only go once the processing below has read
+    # them. The finally covers the cancel path and any failure, which otherwise left the uploaded
+    # archive and every extracted image behind for the life of the container.
     temp_zip_folder = tempfile.mkdtemp()
-    temp_zip_path = os.path.join(temp_zip_folder, file_name)
-    
-    import shutil
-    shutil.move(temp_upload_path, temp_zip_path)
-    debug_me(f"Moved {file_name} to temporary path: {temp_zip_folder}")
+    extract_dir = tempfile.mkdtemp()
+    try:
+        # Move to a proper file location with correct filename for processing
+        temp_zip_path = os.path.join(temp_zip_folder, file_name)
 
-    debug_me(f"Saved ZIP file: {temp_zip_path}")
+        shutil.move(temp_upload_path, temp_zip_path)
+        debug_me(f"Moved {file_name} to temporary path: {temp_zip_folder}")
 
-    update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file and parsing files...")
-    extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
-        instance,
-        temp_zip_path,
-        filename_pattern,
-        filters,
-        plex_title,
-        plex_year,
-        check_image_orientation_func,
-        sort_key_func
-    )
-    if globals.cancel_scrape:
-        notify_web(instance, "progress_bar", {"message": "Parsing canceled by user...", "percent": 100})#, "bar_type": bar_type, "bar_speed": bar_speed})
-        globals.main_bar["active"] = False
-        update_log(instance, f"🛑 {os.path.basename(temp_zip_path)} • ZIP file parsing canceled by user")
-        update_status(instance, f"ZIP file parsing canceled by user", color=StatusColor.WARNING.value)
-        RunHistory().add_run(
-            run_type=RunType.UPLOAD.value,
-            label=globals.upload_run_metadata.get("run_label", "unknown"),
-            started_at=globals.upload_run_metadata.get("start_time", datetime.now(timezone.utc).isoformat()),
-            ended_at=datetime.now(timezone.utc).isoformat(),
-            trigger=RunTrigger.MANUAL.value,
-            outcome=RunOutcome.STOPPED.value
+        debug_me(f"Saved ZIP file: {temp_zip_path}")
+
+        update_log(instance, f"📦 {os.path.basename(temp_zip_path)} • Extracting ZIP file and parsing files...")
+        extracted_files, skipped, zip_title, zip_author, zip_source = extract_and_list_zip(
+            instance,
+            temp_zip_path,
+            extract_dir,
+            filename_pattern,
+            filters,
+            plex_title,
+            plex_year,
+            check_image_orientation_func,
+            sort_key_func
         )
+        if globals.cancel_scrape:
+            notify_web(instance, "progress_bar", {"message": "Parsing canceled by user...", "percent": 100})#, "bar_type": bar_type, "bar_speed": bar_speed})
+            globals.main_bar["active"] = False
+            update_log(instance, f"🛑 {os.path.basename(temp_zip_path)} • ZIP file parsing canceled by user")
+            update_status(instance, f"ZIP file parsing canceled by user", color=StatusColor.WARNING.value)
+            RunHistory().add_run(
+                run_type=RunType.UPLOAD.value,
+                label=globals.upload_run_metadata.get("run_label", "unknown"),
+                started_at=globals.upload_run_metadata.get("start_time", datetime.now(timezone.utc).isoformat()),
+                ended_at=datetime.now(timezone.utc).isoformat(),
+                trigger=RunTrigger.MANUAL.value,
+                outcome=RunOutcome.STOPPED.value
+            )
+            globals.scrapes_running -= 1
+            if globals.scrapes_running <= 0:
+                globals.scrapes_running = 0
+                globals.cancel_scrape = False
+                notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
+                globals.scrape_type = "stopped"
+            return
+
+        # Delete the ZIP file after extraction, so it is not held while the artwork is processed
+        try:
+            os.remove(temp_zip_path)
+            debug_me(f"Deleted temporary ZIP file: {temp_zip_path}")
+        except OSError as e:
+            debug_me(f"Error deleting temporary ZIP file: {e}")
+
+        process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
+
+        if globals.cancel_scrape:
+            update_status(instance, "Uploaded file processing canceled by user", color=StatusColor.WARNING.value)
+        else:
+            update_status(instance, "Finished processing uploaded file", color=StatusColor.SUCCESS.value)
+
         globals.scrapes_running -= 1
         if globals.scrapes_running <= 0:
             globals.scrapes_running = 0
             globals.cancel_scrape = False
             notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
             globals.scrape_type = "stopped"
-        return
-
-    # Delete the ZIP file after extraction
-    try:
-        os.remove(temp_zip_path)
-        os.rmdir(temp_zip_folder)
-        debug_me(f"Deleted temporary ZIP file: {temp_zip_path}")
-    except Exception as e:
-        debug_me(f"Error deleting temporary ZIP file: {e}")
-
-    process_uploaded_artwork(instance, extracted_files, skipped, zip_title, zip_author, zip_source, options, filters, plex_title, plex_year)
-    
-    if globals.cancel_scrape:
-        update_status(instance, "Uploaded file processing canceled by user", color=StatusColor.WARNING.value)
-    else:
-        update_status(instance, "Finished processing uploaded file", color=StatusColor.SUCCESS.value)
-    
-    globals.scrapes_running -= 1
-    if globals.scrapes_running <= 0:
-        globals.scrapes_running = 0
-        globals.cancel_scrape = False
-        notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
-        globals.scrape_type = "stopped"
+    finally:
+        shutil.rmtree(temp_zip_folder, ignore_errors=True)
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        debug_me(f"Removed temporary directories {temp_zip_folder} and {extract_dir}")
 
 def extract_and_list_zip(
     instance: Instance,
     zip_path: str,
+    extract_dir: str,
     filename_pattern: re.Pattern,
     filters: list,
     plex_title: str,
@@ -1575,6 +1585,8 @@ def extract_and_list_zip(
 
     Args:
         zip_path: Path to the ZIP file
+        extract_dir: Directory to extract into. The returned artwork dictionaries hold paths
+            into it, so the caller creates it and removes it once it has finished reading them
         filename_pattern: Regex pattern for validating filenames
         check_image_orientation_func: Function to check image orientation
         sort_key_func: Function to generate sort keys
@@ -1582,7 +1594,6 @@ def extract_and_list_zip(
     Returns:
         List of artwork dictionaries sorted by media type, season, episode
     """
-    extract_dir = tempfile.mkdtemp()
     file_list = []
     zip_title = ""
     zip_author = ""
