@@ -211,6 +211,9 @@ def log_to_file(label: str) -> Optional[str]:
     if current:
         debug_me(f"Logging is already active for this run")
         return current
+    # The label names the file, so it starts as whatever the caller passed and the branches
+    # below only improve on it. A run is not worth losing over the name of its log.
+    log_label = label
     if ".txt" in label:
         log_label = f"bulk_{label.split(".txt")[0]}"
     elif "https" in label:
@@ -219,11 +222,17 @@ def log_to_file(label: str) -> Optional[str]:
         if len(parts) >= 3:
             domain, asset_type, id = parts[0], parts[1], parts[2]
             source = URL_SOURCE_MAP.get(domain, "unknown_source")
-            type = URL_TYPE_MAP.get(asset_type, "Unknown_type")
+            # An asset type the map does not know falls through to the label default below.
+            # The old fallback was a string, and .get on it crashed the run the same way.
+            type = URL_TYPE_MAP.get(asset_type, {})
             url_type = type.get("label", "unknown_url_type")
             log_label = f"scrape_{source}_{url_type}_{id}"
-    else:
-        log_label = label
+        else:
+            # A URL too short to read a source, a type and an id out of is named after the
+            # parts it does have, joined rather than left as the URL it arrived as. The label
+            # ends up in a filename, and one with the URL's slashes still in it points inside
+            # directories nothing creates, so the run would quietly get no log at all.
+            log_label = "_".join(parts)
 
     log_label = log_label.lower()
     timestamp = datetime.now()
