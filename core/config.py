@@ -43,6 +43,36 @@ def normalize_notification_channels(apprise_urls: List[Any]) -> List[Dict[str, A
     return channels
 
 
+def write_json_atomically(path: str, config_json: Dict[str, Any]) -> None:
+    """
+    Write the configuration JSON to a temporary file and move it into place.
+
+    Writing over the live config.json means a process stopped part way through the write
+    leaves it truncated, and the next load cannot parse it. That file holds the Plex
+    token, the webhook token, the OIDC client secret, the basic auth password hash and
+    every schedule, so losing it means entering all of that again by hand. os.replace is
+    atomic on POSIX and on Windows, so a reader sees either the old file or the new one
+    and never a half written one. The temporary file sits in the same directory as the
+    target, or the move becomes a cross device copy and stops being atomic.
+    """
+    temp_path = f"{path}.tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as config_file:
+            json.dump(config_json, config_file, indent=4)
+        if os.path.isfile(path):
+            # The file being moved into place is a new one with whatever permissions the
+            # umask gave it, and this one holds credentials, so a config.json an
+            # administrator has restricted to its owner stays that way across a save.
+            os.chmod(temp_path, os.stat(path).st_mode & 0o777)
+        os.replace(temp_path, path)
+    except Exception:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass  # nothing to tidy up, or the same problem that stopped the write
+        raise
+
+
 class Config:
     """
     Manages application configuration stored in JSON format.
@@ -283,8 +313,7 @@ class Config:
         # Create the config.json file if it doesn't exist
         if not os.path.isfile(self.path):
             try:
-                with open(self.path, "w", encoding="utf-8") as config_file:
-                    json.dump(config_json, config_file, indent=4)
+                write_json_atomically(self.path, config_json)
                 debug_me(f"Config file '{self.path}' created with default settings.")
             except Exception as e:
                 raise ConfigCreationError(f"Error creating configuration file as '{self.path}': {e}") from e
@@ -341,7 +370,6 @@ class Config:
         }
 
         try:
-            with open(self.path, "w", encoding="utf-8") as config_file:
-                json.dump(config_json, config_file, indent=4)
+            write_json_atomically(self.path, config_json)
         except Exception as e:
             raise ConfigSaveError(f"Error saving configuration to '{self.path}': {e}") from e
