@@ -40,19 +40,19 @@ from core.constants import (
     DEFAULT_LOG_PATH
 )
 
+def authentication_required():
+    """Whether the config asks for a login. Read from globals so the HTTP routes and the socket
+       handlers answer from one place, and so a config reload is picked up by both."""
+    config = globals.config if hasattr(globals, 'config') and globals.config else None
+    if not config:
+        return False
+    return config.auth_enabled or config.oidc_enabled
+
 def login_required(f):
     """Decorator to require authentication for routes."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Get config from globals
-        config = globals.config if hasattr(globals, 'config') and globals.config else None
-
-        # If auth not enabled, allow access
-        must_login = False
-        if config:
-            must_login = config.auth_enabled or config.oidc_enabled
-
-        if not config or not must_login:
+        if not authentication_required():
             return f(*args, **kwargs)
 
         # Check if user is logged in
@@ -408,6 +408,18 @@ def setup_socket_handlers(
 
     # Temporary storage for chunked uploads
     upload_chunks = {}
+
+    @globals.web_socket.on("connect")
+    def handle_connect():
+        """Refuse the connection when a login is configured and this session has not logged in.
+
+           The web UI does its real work over the socket, so guarding the HTTP routes alone
+           leaves every handler below reachable without a session. Rejecting at connect covers
+           all of them, including any added later. The login page loads no socket, so nothing
+           needs a connection before a session exists."""
+        if authentication_required() and not session.get('authenticated'):
+            debug_me("Refused a Socket.IO connection from a session that has not logged in")
+            return False
 
     @globals.web_socket.on("debug_mode")
     def debug_mode(data):
