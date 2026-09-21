@@ -299,7 +299,6 @@ def setup_routes(web_app, config: Config):
     @login_required
     def browse_directory():
         req_path = request.args.get('path', '').strip()
-        debug_me(f"Received browse request for path: {req_path}")
 
         if not req_path and os.name == 'nt':
             import string, ctypes
