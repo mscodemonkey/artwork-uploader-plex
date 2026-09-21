@@ -294,6 +294,7 @@ def setup_routes(web_app, config: Config):
         return send_from_directory(uploads_path, filename)
 
     @web_app.route('/api/browse', methods=['GET'])
+    @login_required
     def browse_directory():
         req_path = request.args.get('path', '').strip()
         debug_me(f"Received browse request for path: {req_path}")
