@@ -244,15 +244,18 @@ class PlexConnector:
                 library_name = library.title
                 debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'")
 
-                matches = [library_item] if library_item else []
-                if library_item and artwork.get('media_folder'):
+                matches = []
+                if library_item:
                     # getGuid returns only the first item with the guid, and an edition in its own
-                    # folder is another item with the same one. When the caller knows the imported
-                    # path (a Radarr import), apply to the items holding that file only. On an
-                    # upgrade the old item stays in the same folder until Plex rescans, so no item
-                    # holding the new file means Plex has not scanned it in yet.
-                    same_guid = library.search(guid=library_item.guid) or [library_item]
-                    matches = self._items_holding(same_guid, artwork['media_folder'], artwork.get('media_file', ()))
+                    # folder is another item with the same one. Every copy of the film gets the
+                    # artwork, as a copy in another library does.
+                    matches = library.search(guid=library_item.guid) or [library_item]
+                if matches and artwork.get('media_folder'):
+                    # When the caller knows the imported path (a Radarr import), apply to the items
+                    # holding that file only. On an upgrade the old item stays in the same folder
+                    # until Plex rescans, so no item holding the new file means Plex has not
+                    # scanned it in yet.
+                    matches = self._items_holding(matches, artwork['media_folder'], artwork.get('media_file', ()))
                 for match in matches:
                     items.append(match)
                     lib_names.append(library_name)
