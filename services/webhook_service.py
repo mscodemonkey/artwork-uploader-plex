@@ -11,7 +11,7 @@ code a normal scrape uses, so the webhook inherits all of it without re-implemen
 import threading, time, re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import FrozenSet, List, Optional, Union
+from typing import FrozenSet, List, Optional, Tuple, Union
 
 from core import globals
 from core.constants import WEBHOOK_RETRY_DELAYS
@@ -53,6 +53,8 @@ class WebhookEvent:
     tvdb_id: Optional[int]
     seasons: FrozenSet[int]
     source: str                    # "radarr" or "sonarr"
+    media_folder: Optional[str] = None     # name of the movie's folder, when Radarr says
+    media_file: Tuple[str, ...] = ()       # the imported file's path inside that folder
 
     def label(self) -> str:
         # Remove the year from the title if the title contains it to avoid duplicating it
@@ -71,6 +73,34 @@ def _int_or_none(value) -> Optional[int]:
     return number or None
 
 
+def _imported_media_path(payload: dict, movie: dict) -> Tuple[Optional[str], Tuple[str, ...]]:
+    """Where a Radarr import landed: the name of the movie's folder, and the file's path inside
+       it. Radarr sends movie.folderPath, and movieFile.path, which is folderPath joined with
+       movieFile.relativePath. Only the part from the movie's folder down is kept, because Radarr
+       and Plex usually mount the library under different roots. The folder is None when the
+       event names no path, and the file is empty when it names only the folder."""
+    # utils.utils imports utils.notifications, which imports the services package (see _log).
+    from utils.utils import get_path_parts
+
+    def parts_of(value) -> Tuple[str, ...]:
+        return tuple(get_path_parts(value.strip())) if isinstance(value, str) and value.strip() else ()
+
+    movie_file = payload.get("movieFile") if isinstance(payload.get("movieFile"), dict) else {}
+    folder_path = parts_of(movie.get("folderPath"))
+    file_path = parts_of(movie_file.get("path"))
+    relative = parts_of(movie_file.get("relativePath"))
+    if file_path and not relative:
+        relative = file_path[-1:]
+
+    if len(folder_path) > 1:
+        folder = folder_path[-1]
+    elif len(file_path) > len(relative) + 1:
+        folder = file_path[-len(relative) - 1]
+    else:
+        return None, ()
+    return folder, relative
+
+
 def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
     """Parse a Radarr/Sonarr webhook payload.
 
@@ -86,6 +116,7 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
         return None
     movie = payload.get("movie")
     if isinstance(movie, dict) and movie.get("title"):
+        media_folder, media_file = _imported_media_path(payload, movie)
         return WebhookEvent(
             kind="movie",
             title=movie["title"],
@@ -93,7 +124,9 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
             tmdb_id=_int_or_none(movie.get("tmdbId")),
             tvdb_id=None,
             seasons=frozenset(),
-            source=WebhookSource.RADARR.value
+            source=WebhookSource.RADARR.value,
+            media_folder=media_folder,
+            media_file=media_file
         )
     series = payload.get("series")
     if isinstance(series, dict) and series.get("title"):
@@ -144,8 +177,10 @@ class WebhookService:
 
     @staticmethod
     def _dedupe_key(event: WebhookEvent):
+        # An edition in its own folder shares the plain release's TMDb ID, so the folder keeps
+        # an import of each apart.
         identity = event.tmdb_id or event.tvdb_id or normalize_title(event.title)
-        return (event.kind, identity, event.seasons)
+        return (event.kind, identity, event.seasons, event.media_folder)
 
     def _release(self, key) -> None:
         with self._lock:
@@ -270,7 +305,13 @@ class WebhookService:
         if event.kind == "movie":
             row = index.lookup(user_keys, event.title, event.year, [FileType.MOVIE_POSTER.value])
             if row:
-                artwork.append(self._artwork_dict(row, cache_buster, FileType.MOVIE_POSTER.value))
+                poster = self._artwork_dict(row, cache_buster, FileType.MOVIE_POSTER.value)
+                if event.media_folder:
+                    # An edition in its own folder is a second Plex item with the same title, year
+                    # and TMDb ID. The imported path tells the lookup which item the event is about.
+                    poster["media_folder"] = event.media_folder
+                    poster["media_file"] = event.media_file
+                artwork.append(poster)
         else:
             row = index.lookup(user_keys, event.title, event.year, [FileType.SHOW_COVER.value])
             if row:
