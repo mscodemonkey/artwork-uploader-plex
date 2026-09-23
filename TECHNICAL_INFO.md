@@ -360,7 +360,7 @@ The History tab in the web UI reads this file. `RunType`, `RunTrigger` and `RunO
 
 **Location**: [services/webhook_service.py](services/webhook_service.py)
 
-`parse_event` turns the incoming JSON into a `WebhookEvent`; the service dedupes concurrent events per title and records each apply in the run history.
+`parse_event` turns the incoming JSON into a `WebhookEvent`; the service dedupes concurrent events per title and records each apply in the run history. For a Radarr event it keeps the name of the movie's folder (`movie.folderPath`, or worked out from `movieFile.path`) and the file's path inside it (`movieFile.relativePath`), and passes them on as the artwork's `media_folder` and `media_file`. `PlexConnector.find_in_library` then applies to the items with the same guid that hold that file, rather than to every item with the guid. No such item means Plex has not scanned the file in yet, which is also the state straight after an upgrade while the old file's item is still there, so the retry schedule waits for the scan. An event with no path applies to every item with the guid, as a scrape does. The folder is part of the dedupe key, so an edition and the plain release importing together are two events.
 
 ---
 

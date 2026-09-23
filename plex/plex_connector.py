@@ -11,6 +11,7 @@ from core.exceptions import PlexConnectorException, LibraryNotFound
 from models.artwork_types import AnyArtwork
 from models.options import Options
 from utils.notifications import debug_me
+from utils.utils import get_path_parts
 from core.config import Config
 from plex.library_index import PlexLibraryIndex, normalize_title
 
@@ -220,6 +221,9 @@ class PlexConnector:
         Args:
             item_type: The type of item to search for ("movie" or "tv").
             artwork: The artwork information containing title and year.
+                An optional 'media_folder' names the folder the imported file is in, and an optional
+                'media_file' gives the file's path inside it. Together they limit the match to the
+                items holding that file, or with only the folder, to the items with a file in it.
 
         Returns:
             A tuple containing:
@@ -240,8 +244,20 @@ class PlexConnector:
                 library_name = library.title
                 debug_me(f"Found '{artwork.get('title')} ({artwork.get('year')})' with TMDb ID '{artwork.get('tmdb_id')}' as '{library_item.title} ({library_item.year})' in '{library_name}'")
 
+                matches = []
                 if library_item:
-                    items.append(library_item)
+                    # getGuid returns only the first item with the guid, and an edition in its own
+                    # folder is another item with the same one. Every copy of the film gets the
+                    # artwork, as a copy in another library does.
+                    matches = library.search(guid=library_item.guid) or [library_item]
+                if matches and artwork.get('media_folder'):
+                    # When the caller knows the imported path (a Radarr import), apply to the items
+                    # holding that file only. On an upgrade the old item stays in the same folder
+                    # until Plex rescans, so no item holding the new file means Plex has not
+                    # scanned it in yet.
+                    matches = self._items_holding(matches, artwork['media_folder'], artwork.get('media_file', ()))
+                for match in matches:
+                    items.append(match)
                     lib_names.append(library_name)
             except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
                 debug_me(f"Plex server timed out while searching '{artwork.get('title')} ({artwork.get('year')})' in {library.title}")
@@ -258,6 +274,21 @@ class PlexConnector:
             return items, lib_names
         return None, None
     
+    @staticmethod
+    def _items_holding(items: List[Union[Movie, Show]], folder: str, file: Tuple[str, ...] = ()) -> List[Union[Movie, Show]]:
+        """The items with a media file at `file` inside a folder called `folder`, or with no
+           `file`, any media file inside that folder. Paths are compared from the folder down
+           rather than in full, as the *arr app and Plex rarely mount the library at the same
+           root."""
+        def holds(path_parts: Tuple[str, ...]) -> bool:
+            if file:
+                return path_parts[-len(file) - 1:] == (folder, *file)
+            return folder in path_parts[:-1]
+
+        return [item for item in items
+                if any(holds(tuple(get_path_parts(part.file)))
+                       for media in item.media for part in media.parts if part.file)]
+
     def movie_or_show(self, title:str, year:Optional[int] = None) -> Tuple[Optional[str], Optional[int], Optional[str], Optional[int]]:
         """
         Looks up a title in the Plex libraries.
