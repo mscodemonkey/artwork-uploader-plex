@@ -1,4 +1,4 @@
-import time
+import time, re
 from typing import Optional, Any
 from core.config import Config
 from core import globals
@@ -244,7 +244,8 @@ class MediuxScraper:
             season_id_ost_data = poster.get("season_id_ost", None)
             is_season_square_art = season_id_ost_data is not None
             
-            episode_id_data = poster.get("episode_id", None)
+            tvdb_episode_id = poster.get("tvdb_episode_id", None)
+            episode_id_data = poster.get("episode_id", None) or tvdb_episode_id
             is_title_card = episode_id_data is not None
             episode_id = episode_id_data.get("id", None) if episode_id_data else None
             
@@ -294,6 +295,7 @@ class MediuxScraper:
                             self.callbacks.debug(f"Detected season cover for {season} S{season:02}")
                     else:
                         self.callbacks.debug(f"⏩ Skipping season cover - incorrect season metadata")
+                        self.callbacks.debug(poster)
                         self.callbacks.log(f"⚠️ {show_name} ({year}) • {self.author} | Skipping season cover - incorrect season metadata")
                         self.errored += 1
                         continue
@@ -316,14 +318,24 @@ class MediuxScraper:
                     if episode_id in show_map["episodes"]:
                         (season, episode) = show_map["episodes"][episode_id]
                         self.callbacks.debug(f"Detected title card for S{season:02}E{episode:02}")
+                    elif tvdb_episode_id: # Fallback for MediUX sets that use TVDb metadata
+                        poster_title = poster.get("title", None)
+                        season = int(tvdb_episode_id["season_id"]["season_number"])
+                        match = re.search(r'S(\d+)\s*E(\d+)', poster_title, re.IGNORECASE)
+                        episode = 0
+                        if match:
+                            episode = int(match.group(2))
+
                     else:
                         self.callbacks.debug(f"⏩ Skipping title card - incorrect episode metadata")
+                        self.callbacks.debug(poster)
                         self.callbacks.log(f"⚠️ {show_name} ({year}) • {self.author} | Skipping title card - incorrect episode metadata")
                         self.errored += 1
                         continue
                 
                 else:
                     self.callbacks.debug(f"⏩ Skipping TV Show asset - missing metadata")
+                    self.callbacks.debug(poster)
                     self.callbacks.log(f"⚠️ {show_name} ({year}) • {self.author} | Skipping TV Show asset - missing metadata")
                     self.errored += 1
                     continue
@@ -387,6 +399,7 @@ class MediuxScraper:
 
                 else:
                     self.callbacks.debug(f"⏩ Skipping asset - missing metadata")
+                    self.callbacks.debug(poster)
                     self.callbacks.log(f"⚠️ {self.title} • {self.author} | Skipping asset - missing metadata")
                     self.errored += 1
                     continue        
@@ -405,6 +418,7 @@ class MediuxScraper:
 
                 else:
                     self.callbacks.debug(f"⏩ Skipping movie asset - missing metadata")
+                    self.callbacks.debug(poster)
                     self.callbacks.log(f"⚠️ {title} ({year}) • {self.author} | Skipping movie asset - missing metadata")
                     self.errored += 1
                     continue                    
@@ -464,6 +478,7 @@ class MediuxScraper:
 
             else:
                 self.callbacks.debug(f"⏩ Skipping asset - missing metadata")
+                self.callbacks.debug(poster)
                 self.callbacks.log(f"⚠️ {self.title} • {self.author} | Skipping asset - missing metadata")
                 self.errored += 1
                 continue
