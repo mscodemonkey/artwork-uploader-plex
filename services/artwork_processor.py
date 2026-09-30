@@ -18,6 +18,7 @@ from core.exceptions import (
     PlexConnectorException,
     ScraperException,
     CollectionNotFound,
+    CollectionsNotSupported,
     MovieNotFound,
     ShowNotFound,
     NotProcessedByFilter,
@@ -198,6 +199,9 @@ class ArtworkProcessor:
 
         except CollectionNotFound as e:
             self.callbacks.log(f"⚠️ {str(e)}")
+
+        except CollectionsNotSupported as e:
+            self.callbacks.log(f"⏩ {str(e)}")
 
         except MovieNotFound as e:
             self.callbacks.log(f"⚠️ {str(e)}")

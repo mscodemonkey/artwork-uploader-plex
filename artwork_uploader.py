@@ -1118,6 +1118,7 @@ if __name__ == "__main__":
         filters=args.filters,
         exclude=args.exclude,
         year=args.year,
+        local_assets=args.local_assets,
         kometa=args.kometa,
         stage=args.stage,
         temp=args.temp,

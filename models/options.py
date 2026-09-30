@@ -16,6 +16,7 @@ class Options:
     Attributes:
         add_posters: Include additional posters from ThePosterDB set
         add_sets: Include additional sets from ThePosterDB
+        local_assets: Saves artwork locally alongside media files
         kometa: Save artwork to Kometa asset directory instead of uploading to Plex
         stage: Download artwork for seasons and episodes not yet in Plex (except Specials)
         temp: Use temporary directory instead of Kometa asset directory
@@ -32,6 +33,7 @@ class Options:
 
     add_posters: bool = False
     add_sets: bool = False
+    local_assets: bool = False
     kometa: bool = False
     stage: bool = False
     temp: bool = False

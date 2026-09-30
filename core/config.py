@@ -81,6 +81,8 @@ class Config:
         path: Path to the configuration file
         base_url: Plex server URL
         token: Plex authentication token
+        plex_local_assets: Save assets locally to media folders
+        path_mappings: Path mappings for media folders between Plex and Artwork Uploader
         bulk_txt: Default bulk import filename
         tv_library: List of TV library names in Plex
         movie_library: List of movie library names in Plex
@@ -127,6 +129,8 @@ class Config:
         self.path: str = config_path
         self.base_url: str = ""
         self.token: str = ""
+        self.plex_local_assets: bool = False
+        self.path_mappings: List[Dict[str, str]] = []
         self.bulk_txt: str = "bulk_import.txt"
         self.tv_library: List[str] = []
         self.movie_library: List[str] = []
@@ -183,6 +187,8 @@ class Config:
 
             self.base_url = config.get("base_url", "")
             self.token = config.get("token", "")
+            self.plex_local_assets = config.get("plex_local_assets", False)
+            self.path_mappings = config.get("path_mappings", [])
             self.tv_library = config.get("tv_library", [])
             self.movie_library = config.get("movie_library", [])
             self.mediux_filters = config.get("mediux_filters", [])
@@ -263,6 +269,8 @@ class Config:
         config_json = {
             "base_url": "",
             "token": "",
+            "plex_local_assets": False,
+            "path_mappings": [],
             "bulk_txt": "bulk_import.txt",
             "tv_library": [],
             "movie_library": [],
@@ -327,6 +335,8 @@ class Config:
         config_json = {
             "base_url": self.base_url,
             "token": self.token,
+            "plex_local_assets": self.plex_local_assets,
+            "path_mappings": self.path_mappings,
             "tv_library": self.tv_library,
             "movie_library": self.movie_library,
             "mediux_filters": self.mediux_filters,

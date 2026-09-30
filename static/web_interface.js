@@ -15,6 +15,7 @@ let validationTimeout;
 let currentBrowseTargetInput = null;
 let currentDirectoryPath = "/";
 let initialConfig = '';
+let pathMappingsCounter = 0;
 
 const socket = io();
 const instanceId = getInstanceId();
@@ -1265,6 +1266,10 @@ function getCurrentConfigForm() {
 
     current_form.base_url = document.getElementById("plex_base_url").value.trim();
     current_form.token = document.getElementById("plex_token").value.trim();
+    current_form.plex_local_assets = document.getElementById("plex_local_assets").checked;
+
+    current_form.path_mappings = collectPathMappings();
+
     current_form.kometa_base = document.getElementById("kometa_base").value.trim();
     current_form.temp_dir = document.getElementById("temp_dir").value.trim();
     current_form.bulk_txt = document.getElementById("bulk_import_file").value;
@@ -1420,6 +1425,30 @@ function updateConfigUI(config) {
 
     document.getElementById("plex_base_url").value = config.base_url;
     document.getElementById("plex_token").value = config.token;
+
+    document.getElementById("plex_local_assets").checked = config.plex_local_assets;
+    togglePathMappings();
+
+    // Populate path mappings
+    pathMappingsCounter = 0
+    document.querySelectorAll(".inline-remove-btn").forEach(btn => {
+        btn.removeEventListener("click", removePathMappingRow);
+    })
+    const pathMappingsContainer = document.getElementById("path_mappings_container");
+    if (pathMappingsContainer) {
+        pathMappingsContainer.innerHTML = "";
+
+        if (Array.isArray(config.path_mappings) && config.path_mappings.length > 0) {
+            config.path_mappings.forEach(mapping => {
+                createPathMappingRow(null, mapping.plex_path, mapping.app_path);
+            });
+        }
+    }
+    // Create event listeners for the remove buttons
+    document.querySelectorAll(".inline-remove-btn").forEach(btn => {
+        btn.addEventListener("click", removePathMappingRow);
+    })
+
     document.getElementById("bulk_import_file").value = config.bulk_txt;
     
     // Load TV libraries
@@ -3533,18 +3562,15 @@ document.getElementById("enable_webhooks").addEventListener("change", toggleWebh
 
 function toggleKometaSettings() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const plexLocalAssets = document.getElementById("plex_local_assets");
     const kometaSettings = document.getElementById("kometa_settings");
     const kometaBase = document.getElementById("kometa_base");
     const dockerWarning = document.getElementById("docker_warning");
-    const kometaTimeout = document.getElementById("kometa_timeout_container");
-    const uploadTimeoutLabel = document.getElementById("plex_timeout_label");
-    const uploadRetryLabel = document.getElementById("upload_retry_label");
 
     if (saveToKometa) {
+        plexLocalAssets.checked = false;
+        togglePathMappings();
         kometaSettings.style.display = "block";
-        kometaTimeout.classList.remove("d-none");
-        uploadTimeoutLabel.innerHTML='<i class="bi bi-plugin"></i>&ensp;Plex connect timeout:';
-        uploadRetryLabel.textContent="download";
         if (docker) {
             if (dockerWarning) {
                 dockerWarning.classList.remove("d-none");
@@ -3565,37 +3591,50 @@ function toggleKometaSettings() {
             dockerWarning.classList.add("d-none");
         }
         kometaSettings.style.display = "none";
-        kometaTimeout.classList.add("d-none");
-        uploadTimeoutLabel.innerHTML='<i class="bi bi-cloud-upload"></i>&ensp;Plex connect/upload timeout:';
-        uploadRetryLabel.textContent="upload";
         if (kometaBase) {
             kometaBase.required = false;
             // Clear invalid styling when hiding
             kometaBase.classList.remove('is-invalid');
         }
     }
-    // Update the label for the "force" option depending on Kometa mode
-    const forceLabel = document.querySelector('label[for="option-force"]');
-    const forceLabelUpload = document.querySelector('label[for="upload-option-force"]');
-    if (forceLabel) {
-        if (saveToKometa) {
-            forceLabel.textContent = 'Force save the artwork, replacing any existing asset';
-            forceLabelUpload.textContent = 'Force save the artwork, replacing any existing asset';
-        } else {
-            forceLabel.textContent = 'Force upload the artwork, even if it\'s locked or it already exists';
-            forceLabelUpload.textContent = 'Force upload the artwork, even if it\'s locked or it already exists';
-        }
-    }
-
+    
     // Check if temp option should be shown, the Plex options should be hidden, and the stage option in the scraper tab should be hidden
     toggleTempCheckbox();
     togglePlexOptions();
     toggleScraperStageCheckbox();
     toggleSkipLockedCheckbox();
+    toggleKometaLabels();
+}
+
+function toggleKometaLabels() {
+    const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const plexLocalAssets = document.getElementById("plex_local_assets").checked;
+    const localAssetMode = saveToKometa || plexLocalAssets;
+    const downloadTimeout = document.getElementById("download_timeout_container");
+    const uploadTimeoutLabel = document.getElementById("plex_timeout_label");
+    const uploadRetryLabel = document.getElementById("upload_retry_label");
+    const forceLabel = document.querySelector('label[for="option-force"]');
+    const forceLabelUpload = document.querySelector('label[for="upload-option-force"]');
+
+    if (localAssetMode) {
+        downloadTimeout.classList.remove("d-none");
+        uploadTimeoutLabel.innerHTML='<i class="bi bi-plugin"></i>&ensp;Plex connect timeout:';
+        uploadRetryLabel.textContent="download";
+        forceLabel.textContent = 'Force save the artwork, replacing any existing asset';
+        forceLabelUpload.textContent = 'Force save the artwork, replacing any existing asset';
+    } else {
+        downloadTimeout.classList.add("d-none");
+        uploadTimeoutLabel.innerHTML='<i class="bi bi-cloud-upload"></i>&ensp;Plex connect/upload timeout:';
+        uploadRetryLabel.textContent="upload";
+        forceLabel.textContent = 'Force upload the artwork, even if it\'s locked or it already exists';
+        forceLabelUpload.textContent = 'Force upload the artwork, even if it\'s locked or it already exists';
+    }
 }
 
 function toggleSkipLockedCheckbox() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const plexLocalAssets = document.getElementById("plex_local_assets").checked;
+    const localAssetMode = saveToKometa || plexLocalAssets;
     const globalSkipLocked = document.getElementById("skip_locked_artwork");
     const skipLockedScraperOption = document.getElementById("option-skip-locked");
     const skipLockedUploadOption = document.getElementById("upload-option-skip-locked");
@@ -3604,7 +3643,7 @@ function toggleSkipLockedCheckbox() {
     const trackArtworkIDs = document.getElementById("track_artwork_ids").checked;
     
     // Hide and uncheck the skip locked option if Kometa is enabled
-    if (saveToKometa) {
+    if (localAssetMode) {
         skipLockedScraperOption.parentElement.style.display = "none";
         skipLockedScraperOption.checked = false;
         skipLockedUploadOption.parentElement.style.display = "none";
@@ -3685,12 +3724,14 @@ function toggleTempCheckbox() {
 
 function togglePlexOptions() {
     const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const plexLocalAssets = document.getElementById("plex_local_assets").checked;
+    const localAssetMode = saveToKometa || plexLocalAssets;
     const trackArtworkIDs = document.getElementById("track_artwork_ids").parentElement;
     const skipLocked = document.getElementById("skip_locked_artwork").parentElement;
     const resetOverlay = document.getElementById("reset_overlay").parentElement;
 
     // Ony show the Track Artwork IDs and Reset Overlay options if Kometa is disabled
-    if (!saveToKometa) {
+    if (!localAssetMode) {
         trackArtworkIDs.style.display = "block";
         resetOverlay.style.display = "block";
         skipLocked.style.display = "block";
@@ -3698,13 +3739,33 @@ function togglePlexOptions() {
         trackArtworkIDs.style.display = "none";
         resetOverlay.style.display = "none";
         skipLocked.style.display = "none";
-        document.getElementById("skip_locked_artwork").checked = false; // Uncheck the skip locked option if Kometa is enabled
+        document.getElementById("skip_locked_artwork").checked = false; // Uncheck the skip locked option if Local Asset mode is enabled
         document.getElementById("track_artwork_ids").checked = true;
     }
 }
 
 // Add event listener for save_to_kometa checkbox
 document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);
+
+// Add event listener for plex_Local_assets checkbox
+document.getElementById("plex_local_assets").addEventListener("change", togglePathMappings);
+
+function togglePathMappings() {
+    const saveToKometa = document.getElementById("save_to_kometa");
+    const plexLocalAssets = document.getElementById("plex_local_assets");
+    const pathMappings = document.getElementById("path-mappings");
+
+
+    if (saveToKometa.checked && plexLocalAssets.checked) {
+        saveToKometa.checked = false;
+        toggleKometaSettings();
+    }
+
+    toggleKometaLabels();
+    togglePlexOptions();
+    
+    pathMappings.classList.toggle("d-none", !plexLocalAssets.checked)
+}
 
 // Add event listener for auto_manage_bulk_files checkbox
 document.getElementById("auto_manage_bulk_files").addEventListener("change", toggleAddToBulkCheckbox);
@@ -3756,9 +3817,130 @@ const NOTIFICATION_EVENTS = [
 // Events a newly added channel is subscribed to, matches core/constants.py DEFAULT_NOTIFICATION_EVENTS
 const DEFAULT_NOTIFICATION_EVENTS = ["run_started", "run_completed", "run_completed_with_errors", "run_cancelled"];
 
-let appriseRowCounter = 0;
+
+// Path Mappings settings
+const addMappingBtn = document.getElementById("add-mapping");
+
+addMappingBtn.addEventListener("click", createPathMappingRow);
+
+function createPathMappingRow(e, plexPath = "", appPath = "") {
+    const container = document.getElementById("path_mappings_container");
+    pathMappingsCounter++;
+    const rowId = pathMappingsCounter;
+
+    const row = document.createElement("div");
+    
+    if (pathMappingsCounter === 1) {
+        const heading = document.createElement("div");
+        
+        heading.innerHTML = `
+        <div class="path-mappings-heading mt-0 d-flex justify-content-between align-items-center me-4">
+            <small class="form-text text-muted w-100">Plex Path</small>
+            <small class="form-text text-muted w-100">Artwork Uploader Path</small>
+        </div>
+        `;
+        container.appendChild(heading);
+    }
+
+    row.innerHTML = `
+        <div id="path_mappings_row_${rowId}" class="path-mappings-row d-flex justify-content-between gap-2 align-items-top mb-3">
+            <input id="plex_path_${rowId}"
+                value="${plexPath || ''}"
+                type="text"
+                class="form-control plex-path-input"
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                data-1p-ignore
+                data-bwignore
+                data-lpignore="true"
+                data-dashlane-ignore="true">
+            <input id="app_path_${rowId}"
+                value="${appPath || ''}"
+                type="text"
+                class="form-control app-path-input"
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                data-1p-ignore
+                data-bwignore
+                data-lpignore="true"
+                data-dashlane-ignore="true">
+            <i class="bi bi-x-circle inline-remove-btn mt-1 me-2" title="Remove mapping" role="button"></i>
+        </div>
+    `;
+
+    container.appendChild(row);
+
+    let rowNum = 0
+    const allRows = document.querySelectorAll(".path-mappings-row")
+    allRows.forEach(row => {
+        rowNum++;
+        if (rowNum === allRows.length) {
+            row.classList.remove("mb-3");
+        } else {
+            row.classList.add("mb-3");
+        }
+    })
+
+    document.querySelectorAll(".plex-path-input").forEach(input => {
+        input.addEventListener("input", toggleConfigButtons);
+    })
+    
+    document.querySelectorAll(".app-path-input").forEach(input => {
+        input.addEventListener("input", toggleConfigButtons);
+    })
+    
+    document.querySelectorAll(".inline-remove-btn").forEach(btn => {
+        btn.addEventListener("click", removePathMappingRow);
+    })
+
+    toggleConfigButtons();
+}
+
+function removePathMappingRow() {
+
+    const container = document.getElementById("path_mappings_container");
+    if (!container || pathMappingsCounter === 0) return;
+    
+    if (pathMappingsCounter === 1) {
+        const heading = document.querySelector(".path-mappings-heading");
+        container.removeChild(heading.parentElement);
+    }
+    
+    const row = this.closest(".path-mappings-row");
+    container.removeChild(row.parentElement);
+
+    const allRows = document.querySelectorAll(".path-mappings-row");
+    let rowNum = 0
+    allRows.forEach(row => {
+        rowNum++;
+        row.id = `path_mappings_row_${rowNum}`;
+        if (rowNum === allRows.length) {
+            row.classList.remove("mb-3");
+        }
+    })
+    
+    pathMappingsCounter--;
+    toggleConfigButtons();
+}
+
+function collectPathMappings() {
+    const pathMappings = Array.from(document.querySelectorAll(".path-mappings-row"))
+        .map(row => {
+            const plex_path = row.querySelector(".plex-path-input").value.trim();
+            const app_path = row.querySelector(".app-path-input").value.trim();
+            return { plex_path, app_path };
+        })
+        .filter(row => row.plex_path !== "" && row.app_path !== "");
+
+    return pathMappings;
+}
 
 // Creates a single Apprise URL input row, with a delete button and per-event notification toggles
+let appriseRowCounter = 0;
 function createAppriseUrlRow(channel = {}, last = false) {
     const container = document.getElementById("apprise_urls_container");
     const url = channel.url || "";

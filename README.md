@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  Upload poster sets from ThePosterDB and MediUX to your Plex server, or save them to your Kometa asset directory, in seconds.
+  Upload poster sets from ThePosterDB and MediUX to your Plex server, or save them locally alongside your media files or to your Kometa asset directory, in seconds.
 </p>
 
 <p align="center">
@@ -15,9 +15,9 @@
 
 ---
 
-Artwork Uploader takes a poster set URL (or a downloaded Zip file) from [ThePosterDB](https://theposterdb.com) or [MediUX](https://mediux.pro) and applies the artwork to the matching movies, shows, seasons, episodes and collections in your Plex libraries. Run it from the web UI, the command line, or on a schedule, and let it keep your libraries beautiful while you sleep.
+Artwork Uploader takes a poster set URL (or a downloaded Zip file) from [ThePosterDB](https://theposterdb.com) or [MediUX](https://mediux.pro) and applies the artwork to the matching movies, shows, seasons, episodes and collections in your Plex libraries. Alternatively, it can save the assets locally alongside your media files following the Plex local assets convention or to a Kometa asset directory for processing, overlaying and applying by Kometa. Run it from the web UI, the command line, or on a schedule, and let it keep your libraries beautiful while you sleep.
 
-It started life as a fork of Brian Brown's [plex-poster-set-helper](https://github.com/bbrown430/plex-poster-set-helper) and has grown into a full application with a web UI, a scheduler, artwork tracking, Sonarr/Radarr webhooks and Kometa integration.
+It started life as a fork of Brian Brown's [plex-poster-set-helper](https://github.com/bbrown430/plex-poster-set-helper) and has grown into a full application with a web UI, a scheduler, artwork tracking, Sonarr/Radarr webhooks, support for Plex local media assets and Kometa integration.
 
 ![Scraper tab](assets/ScraperTab.png)
 
@@ -34,7 +34,7 @@ It started life as a fork of Brian Brown's [plex-poster-set-helper](https://gith
   - [Bulk files](#bulk-files)
   - [Scheduler and notifications](#scheduler-and-notifications)
   - [Automatic artwork for new imports (Sonarr/Radarr webhook)](#automatic-artwork-for-new-imports-sonarrradarr-webhook)
-  - [Kometa integration](#kometa-integration)
+  - [Local assets](#local-assets)
 - [Screenshots](#screenshots)
 - [Troubleshooting](#troubleshooting)
 - [For developers](#for-developers)
@@ -63,8 +63,11 @@ It started life as a fork of Brian Brown's [plex-poster-set-helper](https://gith
 - Sonarr/Radarr webhooks: new imports get the right artwork within about a minute of landing, instead of waiting for the next scheduled run.
 - Auto-managed bulk files: let the app add, label and sort URLs for you.
 
-**Kometa**
-- Reset Kometa's overlay tag on upload so overlays get reapplied, or save artwork straight to your Kometa asset directory and let Kometa do the applying. See [Kometa integration](#kometa-integration).
+**Local Assets**
+Some users like to keep offline copies of their custom artwork. Artwork Uploader for Plex supports two distinct ways to do this:
+- Plex local media assets: Saves the assets to your media folders right next to your media files, following Plex's [local media assets](https://support.plex.tv/articles/200220677-local-media-assets-movies/) naming conversion so they are immediately picked up and applied by Plex. See [Plex local assets](#plex-local-media-assets).
+- Kometa asset directory: Saves the assets to your Kometa asset directory, allowing Kometa to do any custom processing (like applying overlays) and apply them to Plex. See [Kometa asset directory](#kometa-asset-directory).
+
 
 ## Installation
 
@@ -82,6 +85,23 @@ services:
     volumes:
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
       - ./config:/artwork-uploader/config:rw
+      - ./logs:/artwork-uploader/logs:rw
+
+      # OPTIONAL: Media paths (required for Plex local media assets mode)
+      # Artwork Uploader must have access to all media folders assigned to Plex libraries
+      # where local assets would potentially need to be saved. The host paths must be the 
+      # actual paths at the host level, and the container path names are arbitrary, but they
+      # will be used if path mappings need to be defined.
+      #
+      # If Plex is also running as a container, use the same container paths here to
+      # avoid having to define path mappings
+      - <HOST_PATH_TO_MEDIA_FOLDER_1>:/media/movies1:rw
+      - <HOST_PATH_TO_MEDIA_FOLDER_2>:/media/movies2:rw
+      - <HOST_PATH_TO_MEDIA_FOLDER_3>:/media/tv1:rw
+      - <HOST_PATH_TO_MEDIA_FOLDER_4>:/media/tv2:rw
+      ... # Add as many bind mounts as root folders for media libraries you have in Plex
+
+      # OPTIONAL: Kometa settings (required for Kometa asset directory mode)
       - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw # Optional, only if you save assets to your Kometa asset directory
       - <HOST_TEMP_PATH>:/temp:rw # Optional, only for testing with a temp dir
     environment:
@@ -139,6 +159,7 @@ Per provider, tick the artwork types you want uploaded by default: show covers, 
 
 ### Additional settings
 
+- **Reset Kometa overlay labels**: Reset Kometa's overlay label on upload so overlays get reapplied the next time Kometa runs. This setting only applies when both Plex local media assets and Kometa asset directory modes are off. 
 - **Track artwork ID in Plex labels** (recommended on): stores an artwork ID in a Plex label per item, so re-runs skip artwork that hasn't changed and finish fast. Turned off, every run uploads everything, which can mean long run times, especially on ThePosterDB. Leave it on and use force when you need to!
 - **Skip locked artwork**: skips any artwork whose target field (poster, background or square art) is locked in Plex, unless forced. Plex locks a field whenever artwork is deliberately set, manually or by an upload, so this makes scheduled runs fill items still on default artwork while leaving your curation alone. A film kept as more than one Plex edition gets the artwork on every edition, the same as a film in more than one library, so lock an edition's poster if it should keep its own.
 - **Allow artist updates** (ThePosterDB only): lets a run replace artwork it applied earlier when the same artist has posted a newer version, even though the field is locked. Artwork you set by hand and artwork from a different artist are left alone, and it only ever moves forward to a newer upload, so runs settle on each artist's latest rather than flip-flopping. Needs **Skip locked artwork** and **Track artwork ID in Plex labels** both on. Because this overwrites artwork the tool chose earlier, note your current posters before the first run if you want to be able to revert.
@@ -147,12 +168,14 @@ Per provider, tick the artwork types you want uploaded by default: show covers, 
 - **Sort and label bulk files automatically**: adds, labels and sorts URLs from the scrape tab into the currently loaded bulk import file. It won't auto-save yet, but that might come later.
 - **Missed run catch-up window**: how late a missed scheduled run can be and still run when the app starts, in minutes. `0` turns catch-up off.
 
-### Kometa settings
+### Local asset settings
 
-- **Save artwork to Kometa asset directory**: save artwork to Kometa's asset directory instead of applying it to Plex, and set **Kometa Asset Directory** to your base asset directory. See [Kometa integration](#kometa-integration).
+- **Save to Kometa asset directory**: save artwork to Kometa's asset directory instead of applying it to Plex, and set **Kometa Asset Directory** to your base asset directory. See [Kometa asset directory](#kometa-asset-directory).
 - **Reset the Overlay tag for Kometa if artwork updated**: lets Kometa reapply its overlays on the next run after new artwork goes up.
 - **Stage assets**: also download assets for TV seasons and episodes not yet in Plex, useful when a scheduled run happens before your automation has downloaded a new season. Doesn't apply to the Specials season (Season 0).
-- **Temp Directory**: an optional directory for test runs with the `--temp` option.
+- **Temp Directory**: an optional directory for test runs with the `--temp` option or the corresponding web UI toggle.
+- **Save as Plex local media assets**: save artwork locally alongside your media files following the Plex local media asset naming convention so that Plex picks up and applies the new assets immediately. See [Plex local media assets](#plex-local-media-assets).
+- **Path mappings**: If Plex and Artwork Uploader see paths to media folders differently, this setting allows you to tell Artwork Uploader which app path corresponds to which Plex path.
 
 ### Authentication settings
 
@@ -225,6 +248,8 @@ Depending on your environment you may need `python3` instead of `python`.
 
 `--no-cache` crawls every page of a ThePosterDB user this run, ignoring the cached index (the index is still refreshed). Handy for forcing a full refresh of one user when **Cache ThePosterDB user pages** is on.
 
+`--port <port-number>` customizes the port number the web app listens at if no other arguments are specified.
+
 All of these options also work in the web UI's scraper tab and in bulk files: just add them after the URL, e.g.
 
 ```
@@ -263,18 +288,110 @@ With **Cache ThePosterDB user pages** on, the app already knows every poster you
 
 Turn on **Enable Sonarr/Radarr webhook**, set a **Webhook token**, and list the ThePosterDB users to apply from (in order of preference) under Webhook settings. Then add a webhook connection in each app:
 
-- **Radarr / Sonarr:** Settings → Connect → + → Webhook. URL `http://<artwork-uploader-host>:4567/webhook/radarr` (or `/webhook/sonarr`), method POST. Tick the "On File Import" and "On File Upgrade" triggers, and no others. An upgrade replaces the file, and without that trigger the new copy can come up in Plex on the stock poster. Send the token as the connection's password, or as a header: click the **Advanced** (cog) button and add a header with key `X-Webhook-Token` and the token as the value. The Test button is acknowledged so you can save the connection.
+- **Radarr / Sonarr:** Settings → Connect → + → Webhook. URL `http://<artwork-uploader-host>:<port-number>/webhook/radarr` (or `/webhook/sonarr`), method POST. Tick the "On File Import" and "On File Upgrade" triggers, and no others. An upgrade replaces the file, and without that trigger the new copy can come up in Plex on the stock poster. Send the token as the connection's password, or as a header: click the **Advanced** (cog) button and add a header with key `X-Webhook-Token` and the token as the value. The Test button is acknowledged so you can save the connection.
 
 On an import, the title is looked up in the cached index. If one of your configured users covers it, that single poster (plus season covers for the imported seasons on TV items) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same. Imports can reach the webhook before Plex has scanned the new file, so the apply retries for a few minutes, then leaves it to the next scheduled run. Ambiguous title matches (same-name remakes, for example) are skipped rather than guessed, and nothing is applied when no configured user has the title. Radarr says which file it imported, and the poster is applied to the Plex item holding that file. So an edition kept in its own folder (`Alien (1979) {edition-35mm Film Scan}` beside `Alien (1979)`) is never mistaken for the plain release, or the other way round. On an upgrade, the item holding the old file is left alone and the apply waits for Plex to scan the new one in. Paths are compared from the movie's folder down, so Radarr and Plex can mount the library at different roots. The endpoints return 404 while the webhook is off.
 
-### Kometa integration
+### Local Assets
 
-Kometa support comes in two flavours:
+Some users prefer to keep offline copies of their custom Plex artwork in order to have a backup for faster recovery in case of disaster. Artwork Uploader for Plex supports two distinct and mutually exclusive ways to save assets locally:
 
-1. **Overlay reset** (the simple one): turn on **Reset the Overlay tag for Kometa if artwork updated** and the app removes Kometa's overlay label when it uploads new artwork, so the next Kometa run reapplies the overlay.
-2. **Asset directory mode**: turn on **Save artwork to Kometa asset directory** and artwork is saved to Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) instead of being applied to Plex. Whenever Kometa runs next, it applies all new or updated artwork with its overlays. Set **Kometa Asset Directory** to your base asset directory.
+#### Plex Local Media Assets
+Turn on **Save as Plex local media assets** and artwork is saved to your media folders right next to your media files. This mode requires Artwork Uploader for Plex to have access to the same media folders as Plex. Depending on your environment, it may require configuring path mappings if Plex and Artwork Uploader see paths differently. In addition, if Artwork Uploder is running as a docker container, you must bind-mount all media folders to the container through the `docker-compose.yml` file. Check the provided [Docker compose example](#docker-recommended) for details.
 
-Asset directory mode assumes:
+In this mode, local media assets must be enabled on every library. Click on the three-dot menu of a media library and choose **Manage Library** > **Edit**. Click on **Advanced**, scroll down and check the **Use local assets** checkbox. Artwork Uploader will automatically refresh the media item so Plex picks up the new asset immediately after saving.
+
+Local media asset mode does not support episode and season asset staging since the season folder or episode media file necessarily has to be present for Artwork Uploader to infer the correct file path and name for the locally saved asset.
+
+<details>
+<summary>Example 1</summary>
+
+You have a Plex server running natively on Windows with two libraries:
+
+- Movies: This library has two root folders:
+  - `D:\Videos\Movies`
+  - `E:\Media\Movies`
+- TV Shows: This library has one root folder:
+  - `F:\Media\TV Shows`
+
+Artwork Uploader is running as a docker container. In your `docker-compose.yml` file you must mount all of these root folders and assign them local container paths:
+
+```yml
+  - volumes:
+    - D:/Videos/Movies:/media/movies_d:rw
+    - E:/Media/Movies:/media/movies_e:rw
+    - F:/Media/TV Shows:/media/tv_f:rw
+```
+
+Since Plex and Artwork Uploader will see fundamentally different paths to the same media file, path mappings must be defined. Path mappings can be defined via de web UI or through the `config.json` file in the following format:
+
+```
+{
+  path_mappings: [
+    {
+      "plex_path": "D:\Videos\Movies",
+      "app_path": "/media/movies_d"
+    },
+    {
+      "plex_path": "E:/Media/Movies",
+      "app_path": "/media/movies_e"
+    },
+    {
+      "plex_path": "F:\Media\TV Shows",
+      "app_path": "/media/tv_f"
+    }
+  ]
+}
+```
+
+Note how the Windows paths can be specified with either back or forward slashes, Artwork Uploader will normalize them to avoid any problem. The container path names are arbitrary, you just have to ensure you use the same paths in the docker bind mounts and the path mappings' `app-path` fields.
+
+When processing a poster for a movie whose location Plex reports as `D:\Videos\Movies\22 Jump Street (2014) {imdb-tt2294449}\22 Jump Street (2014) {imdb-tt2294449} - [Remux-1080p][AAC 2.0][HLG][x265]-TURG.mkv`, Artwork Uploader will translate the path as `/media/movies_d/22 Jump Street (2014) {imdb-tt2294449}` and will save the poster as `/media/movies_d/22 Jump Street (2014) {imdb-tt2294449}/poster.jpg` which through the docker bind mount will land exactly where Plex expects it at `D:\Videos\Movies\22 Jump Street (2014) {imdb-tt2294449}\poster.jpg`.
+</details>
+
+<details>
+<summary>Example 2</summary>
+
+You have a Plex server running as a container in a Linux machine. You have three media locations:
+
+- `/mnt/sda/media/movies`
+- `/mnt/sdb/files/tv1`
+- `/media/anime`
+
+Your Plex server's compose file has the following bind mounts:
+
+```yaml
+  - volumes:
+    - /mnt/sda/media/movies:/media/movies:rw
+    - /mnt/sdb/files/tv1:/media/tv_shows:rw
+    - /media/anime:/media/anime:rw
+```
+
+Plex has three libraries:
+
+- Movies: This library has one root folder:
+  - `/media/movies` # Note
+- TV Shows: This library has one root folder:
+  - `/media/tv_shows`
+- Anime: This library has one root folder:
+  - `/media/anime`
+
+Artwork Uploader is also running as a docker container. In your `docker-compose.yml` file you must mount all these root folders and assign them local container paths:
+
+```yml
+  - volumes:
+    - /mnt/sda/media/movies:/media/movies:rw
+    - /mnt/sdb/files/tv1:/media/tv_shows:rw
+    - /media/tv:/media/tv_shows_2:rw
+```
+
+Since Plex and Artwork Uploader see the exact same paths to each media root folder, no path mappings are required. When Artwork Uploader processes title card for a TV show episode whose location Plex reports as `/media/tv_shows/Ted Lasso (2020) {tmdb-97546}/Season 01/Ted Lasso (2020) - S01E06 [Bluray-2160p h265 HDR10PLUS DTS-ES 5.1]-BAE.mkv`, it will save its corresponding title card as `/media/tv_shows/Ted Lasso (2020) {tmdb-97546}/Season 01/Ted Lasso (2020) - S01E06 [Bluray-2160p h265 HDR10PLUS DTS-ES 5.1]-BAE.png` which is exactly where Plex expects it.
+</details>
+
+#### Kometa Asset Directory
+Turn on **Save to Kometa asset directory** and artwork is saved to Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) following Kometa's asset naming and directory structure convention instead of being applied to Plex. Whenever Kometa runs next, it applies all new or updated artwork with its overlays. Set **Kometa Asset Directory** to your base asset directory. You can optionally specify a **Temp Directory** for test runs.
+
+Kometa asset directory mode assumes:
 
 - `asset_folders` is `true` in Kometa's config.yml, so each show or movie has its own folder
 - `assets_for_all` is `true` in each library
@@ -381,6 +498,8 @@ settings:
 
 </details>
 
+Kometa asset directory mode supports asset staging. This allows Artwork Uploader to download assets for seasons or episodes not yet present in Plex, useful when a scheduled run happens before your automation has downloaded a new season or episode. This setting doesn't apply to the Specials season (Season 0).
+
 Finally, if you're using the asset directory and running in Docker, the app detects it (via the `RUNNING_IN_DOCKER` environment variable) and hardcodes the Kometa base directory to `/assets` and the temp directory to `/temp`. Map your real asset and temp folders to those paths in the container, as in the [Docker compose example](#docker-recommended). Your real paths stay in `config.json`, so running the app outside the container still works too.
 
 ## Screenshots
@@ -464,7 +583,7 @@ If you see the scheduler messages but can't access the web UI:
 2. **Check whether another process is using port 4567**:
    ```bash
    lsof -i :4567
-   # If something is using it, either kill it or change the port in config.json
+   # If something is using it, either kill it or change the port in docker-compose.yml or via the --port argument
    ```
 3. **Try the other local URLs**: `http://localhost:4567`, `http://127.0.0.1:4567`, `http://0.0.0.0:4567`.
 4. **Check firewall settings** to make sure port 4567 isn't blocked.
@@ -483,7 +602,7 @@ Errors like this in your logs:
 
 **"Cannot reach Plex server" or the application hangs on startup**
 
-The app has a 3-second timeout for Plex connections and shows a clear error if it can't connect:
+The app has a customizeable timeout for Plex connections and shows a clear error if it can't connect:
 
 ```
 ======================================================================
@@ -507,6 +626,8 @@ How to fix:
 3. **Check the IP address.** Your Plex server IP might have changed: Plex Web App → Settings → Network → Show Advanced.
 4. **Update the Base URL** in Settings (or `config.json`).
 5. **Firewall/network:** make sure port 32400 isn't blocked.
+
+The timeout can be customized under **Additional Settings** > **Timeouts and Retries** in the web UI or via the `plex_connect_timeout` key in `config.json`.
 
 **"Invalid Plex token or base URL"**
 - Verify your Plex token ([finding your Plex token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)).

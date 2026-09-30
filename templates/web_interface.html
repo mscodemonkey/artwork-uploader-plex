@@ -219,15 +219,14 @@
                                 <div class="card-kometa">
                                     <!-- Kometa settings -->
                                     <div class="p-3 border mt-0 rounded-4 shadow-sm mb-3 mb-lg-0">
-                                        <h5 class="mb-3"><i class="bi bi-download"></i>&ensp;Kometa Settings</h5>
-                                        <div class="form-check form-switch">
+                                        <h5 class="mb-3"><i class="bi bi-download"></i>&ensp;Local Assets</h5>
+                                        <div class="mt-3 form-check form-switch">
                                             <input class="form-check-input" type="checkbox" value="--kometa" id="save_to_kometa"/>
-                                            <label for="save_to_kometa" class="form-check-label">Save artwork to Kometa asset directory</label>
+                                            <label for="save_to_kometa" class="form-check-label">Save to Kometa asset <span class="text-nowrap">directory
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle"
+                                                data-bs-toggle="tooltip" data-bs-title="Saves artwork to the Kometa asset directory instead of applying it directly to your Plex server.
+                                                This setting is mutually exclusive with saving artwork to media folders as local assets." data-bs-custom-class="wide-tooltip"></i></span></label>
                                         </div>
-                                        <div class="form-check form-switch mt-2" style="display: none;">
-                                            <input class="form-check-input" type="checkbox" value="reset_overlay" id="reset_overlay"/>
-                                            <label for="reset_overlay" class="form-check-label">Reset the Overlay tag for Kometa if artwork updated</label>
-                                        </div>                                
                                         <div id="kometa_settings" style="display: none;">
                                             <div class="form-check form-switch mt-2">
                                                 <input class="form-check-input" type="checkbox" value="stage_assets" id="stage_assets"/>
@@ -287,6 +286,33 @@
                                             To change them you must edit your compose file and restart the container.
                                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                         </div>
+                                        <div class="mt-2 form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" value="--local_assets" id="plex_local_assets"/>
+                                            <label for="plex_local_assets" class="form-check-label">Save as Plex local media <span class="text-nowrap">assets
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle"
+                                                data-bs-toggle="tooltip" data-bs-title="Saves artwork as <a href='https://support.plex.tv/articles/200220677-local-media-assets-movies/' target='_blank'>Plex local media assets</a> alongside your media files instead of applying it directly to your
+                                                Plex server. Requires Artwork Uploader to have access to your media folders. It may require defining path mappings if Artwork Uploader and 
+                                                Plex see paths differently. This mode is mutually exclusive with saving to Kometa asset directory and does not support Kometa overlays."
+                                                data-bs-custom-class="wide-tooltip"></i></span></label>
+                                        </div>
+                                        <div id="path-mappings" class="d-none">
+                                            <div class="mt-3 me-2 d-flex justify-content-between">
+                                                <label><i class="bi bi-signpost-split"></i>&ensp;Path <span class="text-nowrap">mappings
+                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle"
+                                                data-bs-toggle="tooltip" data-bs-title="Use the add/remove buttons to create or delete path mappings."></i></span></label>
+                                                <div>
+                                                    <i id="add-mapping" class="bi bi-plus-circle inline-add-btn" title="Add mapping" role="button"></i>
+                                                    <!-- <i id="remove-mapping" class="bi bi-dash-circle inline-add-remove-btn" title="Remove mapping" role="button"></i> -->
+                                                </div>
+                                            </div>
+                                            <!-- Dynamic Path Mapping Rows Container -->
+                                            <div id="path_mappings_container">
+                                                <!-- <div class="mt-3 d-flex justify-content-between gap-2">
+                                                    <input id="plex_path_1" placeholder="Plex path" type="text" class="form-control">
+                                                    <input id="app_path_1" placeholder="App path" type="text" class="form-control">
+                                                </div> -->
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="card-webhook">
@@ -298,7 +324,7 @@
                                             <label for="enable_webhooks" class="form-check-label">Enable Sonarr/Radarr <span class="text-nowrap">webhook
                                                 &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle"
                                                 data-bs-toggle="tooltip" data-bs-title="Allows TPDb artwork from cached user pages to be applied to items 
-                                                or downloaded to the Kometa asset directory immediately after they are imported in Sonarr or Radarr"></i></span></label>
+                                                or downloaded locally immediately after they are imported in Sonarr or Radarr" data-bs-custom-class="wide-tooltip"></i></span></label>
                                         </div>
                                         <div id="webhook_settings" style="display: none;">
                                             <div class="mb-3 mt-3">
@@ -579,7 +605,11 @@
                                 <div class="col-lg-6 mb-0">
                                     <div class="p-3 border rounded-4 shadow-sm">
                                         <h5 class="mb-3"><i class="bi bi-sliders"></i>&ensp;Options</h5>
-                                        <div class="form-check form-switch mb-0">
+                                        <div class="form-check form-switch mt-2" style="display: none;">
+                                            <input class="form-check-input" type="checkbox" value="reset_overlay" id="reset_overlay"/>
+                                            <label for="reset_overlay" class="form-check-label">Reset the Overlay label for Kometa if artwork updated</label>
+                                        </div>                                
+                                        <div class="form-check form-switch mt-2">
                                             <input class="form-check-input" type="checkbox" value="auto_manage" id="auto_manage_bulk_files"/>
                                             <label for="auto_manage_bulk_files" class="form-check-label">Sort and label bulk files automatically</label>
                                         </div>
@@ -660,9 +690,9 @@
                                                 id="plex_connect_timeout" name="plex_connect_timeout" min="1" max="300" value="10" style="width: 60px;" required />
                                             seconds</label>
                                         </div>
-                                        <div class="mt-2 d-flex align-items-center d-none" id="kometa_timeout_container">
+                                        <div class="mt-2 d-flex align-items-center d-none" id="download_timeout_container">
                                             <label for="kometa_download_timeout" class="form-label me-2 mb-0">
-                                            <i class="bi bi-cloud-download"></i>&ensp;Kometa download timeout:
+                                            <i class="bi bi-cloud-download"></i>&ensp;Asset download timeout:
                                             <input type="number" class="form-control form-control-sm text-center d-inline-block me-0 input-monospace"
                                                 id="kometa_download_timeout" name="kometa_download_timeout" min="1" max="300" value="10" style="width: 60px;" required />
                                             seconds</label>

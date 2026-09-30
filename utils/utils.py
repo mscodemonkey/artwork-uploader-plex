@@ -284,6 +284,9 @@ def get_path_parts(path: str) -> list:
     else:
         return PurePosixPath(path).parts
 
+def normalize_path(path:str) -> str:
+    return path.replace("\\", "/")
+
 def get_host_path(container_path: str) -> str:
     """
     Parses /proc/self/mountinfo to find the host path

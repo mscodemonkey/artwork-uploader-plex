@@ -80,7 +80,7 @@ ARTWORK_TYPE_MAP = {
     FileType.SQUARE_ART.value: "Square art",
     FileType.SHOW_COVER.value: "Show cover",
     FileType.MOVIE_POSTER.value: "Poster",
-    FileType.COLLECTION_POSTER.value: "Poster",
+    FileType.COLLECTION_POSTER.value: "Collection poster",
     FileType.SEASON_COVER.value: "Season cover",
     FileType.TITLE_CARD.value: "Title card"
 }

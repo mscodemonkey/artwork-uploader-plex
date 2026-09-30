@@ -86,6 +86,10 @@ class CollectionNotFound(UploadError):
     """A collection was not found for the artwork provided."""
     pass
 
+class CollectionsNotSupported(UploadError):
+    """A collection was not found for the artwork provided."""
+    pass
+
 
 class MovieNotFound(UploadError):
     """A movie was not found for the artwork provided."""

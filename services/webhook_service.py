@@ -107,6 +107,8 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
        Returns a WebhookEvent for an import ("Download") event, the string "test" for the
        connection Test button, or None for any other event type or malformed payload. Never
        raises, so an unexpected payload is acknowledged and ignored rather than erroring."""
+    _debug(f"Parsing webhook event with payload: {payload}")
+
     if not isinstance(payload, dict):
         return None
     event_type = payload.get("eventType")

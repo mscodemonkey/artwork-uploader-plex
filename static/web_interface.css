@@ -310,37 +310,73 @@ h1 {
     transition: transform 0.15s ease, opacity 0.15s ease;
 }
 
+.inline-add-btn,
+.inline-remove-btn {
+    display: inline-block !important;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+    color: #0d6efe;
+}
+
 /* Hover effects */
 @media (hover: hover) {
     .delete-schedule-btn:hover,
     .inline-run-btn:hover,
+    .inline-add-btn:hover,
     .btn-inline-icon:hover {
         opacity: 1;
     }
 
     .delete-schedule-btn:hover,
     .inline-run-btn:hover,
+    .inline-add-btn:hover,
+    .inline-remove-btn:hover,
     .btn-inline-icon:hover i {
         transform: scale(1.15); /* Scales the icon cleanly without affecting position */
+    }
+}
+@media (hover: hover) {
+    .inline-remove-btn:hover {
+        opacity: 1;
+        color: #dc3545;
     }
 }
 
 .delete-schedule-btn:active,
 .inline-run-btn:active,
+.inline-add-btn:active,
 .btn-inline-icon:active {
     opacity: 1;
 }
 
+.inline-remove-btn:active {
+    opacity: 1;
+    color: #dc3545 !important;
+}
+
 .delete-schedule-btn:active,
 .inline-run-btn:active,
+.inline-add-btn:active,
+.inline-remove-btn:active,
 .btn-inline-icon:active i {
     transform: scale(0.90) !important;
     transition: transform 0.1s ease, opacity 0.1s ease;
 }
 
 /* Dark mode color override */
-[data-bs-theme="dark"] .btn-inline-icon {
+[data-bs-theme="dark"] .btn-inline-icon,
+[data-bs-theme="dark"] .inline-add-btn,
+[data-bs-theme="dark"] .inline-remove-btn {
     color: #ffffff !important;
+}
+
+[data-bs-theme="dark"] .inline-remove-btn:active {
+    opacity: 1;
+    color: #dc3545 !important;
+}
+
+[data-bs-theme="dark"] .inline-remove-btn:hover {
+    opacity: 1;
+    color: #dc3545 !important;
 }
 
 /* Generic container for multiple inline input action buttons */

@@ -13,6 +13,7 @@ import argparse
 # --exclude         Specify one or more IDs to exclude from any uploads
 # --year            Override the year for matching (use the year in Plex)
 # --debug           Spits out debugging information
+# --local_assets    Saves artwork locally alongside media files
 # --kometa          Saves artwork to Kometa asset directory (specified in config file) instead of uploading to Plex.
 # --stage           Downloads artwork for seasons and episodes that are not in Plex yet (except Specials).
 # --temp            Uses a temporary directory (specified in config file) instead of the Kometa asset directory.
@@ -32,14 +33,15 @@ def parse_arguments():
     parser.add_argument('--force', action='store_true', help="Force upload/save even if its the same artwork or artwork already exists")
     parser.add_argument('--skip-locked', action='store_true', help="Skip artwork when its target field is locked in Plex (already set), unless --force is used")
     parser.add_argument('--allow-artist-updates', action='store_true', help="Update locked artwork we applied when the same artist has posted a newer version (requires --skip-locked and track_artwork_ids)")
-    parser.add_argument("--filters", nargs='+', help="Only these artwork types will be applied (e.g., title_card, background, square_art, season_cover, show_cover, movie_poster, collection_poster).")
-    parser.add_argument("--exclude", nargs='+', help="Specify one or more IDs to exclude from any uploads.")
+    parser.add_argument("--filters", nargs='+', help="Only these artwork types will be applied (e.g., title_card, background, square_art, season_cover, show_cover, movie_poster, collection_poster)")
+    parser.add_argument("--exclude", nargs='+', help="Specify one or more IDs to exclude from any uploads")
     parser.add_argument("--year", type=int, help="Override the year for matching (use the year in Plex)")
     parser.add_argument("--debug", action='store_true', help="Spits out debugging information")
-    parser.add_argument("--kometa", action='store_true', help="Saves artwork to Kometa asset directory (specified in config file) instead of uploading to Plex.")
-    parser.add_argument("--stage", action='store_true', help="Downloads artwork for seasons and episodes that are not in Plex yet (except Specials).")
-    parser.add_argument("--temp", action='store_true', help="Uses a temporary directory (specified in config file) instead of the Kometa asset directory.")
-    parser.add_argument("--no-cache", action='store_true', help="Ignore the cached ThePosterDB user uploads index for this run and crawl every page (the run still refreshes the index).")
+    parser.add_argument("--local_assets", action='store_true', help="Saves artwork locally alongside media files (may require path mappings via config file if Plex and Artwork Uploader see paths differently)")
+    parser.add_argument("--kometa", action='store_true', help="Saves artwork to Kometa asset directory (specified in config file) instead of uploading to Plex")
+    parser.add_argument("--stage", action='store_true', help="Downloads artwork for seasons and episodes that are not in Plex yet (except Specials)")
+    parser.add_argument("--temp", action='store_true', help="Uses a temporary directory (specified in config file) instead of the Kometa asset directory")
+    parser.add_argument("--no-cache", action='store_true', help="Ignore the cached ThePosterDB user uploads index for this run and crawl every page (the run still refreshes the index)")
     parser.add_argument("--port", type=int, help="Specify port number for web server (default is 4567 if argument omitted)")
 
     return parser.parse_args()

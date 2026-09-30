@@ -371,6 +371,7 @@ def setup_routes(web_app, config: Config):
         if not globals.config.webhook_tpdb_users:
             update_log(Instance(broadcast=True), "📥 Webhook received but no ThePosterDB users are configured (webhook_tpdb_users)")
             return {"status": "no users configured"}, 200
+        update_log(Instance(broadcast=True), "📥 Webhook received and queued for processing")
         globals.webhook_service.enqueue(event)
         return {"status": "queued"}, 200
 
