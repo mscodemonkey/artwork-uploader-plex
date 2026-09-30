@@ -838,7 +838,7 @@ def find_bulk_file(filename: str = None):
     return None
 
 
-def setup_web_sockets():
+def setup_web_sockets(port:int = None):
     """
     Set up Flask routes and Socket.IO handlers.
 
@@ -853,7 +853,7 @@ def setup_web_sockets():
     web_routes.setup_socket_handlers(config, filename_pattern)
 
     # Start the web server
-    web_routes.start_web_server(web_app, DEFAULT_WEB_HOST, DEFAULT_WEB_PORT, globals.debug)
+    web_routes.start_web_server(web_app, DEFAULT_WEB_HOST, port or DEFAULT_WEB_PORT, globals.debug)
 
 def check_image_orientation(image_path):
     """Check image orientation using ImageService."""
@@ -1121,7 +1121,8 @@ if __name__ == "__main__":
         kometa=args.kometa,
         stage=args.stage,
         temp=args.temp,
-        no_cache=args.no_cache
+        no_cache=args.no_cache,
+        port=args.port
     )  # Arguments per url to process
 
     # Create config as a global object
@@ -1342,5 +1343,5 @@ if __name__ == "__main__":
 
             globals.update_service.start_periodic_check(on_update_available)
 
-            setup_web_sockets()
+            setup_web_sockets(cli_options.port)
 

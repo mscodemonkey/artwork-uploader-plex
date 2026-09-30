@@ -1824,7 +1824,7 @@ def start_web_server(web_app, web_host: str, web_port: int, debug: bool = False)
         web_port: Port to bind to
         debug: Whether to run in debug mode
     """
-    debug_me("Initiating web server")
+    debug_me(f"Initiating web server on port {web_port}")
     flask.cli.show_server_banner = lambda *args: None
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
