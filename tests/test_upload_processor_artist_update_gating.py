@@ -18,6 +18,7 @@ class _Config:
         self.track_artwork_ids = track_artwork_ids
         self.allow_artist_updates = allow_artist_updates
         self.save_to_kometa = False
+        self.plex_local_assets = False
         self.skip_locked_artwork = True
 
 
