@@ -27,6 +27,7 @@ class Options:
         exclude: List of artwork IDs to skip
         year: Override year for Plex matching
         add_to_bulk: Add successfully processed URLs to bulk file
+        port: Port number for web server (default is 4567)
     """
 
     add_posters: bool = False
@@ -42,6 +43,7 @@ class Options:
     exclude: Optional[List[str]] = None
     year: Optional[int] = None
     add_to_bulk: bool = False
+    port: Optional[int] = None
 
     def has_filter(self, filter_type: str) -> bool:
         """Check if a specific filter type is enabled."""
