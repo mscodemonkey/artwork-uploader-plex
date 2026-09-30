@@ -1246,7 +1246,12 @@ function getCanonicalConfig(config) {
         if (Array.isArray(config[key])) {
             // Sort lists so that list order changes don't trigger a config 
             // changed state where the buttons get enabled unnecessarily
-            result[key] = [...config[key]].sort()
+            // except for the webhook TPDb users where order matters
+            if (key != "webhook_tpdb_users") {
+                result[key] = [...config[key]].sort()
+            } else {
+                result[key] = config[key]
+            }
         } else {
             result[key] = config[key]
         }

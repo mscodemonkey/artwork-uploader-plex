@@ -940,9 +940,10 @@ def setup_socket_handlers(
                 if isinstance(new_config_dict[key], list):
                     if len(new_config_dict[key]) > 0 and len(current_config_dict[key]) > 0 and isinstance(new_config_dict[key][0], str):
                         new_list_to_compare = new_config_dict[key]
-                        new_list_to_compare.sort()
                         current_list_to_compare = current_config_dict[key]
-                        current_list_to_compare.sort()
+                        if key != "webhook_tpdb_users":
+                            new_list_to_compare.sort()
+                            current_list_to_compare.sort()
                         config_changed = config_changed or new_list_to_compare != current_list_to_compare
                     elif len(new_config_dict[key]) != len(current_config_dict[key]):
                         config_changed = True
