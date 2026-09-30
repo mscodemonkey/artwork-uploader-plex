@@ -139,19 +139,13 @@ class PlexLibraryIndex:
                 # the item doesn't have (e.g. originalTitle on most items) makes plexapi reload the
                 # item, which would be one extra request per library item
                 item._autoReload = False
-                tmdb_id: Optional[int] = None
-                for guid in item.guids:
-                    if "tmdb://" in guid.id:
-                        try:
-                            tmdb_id = int(guid.id.split("tmdb://", 1)[-1])
-                        except ValueError:
-                            pass
-                        break
                 entry = {
                     "title": item.title,
                     "year": item.year,
-                    "tmdb_id": tmdb_id,
-                    "type": MediaType.TV_SHOW.value if library.type == "show" else MediaType.MOVIE.value
+                    "tmdb_id": self._tmdb_id_from_guids(item.guids),
+                    "type": MediaType.TV_SHOW.value if library.type == "show" else MediaType.MOVIE.value,
+                    "rating_key": item.ratingKey,
+                    "library": library.title
                 }
                 for key in self._title_keys(item):
                     self.index[library.title].setdefault(key, []).append(entry)
@@ -160,6 +154,35 @@ class PlexLibraryIndex:
             return True
 
         return False
+
+    @staticmethod
+    def _tmdb_id_from_guids(guids) -> Optional[int]:
+        for guid in guids:
+            if "tmdb://" in guid.id:
+                try:
+                    return int(guid.id.split("tmdb://", 1)[-1])
+                except ValueError:
+                    return None
+        return None
+
+    def _refresh_entry(self, entry: Dict) -> None:
+        """Read an entry's guids from Plex again.
+
+        Plex creates a new item a few seconds before its agent match lands, so an index built in
+        that window holds the item with no TMDb ID. The library snapshot is already final by then
+        (same count, same newest item), so nothing would rebuild the entry until the index expires.
+        A lookup that lands on an entry with no ID asks Plex for that one item instead."""
+        library = next(
+            (lib for lib in self.movie_libraries + self.tv_libraries if lib.title == entry.get("library")),
+            None
+        )
+        if library is None or entry.get("rating_key") is None:
+            return
+        try:
+            item = library.fetchItem(int(entry["rating_key"]))
+            entry["tmdb_id"] = self._tmdb_id_from_guids(item.guids)
+        except Exception as e:
+            debug_me(f"Could not refresh '{entry.get('title')} ({entry.get('year')})' from {library.title}: {e}")
 
     def _title_keys(self, item) -> set:
         """All the normalized keys an item should be findable under."""
@@ -204,7 +227,12 @@ class PlexLibraryIndex:
         # If multiple items have been found by title/year but they all have the same TMDb ID (same item across multiple libraries),
         # or if a single item has been matched by title/year, even if it has no TMDb ID, then we have a match
         if len(tmdb_ids) == 1 or len(matched) == 1:
-            match = next(item for item in matched)
+            match = next((item for item in matched if item.get("tmdb_id") is not None), matched[0])
+            if match.get("tmdb_id") is None:
+                # Indexed before Plex had matched the item, or never matched at all. Ask Plex for
+                # this one item first, because a match with no TMDb ID cannot be looked up by guid
+                # and reads downstream as "not on Plex".
+                self._refresh_entry(match)
             return "matched", match
 
         # If multiple items have been returned with differing TMDb IDs then we have an ambiguous match
