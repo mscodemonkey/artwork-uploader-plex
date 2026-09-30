@@ -574,14 +574,15 @@ def test_an_upgrade_waits_for_plex_to_scan_the_new_file(edition_library, history
 
 
 @pytest.mark.unit
-def test_an_import_with_no_path_applies_to_the_first_row_with_the_guid(edition_library, history):
+def test_an_import_with_no_path_applies_to_every_row_with_the_guid(edition_library, history):
     event = parse_event({"eventType": "Download",
                          "movie": {"title": "Alien", "year": 1979, "tmdbId": 348}})
 
     WebhookService()._attempt(event, WebhookService._dedupe_key(event), _now(), _tally())
 
-    assert history.get_runs()[0]["locked_count"] == 1
-    assert edition_library.plain.uploaded == []
+    assert history.get_runs()[0]["locked_count"] == 1       # the locked edition is skipped
+    assert len(edition_library.plain.uploaded) == 1         # the plain release is not masked by it
+    assert edition_library.edition.uploaded == []
 
 
 def _row(*files):
