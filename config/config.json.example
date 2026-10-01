@@ -8,6 +8,12 @@
     "token": "YOUR_PLEX_TOKEN_HERE",
     "_token_help": "Your Plex authentication token. Find it at: https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/",
 
+    "plex_local_assets": false,
+    "_plex_local_assets": "Saves assets locally alongside your media files following the Plex local media assets convention",
+
+    "path_mappings": [],
+    "_path_mappings": "List of path mappings in the format { 'plex_path': '/plex/path', 'app_path': '/app/path' } in case Plex and Artwork Uploader don't see the same paths to the media folders (only used if plex_local_assets is set to true). Best configured through the web UI",
+
     "bulk_txt": "bulk_import.txt",
     "_bulk_txt_help": "Default filename for bulk import operations",
 
@@ -18,20 +24,21 @@
     "_movie_library_help": "List of movie library names in Plex. Can be a single string or array of strings",
 
     "mediux_filters": [
-        "title_card",
         "background",
+        "collection_poster",
+        "movie_poster",
         "season_cover",
         "show_cover",
-        "movie_poster",
-        "collection_poster"
+        "square_art",
+        "title_card"
     ],
     "_mediux_filters_help": "Default artwork types to process from MediUX. Remove types you don't want to upload",
 
     "tpdb_filters": [
-        "season_cover",
-        "show_cover",
+        "collection_poster",
         "movie_poster",
-        "collection_poster"
+        "season_cover",
+        "show_cover"
     ],
     "_tpdb_filters_help": "Default artwork types to process from ThePosterDB. Remove types you don't want to upload",
 
@@ -50,6 +57,21 @@
     "track_artwork_ids": true,
     "_track_artwork_ids_help": "Use Plex labels to track uploaded artwork and prevent duplicate uploads",
 
+    "skip_locked_artwork": false,
+    "_skip_locked_artwork": "Skips artwork that is locked in Plex, typically when it was been set manually by a user",
+
+    "local_library_matching": false,
+    "_local_library_matching": "Matches TPDb artwork against your local library without issuing a web request to fetch the TMDb ID for faster processing (can be less reliable)",
+
+    "allow_artist_updates": false,
+    "_allow_artist_updates": "Allow replacing an artist's assets if newer versiones are posted (TPDb only)", 
+
+    "cache_user_scrapes": true,
+    "_cache_user_scrapes": "Keeps a persistent cache in a SQLite database of TPDb user page scrapes so that periodic scrapes of large user portfolios are much faster (TPDb only)",
+
+    "user_cache_refresh_days": 30,
+    "_user_cache_refresh_days": "How often to refresh the user cache",
+    
     "auto_manage_bulk_files": true,
     "_auto_manage_bulk_files_help": "Automatically organize bulk import files after processing",
 
@@ -59,14 +81,59 @@
     "schedules": [],
     "_schedules_help": "Scheduled bulk import jobs. Configure through the web UI",
 
+    "catch_up_window_minutes": 30,
+    "_catch_up_window_minutes": "If the app was not running when a scheduled bulk import was due, run it on startup as long as it's within this many minutes of when it was due (set to 0 to leave missed runs skipped)",
+
+    "auth_enabled": false,
+    "_auth_enabled": "Enable or disable basic username/password authentication (configure via web UI)",
+
+    "auth_username": "",
+    "_auth_username": "Username",
+
+    "auth_password_hash": "",
+    "_auth_password_hash": "This field is automatically populated when enabling authentication via the web UI",
+
+    "oidc_enabled": false,
+    "_oidc_enabled": "Enable or disable single sign-on via an Open ID Connect (OIDC) authentication provider",
+
+    "oidc_label": "",
+    "_oidc_label": "Name of your OIDC provider used to customize the login button in the web UI",
+    
+    "oidc_issuer": "https://auth.example.com",
+    "_oidc_issuer": "URL of your OIDC provider (must use https)",
+
+    "oidc_client_id": "",
+    "_oidc_client_id": "Artwork Uploader's client ID on the OIDC provider",
+
+    "oidc_client_secret": "",
+    "_oidc_client_secret": "Artwork Uploader's client secret (must be created at the OIDC provider)",
+    
+    "oidc_scopes": ["email", "groups", "openid", "profile"],
+    "oidc_scopes": "List of OIDC scopes to fetch",
+
+    "oidc_groups_claim": "groups",
+    "_oidc_groups_claim": "Name of the claim that carries group membership for users (this is typically 'groups')",
+
+    "oidc_allowed_groups": [],
+    "_oidc_allowed_groups": "List of allowed OIDC groups",
+
+    "external_url": "https://artwork-uploader.example.com",
+    "_external_url": "Artwork Uploader's external URL (must be https)",
+
     "apprise_urls": [],
     "_apprise_urls_help": "List of notification channels, each {\"url\": <Apprise URL>, \"events\": [<event names>]}. Configure through the web UI",
 
+    "enable_webhooks": false,
+    "_enable_webhooks": "Enable the Sonarr/Radarr webhook to automatically fetch artwork when new media is imported",
+
+    "webhook_tpdb_users": [],
+    "_webhook_tpdb_users": "List of TPDb users to fetch artwork from when a webhook event is received, in order of preference",
+
+    "webhook_apply_delay": 30,
+    "_webhook_apply_delay": "Time to wait (seconds) before fetching artwork, to give Plex time to scan the new item in",
+
     "plex_connect_timeout": 10,
     "_plex_connect_timeout_help": "Seconds to wait when connecting to the Plex server (also applies to uploads)",
-
-    "plex_test_connection_timeout": 5,
-    "_plex_test_connection_timeout_help": "Seconds to wait when testing a Plex connection from the web settings",
 
     "kometa_download_timeout": 5,
     "_kometa_download_timeout_help": "Seconds to wait when downloading artwork to save to the Kometa asset directory",
