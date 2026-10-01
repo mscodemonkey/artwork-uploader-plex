@@ -1385,8 +1385,12 @@ def setup_socket_handlers(
             decoded_chunk = base64.b64decode(chunk_data)
             upload_chunks[file_name]["temp_file"].write(decoded_chunk)
             upload_chunks[file_name]["chunks_received"] += 1
-            percent = (progress_MB * 100 / total_size).__round__(2)
-            current_rate = ((progress_MB * 1000) / (current_time - start_time)).__round__(2)
+            percent = (progress_MB * 100 / total_size).__round__(2) if total_size else 0.0
+            # Browsers coarsen performance.now() (Firefox to 1 ms), so the first chunk can carry
+            # identical timestamps; a zero interval must not turn into a swallowed exception
+            # that leaves the chunk unacknowledged.
+            elapsed_ms = current_time - start_time
+            current_rate = ((progress_MB * 1000) / elapsed_ms).__round__(2) if elapsed_ms > 0 else 0.0
             message = f"{file_name} • {progress_MB} MB of {total_size} MB • {current_rate} MB/s"
             notify_web(instance, "progress_bar", { "percent": percent, "message": message, "bar_speed": bar_speed}, silent=True )
                 
