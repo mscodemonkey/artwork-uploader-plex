@@ -64,6 +64,7 @@ It started life as a fork of Brian Brown's [plex-poster-set-helper](https://gith
 - Auto-managed bulk files: let the app add, label and sort URLs for you.
 
 **Local Assets**
+
 Some users like to keep offline copies of their custom artwork. Artwork Uploader for Plex supports two distinct ways to do this:
 - Plex local media assets: Saves the assets to your media folders right next to your media files, following Plex's [local media assets](https://support.plex.tv/articles/200220677-local-media-assets-movies/) naming convention so they are immediately picked up and applied by Plex. See [Plex local assets](#plex-local-media-assets).
 - Kometa asset directory: Saves the assets to your Kometa asset directory, allowing Kometa to do any custom processing (like applying overlays) and apply them to Plex. See [Kometa asset directory](#kometa-asset-directory).
@@ -139,7 +140,7 @@ pip install -r requirements.txt
 python artwork_uploader.py
 ```
 
-With no arguments, Artwork Uploader starts a web server on port 4567 (this may change!). If you get dependency errors, you're probably not using the virtual environment. See [Troubleshooting](#troubleshooting).
+With no arguments, Artwork Uploader starts a web server on port 4567. You can customize the port number with the `--port <port-numer>` argument. If you get dependency errors, you're probably not using the virtual environment. See [Troubleshooting](#troubleshooting).
 
 ## Settings
 
