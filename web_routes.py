@@ -79,6 +79,15 @@ def setup_routes(web_app, config: Config):
         config: Configuration object
     """
 
+    @web_app.route("/api/health", methods=["GET"])
+    def health_report():
+        """Public healthcheck endpoint"""
+        return jsonify({
+            "status": "healthy",
+            "timestamp": datetime.now().isoformat(),
+            "version": __version__
+        })
+    
     @web_app.route("/api/auth/status", methods=["GET"])
     def auth_status():
         """Public endpoint to check which authentication methods are enabled."""

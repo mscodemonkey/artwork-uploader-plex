@@ -23,5 +23,9 @@ EXPOSE 4567
 # Declare volume for bulk imports
 VOLUME ["/artwork-uploader/bulk_imports"]
 
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:4567/api/health').getcode() == 200 else 1)"
+
 # Run application
 ENTRYPOINT ["python", "artwork_uploader.py"]
