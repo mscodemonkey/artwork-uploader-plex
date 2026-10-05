@@ -371,7 +371,7 @@ Your Plex server's compose file has the following bind mounts:
 Plex has three libraries:
 
 - Movies: This library has one root folder:
-  - `/media/movies` # Note
+  - `/media/movies`
 - TV Shows: This library has one root folder:
   - `/media/tv_shows`
 - Anime: This library has one root folder:
