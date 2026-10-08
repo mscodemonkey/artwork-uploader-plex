@@ -440,6 +440,7 @@ class UploadProcessor:
 
                         if locally_matched:
                             saver.confirm_match = lambda a=artwork, item=tv_show: self._artwork_matches_item(a, item, "tv")
+                        
                         result = saver.save_to_kometa()
 
                         if self.local_assets and upload_target and (result.startswith("✅") or result.startswith("♻️")):

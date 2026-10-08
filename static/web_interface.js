@@ -1226,7 +1226,7 @@ document.getElementById("save_config_button").addEventListener("click", async fu
     // Form is valid: make sure highlights are cleared if user successfully saves
     const tvLibraries = tvPicker ? tvPicker.getValue() : [];
     const movieLibraries = moviePicker ? moviePicker.getValue() : [];
-
+    
     if (tvLibraries.length + movieLibraries.length > 0) {
         form.classList.remove("was-validated");
         saveConfig();
@@ -1286,6 +1286,18 @@ function getCurrentConfigForm() {
 
     // Checkbox for saving artwork to Kometa asset directory
     current_form.save_to_kometa = document.getElementById("save_to_kometa").checked;
+
+    // Kometa config directory
+    current_form.kometa_config_path = document.getElementById("kometa_config_path").value;
+    
+    // Kometa container name
+    current_form.kometa_container_name = document.getElementById("kometa_container_name").value;
+    
+    // Kometa debounce
+    current_form.kometa_debounce = parseInt(document.getElementById("kometa_debounce").value) || 10;
+
+    // Checkbox for Kometa auto run if assets updated
+    current_form.kometa_auto_run = document.getElementById("kometa_auto_run").checked;
 
     // Checkbox for staging assets
     current_form.stage_assets = document.getElementById("stage_assets").checked;
@@ -1469,6 +1481,11 @@ function updateConfigUI(config) {
     
     document.getElementById("track_artwork_ids").checked = config.track_artwork_ids;
     document.getElementById("save_to_kometa").checked = config.save_to_kometa;
+    document.getElementById("kometa_auto_run").checked = config.kometa_auto_run;
+    document.getElementById("kometa_config_path").value = config.kometa_config_path;
+    document.getElementById("kometa_container_name").value = config.kometa_container_name;
+    document.getElementById("kometa_debounce").value = config.kometa_debounce ?? 10;
+    console.log(`Obtained kometa_debounce as ${config.kometa_debounce}`)
     document.getElementById("stage_assets").checked = config.stage_assets;
     document.getElementById("kometa_base").value = config.kometa_base;
     document.getElementById("temp_dir").value = config.temp_dir || "";
@@ -1547,6 +1564,9 @@ function updateConfigUI(config) {
     
     // Toggle Kometa settings visibility
     toggleKometaSettings();
+
+    // Toggle Kometa autorun settings visibility
+    toggletKometaAutoRunSettings();
     
     // Toggle Add to Bulk checkbox visibility
     toggleAddToBulkCheckbox();
@@ -1619,6 +1639,8 @@ function loadConfig(silent=false, restore=false) {
                 updateStatus("Configuration restored successfully", "success", false, false, "check2-circle");
                 const passwordField = document.getElementById("auth_password");
                 if (passwordField) passwordField.value = '';
+                const form = document.getElementById("config_form");
+                form.classList.remove("was-validated");
             }
         }
     });
@@ -3566,6 +3588,7 @@ function toggleKometaSettings() {
     const kometaSettings = document.getElementById("kometa_settings");
     const kometaBase = document.getElementById("kometa_base");
     const dockerWarning = document.getElementById("docker_warning");
+    const autoRun = document.getElementById("kometa_auto_run");
 
     if (saveToKometa) {
         plexLocalAssets.checked = false;
@@ -3591,6 +3614,7 @@ function toggleKometaSettings() {
             dockerWarning.classList.add("d-none");
         }
         kometaSettings.style.display = "none";
+        autoRun.checked = false;
         if (kometaBase) {
             kometaBase.required = false;
             // Clear invalid styling when hiding
@@ -3604,6 +3628,7 @@ function toggleKometaSettings() {
     toggleScraperStageCheckbox();
     toggleSkipLockedCheckbox();
     toggleKometaLabels();
+    toggletKometaAutoRunSettings();
 }
 
 function toggleKometaLabels() {
@@ -3746,6 +3771,9 @@ function togglePlexOptions() {
 
 // Add event listener for save_to_kometa checkbox
 document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);
+
+// Add event listener for kometa_auto_run checkbox
+document.getElementById("kometa_auto_run").addEventListener("change", toggletKometaAutoRunSettings);
 
 // Add event listener for plex_Local_assets checkbox
 document.getElementById("plex_local_assets").addEventListener("change", togglePathMappings);
@@ -4109,3 +4137,20 @@ document.querySelectorAll(".link-to-filters").forEach(el => el.addEventListener(
     bootstrap.Tab.getOrCreateInstance(mainTab).show();
     bootstrap.Tab.getOrCreateInstance(subTab).show();
 }));
+
+function toggletKometaAutoRunSettings() {
+    const autoRun = document.getElementById("kometa_auto_run").checked;
+    const autoRunSettings = document.getElementById("auto_run_settings");
+    const configDir = document.getElementById("kometa_config_path");
+    const containerName = document.getElementById("kometa_container_name");
+
+    if (autoRun) {
+        autoRunSettings.classList.remove("d-none");
+        configDir.required = true;
+        containerName.required = true;
+    } else {
+        autoRunSettings.classList.add("d-none");
+        configDir.required = false;
+        containerName.required = false;
+    }
+}

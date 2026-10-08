@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Callable
+from typing import Optional, Callable, Set, Dict, Union, List
 
 from core.enums import RunOutcome
 
@@ -23,6 +23,7 @@ class ProcessingCallbacks:
     cached_counter: list = field(default_factory=lambda: [0])  # Mutable list to track assets newly added to the user cache (contains count as single element)
     locked_counter: list = field(default_factory=lambda: [0])  # Mutable list to track artwork skipped because the Plex field was locked (contains count as single element)
     failed_counter: list = field(default_factory=lambda: [0])  # Mutable list to track uploads that failed after exhausting their retries (contains count as single element)
+    updated_asset_map: Dict[str, Dict[int, str]] = field(default_factory=dict)
 
     def status(self, message: str, color: str = "info", spinner: bool = False, sticky: bool = False):
         if self.on_status_update:
@@ -60,7 +61,7 @@ class ProcessingCallbacks:
         if self.failed_counter:
             self.failed_counter[0] += count
 
-    def record_result(self, result: str) -> Optional[str]:
+    def record_result(self, result: str, artwork: str = None, library: str = None, kometa: bool = False) -> Optional[str]:
         """Count one upload result and say what it was.
 
         The uploader and the Kometa saver both report what happened as a prefixed
@@ -69,6 +70,12 @@ class ProcessingCallbacks:
         self.assets(1)
         if result.startswith('✅') or result.startswith('♻️'):
             self.success(1)
+            if kometa:
+                tmdb_id = int(artwork.get('tmdb_id', 0))
+                title = f"{artwork.get('title', '')} ({artwork.get('year', '0000')})"
+                if library not in self.updated_asset_map:
+                    self.updated_asset_map[library] = {}
+                self.updated_asset_map[library][tmdb_id] = title
             return "success"
         if result.startswith('🔒'):
             self.locked(1)

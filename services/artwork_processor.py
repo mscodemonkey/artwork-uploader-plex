@@ -53,6 +53,8 @@ class ArtworkProcessor:
             PlexConnectorException: If Plex connection fails
             ScraperException: If scraping fails
         """
+        kometa = (options.kometa or globals.config.save_to_kometa) and not options.temp
+
         # Check Plex connection
         try:
             self.plex.connect()
@@ -114,7 +116,8 @@ class ArtworkProcessor:
             n += 1
             self._process_single_artwork(
                 artwork,
-                processor.process_collection_artwork
+                processor.process_collection_artwork,
+                kometa
             )
 
         # Process movies
@@ -129,7 +132,8 @@ class ArtworkProcessor:
             n += 1
             self._process_single_artwork(
                 artwork,
-                processor.process_movie_artwork
+                processor.process_movie_artwork,
+                kometa
             )
 
         # Process TV shows
@@ -144,7 +148,8 @@ class ArtworkProcessor:
             n += 1
             self._process_single_artwork(
                 artwork,
-                processor.process_tv_artwork
+                processor.process_tv_artwork,
+                kometa
             )
 
         end_time = time.time()
@@ -179,6 +184,7 @@ class ArtworkProcessor:
         self,
         artwork: dict,
         process_func: Callable[[dict], str],
+        kometa: bool = False
     ) -> None:
         """
         Process a single piece of artwork with error handling.
@@ -194,7 +200,10 @@ class ArtworkProcessor:
 
             # Log the result
             for result in results:
-                self.callbacks.record_result(result)
+                library = ''
+                if result.startswith("✅") or result.startswith("♻️"):
+                    library = result.split(" in ")[-1].strip()
+                self.callbacks.record_result(result, artwork, library, kometa)
                 self.callbacks.log(result)
 
         except CollectionNotFound as e:

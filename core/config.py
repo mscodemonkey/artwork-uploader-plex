@@ -139,6 +139,10 @@ class Config:
         self.kometa_base: str = ""
         self.temp_dir: str = ""
         self.save_to_kometa: bool = False
+        self.kometa_auto_run: bool = False
+        self.kometa_config_path: str = ""
+        self.kometa_container_name: str = None
+        self.kometa_debounce: float = 10
         self.stage_assets: bool = False
         self.track_artwork_ids: bool = True
         self.skip_locked_artwork: bool = False
@@ -200,6 +204,10 @@ class Config:
                 self.kometa_base = config.get("kometa_base", "")
                 self.temp_dir = config.get("temp_dir", "")
             self.save_to_kometa = config.get("save_to_kometa", False)
+            self.kometa_auto_run = config.get("kometa_auto_run", False)
+            self.kometa_config_path = config.get("kometa_config_path", "")
+            self.kometa_container_name = config.get("kometa_container_name", None)
+            self.kometa_debounce = float(config.get("kometa_debounce", 10))
             self.stage_assets = config.get("stage_assets", True)
             self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
             self.track_artwork_ids = config.get("track_artwork_ids", True)
@@ -279,6 +287,10 @@ class Config:
             "kometa_base": "",
             "temp_dir": "",
             "save_to_kometa": False,
+            "kometa_auto_run": False,
+            "kometa_config_path": "",
+            "kometa_container_name": None,
+            "kometa_debounce": 10,
             "stage_assets": False,
             "track_artwork_ids": True,
             "skip_locked_artwork": False,
@@ -344,6 +356,10 @@ class Config:
             "kometa_base": self.kometa_base,
             "temp_dir": self.temp_dir,
             "save_to_kometa": self.save_to_kometa,
+            "kometa_auto_run": self.kometa_auto_run,
+            "kometa_config_path": self.kometa_config_path,
+            "kometa_container_name": self.kometa_container_name,
+            "kometa_debounce": self.kometa_debounce,
             "stage_assets": self.stage_assets,
             "bulk_txt": self.bulk_txt,
             "track_artwork_ids": self.track_artwork_ids,

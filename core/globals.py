@@ -7,6 +7,7 @@ web_socket = None  # SocketIO instance
 debug = False  # Debug mode
 plex = None  # Plex connector
 docker: bool = False # Running in Docker
+kometa_runner = None
 
 # Services (initialized in main)
 bulk_file_service = None

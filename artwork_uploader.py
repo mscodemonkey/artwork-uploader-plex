@@ -61,6 +61,7 @@ from services.artwork_processor import ArtworkProcessor
 from services.scheduler_service import SchedulerService, BulkSchedule
 from models.callbacks import ProcessingCallbacks
 from services.update_service import UpdateService
+from kometa.kometa_runner import KometaRunner
 
 
 # ----------------------------------------------
@@ -302,6 +303,13 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
             globals.scrape_type = "stopped"
 
+        if tally.updated_asset_map and globals.kometa_runner:
+            debug_me(f"Enqueueing {len(tally.updated_asset_map)} libraries for targeted Kometa update...")
+            globals.kometa_runner.enqueue(tally.updated_asset_map)
+        else:
+            debug_me("DSAHGDKJHAGSDJHGASJDGASJHDGJHASGDHGASJDGAJHSGDJHGASJHGDJHAGSJDHGJHAGSHJGDJHGSGD")
+
+
 def run_bulk_import_scrape_in_thread(
         instance: Instance,
         web_list = None,
@@ -334,6 +342,7 @@ def run_bulk_import_scrape_in_thread(
             except InvalidFlag as e:
                 update_log(instance, f"❌ One or more invalid flags found in bulk import file '{filename}', line {n}: {str(e)}")
                 continue
+
     if len(parsed_urls) == 0:
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         now = datetime.now(timezone.utc).isoformat()
@@ -464,7 +473,7 @@ def process_bulk_import_from_ui(
                     },
                     tally=tally
                 )
-                #time.sleep(1)
+
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
                 debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}")
@@ -571,6 +580,18 @@ def process_bulk_import_from_ui(
             notify_web(instance, "scrape_state", {"running": False, "type": globals.scrape_type})
             globals.scrape_type = "stopped"
         globals.bulk_import_lock.release()
+        if tally.updated_asset_map and globals.kometa_runner:
+            debug_me(f"Enqueueing {len(tally.updated_asset_map)} libraries for targeted Kometa update...")
+            globals.kometa_runner.enqueue(tally.updated_asset_map)
+        else:
+            debug_me("DSAHGDKJHAGSDJHGASJDGASJHDGJHASGDHGASJDGAJHSGDJHGASJHGDJHAGSJDHGJHAGSHJGDJHGSGD")
+            # for library in tally.updated_asset_map:
+            #     media_items = tally.updated_asset_map[library]
+            #     debug_me(f"Found {len(media_items)} items to update in {library}")
+            #     for tmdb_id, title in media_items.items():
+            #         debug_me(f"• Title: {title}, TMDb ID: {tmdb_id}")
+                
+
 
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
 def scrape_and_upload(
@@ -1130,6 +1151,7 @@ if __name__ == "__main__":
     config = Config()
     globals.config = config  # Also store in globals for cross-module access
 
+
     # Load the config from the config.json file
     try:
         config.load()
@@ -1137,6 +1159,9 @@ if __name__ == "__main__":
         sys.exit("Can't load config.json file.  Please check that the file exists and is in the correct format.")
     except Exception as config_load_exception:
         sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
+    
+    if config.kometa_auto_run:
+        globals.kometa_runner = KometaRunner()
 
     # Create services
     globals.bulk_file_service = BulkFileService(get_exe_dir())
