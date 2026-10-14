@@ -174,46 +174,111 @@
                         <!-- General Tab -->
                         <div class="tab-pane fade show active" id="subtab-general" role="tabpanel">
                             <div class="settings-grid">
-                                <div class="card-plex">
-                                    <!-- Plex settings -->
-                                    <div class="p-3 border rounded-4 shadow-sm mb-3 mb-lg-0">
-                                        <h5 class="mb-3"><i class="bi bi-film"></i>&ensp;Plex Server Settings</h5>
-                                        <div class="mb-3">
-                                            <label for="plex_base_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Base URL</label>
-                                            <input type="url" id="plex_base_url" name="plex_base_url" class="form-control" required
-                                                placeholder="https://plex.example.com"
-                                                pattern="https?:\/\/([a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?"
-                                                title="Please enter a valid URL (e.g., https://plex.example.com)"
-                                                spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
-                                            <div class="invalid-feedback">
-                                                Please provide a valid Plex base URL.
+                                <div class="settings-left-col">
+                                    <div class="card-plex">
+                                        <!-- Plex settings -->
+                                        <div class="p-3 border rounded-4 shadow-sm mb-3 mb-lg-0">
+                                            <h5 class="mb-3"><i class="bi bi-film"></i>&ensp;Plex Server Settings</h5>
+                                            <div class="mb-3">
+                                                <label for="plex_base_url" class="form-label"><i class="bi bi-link-45deg"></i>&ensp;Base URL</label>
+                                                <input type="url" id="plex_base_url" name="plex_base_url" class="form-control" required
+                                                    placeholder="https://plex.example.com"
+                                                    pattern="https?:\/\/([a-zA-Z0-9\-]+(\.[a-zA-Z0-9\-]+)*|(\d{1,3}(\.\d{1,3}){3}))(:\d+)?(\/.*)?"
+                                                    title="Please enter a valid URL (e.g., https://plex.example.com)"
+                                                    spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off">
+                                                <div class="invalid-feedback">
+                                                    Please provide a valid Plex base URL.
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="plex_token" class="form-label"><i class="bi bi-key"></i>&ensp;Authentication <span class="text-nowrap">Token
+                                                    &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true"
+                                                    data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i></span></label>
+                                                <div class="position-relative">
+                                                    <input type="password" id="plex_token" name="plex_token" class="form-control input-monospace pe-5 has-inline-btn" required pattern="[A-Za-z0-9_\-]{20,40}"
+                                                        title="Plex token should be a 20+ character string with letters, digits, dashes or underscores."
+                                                        spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" 
+                                                        data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
+                                                    <button type="button" class="btn-inline-icon toggle-password-btn" data-target="plex_token" title="Show token">
+                                                        <i class="bi bi-eye"></i>
+                                                    </button>
+                                                </div>
+                                                <div class="invalid-feedback">
+                                                    Please provide a valid Plex token.
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="tv_library" class="form-label"><i class="bi bi-tv"></i>&ensp;TV Libraries</label>
+                                                <select id="tv_library" name="tv_library" multiple placeholder="Click to add..."></select>
+                                            </div>
+                                            <div class="mb-0">
+                                                <label for="movie_library" class="form-label"><i class="bi bi-camera-reels"></i>&ensp;Movie Libraries</label>
+                                                <select id="movie_library" name="movie_library" multiple placeholder="Click to add..."></select>
                                             </div>
                                         </div>
-                                        <div class="mb-3">
-                                            <label for="plex_token" class="form-label"><i class="bi bi-key"></i>&ensp;Authentication <span class="text-nowrap">Token
-                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-html="true"
-                                                data-bs-title="Check the <a href='https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/' target='_blank'>Plex support docs</a> for instructions on how to obtain your token"></i></span></label>
-                                            <div class="position-relative">
-                                                <input type="password" id="plex_token" name="plex_token" class="form-control input-monospace pe-5 has-inline-btn" required pattern="[A-Za-z0-9_\-]{20,40}"
-                                                    title="Plex token should be a 20+ character string with letters, digits, dashes or underscores."
-                                                    spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" 
-                                                    data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
-                                                <button type="button" class="btn-inline-icon toggle-password-btn" data-target="plex_token" title="Show token">
-                                                    <i class="bi bi-eye"></i>
-                                                </button>
+                                    </div>
+                                    <div class="card-webhook">
+                                        <!-- Webhook settings -->
+                                        <div class="p-3 border mt-0 rounded-4 shadow-sm">
+                                            <h5 class="mb-3"><i class="bi bi-broadcast-pin"></i>&ensp;Webhook Settings</h5>
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input" type="checkbox" id="enable_webhooks"/>
+                                                <label for="enable_webhooks" class="form-check-label">Enable Sonarr/Radarr <span class="text-nowrap">webhook
+                                                    &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle"
+                                                    data-bs-toggle="tooltip" data-bs-title="Allows TPDb artwork from cached user pages to be applied to items 
+                                                    or downloaded locally immediately after they are imported in Sonarr or Radarr" data-bs-custom-class="wide-tooltip"></i></span></label>
                                             </div>
-                                            <div class="invalid-feedback">
-                                                Please provide a valid Plex token.
+                                            <div id="webhook_settings" style="display: none;">
+                                                <div class="mb-3 mt-3">
+                                                    <label for="webhook_token" class="form-label"><i class="bi bi-key"></i>&ensp;Webhook <span class="text-nowrap">Token</span>
+                                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
+                                                        data-bs-title="In Sonarr/Radarr go to Settings &rarr; Connect &rarr; <i class='bi bi-plus-square'></i> &rarr; Webhook. Set the URL to 
+                                                        <code>/webhook/sonarr</code> or <code>/webhook/radarr</code> on this server, method POST, and tick only the 'On File Import' 
+                                                        trigger. Send this token either as the connection's Password, or as a header: click the <span class='text-nowrap'><strong>Advanced</strong> 
+                                                        (<i class='bi bi-gear-fill'></i>)</span> button on the webhook connection and add a Header with Key <span class='text-nowrap'>
+                                                        <code>X-Webhook-Token</code></span> and Value set to this token."></i></span></label></span></label>
+                                                    <div class="position-relative">
+                                                        <input type="password" id="webhook_token" name="webhook_token" class="form-control input-monospace has-two-inline-btns" placeholder="Enter token or click to generate"
+                                                        spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" required
+                                                        data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
+                                                        <div class="input-inline-actions">
+                                                            <button type="button" class="btn-inline-icon toggle-password-btn" data-target="webhook_token" title="Show token">
+                                                                <i class="bi bi-eye"></i>
+                                                            </button>
+                                                            <button type="button" id="generate_webhook_token" class="btn-inline-icon" title="Generate new random token">
+                                                                <i class="bi bi-arrow-clockwise"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div class="invalid-feedback">
+                                                        Please generate a webhook token
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="webhook_tpdb_users" class="form-label"><i class="bi bi-people"></i>&ensp;TPDb <span class="text-nowrap">Users
+                                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
+                                                        data-bs-title="List of TPDb users, searched in this order (first match wins). Requires <strong>Cache TPDb user pages</strong> enabled, and a scrape 
+                                                        of these users needs to have run at least once, so their artwork is cacehd and ca be looked up.)"></i></span></label>
+                                                    <select id="webhook_tpdb_users" name="webhook_tpdb_users" multiple placeholder="Enter usernames"></select>
+                                                </div>
+                                                <div class="mb-0">
+                                                    <label for="webhook_apply_delay" class="form-label me-2 mb-0"><i class="bi bi-clock""></i>&ensp;Delay
+                                                    <input type="number" 
+                                                        class="form-control form-control-sm text-center d-inline-block me-0 input-monospace" 
+                                                        id="webhook_apply_delay" 
+                                                        name="webhook_apply_delay"
+                                                        min="0" 
+                                                        placeholder="30" 
+                                                        value="30"
+                                                        style="width: 60px;" 
+                                                        required />
+                                                    seconds before <span class="text-nowrap">applying
+                                                        &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
+                                                        data-bs-title="How long to wait after an import before applying artwork, 
+                                                    giving Plex time to scan the new item. If it is still not ready, the apply retries for a few minutes."></i></span></label>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label for="tv_library" class="form-label"><i class="bi bi-tv"></i>&ensp;TV Libraries</label>
-                                            <select id="tv_library" name="tv_library" multiple placeholder="Click to add..."></select>
-                                        </div>
-                                        <div class="mb-0">
-                                            <label for="movie_library" class="form-label"><i class="bi bi-camera-reels"></i>&ensp;Movie Libraries</label>
-                                            <select id="movie_library" name="movie_library" multiple placeholder="Click to add..."></select>
-                                        </div>
+                                        </div>                                    
                                     </div>
                                 </div>
                                 <div class="card-kometa">
@@ -286,6 +351,7 @@
                                             To change them you must edit your compose file and restart the container.
                                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                         </div>
+                                        <hr>
                                         <div class="mt-2 form-check form-switch">
                                             <input class="form-check-input" type="checkbox" value="--local_assets" id="plex_local_assets"/>
                                             <label for="plex_local_assets" class="form-check-label">Save as Plex local media <span class="text-nowrap">assets
@@ -314,69 +380,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="card-webhook">
-                                    <!-- Webhook settings -->
-                                    <div class="p-3 border mt-0 rounded-4 shadow-sm">
-                                        <h5 class="mb-3"><i class="bi bi-broadcast-pin"></i>&ensp;Webhook Settings</h5>
-                                        <div class="form-check form-switch mb-0">
-                                            <input class="form-check-input" type="checkbox" id="enable_webhooks"/>
-                                            <label for="enable_webhooks" class="form-check-label">Enable Sonarr/Radarr <span class="text-nowrap">webhook
-                                                &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle"
-                                                data-bs-toggle="tooltip" data-bs-title="Allows TPDb artwork from cached user pages to be applied to items 
-                                                or downloaded locally immediately after they are imported in Sonarr or Radarr" data-bs-custom-class="wide-tooltip"></i></span></label>
-                                        </div>
-                                        <div id="webhook_settings" style="display: none;">
-                                            <div class="mb-3 mt-3">
-                                                <label for="webhook_token" class="form-label"><i class="bi bi-key"></i>&ensp;Webhook <span class="text-nowrap">Token</span>
-                                                    &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
-                                                    data-bs-title="In Sonarr/Radarr go to Settings &rarr; Connect &rarr; <i class='bi bi-plus-square'></i> &rarr; Webhook. Set the URL to 
-                                                    <code>/webhook/sonarr</code> or <code>/webhook/radarr</code> on this server, method POST, and tick only the 'On File Import' 
-                                                    trigger. Send this token either as the connection's Password, or as a header: click the <span class='text-nowrap'><strong>Advanced</strong> 
-                                                    (<i class='bi bi-gear-fill'></i>)</span> button on the webhook connection and add a Header with Key <span class='text-nowrap'>
-                                                    <code>X-Webhook-Token</code></span> and Value set to this token."></i></span></label></span></label>
-                                                <div class="position-relative">
-                                                    <input type="password" id="webhook_token" name="webhook_token" class="form-control input-monospace has-two-inline-btns" placeholder="Enter token or click to generate"
-                                                    spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" required
-                                                    data-1p-ignore data-bwignore data-lpignore="true" data-dashlane-ignore="true" data-form-type="other">
-                                                    <div class="input-inline-actions">
-                                                        <button type="button" class="btn-inline-icon toggle-password-btn" data-target="webhook_token" title="Show token">
-                                                            <i class="bi bi-eye"></i>
-                                                        </button>
-                                                        <button type="button" id="generate_webhook_token" class="btn-inline-icon" title="Generate new random token">
-                                                            <i class="bi bi-arrow-clockwise"></i>
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <div class="invalid-feedback">
-                                                    Please generate a webhook token
-                                                </div>
-                                            </div>
-                                            <div class="mb-3">
-                                                <label for="webhook_tpdb_users" class="form-label"><i class="bi bi-people"></i>&ensp;TPDb <span class="text-nowrap">Users
-                                                    &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip" data-bs-custom-class="wide-tooltip"
-                                                    data-bs-title="List of TPDb users, searched in this order (first match wins). Requires <strong>Cache TPDb user pages</strong> enabled, and a scrape 
-                                                    of these users needs to have run at least once, so their artwork is cacehd and ca be looked up.)"></i></span></label>
-                                                <select id="webhook_tpdb_users" name="webhook_tpdb_users" multiple placeholder="Enter usernames"></select>
-                                            </div>
-                                            <div class="mb-0">
-                                                <label for="webhook_apply_delay" class="form-label me-2 mb-0"><i class="bi bi-clock""></i>&ensp;Delay
-                                                <input type="number" 
-                                                    class="form-control form-control-sm text-center d-inline-block me-0 input-monospace" 
-                                                    id="webhook_apply_delay" 
-                                                    name="webhook_apply_delay"
-                                                    min="0" 
-                                                    placeholder="30" 
-                                                    value="30"
-                                                    style="width: 60px;" 
-                                                    required />
-                                                seconds before <span class="text-nowrap">applying
-                                                    &nbsp;<i onclick="event.preventDefault(); event.stopPropagation();" class="bi bi-info-circle" data-bs-toggle="tooltip"
-                                                    data-bs-title="How long to wait after an import before applying artwork, 
-                                                giving Plex time to scan the new item. If it is still not ready, the apply retries for a few minutes."></i></span></label>
-                                            </div>
-                                        </div>
-                                    </div>                                    
                                 </div>
                             </div>
                         </div>
