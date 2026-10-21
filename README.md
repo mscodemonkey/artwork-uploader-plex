@@ -5,12 +5,16 @@
 <p align="center">
   Upload poster sets from ThePosterDB and MediUX to your Plex server, or save them locally alongside your media files or to your Kometa asset directory, in seconds.
 </p>
-
 <p align="center">
+  <!-- Build & Version -->
   <a href="https://github.com/mscodemonkey/artwork-uploader-plex/actions/workflows/tests.yml"><img src="https://github.com/mscodemonkey/artwork-uploader-plex/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
-  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/releases/latest"><img src="https://img.shields.io/github/v/release/mscodemonkey/artwork-uploader-plex" alt="Latest release"></a>
-  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader"><img src="https://img.shields.io/badge/ghcr.io-artwork--uploader-2496ED?logo=docker&logoColor=white" alt="Docker image"></a>
+  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/releases/latest"><img src="https://img.shields.io/github/v/release/mscodemonkey/artwork-uploader-plex?color=007ec6" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python 3.12+">
+  <br>
+  <!-- Stats -->
+  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/stargazers"><img src="https://img.shields.io/github/stars/mscodemonkey/artwork-uploader-plex?style=flat&logo=github" alt="Stars"></a>
+  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/releases"><img src="https://img.shields.io/github/downloads/mscodemonkey/artwork-uploader-plex/total?style=flat&logo=github&label=downloads" alt="Downloads"></a>
+  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader"><img src="https://img.shields.io/badge/ghcr.io-artwork--uploader-2496ED?logo=docker&logoColor=white" alt="Docker image"></a>
 </p>
 
 ---
