@@ -131,3 +131,32 @@ def test_an_entry_with_a_tmdb_id_is_never_fetched():
     assert status == "matched"
     assert match["tmdb_id"] == 95480
     assert library.fetched == []
+
+
+@pytest.mark.unit
+def test_an_entry_indexed_before_plex_set_its_year_is_found_by_year():
+    # A show folder named without a year gives Plex no year until its agent match lands.
+    item = _FakeItem(90167, "Nocturne", None)
+    index, library = _index_with(item)
+
+    item.year = 2026
+    item.guids = [_FakeGuid("tmdb://292741"), _FakeGuid("tvdb://430654")]
+
+    status, match = index.lookup("Nocturne", 2026, MediaType.TV_SHOW)
+
+    assert status == "matched"
+    assert match["year"] == 2026
+    assert match["tmdb_id"] == 292741
+    assert library.fetched == [90167]
+
+
+@pytest.mark.unit
+def test_an_entry_still_without_a_year_is_not_matched_by_year():
+    item = _FakeItem(90167, "Nocturne", None)
+    index, library = _index_with(item)
+
+    status, match = index.lookup("Nocturne", 2026, MediaType.TV_SHOW)
+
+    assert status == "not_found"
+    assert match is None
+    assert library.fetched == [90167]

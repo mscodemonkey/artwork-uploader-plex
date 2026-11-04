@@ -166,12 +166,13 @@ class PlexLibraryIndex:
         return None
 
     def _refresh_entry(self, entry: Dict) -> None:
-        """Read an entry's guids from Plex again.
+        """Read an entry's year and guids from Plex again.
 
         Plex creates a new item a few seconds before its agent match lands, so an index built in
-        that window holds the item with no TMDb ID. The library snapshot is already final by then
-        (same count, same newest item), so nothing would rebuild the entry until the index expires.
-        A lookup that lands on an entry with no ID asks Plex for that one item instead."""
+        that window holds the item with no TMDb ID, and with no year when its folder name carries
+        none. The library snapshot is already final by then (same count, same newest item), so
+        nothing would rebuild the entry until the index expires. A lookup that lands on an entry
+        with no ID or no year asks Plex for that one item instead."""
         library = next(
             (lib for lib in self.movie_libraries + self.tv_libraries if lib.title == entry.get("library")),
             None
@@ -180,6 +181,7 @@ class PlexLibraryIndex:
             return
         try:
             item = library.fetchItem(int(entry["rating_key"]))
+            entry["year"] = item.year
             entry["tmdb_id"] = self._tmdb_id_from_guids(item.guids)
         except Exception as e:
             debug_me(f"Could not refresh '{entry.get('title')} ({entry.get('year')})' from {library.title}: {e}")
@@ -216,6 +218,11 @@ class PlexLibraryIndex:
             candidates.extend(c for c in lib_index.get(lookup_string, []) if c["type"] in _kind)
 
         if candidates and year is not None:
+            # An entry indexed before Plex matched the item can have no year yet, and the year check
+            # below would drop it as a miss. Ask Plex for it again before checking.
+            for candidate in candidates:
+                if candidate.get("year") is None:
+                    self._refresh_entry(candidate)
             for candidate_year in (year, int(year) - 1, int(year) + 1):
                 matched = [c for c in candidates if c["year"] == candidate_year]
                 if matched:
