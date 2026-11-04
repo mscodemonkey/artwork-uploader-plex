@@ -4,7 +4,8 @@ from typing import Optional
 class NotifyService:
 
     def __init__(self):
-        self.apobj = apprise.Apprise()
+        asset = apprise.AppriseAsset(http_redirects=False)
+        self.apobj = apprise.Apprise(asset=asset)
 
     def add_url(self, url: str):
         self.apobj.add(url)
