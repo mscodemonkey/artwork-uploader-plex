@@ -16,8 +16,8 @@ jobs:
       - name: Fetch GHCR pull count
         id: fetch
         run: |
-          HTML=$(curl -sL "https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader")
-          PULLS=$(echo "$HTML" | grep -A 2 "Total downloads" | grep -oE '[0-9,.]+[KMB]?' | head -n 1)
+          HTML=$(curl -sL "https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader" | tr '\n' ' ')
+          PULLS=$(echo "$HTML" | grep -oP 'Total downloads</span>\s*<h3[^>]*>\K[^<]+' | xargs)
           if [ -z "$PULLS" ]; then
             PULLS="unknown"
           fi
@@ -27,9 +27,9 @@ jobs:
       - name: Commit JSON to badges branch
         if: steps.fetch.outputs.pulls != 'unknown'
         run: |
+          git init
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git init
           git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
           cat <<EOF > ghcr-pulls.json
           {
