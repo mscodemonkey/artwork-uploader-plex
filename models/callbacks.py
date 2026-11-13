@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 
 from core.enums import RunOutcome
 
@@ -23,6 +23,8 @@ class ProcessingCallbacks:
     cached_counter: list = field(default_factory=lambda: [0])  # Mutable list to track assets newly added to the user cache (contains count as single element)
     locked_counter: list = field(default_factory=lambda: [0])  # Mutable list to track artwork skipped because the Plex field was locked (contains count as single element)
     failed_counter: list = field(default_factory=lambda: [0])  # Mutable list to track uploads that failed after exhausting their retries (contains count as single element)
+    unavailable_counter: list = field(default_factory=lambda: [0]) # Mutable list to track items that are not available in Plex
+    updated_asset_map: Dict[str, Dict[int, str]] = field(default_factory=dict)
 
     def status(self, message: str, color: str = "info", spinner: bool = False, sticky: bool = False):
         if self.on_status_update:
@@ -60,7 +62,11 @@ class ProcessingCallbacks:
         if self.failed_counter:
             self.failed_counter[0] += count
 
-    def record_result(self, result: str) -> Optional[str]:
+    def unavailable(self, count: int):
+        if self.unavailable_counter:
+            self.unavailable_counter[0] += count
+
+    def record_result(self, result: str, artwork: Dict = None) -> Optional[str]:
         """Count one upload result and say what it was.
 
         The uploader and the Kometa saver both report what happened as a prefixed
@@ -69,6 +75,44 @@ class ProcessingCallbacks:
         self.assets(1)
         if result.startswith('✅') or result.startswith('♻️'):
             self.success(1)
+            if artwork:
+                library = artwork.get('library', None)
+                ratingKey = artwork.get('ratingKey', 0)
+                parent_key = artwork.get("parent_key", None)
+                title = artwork.get('title', '')
+                alt_title = artwork.get('alt_title', None)
+                year = artwork.get('year', None)
+                media_type = artwork.get('media_type', '')
+                overlay = artwork.get('overlay', False)
+                season = artwork.get('season', None)
+                from utils.utils import is_numeric
+                if is_numeric(season):
+                    season = int(season)
+                episode = artwork.get('episode', None)
+                if is_numeric(episode):
+                    episode = int(episode)
+                if ratingKey and library:
+                    if library not in self.updated_asset_map:
+                        self.updated_asset_map[library] = {}
+                    if ratingKey not in self.updated_asset_map[library]:
+                        self.updated_asset_map[library][ratingKey] = {}
+                    self.updated_asset_map[library][ratingKey]["title"] = title
+                    self.updated_asset_map[library][ratingKey]["year"] = year
+                    self.updated_asset_map[library][ratingKey]["media_type"] = media_type
+                    if parent_key:
+                        self.updated_asset_map[library][ratingKey]["parent_key"] = parent_key
+                    if alt_title:
+                        self.updated_asset_map[library][ratingKey]["alt_title"] = alt_title
+                    if "updated_assets" not in self.updated_asset_map[library][ratingKey]:
+                        self.updated_asset_map[library][ratingKey]["updated_assets"] = []
+                    self.updated_asset_map[library][ratingKey]["updated_assets"].append({
+                        "file_type": artwork["file_type"],
+                        "author": artwork["author"],
+                        "season": season,
+                        "episode": episode,
+                        "overlay": overlay,
+                        "status": artwork.get("status", "")
+                    })
             return "success"
         if result.startswith('🔒'):
             self.locked(1)
@@ -76,6 +120,9 @@ class ProcessingCallbacks:
         if result.startswith('❌'):
             self.failed(1)
             return "failed"
+        if "not available" in str(result).lower():
+            self.unavailable(1)
+            return "unavailable"
         return None
 
     def errors(self, extra: int = 0) -> int:

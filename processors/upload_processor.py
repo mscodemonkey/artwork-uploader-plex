@@ -4,22 +4,23 @@ from core.config import Config
 from core.exceptions import CollectionNotFound, CollectionsNotSupported, MovieNotFound, ShowNotFound, PlexConnectorException
 from core.enums import ScraperSource, MediaType
 from core.exceptions import ScraperException
-from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP, ARTWORK_FILENAME_MAP
+from core.constants import ARTWORK_ID_MAP, ARTWORK_TYPE_MAP, ARTWORK_FILENAME_MAP, KOMETA_OVERLAY_LABEL, DOCKER_KOMETA_ASSETS_PATH, DOCKER_KOMETA_TEMP_PATH
 from models.options import Options
 from plex.plex_connector import PlexConnector
 from plex.plex_uploader import PlexUploader
 from plexapi.exceptions import NotFound
 from kometa.kometa_saver import KometaSaver
 from utils import soup_utils
-from utils.utils import is_numeric, get_path_parts, normalize_path
+from utils.utils import is_numeric, get_path_parts, normalize_path, title_cleaner
 from models.artwork_types import MovieArtwork, TVArtwork, CollectionArtwork
+from models.callbacks import ProcessingCallbacks
 from core import globals
-from utils.notifications import debug_me
 
 class UploadProcessor:
 
-    def __init__(self, plex: PlexConnector) -> None:
+    def __init__(self, plex: PlexConnector, callbacks: Optional[ProcessingCallbacks]) -> None:
         self.plex: PlexConnector = plex
+        self.callbacks: ProcessingCallbacks = callbacks
         self.options: Options = Options()
         self.config: Config = Config()
         self.config.load()
@@ -31,6 +32,7 @@ class UploadProcessor:
         self.options = options
         self.local_assets: bool = self.options.local_assets or globals.config.plex_local_assets
         self.kometa: bool = self.options.kometa or globals.config.save_to_kometa
+        self.kometa_auto_run: bool = globals.config.kometa_auto_run and not self.options.temp
         self.skip_locked: bool = self.options.skip_locked or globals.config.skip_locked_artwork
         requested_artist_updates: bool = self.options.allow_artist_updates or globals.config.allow_artist_updates
         # Artist updates read the artwork ID labels to tell our own artwork from a hand-set custom.
@@ -38,9 +40,9 @@ class UploadProcessor:
         # earlier tracked run would let a locked field be replaced on stale information.
         self.allow_artist_updates: bool = requested_artist_updates and self.config.track_artwork_ids
         if requested_artist_updates and not self.config.track_artwork_ids:
-            debug_me("allow_artist_updates has no effect while track_artwork_ids is off - without "
+            self.callbacks.debug("allow_artist_updates has no effect while track_artwork_ids is off - without "
                      "artwork IDs there's no way to tell artwork we applied from artwork set by "
-                     "hand, so locked items are all left alone.", "UploadProcessor/set_options")
+                     "hand, so locked items are all left alone.")
 
     def _resolve_tmdb_id(self, artwork, description: str, kind: Literal[MediaType.TV_SHOW, MediaType.MOVIE]) -> bool:
         """
@@ -66,10 +68,10 @@ class UploadProcessor:
                 raise ShowNotFound(f'{description} | Show not available on Plex')
             if status == "matched":
                 tmdb_id = match.get("tmdb_id")
-                debug_me(f"Matched '{artwork.get('title')} ({artwork.get('year')})' locally as TMDb ID '{tmdb_id}'")
+                self.callbacks.debug(f"Matched '{artwork.get('title')} ({artwork.get('year')})' locally as TMDb ID '{tmdb_id}'")
                 artwork["tmdb_id"] = tmdb_id
                 return True
-            debug_me(f"'{artwork.get('title')} ({artwork.get('year')})' is ambiguous locally, fetching the poster page")
+            self.callbacks.debug(f"'{artwork.get('title')} ({artwork.get('year')})' is ambiguous locally, fetching the poster page")
 
         self._fetch_tmdb_id_from_tpdb(artwork, description)
         return False
@@ -79,18 +81,18 @@ class UploadProcessor:
            to a local Plex title/year search if the page doesn't expose one."""
         poster_id = artwork.get("id", None)
         poster_page_url = f"https://theposterdb.com/poster/{poster_id}"
-        debug_me(f"Fetching TMDb ID from '{poster_page_url}'")
+        self.callbacks.debug(f"Fetching TMDb ID from '{poster_page_url}'")
         try:
             poster_page_soup = soup_utils.cook_soup(poster_page_url)
         except ScraperException as e:
-            debug_me(f"Unable to fetch TMDb ID due to error: {str(e)}")
+            self.callbacks.debug(f"Unable to fetch TMDb ID due to error: {str(e)}")
             raise ScraperException(f"{description} | {str(e)}") from None
         try:
             artwork["tmdb_id"] = int(poster_page_soup.find('div', {"data-media-id": True})['data-media-id'])
         except (KeyError, TypeError, ValueError) as e:
-            debug_me(f"Failed to extract TMDb ID from poster page, trying another way. Error was: {e}")
+            self.callbacks.debug(f"Failed to extract TMDb ID from poster page, trying another way. Error was: {e}")
             _, artwork["tmdb_id"], _, _ = self.plex.movie_or_show(artwork.get("title"), artwork.get("year"))
-            debug_me(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.")
+            self.callbacks.debug(f"Found TMDb ID '{artwork['tmdb_id']}' for '{artwork.get('title')}' using Plex search.")
 
     def _artwork_matches_item(self, artwork, plex_item, kind: Literal[MediaType.TV_SHOW, MediaType.MOVIE]) -> bool:
         """
@@ -105,7 +107,7 @@ class UploadProcessor:
         if cached is not None:
             return cached
         poster_page_url = f"https://theposterdb.com/poster/{artwork.get('id')}"
-        debug_me(f"Confirming local match for '{artwork.get('title')}' from '{poster_page_url}'")
+        self.callbacks.debug(f"Confirming local match for '{artwork.get('title')}' from '{poster_page_url}'")
         try:
             poster_page_soup = soup_utils.cook_soup(poster_page_url)
         except ScraperException:
@@ -121,7 +123,6 @@ class UploadProcessor:
     def process_collection_artwork(self, artwork: CollectionArtwork) -> Optional[str]:
 
         result = None
-        results = []
         description = f"{artwork['title']} • {artwork['author']}"
         artwork_type = ARTWORK_TYPE_MAP.get(artwork.get('file_type'))
         artwork_id = ARTWORK_ID_MAP.get(artwork.get('file_type'))
@@ -140,8 +141,12 @@ class UploadProcessor:
             raise Exception from e
 
         if collection_items:
-            debug_me(f"Found collection '{artwork['title']}' in {len(libraries)} libraries.")
+            self.callbacks.debug(f"Found collection '{artwork['title']}' in {len(libraries)} libraries.")
             for collection_item, library in zip(collection_items, libraries):
+                artwork["library"] = library
+                artwork["media_type"] = MediaType.COLLECTION.value
+                if hasattr(collection_item, "ratingKey"):
+                    artwork["ratingKey"] = collection_item.ratingKey
                 if self.kometa:
                     asset_folder = collection_item.title.replace("/", "").replace(":", "")
                     saver = KometaSaver(artwork_type, library)
@@ -149,15 +154,16 @@ class UploadProcessor:
                     saver.retry_attempts = self.config.upload_retry_attempts
                     saver.retry_backoff = self.config.upload_retry_backoff_seconds
                     saver.set_artwork(artwork)
-                    base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
+                    base_dir = (DOCKER_KOMETA_TEMP_PATH if self.options.temp else DOCKER_KOMETA_ASSETS_PATH) if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                     saver.dest_dir = os.path.join(base_dir, library, asset_folder)
-                    debug_me(f"Destination directory is {saver.dest_dir}")
+                    self.callbacks.debug(f"Destination directory is {saver.dest_dir}")
                     saver.dest_file_name = ARTWORK_FILENAME_MAP.get(artwork.get('file_type'), 'poster')
                     saver.dest_file_ext = ".jpg"
                     saver.set_description(description)
                     saver.set_options(self.options)
                     result = saver.save_to_kometa()
-                    results.append(result)
+                    self.callbacks.log(message=result)
+                    self.callbacks.record_result(result=result, artwork=artwork if self.kometa_auto_run else None)
                 else:
                     uploader = PlexUploader(collection_item, artwork_type, artwork_id)
                     uploader.set_artwork(artwork)
@@ -171,17 +177,17 @@ class UploadProcessor:
                     uploader.set_description(description)
                     uploader.set_options(self.options)
                     result = uploader.upload_to_plex()
-                    results.append(result)
+                    self.callbacks.log(message=result)
+                    self.callbacks.record_result(result=result)
         else:
             raise CollectionNotFound(f'{description} | {artwork_type} not processed (Collection not available on Plex)')
-        return results
+        # return results
 
     def process_movie_artwork(self, artwork: MovieArtwork) -> Optional[str]:
 
         artwork['year'] = self.options.year if self.options.year else artwork['year']
         
         result = None
-        results = []
         description = f"{artwork['title']} ({artwork['year']}) • {artwork['author']}"
         artwork_type = ARTWORK_TYPE_MAP.get(artwork.get('file_type'))
         artwork_id = ARTWORK_ID_MAP.get(artwork.get('file_type'))
@@ -197,10 +203,21 @@ class UploadProcessor:
             raise Exception from e
 
         if movie_items:
-            debug_me(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.")
+            self.callbacks.debug(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.")
             for movie_item, library in zip(movie_items, libraries):
+                artwork["library"] = library
+                artwork["media_type"] = MediaType.MOVIE.value
+                if movie_item.title != artwork["title"]:
+                    artwork["alt_title"] = movie_item.title
+                if hasattr(movie_item, "ratingKey"):
+                    artwork["ratingKey"] = movie_item.ratingKey
+                if hasattr(movie_item, "labels"):
+                    item_labels = [str(label) for label in movie_item.labels]
+                    artwork["overlay"] = KOMETA_OVERLAY_LABEL in item_labels
+
                 # Use the actual movie title from Plex in case it differs from the artwork title (if it's a foreign title, etc.)
-                desc = description.replace(artwork["title"], movie_item.title) if movie_item.title != artwork["title"] else description
+                alt_title = artwork.get("alt_title", None)
+                desc = description.replace(artwork["title"], alt_title) if alt_title else description
                 item_path = normalize_path(movie_item.media[0].parts[0].file)
                 path_parts = []
                 path_parts = get_path_parts(item_path)
@@ -224,23 +241,25 @@ class UploadProcessor:
                         remapped = False
                         for mapping in normalized_mappings:
                             if mapping["plex_path"] in movie_path:
-                                debug_me(f"Replacing {mapping["plex_path"]} for {mapping["app_path"]}")
+                                self.callbacks.debug(f"Replacing {mapping["plex_path"]} for {mapping["app_path"]}")
                                 movie_path = movie_path.replace(mapping["plex_path"], mapping["app_path"])
                                 remapped = True
 
                         if not os.path.exists(movie_path):
-                            debug_me(f"ERROR: Path '{movie_path}' does not exist")
-                            results.append(f"❌ {desc} | Error saving asset: {movie_path} {f'({os.path.dirname(item_path)}) ' if remapped else ''}does not exist")
+                            self.callbacks.debug(f"ERROR: Path '{movie_path}' does not exist")
+                            result = f"❌ {desc} | Error saving asset: {movie_path} {f'({os.path.dirname(item_path)}) ' if remapped else ''}does not exist"
+                            self.callbacks.log(message=result)
+                            self.callbacks.record_result(result=result)
                             continue
 
                         saver.dest_dir = movie_path
                     
                     elif self.kometa:
                         asset_folder = path_parts[-2]
-                        base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
+                        base_dir = (DOCKER_KOMETA_TEMP_PATH if self.options.temp else DOCKER_KOMETA_ASSETS_PATH) if globals.docker else getattr(globals.config, "temp_dir" if self.options.temp else "kometa_base", None)
                         saver.dest_dir = os.path.join(base_dir, library, asset_folder)
 
-                    debug_me(f"Destination directory is {saver.dest_dir}")
+                    self.callbacks.debug(f"Destination directory is {saver.dest_dir}")
                     saver.dest_file_name = ARTWORK_FILENAME_MAP.get(artwork.get('file_type'), 'poster')
                     saver.dest_file_ext = ".jpg"
                     saver.set_description(desc)
@@ -248,9 +267,14 @@ class UploadProcessor:
                     if locally_matched:
                         saver.confirm_match = lambda a=artwork, item=movie_item: self._artwork_matches_item(a, item, "movie")
                     result = saver.save_to_kometa()
+                    if result.startswith("✅"):
+                        artwork["status"] = "new"
+                    elif result.startswith("♻️"):
+                        artwork["status"] = "updated"                    
                     if self.local_assets and (result.startswith("✅") or result.startswith("♻️")):
                         movie_item.refresh()
-                    results.append(result)
+                    self.callbacks.log(message=result)
+                    self.callbacks.record_result(result=result, artwork=artwork if self.kometa_auto_run else None)
                 else:
                     uploader = PlexUploader(movie_item, artwork_type, artwork_id)
                     uploader.set_artwork(artwork)
@@ -266,10 +290,10 @@ class UploadProcessor:
                     uploader.set_description(desc)
                     uploader.set_options(self.options)
                     result = uploader.upload_to_plex()
-                    results.append(result)
+                    self.callbacks.log(message=result)
+                    self.callbacks.record_result(result=result)
         else:
             raise MovieNotFound(f'{description} | {artwork_type} not processed (Movie not available on Plex)')
-        return results
 
 
     def process_tv_artwork(self, artwork: TVArtwork) -> Optional[str]:
@@ -279,7 +303,6 @@ class UploadProcessor:
         artwork_type = None
         artwork_id = None
         result = None
-        results = []
         self.staging: bool = self.kometa and (globals.config.stage_assets or self.options.stage)
 
         season = artwork.get('season')
@@ -311,12 +334,22 @@ class UploadProcessor:
             raise Exception from e
 
         if tv_show_items:
-            debug_me(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.")
+            self.callbacks.debug(f"Found TMDb ID '{artwork.get('tmdb_id')}' in {len(libraries)} libraries.")
             for tv_show, library in zip(tv_show_items, libraries):
+                artwork["library"] = library
+                artwork["media_type"] = MediaType.TV_SHOW.value
+                if title_cleaner(tv_show.title) != artwork["title"]:
+                    artwork["alt_title"] = title_cleaner(tv_show.title)
+                if hasattr(tv_show, "ratingKey"):
+                    artwork["ratingKey"] = tv_show.ratingKey
+                item_labels = [str(label) for label in tv_show.labels] if hasattr(tv_show, "labels") else []
+                artwork["overlay"] = KOMETA_OVERLAY_LABEL in item_labels
                 # Use the actual TV show title from Plex in case it differs from the artwork title (if it's a foreign title, etc.)
-                desc = description.replace(artwork['title'], tv_show.title.split(' (')[0]) if tv_show.title.split(' (')[0] != artwork['title'] else description
+                alt_title = artwork.get("alt_title", None)
+                desc = description.replace(artwork['title'], alt_title) if alt_title else description
                 # Use the year from Plex if it differs
-                desc = desc.replace(f"({artwork['year']})", f"({tv_show.year})") if tv_show.year and artwork['year'] != tv_show.year else desc
+                plex_year = getattr(tv_show, "year", None)
+                desc = desc.replace(f"({artwork['year']})", f'({plex_year})') if plex_year else desc
                 item_path = normalize_path(tv_show.seasons()[0].episodes()[0].media[0].parts[0].file)
                 path_parts = []
                 path_parts = get_path_parts(item_path)
@@ -348,12 +381,22 @@ class UploadProcessor:
                             else:
                                 # If we're applying directly to a Plex server, only process the first one and ignore the rest
                                 result = f"⚠️ {desc} | Ignoring additional square art asset"
-                                results.append(result)
+                                self.callbacks.log(message=result)
+                                self.callbacks.record_result(result=result)
                                 continue
+
                     elif is_numeric(artwork['season']):
                         # This is either a season asset (season cover) or an episode asset (title card)
                         if artwork['season'] >= 0:
                             is_season_available = artwork['season'] in [S.index for S in tv_show.seasons()]
+                            if is_season_available:
+                                _season = tv_show.season(artwork['season'])
+                                artwork["parent_key"] = getattr(tv_show, "ratingKey", None)
+                                artwork["ratingKey"] = getattr(_season, "ratingKey", artwork["parent_key"])
+                                _s_labels = [str(label) for label in _season.labels] if hasattr(_season, "labels") else []
+                                artwork["overlay"] = KOMETA_OVERLAY_LABEL in _s_labels
+                            else:
+                                artwork.pop("ratingKey", None)
 
                             if self.local_assets and is_season_available:
                                 item_path = normalize_path(tv_show.season(artwork['season']).episodes()[0].media[0].parts[0].file)
@@ -363,22 +406,32 @@ class UploadProcessor:
                             if artwork['episode'] == "Cover" or artwork['episode'] is None:
                                 # This is a season cover
                                 if is_season_available or (self.staging and season != "Specials"):
-                                    debug_me(f"Staging is {'enabled' if self.staging else 'disabled'}")
+                                    self.callbacks.debug(f"Staging is {'enabled' if self.staging else 'disabled'}")
                                     file_name = f"Season{artwork['season']:02}"
 
                                     if artwork['season'] == 0 and self.local_assets:
                                         file_name = "season-specials-poster"
 
                                     if not self.kometa:
-                                        upload_target = tv_show.season(artwork['season'])
+                                        upload_target = _season
                                 else:
                                     result = f"⚠️ {desc} | {season} not available in {library}"
-                                    results.append(result)
+                                    self.callbacks.log(message=result)
+                                    self.callbacks.record_result(result=result)
                                     continue
+
                             elif is_numeric(artwork['episode']) and artwork['episode'] >= 0:
                                 # This is a title card
                                 if is_season_available or (self.staging and season != "Specials"):
-                                    is_episode_available = artwork['episode'] in [E.index for E in tv_show.season(artwork['season']).episodes()]
+                                    is_episode_available = artwork['episode'] in [E.index for E in tv_show.season(artwork['season']).episodes()] if is_season_available else False
+                                    if is_episode_available:
+                                        _episode = tv_show.season(artwork['season']).episode(artwork['episode'])
+                                        artwork["parent_key"] = getattr(tv_show, "ratingKey", None)
+                                        artwork["ratingKey"] = getattr(_episode, "ratingKey", artwork["parent_key"])
+                                        _e_labels = [str(label) for label in _episode.labels] if hasattr(_episode, "labels") else []
+                                        artwork["overlay"] = KOMETA_OVERLAY_LABEL in _e_labels
+                                    else:
+                                        artwork.pop("ratingKey", None)
 
                                     if (is_season_available and is_episode_available) or self.staging:
                                         file_name = f"S{artwork['season']:02}E{artwork['episode']:02}"
@@ -387,14 +440,16 @@ class UploadProcessor:
                                             ep_path = tv_show.season(artwork['season']).episode(artwork['episode']).media[0].parts[0].file
                                             file_name = os.path.splitext(get_path_parts(ep_path)[-1])[0]
                                         if not self.kometa:
-                                            upload_target = tv_show.season(artwork['season']).episode(artwork['episode'])
+                                            upload_target = _episode
                                     else:
                                         result = f"⚠️ {desc} | {season}, Episode {artwork['episode']:02} not available in {library}"
-                                        results.append(result)
+                                        self.callbacks.log(message=result)
+                                        self.callbacks.record_result(result=result)
                                         continue
                                 else:
                                     result = f"⚠️ {desc} | {season} not available in {library}"
-                                    results.append(result)
+                                    self.callbacks.log(message=result)
+                                    self.callbacks.record_result(result=result)
                                     continue
 
                 except (AttributeError, KeyError, NotFound) as e:
@@ -417,22 +472,24 @@ class UploadProcessor:
                             remapped = False
                             for mapping in normalized_mappings:
                                 if mapping["plex_path"] in final_path:
-                                    debug_me(f"Replacing {mapping["plex_path"]} for {mapping["app_path"]}")
+                                    self.callbacks.debug(f"Replacing {mapping["plex_path"]} for {mapping["app_path"]}")
                                     final_path = final_path.replace(mapping["plex_path"], mapping["app_path"])
                                     remapped = True
 
                             if not os.path.exists(final_path):
-                                debug_me(f"ERROR: Path '{final_path}' does not exist")
-                                results.append(f"❌ {desc} | Error saving asset: {final_path} {f'({os.path.dirname(item_path)}) ' if remapped else ''}does not exist")
+                                self.callbacks.debug(f"ERROR: Path '{final_path}' does not exist")
+                                result = f"❌ {desc} | Error saving asset: {final_path} {f'({os.path.dirname(item_path)}) ' if remapped else ''}does not exist"
+                                self.callbacks.log(message=result)
+                                self.callbacks.record_result(result=result)
                                 continue
 
                             saver.dest_dir = final_path
 
                         elif self.kometa:
-                            base_dir = ("/temp" if self.options.temp else "/assets") if globals.docker else getattr(globals.config, 'temp_dir' if self.options.temp else 'kometa_base', None)
+                            base_dir = (DOCKER_KOMETA_TEMP_PATH if self.options.temp else DOCKER_KOMETA_ASSETS_PATH) if globals.docker else getattr(globals.config, 'temp_dir' if self.options.temp else 'kometa_base', None)
                             saver.dest_dir = os.path.join(base_dir, library, asset_folder)
 
-                        debug_me(f"Destination directory is {saver.dest_dir}")
+                        self.callbacks.debug(f"Destination directory is {saver.dest_dir}")
                         saver.dest_file_name = file_name
                         saver.dest_file_ext = ".jpg"
                         saver.set_description(desc)
@@ -440,12 +497,18 @@ class UploadProcessor:
 
                         if locally_matched:
                             saver.confirm_match = lambda a=artwork, item=tv_show: self._artwork_matches_item(a, item, "tv")
+                        
                         result = saver.save_to_kometa()
+                        if result.startswith("✅"):
+                            artwork["status"] = "new"
+                        elif result.startswith("♻️"):
+                            artwork["status"] = "updated"                                             
 
                         if self.local_assets and upload_target and (result.startswith("✅") or result.startswith("♻️")):
                             upload_target.refresh()
 
-                        results.append(result)
+                        self.callbacks.log(message=result)
+                        self.callbacks.record_result(result=result, artwork=artwork if self.kometa_auto_run else None)
 
                     elif upload_target:
                         artwork_id = ARTWORK_ID_MAP.get(artwork.get('file_type'))
@@ -463,11 +526,10 @@ class UploadProcessor:
                         uploader.set_description(desc)
                         uploader.set_options(self.options)
                         result = uploader.upload_to_plex()
-                        results.append(result)
+                        self.callbacks.log(message=result)
+                        self.callbacks.record_result(result=result)
                 except Exception:
                     raise
         else:
             raise ShowNotFound(f"{description} | {artwork_type} not processed (Show not available on Plex)")
-
-        return results
 

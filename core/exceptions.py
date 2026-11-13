@@ -52,7 +52,7 @@ class PlexConnectorException(PlexError):
     pass
 
 
-class LibraryNotFound(PlexError):
+class LibraryNotFound(PlexConnectorException):
     """The requested library could not be found."""
     pass
 

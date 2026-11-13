@@ -53,6 +53,8 @@ class ArtworkProcessor:
             PlexConnectorException: If Plex connection fails
             ScraperException: If scraping fails
         """
+        kometa_auto_run = globals.config.kometa_auto_run and not options.temp
+
         # Check Plex connection
         try:
             self.plex.connect()
@@ -72,7 +74,7 @@ class ArtworkProcessor:
             raise ScraperException(f"Scraper error: {str(e)}") from e
 
         # Process the scraped artwork
-        processor = UploadProcessor(self.plex)
+        processor = UploadProcessor(self.plex, self.callbacks)
         processor.set_options(options)
         # allow_artist_updates needs to know which posters belong to the artist being processed.
         # The cached scrape builds that from the index (tombstones included); otherwise derive it
@@ -113,8 +115,8 @@ class ArtworkProcessor:
                 self.callbacks.progress(bulk_percent, 100, message, bar_type="bulk")
             n += 1
             self._process_single_artwork(
-                artwork,
-                processor.process_collection_artwork
+                artwork=artwork,
+                process_func=processor.process_collection_artwork
             )
 
         # Process movies
@@ -128,8 +130,8 @@ class ArtworkProcessor:
                 self.callbacks.progress(bulk_percent, 100, message, bar_type="bulk")
             n += 1
             self._process_single_artwork(
-                artwork,
-                processor.process_movie_artwork
+                artwork=artwork,
+                process_func=processor.process_movie_artwork
             )
 
         # Process TV shows
@@ -143,8 +145,8 @@ class ArtworkProcessor:
                 self.callbacks.progress(bulk_percent, 100, message, bar_type="bulk")
             n += 1
             self._process_single_artwork(
-                artwork,
-                processor.process_tv_artwork
+                artwork=artwork,
+                process_func=processor.process_tv_artwork
             )
 
         end_time = time.time()
@@ -178,7 +180,7 @@ class ArtworkProcessor:
     def _process_single_artwork(
         self,
         artwork: dict,
-        process_func: Callable[[dict], str],
+        process_func: Callable[[dict], str]
     ) -> None:
         """
         Process a single piece of artwork with error handling.
@@ -190,12 +192,7 @@ class ArtworkProcessor:
         """
         try:
             # Process the artwork
-            results = process_func(artwork)
-
-            # Log the result
-            for result in results:
-                self.callbacks.record_result(result)
-                self.callbacks.log(result)
+            process_func(artwork)
 
         except CollectionNotFound as e:
             self.callbacks.log(f"⚠️ {str(e)}")
@@ -219,7 +216,7 @@ class ArtworkProcessor:
 
         except Exception as e:
             self.callbacks.log(f"❌ {str(e)}")
-            self.callbacks.debug(f"Error processing {artwork["title"]} ({artwork["year"]}):{str(e)}")
+            self.callbacks.debug(f"Error processing {artwork["title"]} {f'({artwork["year"]})' if "year" in artwork else ''}:{str(e)}")
             self.callbacks.status(
                 f"Error: {str(e)}",
                 "danger",
@@ -246,7 +243,7 @@ class ArtworkProcessor:
             callbacks: Optional callbacks for UI updates
             override_title: Optional title to override in all files
         """
-        processor = UploadProcessor(self.plex)
+        processor = UploadProcessor(self.plex, self.callbacks)
         processor.set_options(options)
 
         total_files = len(file_list)
@@ -265,10 +262,6 @@ class ArtworkProcessor:
             year = None
             self.callbacks.debug("No files to process in uploaded ZIP file")
         
-        processed_files = 0
-        success_counter = 0  # Mutable counter to track successful uploads
-        failed_counter = 0  # Mutable counter to track uploads that failed after exhausting their retries
-
         # Initial progress update
         self.callbacks.debug("Processing uploaded file...")
         self.callbacks.progress(0, total_files, "Processing ZIP file")
@@ -328,16 +321,7 @@ class ArtworkProcessor:
             # Process the artwork if media_type is known
             if media_type != "unavailable":
                 try:
-                    processed_files += 1
-                    results = process_func(artwork)
-
-                    for result in results:
-                        counted = self.callbacks.record_result(result)
-                        if counted == "success":
-                            success_counter += 1
-                        elif counted == "failed":
-                            failed_counter += 1
-                        self.callbacks.log(result)
+                    process_func(artwork)
 
                 except CollectionNotFound as e:
                     self.callbacks.log(f"⚠️ {str(e)}")
@@ -368,11 +352,11 @@ class ArtworkProcessor:
             except OSError:
                 pass
         # Final progress update
-        failed_note = f" • {failed_counter} asset(s) failed" if failed_counter else ""
+        failed_note = f" • {self.callbacks.failed_counter[0]} asset(s) failed" if self.callbacks.failed_counter[0] > 0 else ""
         if globals.cancel_scrape:
             self.callbacks.progress(1, 1, "", "main")
-            self.callbacks.log(f"🛑 {title}{f' ({year})' if year else ''} • {author} | Stopped by user. {processed_files} file(s) processed • {success_counter} asset(s) updated{failed_note}.")
+            self.callbacks.log(f"🛑 {title}{f' ({year})' if year else ''} • {author} | Stopped by user. {self.callbacks.assets_processed[0]} file(s) processed • {self.callbacks.success_counter[0]} asset(s) updated{failed_note}.")
 
         else:
-            self.callbacks.log(f"✔️ {title}{f' ({year})' if year else ''} • {author} | {total_files} file(s) processed • {success_counter} asset(s) updated{failed_note}.")
+            self.callbacks.log(f"✔️ {title}{f' ({year})' if year else ''} • {author} | {total_files} file(s) processed • {self.callbacks.success_counter[0]} asset(s) updated{failed_note}.")
             self.callbacks.progress(total_files, total_files, f"Processing ZIP file • {total_files} of {total_files}")

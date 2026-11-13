@@ -102,7 +102,12 @@ def test_cancel_scrape_breaks_crawl_and_blocks_partial_upload():
 
         processor = ArtworkProcessor(plex=MagicMock(), callbacks=ProcessingCallbacks(success_counter=[0]))
 
+        # Patch globals.config so globals.config.kometa_auto_run is available
+        mock_config = MagicMock()
+        mock_config.kometa_auto_run = False
+
         with (
+            patch("core.globals.config", mock_config),
             patch("services.artwork_processor.Scraper", return_value=mock_scraper),
             patch("services.artwork_processor.UploadProcessor", return_value=mock_upload_processor),
         ):
@@ -225,7 +230,12 @@ def test_single_url_cancel_emits_stopped_status():
 
         processor = ArtworkProcessor(plex=MagicMock(), callbacks=callbacks)
 
+        # Patch globals.config so globals.config.kometa_auto_run is available
+        mock_config = MagicMock()
+        mock_config.kometa_auto_run = False
+        
         with (
+            patch("core.globals.config", mock_config),
             patch("services.artwork_processor.Scraper", return_value=mock_scraper),
             patch("services.artwork_processor.UploadProcessor", return_value=MagicMock()),
         ):

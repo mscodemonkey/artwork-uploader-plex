@@ -61,6 +61,7 @@ from services.artwork_processor import ArtworkProcessor
 from services.scheduler_service import SchedulerService, BulkSchedule
 from models.callbacks import ProcessingCallbacks
 from services.update_service import UpdateService
+from kometa.kometa_runner import KometaRunner
 
 
 # ----------------------------------------------
@@ -206,6 +207,10 @@ def parse_bulk_file_from_cli(instance: Instance, file_path):
             error_count=tally.errors(errors)
         )
 
+        if tally.updated_asset_map and globals.config.kometa_auto_run:
+            globals.kometa_runner.set_instance(instance)
+            globals.kometa_runner.run_from_cli(tally.updated_asset_map)
+
 # ---------------------- GUI FUNCTIONS ----------------------
 
 # * UI helper functions ---
@@ -302,6 +307,12 @@ def process_scrape_url_from_web(instance: Instance, url: str) -> None:
             notify_web(instance, "scrape_state", { "running": False, "type": globals.scrape_type })
             globals.scrape_type = "stopped"
 
+        if tally.updated_asset_map and globals.config.kometa_auto_run:
+            debug_me(f"Enqueueing {len(tally.updated_asset_map)} libraries for targeted Kometa update...")
+            globals.kometa_runner.set_instance(instance)
+            globals.kometa_runner.enqueue(tally.updated_asset_map)
+
+
 def run_bulk_import_scrape_in_thread(
         instance: Instance,
         web_list = None,
@@ -334,6 +345,7 @@ def run_bulk_import_scrape_in_thread(
             except InvalidFlag as e:
                 update_log(instance, f"❌ One or more invalid flags found in bulk import file '{filename}', line {n}: {str(e)}")
                 continue
+
     if len(parsed_urls) == 0:
         update_status(instance, "No valid bulk import entries found. Check logs for details", color=StatusColor.DANGER.value, icon="x-circle")
         now = datetime.now(timezone.utc).isoformat()
@@ -464,7 +476,7 @@ def process_bulk_import_from_ui(
                     },
                     tally=tally
                 )
-                #time.sleep(1)
+
             except ScraperException as e:
                 update_log(instance, f"❌ Error processing line: '{parsed_line.url}'")
                 debug_me(f"ScraperException: Failed to scrape URL: {parsed_line.url} | {str(e)}")
@@ -572,6 +584,11 @@ def process_bulk_import_from_ui(
             globals.scrape_type = "stopped"
         globals.bulk_import_lock.release()
 
+        if tally.updated_asset_map and globals.config.kometa_auto_run:
+            debug_me(f"Enqueueing {len(tally.updated_asset_map)} libraries for targeted Kometa update...")
+            globals.kometa_runner.set_instance(instance)
+            globals.kometa_runner.enqueue(tally.updated_asset_map)
+
 # Scraped the URL then uploads what it's scraped to Plex or download to Kometa asset directory
 def scrape_and_upload(
         instance: Instance,
@@ -639,7 +656,6 @@ def scrape_and_upload(
     except Exception as e:
         debug_me(f"Exception: {str(e)}")
         raise
-
 
 def process_uploaded_artwork(
         instance: Instance,
@@ -732,6 +748,10 @@ def process_uploaded_artwork(
             error_count=callbacks.errors()
         )
 
+        if callbacks.updated_asset_map and globals.config.kometa_auto_run:
+            debug_me(f"Enqueueing {len(callbacks.updated_asset_map)} libraries for targeted Kometa update...")
+            globals.kometa_runner.set_instance(instance)
+            globals.kometa_runner.enqueue(callbacks.updated_asset_map)
 
 # * Bulk import file I/O functions ---
 def load_bulk_import_file(instance: Instance, filename = None):
@@ -763,7 +783,6 @@ def load_bulk_import_file(instance: Instance, filename = None):
         traceback.print_exc()
         notify_web(instance, "load_bulk_import", {"loaded": False, "error": str(e)})
 
-
 def rename_bulk_import_file(instance: Instance, old_name, new_name) -> bool:
     debug_me(f"Renaming from {old_name} to {new_name}")
 
@@ -781,7 +800,6 @@ def rename_bulk_import_file(instance: Instance, old_name, new_name) -> bool:
             debug_me(f"Could not rename bulk import file '{old_name}': {e}")
     return False
 
-
 def delete_bulk_import_file(instance: Instance, file_name) -> bool:
     if file_name:
         try:
@@ -796,7 +814,6 @@ def delete_bulk_import_file(instance: Instance, file_name) -> bool:
             update_log(instance, f"🔴 Could not delete bulk import file '{file_name}'")
             debug_me(f"Could not delete bulk import file '{file_name}': {e}")
     return False
-
 
 def save_bulk_import_file(instance: Instance, contents = None, filename = None, now_load = None):
     """Save the bulk import text area content to a file relative to the executable location."""
@@ -817,7 +834,6 @@ def save_bulk_import_file(instance: Instance, contents = None, filename = None, 
             update_log(instance, f"🔴 Error saving bulk import file '{bulk_import_filename}'")
             debug_me(f"Error saving bulk import file '{bulk_import_filename}': {e}")
 
-
 def check_for_bulk_import_file(instance: Instance):
     """Check if any .txt files exist in the bulk_imports folder before creating bulk_import.txt."""
     try:
@@ -825,7 +841,6 @@ def check_for_bulk_import_file(instance: Instance):
         globals.bulk_file_service.ensure_default_file_exists(bulk_import_filename)
     except Exception as e:
         update_status(instance, message="Error creating bulk import file", color=StatusColor.DANGER.value)
-
 
 def find_bulk_file(filename: str = None):
     """Find a bulk import file - returns full path if exists, None otherwise."""
@@ -836,7 +851,6 @@ def find_bulk_file(filename: str = None):
     if globals.bulk_file_service.file_exists(bulk_import_filename):
         return globals.bulk_file_service.get_bulk_file_path(bulk_import_filename)
     return None
-
 
 def setup_web_sockets(port:int = None):
     """
@@ -862,8 +876,6 @@ def check_image_orientation(image_path):
 def sort_key(item):
     """Sort key for artwork items - uses UtilityService."""
     return UtilityService.sort_key(item)
-
-# Autoupdate functions
 
 def get_latest_version():
     """Fetch the latest release version from GitHub."""
@@ -1130,6 +1142,7 @@ if __name__ == "__main__":
     config = Config()
     globals.config = config  # Also store in globals for cross-module access
 
+
     # Load the config from the config.json file
     try:
         config.load()
@@ -1137,8 +1150,10 @@ if __name__ == "__main__":
         sys.exit("Can't load config.json file.  Please check that the file exists and is in the correct format.")
     except Exception as config_load_exception:
         sys.exit(f"Unexpected error when loading config.json file: {str(config_load_exception)}")
+    
 
     # Create services
+    globals.kometa_runner = KometaRunner()
     globals.bulk_file_service = BulkFileService(get_exe_dir())
     globals.scheduler_service = SchedulerService(check_interval=SCHEDULER_CHECK_INTERVAL)
     globals.webhook_service = WebhookService()
@@ -1241,6 +1256,10 @@ if __name__ == "__main__":
                     trigger=RunTrigger.CLI.value,
                     outcome=RunOutcome.FAILED.value
                 )
+            finally:
+                if tally.updated_asset_map and globals.config.kometa_auto_run:
+                    globals.kometa_runner.set_instance(cli_instance)
+                    globals.kometa_runner.run_from_cli(tally.updated_asset_map)
 
         # User passed in a poster or set URL, so let's process that
         else:
@@ -1279,6 +1298,10 @@ if __name__ == "__main__":
                     trigger=RunTrigger.CLI.value,
                     outcome=RunOutcome.FAILED.value
                 )
+            finally:
+                if tally.updated_asset_map and globals.config.kometa_auto_run:
+                    globals.kometa_runner.set_instance(cli_instance)
+                    globals.kometa_runner.run_from_cli(tally.updated_asset_map)
 
     else:
 

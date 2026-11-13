@@ -20,7 +20,7 @@ from requests_oauthlib import OAuth2Session
 from functools import wraps
 from core import globals
 from services.notify_service import NotifyService
-from utils.utils import calculate_file_md5, get_host_path
+from utils.utils import calculate_file_md5, get_host_path, is_docker_socket_available
 from models.instance import Instance
 from models.bulk_schedule import BulkSchedule
 from core.config import Config, normalize_notification_channels
@@ -38,7 +38,10 @@ from core.constants import (
     URL_SOURCE_MAP,
     URL_TYPE_MAP,
     DEFAULT_LOG_PATH,
-    OIDC_REQUEST_TIMEOUT
+    OIDC_REQUEST_TIMEOUT,
+    DOCKER_KOMETA_ASSETS_PATH,
+    DOCKER_KOMETA_TEMP_PATH,
+    DOCKER_KOMETA_CONFIG_PATH
 )
 
 def authentication_required():
@@ -1216,13 +1219,19 @@ def setup_socket_handlers(
         """Detects whether app is running in docker and informs frontend"""
         instance = Instance(data.get("instance_id"), "web")
         if globals.docker:
-            kometa_base = get_host_path("/assets")
-            temp_dir = get_host_path("/temp")
+            kometa_base = get_host_path(DOCKER_KOMETA_ASSETS_PATH)
+            temp_dir = get_host_path(DOCKER_KOMETA_TEMP_PATH)
+            kometa_config = get_host_path(DOCKER_KOMETA_CONFIG_PATH)
+            socket_available, reason = is_docker_socket_available()
+            if not socket_available:
+                debug_me(reason)
             update_log(instance, f"🐳 Docker environment detected")
-            debug_me(f"Docker detected, Kometa asset path mapped to '{kometa_base}', temp dir mapped to '{temp_dir}'")
+            debug_me(f"Docker detected, Kometa asset path mapped to '{kometa_base}', temp dir mapped to '{temp_dir}', Kometa config dir mapped to '{kometa_config}'")
             if kometa_base == "(not defined)":
                 update_log(instance, "⚠️ Kometa base path is not defined in docker-compose.yml file. Saving assets to Kometa asset directory is not available.")
-            notify_web(instance, "docker_detected", { "docker": "true", "kometa_base": kometa_base, "temp_dir": temp_dir })
+            if kometa_config == "(not defined)":
+                update_log(instance, "⚠️ Kometa config path is not defined in docker-compose.yml file. Auto running Kometa to refresh assets is not available.")
+            notify_web(instance, "docker_detected", { "docker": "true", "kometa_base": kometa_base, "temp_dir": temp_dir, "kometa_config_path": kometa_config, "socket_available": socket_available })
         else:
             notify_web(instance, "docker_detected", { "docker": "false" })
 

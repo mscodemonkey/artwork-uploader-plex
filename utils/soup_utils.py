@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 from core.exceptions import ScraperException
 from utils.utils import is_valid_url
+from core.constants import DEFAULT_GENERIC_TIMEOUT
 
 BROWSER_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -35,10 +36,10 @@ def _session():
 def cook_soup(url):
     if is_valid_url(url):
         try:
-            response = _session().get(url, timeout=5)
+            response = _session().get(url, timeout=DEFAULT_GENERIC_TIMEOUT)
             response.raise_for_status()
         except requests.exceptions.Timeout:
-            raise ScraperException(f"Connection timed out (5 seconds) for URL: {url}")
+            raise ScraperException(f"Connection timed out ({DEFAULT_GENERIC_TIMEOUT} seconds) for URL: {url}")
         except requests.exceptions.ConnectionError:
             raise ScraperException(f"Could not connect to server, check your internet connection or the site's status")
         except requests.exceptions.HTTPError as e:

@@ -3,7 +3,7 @@ Application-wide constants.
 """
 
 from core.__version__ import __version__, __url__
-from core.enums import ArtworkIDPrefix, FileType, MediaType, NotificationEvent
+from core.enums import ArtworkIDPrefix, FileType, MediaType, NotificationEvent, FilterType
 
 # Application metadata
 APP_NAME = "Artwork Uploader for Plex"
@@ -19,12 +19,16 @@ DEFAULT_WEB_PORT = 4567
 DEFAULT_WEB_HOST = "0.0.0.0"
 
 # File paths
-DEFAULT_CONFIG_PATH = "config.json"
+DEFAULT_CONFIG_PATH = "config/config.json"
 ASSET_INDEX_PATH = "config/asset_index.db"
 DEFAULT_BULK_IMPORTS_DIR = "bulk_imports"
 DEFAULT_BULK_IMPORT_FILE = "bulk_import.txt"
 RUN_HISTORY_PATH = "config/run_history.json"
 DEFAULT_LOG_PATH = "logs"
+DOCKER_KOMETA_ASSETS_PATH = "/assets"
+DOCKER_KOMETA_TEMP_PATH = "/temp"
+DOCKER_KOMETA_CONFIG_PATH = "/kometa_config"
+DOCKER_SOCKET_PATH = "/var/run/docker.sock"
 
 # Run history retention (whichever limit is hit first prunes the record).
 # The entry cap is per run type, so frequent webhook imports can't crowd out bulk runs.
@@ -38,30 +42,22 @@ DEFAULT_MOVIE_LIBRARY = ["Movies"]
 # Plex library index refresh timeout (seconds)
 PLEX_LIBRARY_INDEX_TIMEOUT = 6 * 60 * 60 # Default 6 hours
 
-# Filter types - valid artwork types that can be filtered
-FILTER_TITLE_CARD = "title_card"
-FILTER_BACKGROUND = "background"
-FILTER_SEASON_COVER = "season_cover"
-FILTER_SHOW_COVER = "show_cover"
-FILTER_MOVIE_POSTER = "movie_poster"
-FILTER_COLLECTION_POSTER = "collection_poster"
-
-ALL_FILTERS = [
-    FILTER_TITLE_CARD,
-    FILTER_BACKGROUND,
-    FILTER_SEASON_COVER,
-    FILTER_SHOW_COVER,
-    FILTER_MOVIE_POSTER,
-    FILTER_COLLECTION_POSTER,
+# Default Filter types
+DEFAULT_MEDIUX_FILTERS = [
+    FilterType.TITLE_CARD.value,
+    FilterType.BACKGROUND.value,
+    FilterType.SEASON_COVER.value,
+    FilterType.SHOW_COVER.value,
+    FilterType.MOVIE_POSTER.value,
+    FilterType.COLLECTION_POSTER.value,
+    FilterType.SQUARE_ART.value
 ]
-
-# Artwork ID prefixes (for Plex labels)
-ARTWORK_ID_BACKGROUND = "BID:"
-ARTWORK_ID_SHOW_COVER = "CID:"
-ARTWORK_ID_SQUARE_ART = "SAID:"
-ARTWORK_ID_POSTER = "PID:"
-ARTWORK_ID_SEASON = "SID:"
-ARTWORK_ID_EPISODE = "EID:"
+DEFAULT_TPDB_FILTERS = [
+    FilterType.MOVIE_POSTER.value,
+    FilterType.SHOW_COVER.value,
+    FilterType.SEASON_COVER.value,
+    FilterType.COLLECTION_POSTER.value
+]
 
 # Artwork type to Plex label prefix mapping
 ARTWORK_ID_MAP = {
@@ -125,6 +121,7 @@ RECONCILE_MIN_COVERAGE = 0.9
 
 # Webhook (Sonarr/Radarr on-import trigger)
 WEBHOOK_TOKEN_HEADER = "X-Webhook-Token"
+WEBHOOK_DEFAULT_DELAY = 30
 WEBHOOK_RETRY_DELAYS = [20, 60, 180, 600]  # seconds; retries while the imported item is not yet in Plex
 
 # MediUX configuration
@@ -132,15 +129,10 @@ MEDIUX_BASE_URL = "https://mediux.pro"
 MEDIUX_API_BASE_URL = "https://api.mediux.pro/assets/"
 MEDIUX_QUALITY_SUFFIX = "&w=3840&q=80"
 
-# Season/Episode special values
-SEASON_COVER = "Cover"
-SEASON_BACKDROP = "Backdrop"
-SEASON_SPECIALS = "Specials"
-SEASON_SPECIALS_NUMBER = 0
-EPISODE_COVER = "Cover"
-
 # Kometa integration
 KOMETA_OVERLAY_LABEL = "Overlay"
+DEFAULT_KOMETA_DEBOUNCE = 10
+DEFAULT_KOMETA_CONTAINER_NAME = "kometa"
 
 # Update check interval (seconds)
 UPDATE_CHECK_INTERVAL = 1800  # 30 minutes
@@ -153,6 +145,7 @@ UPLOAD_CHUNK_SIZE = 1024 * 512  # bytes
 UPLOAD_CHUNK_TIMEOUT = 10 # seconds
 
 # Network timeouts (seconds)
+DEFAULT_GENERIC_TIMEOUT = 10
 DEFAULT_PLEX_CONNECT_TIMEOUT = 10  # PlexConnector.connect()
 DEFAULT_KOMETA_DOWNLOAD_TIMEOUT = 10  # Downloading artwork to save to the Kometa asset directory
 OIDC_REQUEST_TIMEOUT = 10  # Discovery, token exchange and userinfo calls to the identity provider

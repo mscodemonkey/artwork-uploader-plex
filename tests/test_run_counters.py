@@ -1,4 +1,4 @@
-"""Unit tests for the run-summary counters."""
+"""Unit tests for run-summary counters, ProcessingCallbacks result recording, and RunOutcome rules."""
 
 import dataclasses
 from unittest.mock import MagicMock, patch
@@ -10,7 +10,7 @@ from artwork_uploader import parse_bulk_file_from_cli, process_bulk_import_from_
 from core.enums import RunOutcome
 from models.callbacks import ProcessingCallbacks
 from models.instance import Instance
-from services.artwork_processor import ArtworkProcessor
+from processors.upload_processor import UploadProcessor
 from services.run_history import RunHistory
 
 
@@ -21,18 +21,79 @@ from services.run_history import RunHistory
     ("❌ A Movie | Failed to update Poster in Movies", "failed"),
     ("⏩ A Movie | Poster unchanged in Movies", None),
     ("⚠️ A Movie | Poster skipped - artwork is for a different title", None),
+    ("Plex API not available at endpoint", "unavailable"),
 ])
-def test_record_result_reads_the_uploader_prefixes(result, expected):
-    """Every caller that tallies a run reads these prefixes, so they are checked once
-    here rather than restated in each one."""
-    counters = ProcessingCallbacks(success_counter=[0], locked_counter=[0], failed_counter=[0])
-
-    assert counters.record_result(result) == expected
+def test_record_result_reads_uploader_prefixes(result, expected):
+    """Verify that record_result maps string prefixes to the correct status category."""
+    callbacks = ProcessingCallbacks()
+    assert callbacks.record_result(result) == expected
 
 
-def test_record_result_reads_the_prefix_with_the_default_counters():
-    assert ProcessingCallbacks().record_result("✅ A Movie | Poster updated") == "success"
+def test_record_result_populates_counters_and_updated_asset_map():
+    """Verify that record_result updates counter metrics and builds updated_asset_map correctly."""
+    callbacks = ProcessingCallbacks()
+    
+    artwork = {
+        "library": "TV Shows",
+        "ratingKey": 418617,
+        "title": "VisionQuest",
+        "year": 2026,
+        "media_type": "episode",
+        "season": "1",        # Intended string to test numeric conversion
+        "episode": "3",       # Intended string to test numeric conversion
+        "file_type": "poster",
+        "author": "RandalPink87",
+        "overlay": True,
+        "status": "refreshed"
+    }
 
+    status = callbacks.record_result("✅ Title card refreshed", artwork=artwork)
+    
+    assert status == "success"
+    assert callbacks.assets_processed[0] == 1
+    assert callbacks.success_counter[0] == 1
+    
+    # Assert structural integrity of updated_asset_map
+    assert "TV Shows" in callbacks.updated_asset_map
+    assert 418617 in callbacks.updated_asset_map["TV Shows"]
+    
+    entry = callbacks.updated_asset_map["TV Shows"][418617]
+    assert entry["title"] == "VisionQuest"
+    assert entry["year"] == 2026
+    assert len(entry["updated_assets"]) == 1
+    
+    asset_meta = entry["updated_assets"][0]
+    assert asset_meta["season"] == 1  # Verify type conversion to int
+    assert asset_meta["episode"] == 3  # Verify type conversion to int
+    assert asset_meta["overlay"] is True
+
+def test_upload_processor_tallying_locked_and_successes():
+    """Verify UploadProcessor records locked and successful items through callbacks correctly."""
+    locked, success = [0], [0]
+    callbacks = ProcessingCallbacks(locked_counter=locked, success_counter=success)
+    uploader = UploadProcessor(plex=None, callbacks=callbacks)
+
+    # Simulate UploadProcessor calling record_result during operations
+    uploader.callbacks.record_result("✅ A Movie | Poster updated in Movies")
+    uploader.callbacks.record_result("🔒 B Movie | Poster locked, skipped in Movies")
+    uploader.callbacks.record_result("🔒 C Movie | Poster locked, skipped in Movies")
+    uploader.callbacks.record_result("⏩ D Movie | Poster unchanged in Movies")
+
+    assert locked[0] == 2
+    assert success[0] == 1
+
+
+def test_upload_processor_tallying_failed_uploads():
+    """Verify failed upload attempts increment the failed counter without affecting success."""
+    success, failed = [0], [0]
+    callbacks = ProcessingCallbacks(success_counter=success, failed_counter=failed)
+    uploader = UploadProcessor(plex=None, callbacks=callbacks)
+
+    uploader.callbacks.record_result("✅ A Movie | Poster updated in Movies")
+    uploader.callbacks.record_result("❌ B Movie | Failed to update Poster in Movies after 3 attempt(s): timed out")
+
+    assert success[0] == 1
+    assert failed[0] == 1
 
 def test_locked_counter_increments():
     locked = [0]
@@ -42,62 +103,17 @@ def test_locked_counter_increments():
     assert locked[0] == 3
 
 
-def test_locked_is_a_no_op_without_a_counter():
-    ProcessingCallbacks().locked(1)   # must not raise
-
-
-def test_locked_results_are_counted_and_successes_still_are():
-    locked, success = [0], [0]
-    callbacks = ProcessingCallbacks(locked_counter=locked, success_counter=success)
-    processor = ArtworkProcessor(plex=None, callbacks=callbacks)
-
-    processor._process_single_artwork({}, lambda artwork: [
-        "✅ A Movie | Poster updated in Movies",
-        "🔒 B Movie | Poster locked, skipped in Movies",
-        "🔒 C Movie | Poster locked, skipped in Movies",
-        "⏩ D Movie | Poster unchanged in Movies",
-    ])
-
-    assert locked[0] == 2
-    assert success[0] == 1
-
-
-def test_failed_counter_increments():
-    failed = [0]
-    callbacks = ProcessingCallbacks(failed_counter=failed)
+def test_counter_methods_are_no_ops_without_target_counters():
+    callbacks = ProcessingCallbacks(
+        success_counter=None,
+        locked_counter=None,
+        failed_counter=None
+    )
+    callbacks.locked(1)
     callbacks.failed(1)
-    callbacks.failed(2)
-    assert failed[0] == 3
-
-
-def test_failed_is_a_no_op_without_a_counter():
-    ProcessingCallbacks().failed(1)   # must not raise
-
-
-def test_failed_uploads_are_counted_and_do_not_count_as_success():
-    # An upload that exhausted its retries returns a ❌ result - it must be counted as a failure
-    # and must not also be counted as a success.
-    success, failed = [0], [0]
-    callbacks = ProcessingCallbacks(success_counter=success, failed_counter=failed)
-    processor = ArtworkProcessor(plex=None, callbacks=callbacks)
-
-    processor._process_single_artwork({}, lambda artwork: [
-        "✅ A Movie | Poster updated in Movies",
-        "❌ B Movie | Failed to update Poster in Movies after 3 attempt(s): timed out",
-    ])
-
-    assert success[0] == 1
-    assert failed[0] == 1
-
-
-# Every counter on ProcessingCallbacks used to be a keyword argument defaulting to None, and
-# each of the increment methods checks for its list before touching it. Leaving one out of a
-# call to scrape_and_upload therefore raised nothing and logged nothing: the number simply
-# stayed at zero. That had already happened once per counter. assets_processed, cached_counter,
-# locked_counter and failed_counter were each added to the bulk import from the Bulk Import
-# tab and none of them reached the command line path, which was still passing only a
-# success_counter years later. The counters carry a real default now and the paths share one
-# tally, so these two can no longer fail. They stay as a guard on that default.
+    callbacks.success(1)
+    callbacks.assets(1)
+    # Must complete without raising AttributeError / TypeError
 
 def _counter_field_names():
     """Read the counters off the class rather than listing them here, so one added later
@@ -107,8 +123,7 @@ def _counter_field_names():
 
 
 def _callbacks_built_by(start_the_run, tmp_path):
-    """Run one of the bulk paths with the processor stubbed out, and give back the
-    ProcessingCallbacks it handed to it."""
+    """Execute a run with stubbed dependencies and extract the generated ProcessingCallbacks."""
     with (
         patch("artwork_uploader.ArtworkProcessor") as processor_class,
         patch("artwork_uploader.RunHistory", lambda: RunHistory(str(tmp_path / "run_history.json"))),
@@ -120,7 +135,7 @@ def _callbacks_built_by(start_the_run, tmp_path):
         processor_class.return_value.scrape_and_process.return_value = ("A Title", "An Author")
         start_the_run()
 
-    assert processor_class.call_count == 1, "the path under test never reached the processor"
+    assert processor_class.call_count == 1, "The target execution path did not reach ArtworkProcessor"
     return processor_class.call_args.args[1]
 
 

@@ -40,46 +40,48 @@ def debug_me(message: str, title: str=None):
             # Automatically infer the source of the call to the debug_me function
             # If it's a function inside a module (like start_web_server in web_routes.py) we get web_routes/start_web_server
             # If it's a method inside a class (like scrape for Scraper in scraper.py) we get Scrape/scrape
-            frame = inspect.currentframe().f_back
+            if title:
+                source = title
+            else:
+                frame = inspect.currentframe().f_back
 
-            while frame:
-                func_name = frame.f_code.co_name
+                while frame:
+                    func_name = frame.f_code.co_name
 
-                current_class = None
-                if "self" in frame.f_locals:
-                    current_class = frame.f_locals["self"].__class__.__name__
-                elif "cls" in frame.f_locals:
-                    obj = frame.f_locals["cls"]
-                    current_class = getattr(obj, "__name__", obj.__class__.__name__)
+                    current_class = None
+                    if "self" in frame.f_locals:
+                        current_class = frame.f_locals["self"].__class__.__name__
+                    elif "cls" in frame.f_locals:
+                        obj = frame.f_locals["cls"]
+                        current_class = getattr(obj, "__name__", obj.__class__.__name__)
+                    
+                    if func_name == "debug_callback" or current_class == "ProcessingCallbacks":
+                        frame = frame.f_back
+                    else:
+                        break
                 
-                if func_name == "debug_callback" or current_class == "ProcessingCallbacks":
-                    frame = frame.f_back
-                else:
-                    break
-            
-            if frame:
-                func_name = frame.f_code.co_name
+                if frame:
+                    func_name = frame.f_code.co_name
 
-                file_path = frame.f_code.co_filename
-                file_name = os.path.splitext(os.path.basename(file_path))[0]
+                    file_path = frame.f_code.co_filename
+                    file_name = os.path.splitext(os.path.basename(file_path))[0]
 
-                class_name = current_class
-                if "self" in frame.f_locals:
-                    class_name = frame.f_locals["self"].__class__.__name__
+                    class_name = current_class
+                    if "self" in frame.f_locals:
+                        class_name = frame.f_locals["self"].__class__.__name__
 
-                elif "cls" in frame.f_locals:
-                    obj = frame.f_locals["cls"]
-                    class_name = getattr(obj, "__name__", obj.__class__.__name__)
+                    elif "cls" in frame.f_locals:
+                        obj = frame.f_locals["cls"]
+                        class_name = getattr(obj, "__name__", obj.__class__.__name__)
 
-                if func_name == "<module>":
-                    source = f"{file_name}/__main__"
-                elif class_name:
-                    source = f"{class_name}/{func_name}"
-                else:
-                    source = f"{file_name}/{func_name}"
+                    if func_name == "<module>":
+                        source = f"{file_name}/__main__"
+                    elif class_name:
+                        source = f"{class_name}/{func_name}"
+                    else:
+                        source = f"{file_name}/{func_name}"
 
             timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            if title: source = title
             if isinstance(message, (list, dict)):
                 print(f"{ANSI_BOLD}{BOOTSTRAP_COLORS.get('light').get('ansi')}", end="")
                 pprint(message, sort_dicts=False, indent=2, compact=False)

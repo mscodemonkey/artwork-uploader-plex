@@ -34,9 +34,9 @@ def _log(text: str) -> None:
     update_log(Instance(broadcast=True), text)
 
 
-def _debug(message: str) -> None:
+def _debug(message: str, context: Optional[str] = None) -> None:
     from utils.notifications import debug_me
-    debug_me(message, "WebhookService")
+    debug_me(message, context)
 
 def _clean_title(title: str) -> str:
     """Removes year in parenthesis from title"""
@@ -168,7 +168,10 @@ class WebhookService:
         # One history record covers the whole event, retries included, so the run starts
         # counting from the moment it was accepted and the tally survives every attempt.
         started_at = datetime.now(timezone.utc).isoformat()
-        tally = ProcessingCallbacks()
+        tally = ProcessingCallbacks(
+            on_log_update=_log,
+            on_debug=_debug
+        )
         # Wait a configurable delay before the first attempt: the *arr apps fire the webhook the
         # moment they import a file, usually before Plex has scanned it in, so give Plex a head
         # start. If it is still not ready by then, the retry ladder takes over.
@@ -191,6 +194,7 @@ class WebhookService:
     def _attempt(self, event: WebhookEvent, key, started_at: str, tally: ProcessingCallbacks,
                  attempt: int = 0, artwork: Optional[List[dict]] = None,
                  log_file: Optional[str] = None) -> None:
+        _debug(f"Processing webhook event with key {key}, attempt #{attempt+1}")
         # UploadProcessor pulls in the processors -> plex chain; import it here so the services
         # package does not drag that in at start-up (mirrors the app's own lazy-import pattern).
         from processors.upload_processor import UploadProcessor
@@ -213,7 +217,7 @@ class WebhookService:
                     return
                 _log(f"📥 Webhook | {event.source.title()} import: {event.label()}")
             globals.plex.connect()
-            processor = UploadProcessor(globals.plex)
+            processor = UploadProcessor(globals.plex, tally)
             processor.set_options(Options())
             # allow_artist_updates is a scheduled-scrape concern and must never apply here.
             # set_options resolves it from the global config, so a bare Options() still inherits it.
@@ -225,20 +229,18 @@ class WebhookService:
             pending = []
             for item in artwork:
                 try:
+                    _debug(f"Processing webhook item {item}")
                     if event.kind == "movie":
-                        results = processor.process_movie_artwork(item)
+                        processor.process_movie_artwork(item)
                     else:
-                        results = processor.process_tv_artwork(item)
-                    results = results or []
+                        processor.process_tv_artwork(item)
                     # A season/episode whose show is in Plex but which Plex has not scanned in yet
                     # comes back as a "not available" result rather than an exception; treat that
                     # the same as not-found so it retries once Plex catches up.
-                    if any("not available" in str(result).lower() for result in results):
+                    if tally.unavailable_counter[0] > 0:
+                        tally.unavailable_counter[0] = 0
                         pending.append(item)
-                    else:
-                        for result in results:
-                            tally.record_result(result)
-                            _log(result)
+
                 except (MovieNotFound, ShowNotFound):
                     pending.append(item)          # not in Plex yet, retry it
                 except Exception as error:
@@ -294,6 +296,10 @@ class WebhookService:
             # future import of this title behind the dedupe guard.
             _debug(f"Could not record the webhook run for {event.label()}: {error}")
         self._release(key)
+        if tally.updated_asset_map and globals.config.kometa_auto_run:
+            _debug(f"Enqueueing {len(tally.updated_asset_map)} libraries for targeted Kometa update...")
+            globals.kometa_runner.set_instance(Instance(mode='web', broadcast=True))
+            globals.kometa_runner.enqueue(tally.updated_asset_map)
 
     def _collect_artwork(self, event: WebhookEvent) -> List[dict]:
         """Build the artwork dicts to apply by looking the title up in the index for each

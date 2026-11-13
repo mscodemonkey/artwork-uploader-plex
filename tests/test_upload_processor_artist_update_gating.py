@@ -11,6 +11,7 @@ import pytest
 from core import globals
 from models.options import Options
 from processors.upload_processor import UploadProcessor
+from models.callbacks import ProcessingCallbacks
 
 
 class _Config:
@@ -20,13 +21,14 @@ class _Config:
         self.save_to_kometa = False
         self.plex_local_assets = False
         self.skip_locked_artwork = True
+        self.kometa_auto_run = False
 
 
 @pytest.fixture
 def processor():
     # UploadProcessor.__init__ connects to Plex and loads config.json from disk; set_options is
     # the only thing under test, so build the instance without running it.
-    return UploadProcessor.__new__(UploadProcessor)
+    return UploadProcessor(plex=None, callbacks=ProcessingCallbacks())
 
 
 def _set_options(processor, monkeypatch, *, config, option_on=False):
@@ -65,7 +67,7 @@ def test_the_debug_message_still_fires_when_the_option_is_dropped(processor, mon
     # The message explains why the option did nothing, so it has to survive the option being
     # resolved to False before the check.
     messages = []
-    monkeypatch.setattr("processors.upload_processor.debug_me",
+    monkeypatch.setattr(processor.callbacks, "debug",
                         lambda message, *args, **kwargs: messages.append(message))
     _set_options(processor, monkeypatch,
                  config=_Config(track_artwork_ids=False, allow_artist_updates=True))

@@ -10,6 +10,8 @@ let currentBulkImport = '';     // Current bulk import file
 let bulkTextAsLoaded = '';      // File contents when loaded, to determine changes
 let barTimer = null;            // Timer for progress bar
 let docker = false;             // Docker environment detected or not
+let dockerKometaConfigPathMissing = null;
+let dockerSocketMissing = null;
 let tvPicker, moviePicker, tpdbUserPicker, oidcScopesPicker, oidcAllowedGroupsPicker;
 let validationTimeout;
 let currentBrowseTargetInput = null;
@@ -708,12 +710,18 @@ socket.on("docker_detected", (data) => {
     const kometaBase = document.getElementById("kometa_base");
     const tempDir = document.getElementById("temp_dir");
     const saveToKometaCheckbox = document.getElementById("save_to_kometa");
+    const kometaAutoRunCheckbox = document.getElementById("kometa_auto_run");
+    const kometaAutoRunWarning = document.getElementById("kometa_auto_run_warning");
     const optionTemp = document.getElementById("option-temp");
     const uploadOptionTemp = document.getElementById("upload-option-temp");
     
     if (validResponse(data)) {
         if (data.docker == "true") {
             docker = true;
+            dockerKometaConfigPathMissing = data.kometa_config_path === "(not defined)";
+            dockerSocketMissing = !data.socket_available
+
+            applyKometaAutoRunAvailability();
             // If no Kometa asset directory has been bind-mounted to the container /asset path, disable the
             // ability to turn on saving to Kometa asset directory
             if (data.kometa_base == "(not defined)") {
@@ -723,6 +731,8 @@ socket.on("docker_detected", (data) => {
                 dockerWarning.innerHTML = '<i class="bi bi-exclamation-triangle"></i>&ensp;Kometa base path not defined in <span class="text-nowrap"><code>docker-compose.yml</code></span>. Saving assets to Kometa asset directory is not available.<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
                 dockerWarning.classList.add("alert-danger");
                 dockerWarning.classList.remove("d-none");
+                kometaAutoRunCheckbox.disabled = true;
+                kometaAutoRunCheckbox.checked = false;
             }
             if (saveToKometaCheckbox.checked && !saveToKometaCheckbox.disabled) {
                 dockerWarning.classList.remove("d-none");
@@ -730,12 +740,12 @@ socket.on("docker_detected", (data) => {
             
             // Disables path input fields, sets values to those detected by backend
             // and removes the in-line browse button
-            const pathInputIds = ["kometa_base", "temp_dir"];
+            const pathInputIds = ["kometa_base", "temp_dir", "kometa_config_path"];
             pathInputIds.forEach(id => {
                 const input = document.getElementById(id);
                 if (input) {
                     input.disabled = true;
-                    input.value = id === "kometa_base" ? data.kometa_base : data.temp_dir;
+                    input.value = id === "kometa_base" ? data.kometa_base : id === "temp_dir" ? data.temp_dir : data.kometa_config_path;
                     input.classList.remove("has-inline-btn", "pe-5");
                     const browseBtn = input.parentElement.querySelector(".browse-folder-btn");
                     if (browseBtn) {
@@ -751,10 +761,41 @@ socket.on("docker_detected", (data) => {
             }
         } else {
             docker = false;
+            dockerKometaConfigPathMissing = false;
+            dockerSocketMissing = false;
+            applyKometaAutoRunAvailability();
             dockerWarning.classList.add("d-none");
         }
     }
 });
+
+function applyKometaAutoRunAvailability() {
+    if (dockerKometaConfigPathMissing === null) return;
+
+    const autoRunCheckbox = document.getElementById("kometa_auto_run");
+    const saveToKometa = document.getElementById("save_to_kometa").checked;
+    const kometaAutoRunWarning = document.getElementById("kometa_auto_run_warning");
+    const kometaAutoRunMessage = document.getElementById("kometa_auto_run_message");
+    const dockerWarning = document.getElementById("docker_warning");
+    autoRunCheckbox.disabled = dockerKometaConfigPathMissing || dockerSocketMissing;
+
+    if (dockerKometaConfigPathMissing) {
+        autoRunCheckbox.checked = false;
+        kometaAutoRunMessage.innerHTML = "The Kometa config path is not defined in <span class='text-nowrap'><code>docker-compose.yml</code></span> file"
+        kometaAutoRunWarning.classList.toggle("d-none", !saveToKometa);
+        dockerWarning.querySelector("custom").innerHTML = "asset and temp directories are hardcoded inside the container to <code>/assets</code> and <code>/temp</code> respectively"
+    } else if (dockerSocketMissing) {
+        autoRunCheckbox.checked = false;
+        kometaAutoRunMessage.innerHTML = "Artwork Uploader cannot communicate with the host's Docker socket"
+        kometaAutoRunWarning.classList.toggle("d-none", !saveToKometa);
+        dockerWarning.querySelector("custom").innerHTML = "asset and temp directories are hardcoded inside the container to <code>/assets</code> and <code>/temp</code> respectively"
+    } else {
+        kometaAutoRunWarning.classList.add("d-none");
+        dockerWarning.querySelector("custom").innerHTML = "asset, temp and config directories are hardcoded inside the container to <code>/assets</code>, <code>/temp</code> and <code>/kometa_config</code> respectively"
+    }
+
+    toggleKometaAutoRunSettings();
+}
 
 // Send test notification
 function testNotifications() {
@@ -1226,7 +1267,7 @@ document.getElementById("save_config_button").addEventListener("click", async fu
     // Form is valid: make sure highlights are cleared if user successfully saves
     const tvLibraries = tvPicker ? tvPicker.getValue() : [];
     const movieLibraries = moviePicker ? moviePicker.getValue() : [];
-
+    
     if (tvLibraries.length + movieLibraries.length > 0) {
         form.classList.remove("was-validated");
         saveConfig();
@@ -1286,6 +1327,18 @@ function getCurrentConfigForm() {
 
     // Checkbox for saving artwork to Kometa asset directory
     current_form.save_to_kometa = document.getElementById("save_to_kometa").checked;
+
+    // Kometa config directory
+    current_form.kometa_config_path = document.getElementById("kometa_config_path").value;
+    
+    // Kometa container name
+    current_form.kometa_container_name = document.getElementById("kometa_container_name").value;
+    
+    // Kometa debounce
+    current_form.kometa_debounce = parseInt(document.getElementById("kometa_debounce").value) || 10;
+
+    // Checkbox for Kometa auto run if assets updated
+    current_form.kometa_auto_run = document.getElementById("kometa_auto_run").checked;
 
     // Checkbox for staging assets
     current_form.stage_assets = document.getElementById("stage_assets").checked;
@@ -1469,9 +1522,22 @@ function updateConfigUI(config) {
     
     document.getElementById("track_artwork_ids").checked = config.track_artwork_ids;
     document.getElementById("save_to_kometa").checked = config.save_to_kometa;
+    document.getElementById("kometa_auto_run").checked = config.kometa_auto_run;
+    document.getElementById("kometa_config_path").value = config.kometa_config_path;
+    document.getElementById("kometa_container_name").value = config.kometa_container_name;
+    document.getElementById("kometa_debounce").value = config.kometa_debounce ?? 10;
     document.getElementById("stage_assets").checked = config.stage_assets;
     document.getElementById("kometa_base").value = config.kometa_base;
+    if (config.kometa_base === "(not defined)") {
+        document.getElementById("save_to_kometa").checked = false;
+        document.getElementById("save_to_kometa").disabled = true;
+    }
     document.getElementById("temp_dir").value = config.temp_dir || "";
+    document.getElementById("kometa_config_path").value = config.kometa_config_path;
+    if (config.kometa_config_path === "(not defined)") {
+        document.getElementById("kometa_auto_run").checked = false;
+        document.getElementById("kometa_auto_run").disabled = true;
+    }
     document.getElementById("auto_manage_bulk_files").checked = config.auto_manage_bulk_files;
     document.getElementById("reset_overlay").checked = config.reset_overlay;
     document.getElementById("skip_locked_artwork").checked = config.skip_locked_artwork;
@@ -1547,6 +1613,10 @@ function updateConfigUI(config) {
     
     // Toggle Kometa settings visibility
     toggleKometaSettings();
+
+    // Toggle Kometa autorun settings visibility
+    toggleKometaAutoRunSettings();
+    applyKometaAutoRunAvailability();
     
     // Toggle Add to Bulk checkbox visibility
     toggleAddToBulkCheckbox();
@@ -1619,6 +1689,8 @@ function loadConfig(silent=false, restore=false) {
                 updateStatus("Configuration restored successfully", "success", false, false, "check2-circle");
                 const passwordField = document.getElementById("auth_password");
                 if (passwordField) passwordField.value = '';
+                const form = document.getElementById("config_form");
+                form.classList.remove("was-validated");
             }
         }
     });
@@ -1951,14 +2023,16 @@ const RUN_HISTORY_TYPE_LABELS = {
     bulk: "Bulk import",
     scrape: "Scrape",
     upload: "Upload",
-    webhook: "Webhook"
+    webhook: "Webhook",
+    kometa: "Kometa"
 };
 
 const RUN_HISTORY_TYPE_ICONS = {
     bulk: "journal-text",
     scrape: "arrow-repeat",
     upload: "cloud-arrow-up",
-    webhook: "broadcast-pin"
+    webhook: "broadcast-pin",
+    kometa: "palette"
 };
 
 const RUN_HISTORY_TRIGGER_LABELS = {
@@ -1966,7 +2040,8 @@ const RUN_HISTORY_TRIGGER_LABELS = {
     scheduled: "Scheduled",
     cli: "Command line",
     radarr: "Radarr",
-    sonarr: "Sonarr"
+    sonarr: "Sonarr",
+    automatic: "Automatic"
 };
 
 const RUN_HISTORY_TRIGGER_ICONS = {
@@ -1974,7 +2049,8 @@ const RUN_HISTORY_TRIGGER_ICONS = {
     scheduled: "alarm",
     cli: "code-square",
     radarr: "film",
-    sonarr: "tv"
+    sonarr: "tv",
+    automatic: "robot"
 }
 
 function formatRunDuration(startedAt, endedAt) {
@@ -2286,7 +2362,6 @@ function showLogsforRun(logFileName, runLabel) {
         if (validResponse(data)) {
             if (data.success) {
                 logData = filterLogContent(data.contents);
-                // logData.content = data.contents;
                 const modalEl = document.getElementById("run_log_modal");
                 const contentEl = document.getElementById("run_log_content");
                 const modalTitleEl = document.getElementById("runLogModalLabel");
@@ -3566,6 +3641,7 @@ function toggleKometaSettings() {
     const kometaSettings = document.getElementById("kometa_settings");
     const kometaBase = document.getElementById("kometa_base");
     const dockerWarning = document.getElementById("docker_warning");
+    const autoRun = document.getElementById("kometa_auto_run");
 
     if (saveToKometa) {
         plexLocalAssets.checked = false;
@@ -3583,7 +3659,7 @@ function toggleKometaSettings() {
         if (kometaBase) {
             // Make the Kometa base directory field required
             kometaBase.required = true;
-            // Optionally clear any previous invalid state so the user can re-validate
+            // Clear any previous invalid state so the user can re-validate
             kometaBase.classList.remove('is-invalid');
         }
     } else {
@@ -3591,6 +3667,7 @@ function toggleKometaSettings() {
             dockerWarning.classList.add("d-none");
         }
         kometaSettings.style.display = "none";
+        autoRun.checked = false;
         if (kometaBase) {
             kometaBase.required = false;
             // Clear invalid styling when hiding
@@ -3604,6 +3681,8 @@ function toggleKometaSettings() {
     toggleScraperStageCheckbox();
     toggleSkipLockedCheckbox();
     toggleKometaLabels();
+    toggleKometaAutoRunSettings();
+    applyKometaAutoRunAvailability();
 }
 
 function toggleKometaLabels() {
@@ -3746,6 +3825,9 @@ function togglePlexOptions() {
 
 // Add event listener for save_to_kometa checkbox
 document.getElementById("save_to_kometa").addEventListener("change", toggleKometaSettings);
+
+// Add event listener for kometa_auto_run checkbox
+document.getElementById("kometa_auto_run").addEventListener("change", toggleKometaAutoRunSettings);
 
 // Add event listener for plex_Local_assets checkbox
 document.getElementById("plex_local_assets").addEventListener("change", togglePathMappings);
@@ -4109,3 +4191,23 @@ document.querySelectorAll(".link-to-filters").forEach(el => el.addEventListener(
     bootstrap.Tab.getOrCreateInstance(mainTab).show();
     bootstrap.Tab.getOrCreateInstance(subTab).show();
 }));
+
+function toggleKometaAutoRunSettings() {
+    const autoRun = document.getElementById("kometa_auto_run").checked;
+    const autoRunSettings = document.getElementById("auto_run_settings");
+    const configDir = document.getElementById("kometa_config_path");
+    const containerName = document.getElementById("kometa_container_name");
+    const dockerWarning = document.getElementById("docker_warning");
+
+    if (autoRun) {
+        autoRunSettings.classList.remove("d-none");
+        configDir.required = true;
+        containerName.required = true;
+        dockerWarning.querySelector("custom").innerHTML = "asset, temp and config directories are hardcoded inside the container to <code>/assets</code>, <code>/temp</code> and <code>/kometa_config</code> respectively"
+    } else {
+        autoRunSettings.classList.add("d-none");
+        configDir.required = false;
+        containerName.required = false;
+        dockerWarning.querySelector("custom").innerHTML = "asset and temp directories are hardcoded inside the container to <code>/assets</code> and <code>/temp</code> respectively"
+    }
+}

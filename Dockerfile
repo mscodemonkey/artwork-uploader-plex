@@ -7,6 +7,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Set working directory
 WORKDIR /artwork-uploader
 
+# Install Docker CLI binary & system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends docker.io && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy only requirements first for better layer caching
 COPY requirements.txt .
 

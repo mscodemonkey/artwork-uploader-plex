@@ -1,0 +1,38 @@
+name: Update GHCR Pulls Badge
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch GHCR pull count
+        id: fetch
+        run: |
+          HTML=$(curl -sL "https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader")
+          # Extract total downloads count shown under "Total downloads"
+          PULLS=$(echo "$HTML" | grep -A 2 "Total downloads" | grep -oE '[0-9,.]+[KMB]?' | head -n 1)
+          if [ -z "$PULLS" ]; then
+            PULLS="unknown"
+          fi
+          echo "pulls=$PULLS" >> $GITHUB_OUTPUT
+
+      - name: Update badge JSON on badges branch
+        if: steps.fetch.outputs.pulls != 'unknown'
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GITHUB_TOKEN }}
+          gistID: ""
+          filename: ghcr-pulls.json
+          label: docker pulls
+          message: ${{ steps.fetch.outputs.pulls }}
+          color: 2496ED
+          namedLogo: docker
+          logoColor: white
