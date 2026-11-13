@@ -17,22 +17,31 @@ jobs:
         id: fetch
         run: |
           HTML=$(curl -sL "https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader")
-          # Extract total downloads count shown under "Total downloads"
           PULLS=$(echo "$HTML" | grep -A 2 "Total downloads" | grep -oE '[0-9,.]+[KMB]?' | head -n 1)
           if [ -z "$PULLS" ]; then
             PULLS="unknown"
           fi
           echo "pulls=$PULLS" >> $GITHUB_OUTPUT
+          echo "Detected pulls: $PULLS"
 
-      - name: Update badge JSON on badges branch
+      - name: Commit JSON to badges branch
         if: steps.fetch.outputs.pulls != 'unknown'
-        uses: schneegans/dynamic-badges-action@v1.7.0
-        with:
-          auth: ${{ secrets.GITHUB_TOKEN }}
-          gistID: ""
-          filename: ghcr-pulls.json
-          label: docker pulls
-          message: ${{ steps.fetch.outputs.pulls }}
-          color: 2496ED
-          namedLogo: docker
-          logoColor: white
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git init
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          cat <<EOF > ghcr-pulls.json
+          {
+            "schemaVersion": 1,
+            "label": "docker pulls",
+            "message": "${{ steps.fetch.outputs.pulls }}",
+            "color": "2496ED",
+            "namedLogo": "docker",
+            "logoColor": "white"
+          }
+          EOF
+          git checkout -b badges
+          git add ghcr-pulls.json
+          git commit -m "chore: update ghcr pulls badge"
+          git push origin badges --force
