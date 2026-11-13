@@ -14,7 +14,7 @@
   <!-- Stats -->
   <a href="https://github.com/mscodemonkey/artwork-uploader-plex/stargazers"><img src="https://img.shields.io/github/stars/mscodemonkey/artwork-uploader-plex?style=flat&logo=github" alt="Stars"></a>
   <a href="https://github.com/mscodemonkey/artwork-uploader-plex/releases"><img src="https://img.shields.io/github/downloads/mscodemonkey/artwork-uploader-plex/total?style=flat&logo=github&label=downloads" alt="Downloads"></a>
-  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader"><img src="https://img.shields.io/badge/ghcr.io-artwork--uploader-2496ED?logo=docker&logoColor=white" alt="Docker image"></a>
+  <a href="https://github.com/mscodemonkey/artwork-uploader-plex/pkgs/container/artwork-uploader"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2Fmscodemonkey%2Fartwork-uploader-plex%2Fbadges%2Fghcr-pulls.json" alt="Docker pulls"></a>
 </p>
 
 ---
@@ -25,7 +25,7 @@ It started life as a fork of Brian Brown's [plex-poster-set-helper](https://gith
 
 ![Scraper tab](assets/ScraperTab.png)
 
-## Contents
+# Contents
 
 - [Features](#features)
 - [Installation](#installation)
@@ -39,11 +39,13 @@ It started life as a fork of Brian Brown's [plex-poster-set-helper](https://gith
   - [Scheduler and notifications](#scheduler-and-notifications)
   - [Automatic artwork for new imports (Sonarr/Radarr webhook)](#automatic-artwork-for-new-imports-sonarrradarr-webhook)
   - [Local assets](#local-assets)
+    - [Kometa Asset Directory](#kometa-asset-directory)
+    - [Plex Local Media Assets](#plex-local-media-assets)
 - [Screenshots](#screenshots)
 - [Troubleshooting](#troubleshooting)
 - [For developers](#for-developers)
 
-## Features
+# Features
 
 **Artwork sources**
 - Scrape sets and boxsets from ThePosterDB and MediUX by URL.
@@ -70,13 +72,13 @@ It started life as a fork of Brian Brown's [plex-poster-set-helper](https://gith
 **Local Assets**
 
 Some users like to keep offline copies of their custom artwork. Artwork Uploader for Plex supports two distinct ways to do this:
-- Plex local media assets: Saves the assets to your media folders right next to your media files, following Plex's [local media assets](https://support.plex.tv/articles/200220677-local-media-assets-movies/) naming convention so they are immediately picked up and applied by Plex. See [Plex local assets](#plex-local-media-assets).
 - Kometa asset directory: Saves the assets to your Kometa asset directory, allowing Kometa to do any custom processing (like applying overlays) and apply them to Plex. See [Kometa asset directory](#kometa-asset-directory).
+- Plex local media assets: Saves the assets to your media folders right next to your media files, following Plex's [local media assets](https://support.plex.tv/articles/200220677-local-media-assets-movies/) naming convention so they are immediately picked up and applied by Plex. See [Plex local assets](#plex-local-media-assets).
 
 
-## Installation
+# Installation
 
-### Docker (recommended)
+## Docker (recommended)
 
 There's a ready-to-run image on the GitHub Container Registry. Create a folder for the app, drop this in as `docker-compose.yml` (or download and rename [docker-compose.example.yml](docker-compose.example.yml)), and customise your [time zone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) and paths:
 
@@ -88,6 +90,7 @@ services:
     ports:
       - "4567:4567"
     volumes:
+      # REQUIRED: The following bind mounts are required for general operation
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
       - ./config:/artwork-uploader/config:rw
       - ./logs:/artwork-uploader/logs:rw
@@ -97,22 +100,42 @@ services:
       # where local assets would potentially need to be saved. The host paths must be the 
       # actual paths at the host level, and the container path names are arbitrary, but they
       # will be used if path mappings need to be defined.
-      #
+      
       # If Plex is also running as a container, use the same container paths here to
       # avoid having to define path mappings
       - <HOST_PATH_TO_MEDIA_FOLDER_1>:/media/movies1:rw
       - <HOST_PATH_TO_MEDIA_FOLDER_2>:/media/movies2:rw
       - <HOST_PATH_TO_MEDIA_FOLDER_3>:/media/tv1:rw
       - <HOST_PATH_TO_MEDIA_FOLDER_4>:/media/tv2:rw
-      ... # Add as many bind mounts as root folders for media libraries you have in Plex
+      - ...
+      # Add as many bind mounts as root folders for media libraries you have in Plex
 
-      # OPTIONAL: Kometa settings (required for Kometa asset directory mode)
-      - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw # Optional, only if you save assets to your Kometa asset directory
+      # OPTIONAL: Kometa settings
+      - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw # Required to save assets to your Kometa asset directory
       - <HOST_TEMP_PATH>:/temp:rw # Optional, only for testing with a temp dir
+      - <HOST_PATH_TO_KOMETA_CONFIF_FILE>:/kometa_config:rw # Required for automatic Kometa updates when assets are downloaded or updated
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Required for automatic Kometa updates when assets are downloaded or updated
     environment:
       - TZ=Europe/London
       - RUNNING_IN_DOCKER=1
+      - DOCKER_HOST=tcp://socket-proxy:2375 # Optional, if using a socket proxy instead of mounting the docker socket directly
     restart: unless-stopped
+
+  # OPTIONAL: Only for Kometa auto-run (comment out or remove this entire section if not needed)
+  # If instead of mounting the socket proxy directly in the container
+  # you'd rather use a socket proxy, you can include one inside the container
+  # or use one you already have deployed (in which case you'll have to change the DOCKER_HOST
+  # environment variable with the appropriate URL). The socket proxy requires POST permission 
+  # to execute 'docker exec' commands and initiate the targeted Kometa runs
+  socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    container_name: socket-proxy
+    environment:
+      - CONTAINERS=1
+      - EXEC=1
+      - POST=1 # Required because docker exec sends HTTP POST requests to create/start the exec instance
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
 
 Then:
@@ -146,23 +169,23 @@ python artwork_uploader.py
 
 With no arguments, Artwork Uploader starts a web server on port 4567. You can customize the port number with the `--port <port-numer>` argument. If you get dependency errors, you're probably not using the virtual environment. See [Troubleshooting](#troubleshooting).
 
-## Settings
+# Settings
 
 Everything is configured from the **Settings** tab in the web UI. On first run, point it at your Plex server and pick your libraries, and you're away. Behind the scenes the settings live in `config/config.json` (created on first run, with keys matching the names below), so you can also edit them in a text editor if that's more your thing.
 
-### Plex server settings
+## Plex server settings
 
 - **Base URL**: the address of your Plex server, e.g. `http://12.34.56.78:32400`, or `https://myplex.example.com` if it's behind a reverse proxy like Nginx or Caddy.
 - **Authentication token**: your Plex token ([how to find it](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)).
 - **TV libraries** and **Movie libraries**: pick one or more of each. Artwork is applied to the same media in every selected library.
 
-### Global filters
+## Global filters
 
 Per provider, tick the artwork types you want uploaded by default: show covers, season covers, title cards, movie posters, backgrounds, square art and collection posters. ThePosterDB doesn't provide title cards, backgrounds or square art, so those only appear under MediUX. Anything unticked is skipped unless you ask for it per URL, with `--filters` on the command line or in a bulk file, or with the checkboxes in the scraper tab.
 
 **A note on square art:** MediUX supports per-season square art for TV shows, but Plex only supports one square art asset at the show level, so the first one processed wins. When saving to the Kometa asset directory, the first is saved as `square.ext` and the rest as `square_alt_#.ext`, so you can rename an alternative into place.
 
-### Additional settings
+## Additional settings
 
 - **Reset Kometa overlay labels**: Reset Kometa's overlay label on upload so overlays get reapplied the next time Kometa runs. This setting only applies when both Plex local media assets and Kometa asset directory modes are off. 
 - **Track artwork ID in Plex labels** (recommended on): stores an artwork ID in a Plex label per item, so re-runs skip artwork that hasn't changed and finish fast. Turned off, every run uploads everything, which can mean long run times, especially on ThePosterDB. Leave it on and use force when you need to!
@@ -173,44 +196,45 @@ Per provider, tick the artwork types you want uploaded by default: show covers, 
 - **Sort and label bulk files automatically**: adds, labels and sorts URLs from the scrape tab into the currently loaded bulk import file. It won't auto-save yet, but that might come later.
 - **Missed run catch-up window**: how late a missed scheduled run can be and still run when the app starts, in minutes. `0` turns catch-up off.
 
-### Local asset settings
+## Local assets settings
 
 - **Save to Kometa asset directory**: save artwork to Kometa's asset directory instead of applying it to Plex, and set **Kometa Asset Directory** to your base asset directory. See [Kometa asset directory](#kometa-asset-directory).
+- **Run Kometa on new or updated assets**: automatically runs Kometa when new assets are downloaded or existing assets are replaced. Relies on Kometa 2.5.5's ability to target runs to individual media items, including seasons and episodes. Check [Kometa asset directory](#kometa-asset-directory) for details on the requirements and how to set it up.
 - **Reset the Overlay tag for Kometa if artwork updated**: lets Kometa reapply its overlays on the next run after new artwork goes up.
 - **Stage assets**: also download assets for TV seasons and episodes not yet in Plex, useful when a scheduled run happens before your automation has downloaded a new season. Doesn't apply to the Specials season (Season 0).
 - **Temp Directory**: an optional directory for test runs with the `--temp` option or the corresponding web UI toggle.
 - **Save as Plex local media assets**: save artwork locally alongside your media files following the Plex local media asset naming convention so that Plex picks up and applies the new assets immediately. See [Plex local media assets](#plex-local-media-assets).
 - **Path mappings**: If Plex and Artwork Uploader see paths to media folders differently, this setting allows you to tell Artwork Uploader which app path corresponds to which Plex path.
 
-### Authentication settings
+## Authentication settings
 
 Artwork Uploader for Plex support two forms of autentication, and you can enable either type or both (or none, although we highly recommend enabling authentication if you plan to access the server from the outside world through a reverse proxy).
 
 - **Basic authentication**: Provides basic authentication via username/password combination. Enable the setting and provide a username and password to this form of authentication.
 - **OIDC authentication**: Enables single-sign-on (SSO) via an Open ID Connect (OIDC) provider such as Pocket ID, Authelia, Authentik and others. Based on standard OIDC and OAuth, it should work with any OIDC provider but it has only been tested with [Pocket ID](https://pocket-id.org/). It supports OIDC authentication as well as group-based authorization if a list of allowed groups is provided (otherwise any user authenticated by the OIDC provider can access the app). It also supports logout callback URI to provide a fully-integrated solutions, logging users out of the OIDC provider when they log out of Artwork Uploader for Plex. Consult your OIDC provider's documentation on how to set up Artwork Uploader for Plex as an OIDC client and how to obtain all the necessary parameters (client ID, client secret, etc.) to enable OIDC authenticaion.
 
-### Webhook settings
+## Webhook settings
 
 - **Enable Sonarr/Radarr webhook**, the **Webhook token**, the **ThePosterDB users** to apply artwork from, and the **Delay** before applying (default 30 seconds). See [the webhook section](#automatic-artwork-for-new-imports-sonarrradarr-webhook) for how it works and how to wire up Sonarr and Radarr.
 
-### Notifications settings
+## Notifications settings
 
 - **Apprise URLs to notify**: one or more [Apprise](https://appriseit.com/services/) notification channels, each with its own selection of events. See [Scheduler and notifications](#scheduler-and-notifications).
 
-### Timeouts and retries
+## Timeouts and retries
 
 - **Plex connect/upload timeout** (default 10 seconds) and **Kometa download timeout** (default 10 seconds).
 - **Max upload attempts** (default 3, including the first) for transient errors like timeouts and server errors, with a **Cool-down period** (default 1 second) that doubles on every retry.
 
-## Usage
+# Usage
 
-### Web UI
+## Web UI
 
 The web UI is a full interface for the app: configure any setting, launch scrapes, run bulk imports, upload Zip files, consult the run history and view the live log or the archived persistent per-run logs. It supports multiple browser instances against the same server, keeps every instance updated on the state of a running operation, guards against launching two scrapes at once, and lets you cancel an operation that's taking too long. There's a debug mode too, in case you run into issues and want to open a GitHub issue for our inspection.
 
 It's fully responsive, so it works just as well from your phone. See [Screenshots](#screenshots).
 
-### Command line
+## Command line
 
 Point it at a single set or boxset:
 
@@ -223,7 +247,7 @@ python artwork_uploader.py https://mediux.pro/boxsets/1153
 
 Depending on your environment you may need `python3` instead of `python`.
 
-#### Optional command line arguments
+### Optional command line arguments
 
 `--add-sets` also parses any additional sets on the page (ThePosterDB).
 
@@ -261,7 +285,7 @@ All of these options also work in the web UI's scraper tab and in bulk files: ju
 https://theposterdb.com/set/71510 --add-posters --force
 ```
 
-### Bulk files
+## Bulk files
 
 Import multiple links from a .txt file with the bulk argument:
 
@@ -273,7 +297,7 @@ python artwork_uploader.py bulk bulk_import.txt
 - With no file argument, your default bulk file is used (tick **Default** next to a file on the bulk imports tab).
 - Turn on **Sort and label bulk files automatically** and the app will add, label and sort URLs from the scrape tab into the open bulk file for you.
 
-### Scheduler and notifications
+## Scheduler and notifications
 
 The scheduler lets you leave the app running and keep your artwork up to date automatically. On the bulk imports page, click the clock to add, edit or remove schedules for the open file. A file can carry more than one schedule, and each one either runs daily at a fixed time or repeats every N hours or days, so a large nightly run and a smaller twice-a-day one can share the same list. Tick **Run now** when creating an interval schedule and the first run happens within a couple of minutes instead of waiting a full interval. Interval schedules keep their anchor across an app restart, so the next run stays when it was already due, and runs missed while the app was down are caught up on startup, within the **Missed run catch-up window**.
 
@@ -287,7 +311,7 @@ A few settings make scheduled runs much more pleasant:
 
 You can also configure push notifications for scheduled runs through [Apprise](https://appriseit.com/services/). Each channel is switched on or off per event from the web UI: a run completing cleanly, completing with errors, failing to start, being skipped, or being cancelled. New channels default to the two completion events; opt each channel in to the noisier ones yourself. Manual runs stay silent unless you turn on the "Notify" toggle before starting one. Scheduled runs always attempt to notify, subject to each channel's event selection.
 
-### Automatic artwork for new imports (Sonarr/Radarr webhook)
+## Automatic artwork for new imports (Sonarr/Radarr webhook)
 
 With **Cache ThePosterDB user pages** on, the app already knows every poster your favourite users have uploaded, so it can apply the right artwork within about a minute of Sonarr or Radarr importing something, instead of waiting for the next scheduled run.
 
@@ -297,108 +321,16 @@ Turn on **Enable Sonarr/Radarr webhook**, set a **Webhook token**, and list the 
 
 On an import, the title is looked up in the cached index. If one of your configured users covers it, that single poster (plus season covers for the imported seasons on TV items) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same. Imports can reach the webhook before Plex has scanned the new file, so the apply retries for a few minutes, then leaves it to the next scheduled run. Ambiguous title matches (same-name remakes, for example) are skipped rather than guessed, and nothing is applied when no configured user has the title. Radarr says which file it imported, and the poster is applied to the Plex item holding that file. So an edition kept in its own folder (`Alien (1979) {edition-35mm Film Scan}` beside `Alien (1979)`) is never mistaken for the plain release, or the other way round. On an upgrade, the item holding the old file is left alone and the apply waits for Plex to scan the new one in. Paths are compared from the movie's folder down, so Radarr and Plex can mount the library at different roots. The endpoints return 404 while the webhook is off.
 
-### Local Assets
+## Local Assets
 
 Some users prefer to keep offline copies of their custom Plex artwork in order to have a backup for faster recovery in case of disaster. Artwork Uploader for Plex supports two distinct and mutually exclusive ways to save assets locally:
 
-#### Plex Local Media Assets
-Turn on **Save as Plex local media assets** and artwork is saved to your media folders right next to your media files. This mode requires Artwork Uploader for Plex to have access to the same media folders as Plex. Depending on your environment, it may require configuring path mappings if Plex and Artwork Uploader see paths differently. In addition, if Artwork Uploder is running as a docker container, you must bind-mount all media folders to the container through the `docker-compose.yml` file. Check the provided [Docker compose example](#docker-recommended) for details.
-
-In this mode, local media assets must be enabled on every library. Click on the three-dot menu of a media library and choose **Manage Library** > **Edit**. Click on **Advanced**, scroll down and check the **Use local assets** checkbox. Artwork Uploader will automatically refresh the media item so Plex picks up the new asset immediately after saving.
-
-Local media asset mode does not support episode and season asset staging since the season folder or episode media file necessarily has to be present for Artwork Uploader to infer the correct file path and name for the locally saved asset.
-
-<details>
-<summary>Example 1</summary>
-
-You have a Plex server running natively on Windows with two libraries:
-
-- Movies: This library has two root folders:
-  - `D:\Videos\Movies`
-  - `E:\Media\Movies`
-- TV Shows: This library has one root folder:
-  - `F:\Media\TV Shows`
-
-Artwork Uploader is running as a docker container. In your `docker-compose.yml` file you must mount all of these root folders and assign them local container paths:
-
-```yml
-  - volumes:
-    - D:/Videos/Movies:/media/movies_d:rw
-    - E:/Media/Movies:/media/movies_e:rw
-    - F:/Media/TV Shows:/media/tv_f:rw
-```
-
-Since Plex and Artwork Uploader will see fundamentally different paths to the same media file, path mappings must be defined. Path mappings can be defined via de web UI or through the `config.json` file in the following format:
-
-```
-{
-  path_mappings: [
-    {
-      "plex_path": "D:\Videos\Movies",
-      "app_path": "/media/movies_d"
-    },
-    {
-      "plex_path": "E:/Media/Movies",
-      "app_path": "/media/movies_e"
-    },
-    {
-      "plex_path": "F:\Media\TV Shows",
-      "app_path": "/media/tv_f"
-    }
-  ]
-}
-```
-
-Note how the Windows paths can be specified with either back or forward slashes, Artwork Uploader will normalize them to avoid any problem. The container path names are arbitrary, you just have to ensure you use the same paths in the docker bind mounts and the path mappings' `app-path` fields.
-
-When processing a poster for a movie whose location Plex reports as `D:\Videos\Movies\22 Jump Street (2014) {imdb-tt2294449}\22 Jump Street (2014) {imdb-tt2294449} - [Remux-1080p][AAC 2.0][HLG][x265]-TURG.mkv`, Artwork Uploader will translate the path as `/media/movies_d/22 Jump Street (2014) {imdb-tt2294449}` and will save the poster as `/media/movies_d/22 Jump Street (2014) {imdb-tt2294449}/poster.jpg` which through the docker bind mount will land exactly where Plex expects it at `D:\Videos\Movies\22 Jump Street (2014) {imdb-tt2294449}\poster.jpg`.
-</details>
-
-<details>
-<summary>Example 2</summary>
-
-You have a Plex server running as a container in a Linux machine. You have three media locations:
-
-- `/mnt/sda/media/movies`
-- `/mnt/sdb/files/tv1`
-- `/media/anime`
-
-Your Plex server's compose file has the following bind mounts:
-
-```yaml
-  - volumes:
-    - /mnt/sda/media/movies:/media/movies:rw
-    - /mnt/sdb/files/tv1:/media/tv_shows:rw
-    - /media/anime:/media/anime:rw
-```
-
-Plex has three libraries:
-
-- Movies: This library has one root folder:
-  - `/media/movies`
-- TV Shows: This library has one root folder:
-  - `/media/tv_shows`
-- Anime: This library has one root folder:
-  - `/media/anime`
-
-Artwork Uploader is also running as a docker container. In your `docker-compose.yml` file you must mount all these root folders and assign them local container paths:
-
-```yml
-  - volumes:
-    - /mnt/sda/media/movies:/media/movies:rw
-    - /mnt/sdb/files/tv1:/media/tv_shows:rw
-    - /media/tv:/media/tv_shows_2:rw
-```
-
-Since Plex and Artwork Uploader see the exact same paths to each media root folder, no path mappings are required. When Artwork Uploader processes title card for a TV show episode whose location Plex reports as `/media/tv_shows/Ted Lasso (2020) {tmdb-97546}/Season 01/Ted Lasso (2020) - S01E06 [Bluray-2160p h265 HDR10PLUS DTS-ES 5.1]-BAE.mkv`, it will save its corresponding title card as `/media/tv_shows/Ted Lasso (2020) {tmdb-97546}/Season 01/Ted Lasso (2020) - S01E06 [Bluray-2160p h265 HDR10PLUS DTS-ES 5.1]-BAE.png` which is exactly where Plex expects it.
-</details>
-
-#### Kometa Asset Directory
+### Kometa Asset Directory
 Turn on **Save to Kometa asset directory** and artwork is saved to Kometa's [asset directory](https://kometa.wiki/en/latest/kometa/guides/assets/) following Kometa's asset naming and directory structure convention instead of being applied to Plex. Whenever Kometa runs next, it applies all new or updated artwork with its overlays. Set **Kometa Asset Directory** to your base asset directory. You can optionally specify a **Temp Directory** for test runs.
 
 Kometa asset directory mode assumes:
 
-- `asset_folders` is `true` in Kometa's config.yml, so each show or movie has its own folder
+- `asset_folders` is `true` in Kometa's `config.yml`, so each show or movie has its own folder
 - `assets_for_all` is `true` in each library
 - `assets_for_all_collections` is `true` in each library, if you want collection assets managed
 - `create_asset_folders` is `true`
@@ -503,11 +435,109 @@ settings:
 
 </details>
 
+Turn on **Run Kometa on new or updated assets** if you'd rather not wait for the next Kometa scheduled run for your shiny new assets to be applied to your Plex server. With this setting, when a successful or partial run yields new or updated assets in your asset directory for one or more media items (movies, shows, seasons, episodes, collections), a custom Kometa config file targeting only the affected libraries will be crafted and Kometa will be invoked to run against only those media items that have received fresh artwork. This automatic Kometa run is supported across manual scrapes (both web and CLI) and bulk file operations, scheduled bulk file runs, ZIP uploads and webhook-triggered runs.
+
+This requires [Kometa 2.5.5](https://github.com/Kometa-Team/Kometa/releases/tag/v2.5.5) or above running as a Docker container in the same host system as Artwork Uploader. Kometa 2.5.5 adds support for targeted runs against specific Plex media items, including individual seasons or episodes. This avoids having to process entire libraries with potentially hundreds or thousands of seasons or episodes, which can take a long time, especially when using season or episode-level overlays. The targeted run will be crafted to update the artwork for affected media items alone, either directly (through a Kometa operations-only run) or with the necessary overlays baked in before applying (throuh a Kometa overlays-only run), completing in a matter of seconds.
+
+Artwork Uploader must have read/write access to the folder where Kometa's main `config.yml` file is stored, and where it will store the bespoke, optimized temporary Kometa configuration file. The path to this folder must be provided via the `kometa_config_path` variable in `config.json` (or configured via web UI). A `kometa_debounce` timer (default 10 seconds) defines how long Artwork Uploader will wait after a run yields new or updated assets and before invoking Kometa in case a subsequent run yields additional assets, in which case they will all be processed together in a single operation.
+
 Kometa asset directory mode supports asset staging. This allows Artwork Uploader to download assets for seasons or episodes not yet present in Plex, useful when a scheduled run happens before your automation has downloaded a new season or episode. This setting doesn't apply to the Specials season (Season 0).
 
-Finally, if you're using the asset directory and running in Docker, the app detects it (via the `RUNNING_IN_DOCKER` environment variable) and hardcodes the Kometa base directory to `/assets` and the temp directory to `/temp`. Map your real asset and temp folders to those paths in the container, as in the [Docker compose example](#docker-recommended). Your real paths stay in `config.json`, so running the app outside the container still works too.
+Finally, if you're using the asset directory and are running Artwork Uploader as a Docker container, the app detects it (via the `RUNNING_IN_DOCKER` environment variable) and hardcodes the Kometa base directory to `/assets`, the temp directory to `/temp` and the Kometa config directory to `/kometa_config`. Map your real asset, temp and Kometa config folders to those paths in the container. Your real paths stay in `config.json`, so running the app outside the container still works too. **Run Kometa on new or updated assets** requires Artwork Uploader to be able to communicate with the Docker socket. This can be achieved by mounting it directly in the container or (more secure) through a Docker socket proxy. Check the [Docker compose example](#docker-recommended) for examples on how to configure both options. If the `kometa_base` path is not defined the option to enable Kometa asset directory will be disabled. Likewise, if the `kometa_config` path is not defined or Artwork Uploader can't communicate with the Docker socket the option to enabled Kometa auto-run will be disabled.
 
-## Screenshots
+### Plex Local Media Assets
+Turn on **Save as Plex local media assets** and artwork is saved to your media folders right next to your media files. This mode requires Artwork Uploader to have access to the same media folders as Plex. Depending on your environment, it may require configuring path mappings if Plex and Artwork Uploader see paths differently. In addition, if Artwork Uploder is running as a docker container, you must bind-mount all media folders to the container through the `docker-compose.yml` file. Check the provided [Docker compose example](#docker-recommended) for details.
+
+In this mode, local media assets must be enabled on every library. Click on the three-dot menu of a media library and choose **Manage Library** > **Edit**. Click on **Advanced**, scroll down and check the **Use local assets** checkbox. Artwork Uploader will automatically refresh the media item so Plex picks up the new asset immediately after saving.
+
+Local media asset mode does not support episode and season asset staging since the season folder or episode media file necessarily has to be present for Artwork Uploader to infer the correct file path and name for the locally saved asset.
+
+<details>
+<summary>Example 1</summary>
+
+You have a Plex server running natively on Windows with two libraries:
+
+- Movies: This library has two root folders:
+  - `D:\Videos\Movies`
+  - `E:\Media\Movies`
+- TV Shows: This library has one root folder:
+  - `F:\Media\TV Shows`
+
+Artwork Uploader is running as a docker container. In your `docker-compose.yml` file you must mount all of these root folders and assign them local container paths:
+
+```yml
+  - volumes:
+    - D:/Videos/Movies:/media/movies_d:rw
+    - E:/Media/Movies:/media/movies_e:rw
+    - F:/Media/TV Shows:/media/tv_f:rw
+```
+
+Since Plex and Artwork Uploader will see fundamentally different paths to the same media file, path mappings must be defined. Path mappings can be defined via de web UI or through the `config.json` file in the following format:
+
+```
+{
+  path_mappings: [
+    {
+      "plex_path": "D:\Videos\Movies",
+      "app_path": "/media/movies_d"
+    },
+    {
+      "plex_path": "E:/Media/Movies",
+      "app_path": "/media/movies_e"
+    },
+    {
+      "plex_path": "F:\Media\TV Shows",
+      "app_path": "/media/tv_f"
+    }
+  ]
+}
+```
+
+Note how the Windows paths can be specified with either back or forward slashes, Artwork Uploader will normalize them to avoid any problem. The container path names are arbitrary, you just have to ensure you use the same paths in the docker bind mounts and the path mappings' `app-path` fields.
+
+When processing a poster for a movie whose location Plex reports as `D:\Videos\Movies\22 Jump Street (2014) {imdb-tt2294449}\22 Jump Street (2014) {imdb-tt2294449} - [Remux-1080p][AAC 2.0][HLG][x265]-TURG.mkv`, Artwork Uploader will translate the path as `/media/movies_d/22 Jump Street (2014) {imdb-tt2294449}` and will save the poster as `/media/movies_d/22 Jump Street (2014) {imdb-tt2294449}/poster.jpg` which through the docker bind mount will land exactly where Plex expects it at `D:\Videos\Movies\22 Jump Street (2014) {imdb-tt2294449}\poster.jpg`.
+</details>
+
+<details>
+<summary>Example 2</summary>
+
+You have a Plex server running as a container in a Linux machine. You have three media locations:
+
+- `/mnt/sda/media/movies`
+- `/mnt/sdb/files/tv1`
+- `/media/anime`
+
+Your Plex server's compose file has the following bind mounts:
+
+```yaml
+  - volumes:
+    - /mnt/sda/media/movies:/media/movies:rw
+    - /mnt/sdb/files/tv1:/media/tv_shows:rw
+    - /media/anime:/media/anime:rw
+```
+
+Plex has three libraries:
+
+- Movies: This library has one root folder:
+  - `/media/movies`
+- TV Shows: This library has one root folder:
+  - `/media/tv_shows`
+- Anime: This library has one root folder:
+  - `/media/anime`
+
+Artwork Uploader is also running as a docker container. In your `docker-compose.yml` file you must mount all these root folders and assign them local container paths:
+
+```yml
+  - volumes:
+    - /mnt/sda/media/movies:/media/movies:rw
+    - /mnt/sdb/files/tv1:/media/tv_shows:rw
+    - /media/tv:/media/tv_shows_2:rw
+```
+
+Since Plex and Artwork Uploader see the exact same paths to each media root folder, no path mappings are required. When Artwork Uploader processes title card for a TV show episode whose location Plex reports as `/media/tv_shows/Ted Lasso (2020) {tmdb-97546}/Season 01/Ted Lasso (2020) - S01E06 [Bluray-2160p h265 HDR10PLUS DTS-ES 5.1]-BAE.mkv`, it will save its corresponding title card as `/media/tv_shows/Ted Lasso (2020) {tmdb-97546}/Season 01/Ted Lasso (2020) - S01E06 [Bluray-2160p h265 HDR10PLUS DTS-ES 5.1]-BAE.png` which is exactly where Plex expects it.
+</details>
+
+# Screenshots
 
 ![Scraper](assets/ScraperTab.png)
 
@@ -543,9 +573,9 @@ And a responsive mobile UI, perfected for using the app from your smartphone!
 
 </details>
 
-## Troubleshooting
+# Troubleshooting
 
-### "Required dependencies are missing or incompatible"
+## "Required dependencies are missing or incompatible"
 
 Python packages can't be imported. Common causes:
 
@@ -580,7 +610,7 @@ Python packages can't be imported. Common causes:
    .venv/bin/python artwork_uploader.py
    ```
 
-### "Cannot access localhost:4567" or "Server won't start"
+## "Cannot access localhost:4567" or "Server won't start"
 
 If you see the scheduler messages but can't access the web UI:
 
@@ -593,7 +623,7 @@ If you see the scheduler messages but can't access the web UI:
 3. **Try the other local URLs**: `http://localhost:4567`, `http://127.0.0.1:4567`, `http://0.0.0.0:4567`.
 4. **Check firewall settings** to make sure port 4567 isn't blocked.
 
-### Strange "400 Bad request" errors in logs with binary data
+## Strange "400 Bad request" errors in logs with binary data
 
 Errors like this in your logs:
 
@@ -603,9 +633,9 @@ Errors like this in your logs:
 
 **This is completely normal and harmless!** They're TLS/SSL handshake attempts: something (your browser, an extension, or a security tool) is trying to connect over HTTPS to the HTTP-only Flask server, and Flask correctly rejects it. If you want HTTPS, put a reverse proxy like Nginx or Caddy in front.
 
-### Plex connection issues
+## Plex connection issues
 
-**"Cannot reach Plex server" or the application hangs on startup**
+### "Cannot reach Plex server" or the application hangs on startup
 
 The app has a customizeable timeout for Plex connections and shows a clear error if it can't connect:
 
@@ -634,31 +664,31 @@ How to fix:
 
 The timeout can be customized under **Additional Settings** > **Timeouts and Retries** in the web UI or via the `plex_connect_timeout` key in `config.json`.
 
-**"Invalid Plex token or base URL"**
+### "Invalid Plex token or base URL"
 - Verify your Plex token ([finding your Plex token](https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/)).
 - The Base URL must include the protocol and port, e.g. `http://192.168.1.100:32400`.
 
-**"Library not found"**
+### "Library not found"
 - Library names must match Plex exactly (case-sensitive), and the library type (TV vs Movie) must match too.
 
-### Scraping issues
+## Scraping issues
 
-**"Can't scrape URL"**
+### "Can't scrape URL"
 - Verify the URL is from a supported source (ThePosterDB or MediUX).
 - Check your internet connection.
 - Some scrapers may be rate-limited. Wait a few minutes and try again.
 
-### Performance issues
+## Performance issues
 
-**Slow upload speeds**
+### Slow upload speeds
 - ThePosterDB has a 6-second rate limit between requests.
 - Use `--filters` to only upload the artwork types you want.
 - Turn on **Track artwork ID in Plex labels** so already-uploaded artwork is skipped.
 
-## For developers
+# For developers
 
 If you'd like to contribute or want to understand how it works under the hood, start with the [Technical Information for Contributors](TECHNICAL_INFO.md): architecture overview, service layer documentation, how to add features, testing procedures and code style guidelines.
 
-## Thanks
+# Thanks
 
 Artwork Uploader began as a fork of Brian Brown's ([@bbrown430](https://github.com/bbrown430)) plex-poster-set-helper - what a fantastic idea, and it's saved us a load of time!

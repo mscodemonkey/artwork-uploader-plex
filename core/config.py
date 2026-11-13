@@ -8,13 +8,22 @@ from typing import List, Dict, Any
 from core.constants import (
     DEFAULT_PLEX_CONNECT_TIMEOUT,
     DEFAULT_KOMETA_DOWNLOAD_TIMEOUT,
+    DEFAULT_KOMETA_DEBOUNCE,
     DEFAULT_UPLOAD_RETRY_ATTEMPTS,
     DEFAULT_UPLOAD_RETRY_BACKOFF_SECONDS,
-    DEFAULT_NOTIFICATION_EVENTS
+    DEFAULT_NOTIFICATION_EVENTS,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_BULK_IMPORT_FILE,
+    DEFAULT_MEDIUX_FILTERS,
+    DEFAULT_TPDB_FILTERS,
+    WEBHOOK_DEFAULT_DELAY,
+    DOCKER_KOMETA_ASSETS_PATH,
+    DOCKER_KOMETA_CONFIG_PATH,
+    DOCKER_KOMETA_TEMP_PATH
 )
 from core.exceptions import ConfigLoadError, ConfigSaveError, ConfigCreationError
 from utils.notifications import debug_me
-from utils.utils import get_host_path
+from utils.utils import get_host_path, is_docker_socket_available
 
 
 def normalize_notification_channels(apprise_urls: List[Any]) -> List[Dict[str, Any]]:
@@ -91,6 +100,10 @@ class Config:
         kometa_base: Base directory for Kometa asset storage
         temp_dir: (Optional) Temporary directory for testing purposes
         save_to_kometa: Whether to save artwork to Kometa
+        kometa_auto_run: Whether to automatically run Kometa to refresh new or updated assets
+        kometa_config_path: Path to the Kometa config.yml file
+        kometa_container_name: Name of the Kometa container for execution
+        kometa_debounce: Time to wait before invoking Kometa in case another run updates additional assets
         stage_assets: Whether to download assets for seasons and episodes that are not in Plex yet (except Specials)
         track_artwork_ids: Whether to track artwork IDs using Plex labels
         skip_locked_artwork: Whether to skip artwork whose target field is locked in Plex (already set)
@@ -125,24 +138,24 @@ class Config:
         upload_retry_backoff_seconds: Seconds to wait before the first retry, doubling after each attempt
     """
 
-    def __init__(self, config_path: str = "config/config.json") -> None:
+    def __init__(self, config_path: str = DEFAULT_CONFIG_PATH) -> None:
         self.path: str = config_path
         self.base_url: str = ""
         self.token: str = ""
         self.plex_local_assets: bool = False
         self.path_mappings: List[Dict[str, str]] = []
-        self.bulk_txt: str = "bulk_import.txt"
+        self.bulk_txt: str = DEFAULT_BULK_IMPORT_FILE
         self.tv_library: List[str] = []
         self.movie_library: List[str] = []
-        self.mediux_filters: List[str] = ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster"]
-        self.tpdb_filters: List[str] = ["season_cover", "show_cover", "movie_poster", "collection_poster"]
+        self.mediux_filters: List[str] = DEFAULT_MEDIUX_FILTERS
+        self.tpdb_filters: List[str] = DEFAULT_TPDB_FILTERS
         self.kometa_base: str = ""
         self.temp_dir: str = ""
         self.save_to_kometa: bool = False
         self.kometa_auto_run: bool = False
         self.kometa_config_path: str = ""
         self.kometa_container_name: str = None
-        self.kometa_debounce: float = 10
+        self.kometa_debounce: float = DEFAULT_KOMETA_DEBOUNCE
         self.stage_assets: bool = False
         self.track_artwork_ids: bool = True
         self.skip_locked_artwork: bool = False
@@ -170,7 +183,7 @@ class Config:
         self.enable_webhooks: bool = False
         self.webhook_token: str = ""
         self.webhook_tpdb_users: List[str] = []
-        self.webhook_apply_delay: int = 30
+        self.webhook_apply_delay: int = WEBHOOK_DEFAULT_DELAY
         self.plex_connect_timeout: int = DEFAULT_PLEX_CONNECT_TIMEOUT
         self.kometa_download_timeout: int = DEFAULT_KOMETA_DOWNLOAD_TIMEOUT
         self.upload_retry_attempts: int = DEFAULT_UPLOAD_RETRY_ATTEMPTS
@@ -197,19 +210,32 @@ class Config:
             self.movie_library = config.get("movie_library", [])
             self.mediux_filters = config.get("mediux_filters", [])
             self.tpdb_filters = config.get("tpdb_filters", [])
+            docker_kometa_base_missing = False
+            docker_kometa_config_missing = False
+            socket_available = False
             if globals.docker:
-                self.kometa_base = get_host_path("/assets")
-                self.temp_dir = get_host_path("/temp")
+                self.kometa_base = get_host_path(DOCKER_KOMETA_ASSETS_PATH)
+                docker_kometa_base_missing = self.kometa_base == "(not defined)"
+                self.temp_dir = get_host_path(DOCKER_KOMETA_TEMP_PATH)
+                self.kometa_config_path = get_host_path(DOCKER_KOMETA_CONFIG_PATH)
+                docker_kometa_config_missing = self.kometa_config_path == "(not defined)"
+                socket_available, _ = is_docker_socket_available()
             else:
                 self.kometa_base = config.get("kometa_base", "")
                 self.temp_dir = config.get("temp_dir", "")
+                self.kometa_config_path = config.get("kometa_config_path", "")
             self.save_to_kometa = config.get("save_to_kometa", False)
+            save_to_kometa_disabled = docker_kometa_base_missing and self.save_to_kometa
+            if save_to_kometa_disabled:
+                self.save_to_kometa = False
             self.kometa_auto_run = config.get("kometa_auto_run", False)
-            self.kometa_config_path = config.get("kometa_config_path", "")
+            auto_run_disabled = globals.docker and (docker_kometa_config_missing or not socket_available) and self.kometa_auto_run
+            if auto_run_disabled:
+                self.kometa_auto_run = False
             self.kometa_container_name = config.get("kometa_container_name", None)
             self.kometa_debounce = float(config.get("kometa_debounce", 10))
             self.stage_assets = config.get("stage_assets", True)
-            self.bulk_txt = config.get("bulk_txt", "bulk_import.txt")
+            self.bulk_txt = config.get("bulk_txt", DEFAULT_BULK_IMPORT_FILE)
             self.track_artwork_ids = config.get("track_artwork_ids", True)
             self.skip_locked_artwork = config.get("skip_locked_artwork", False)
             self.local_library_matching = config.get("local_library_matching", False)
@@ -236,7 +262,7 @@ class Config:
             self.enable_webhooks = config.get("enable_webhooks", False)
             self.webhook_token = config.get("webhook_token", "")
             self.webhook_tpdb_users = config.get("webhook_tpdb_users", [])
-            self.webhook_apply_delay = config.get("webhook_apply_delay", 30)
+            self.webhook_apply_delay = config.get("webhook_apply_delay", WEBHOOK_DEFAULT_DELAY)
             self.plex_connect_timeout = config.get("plex_connect_timeout", DEFAULT_PLEX_CONNECT_TIMEOUT)
             self.kometa_download_timeout = config.get("kometa_download_timeout", DEFAULT_KOMETA_DOWNLOAD_TIMEOUT)
             self.upload_retry_attempts = config.get("upload_retry_attempts", DEFAULT_UPLOAD_RETRY_ATTEMPTS)
@@ -248,7 +274,9 @@ class Config:
         # Persist any ids minted by the migration above, so they stay stable
         # across reloads instead of being handed out fresh every time (which
         # would break anything that had already matched a schedule by id).
-        if schedules_migrated:
+        # Also persist the disbaling of save_to_kometa or kometa_auto_run if the necessary
+        # container paths are not defined in the docker-compose.yml file
+        if schedules_migrated or save_to_kometa_disabled or auto_run_disabled:
             self.save()
 
     @staticmethod
@@ -279,18 +307,18 @@ class Config:
             "token": "",
             "plex_local_assets": False,
             "path_mappings": [],
-            "bulk_txt": "bulk_import.txt",
+            "bulk_txt": DEFAULT_BULK_IMPORT_FILE,
             "tv_library": [],
             "movie_library": [],
-            "mediux_filters": ["title_card", "background", "season_cover", "show_cover", "movie_poster", "collection_poster", "square_art"],
-            "tpdb_filters": ["season_cover", "show_cover", "movie_poster", "collection_poster"],
+            "mediux_filters": DEFAULT_MEDIUX_FILTERS,
+            "tpdb_filters": DEFAULT_TPDB_FILTERS,
             "kometa_base": "",
             "temp_dir": "",
             "save_to_kometa": False,
             "kometa_auto_run": False,
             "kometa_config_path": "",
             "kometa_container_name": None,
-            "kometa_debounce": 10,
+            "kometa_debounce": DEFAULT_KOMETA_DEBOUNCE,
             "stage_assets": False,
             "track_artwork_ids": True,
             "skip_locked_artwork": False,
@@ -317,7 +345,7 @@ class Config:
             "enable_webhooks": False,
             "webhook_token": "",
             "webhook_tpdb_users": [],
-            "webhook_apply_delay": 30,
+            "webhook_apply_delay": WEBHOOK_DEFAULT_DELAY,
             "plex_connect_timeout": DEFAULT_PLEX_CONNECT_TIMEOUT,
             "kometa_download_timeout": DEFAULT_KOMETA_DOWNLOAD_TIMEOUT,
             "upload_retry_attempts": DEFAULT_UPLOAD_RETRY_ATTEMPTS,
@@ -325,10 +353,15 @@ class Config:
         }
 
         if globals.docker:
-            host_kometa_base = get_host_path("/assets")
+            host_kometa_base = get_host_path(DOCKER_KOMETA_ASSETS_PATH)
             config_json["kometa_base"] = host_kometa_base if host_kometa_base != "(not defined)" else ""
-            host_temp_dir = get_host_path("/temp")
+            host_temp_dir = get_host_path(DOCKER_KOMETA_TEMP_PATH)
             config_json["temp_dir"] = host_temp_dir if host_temp_dir != "(not defined)" else ""
+            host_kometa_config = get_host_path(DOCKER_KOMETA_CONFIG_PATH)
+            config_json["kometa_config_path"] = host_kometa_config if host_kometa_config != "(not defined)" else ""
+            socket_available, _ = is_docker_socket_available()
+            if not socket_available:
+                config_json["kometa_auto_run"] = False
 
         # Create the config.json file if it doesn't exist
         if not os.path.isfile(self.path):
@@ -396,6 +429,12 @@ class Config:
         }
 
         try:
+            if globals.docker and os.path.isfile(self.path):
+                with open(self.path, "r", encoding="utf-8") as config_file:
+                    saved_config = json.load(config_file)
+                for path_key in ("kometa_base", "kometa_config_path", "temp_dir"):
+                    config_json[path_key] = saved_config.get(path_key, "")
+
             write_json_atomically(self.path, config_json)
         except Exception as e:
             raise ConfigSaveError(f"Error saving configuration to '{self.path}': {e}") from e

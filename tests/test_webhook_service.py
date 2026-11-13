@@ -34,7 +34,7 @@ def history(tmp_path, monkeypatch):
 
 def _tally():
     return ProcessingCallbacks(
-        success_counter=[0], assets_processed=[0], locked_counter=[0], failed_counter=[0]
+        success_counter=[0], assets_processed=[0], locked_counter=[0], failed_counter=[0], unavailable_counter=[0], updated_asset_map={}
     )
 
 
@@ -237,7 +237,7 @@ def test_attempt_forces_allow_artist_updates_off(monkeypatch, history):
     seen = {}
 
     class _FakeProcessor:
-        def __init__(self, _plex):
+        def __init__(self, _plex, _callbacks=None):
             # Whatever set_options would have resolved from the global config.
             self.allow_artist_updates = True
 
@@ -269,14 +269,17 @@ def _applying_service(monkeypatch, results):
     from core import globals as app_globals
 
     class _FakeProcessor:
-        def __init__(self, _plex):
+        def __init__(self, _plex, callbacks=None):
+            self.callbacks = callbacks
             self.allow_artist_updates = True
 
         def set_options(self, _options):
             pass
 
         def process_movie_artwork(self, _item):
-            return list(results)
+            for res in results:
+                if self.callbacks:
+                    self.callbacks.record_result(res)
 
     monkeypatch.setattr(upload_processor_module, "UploadProcessor", _FakeProcessor)
     monkeypatch.setattr(app_globals, "plex", MagicMock())

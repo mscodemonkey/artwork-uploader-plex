@@ -98,6 +98,7 @@ class RunType(str, Enum):
     SCRAPE = "scrape"   # a single URL scraped from the main tab
     UPLOAD = "upload"   # an artwork ZIP uploaded through the browser
     WEBHOOK = "webhook" # a Radarr/Sonarr import applied from the cache
+    KOMETA = "kometa"   # a Kometa Operations or Overlays run
 
 class RunTrigger(str, Enum):
     """Type of trigger that triggered a run"""
@@ -106,6 +107,7 @@ class RunTrigger(str, Enum):
     CLI = "cli"
     RADARR = "radarr"
     SONARR = "sonarr"
+    AUTO = "automatic"
 
 class RunOutcome(str, Enum):
     SUCCESS = "success"

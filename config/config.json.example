@@ -51,6 +51,18 @@
     "save_to_kometa": false,
     "_save_to_kometa_help": "Saves artwork to Kometa asset directory instead of applying it to Plex directly",
 
+    "kometa_auto_run": false,
+    "_kometa_auto_run_help": "Automatically runs Kometa to update artwork for media items that have received new or updated assets",
+
+    "kometa_config_path": "",
+    "_kometa_config_path": "Path to the Kometa config.yml folder",
+
+    "kometa_container_name": "",
+    "_kometa_container_name": "Name of the Kometa container to launch the automatic updates",
+
+    "kometa_debounce": 10,
+    "_kometa_debounce": "How long to wait (seconds) before invoking Kometa in case another run downloads or updates assets for additional media items",
+
     "stage_assets": false,
     "_stage_assets": "Saves artwork for seasons and episodes not yet in Plex (except season specials)",
 

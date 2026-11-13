@@ -5,6 +5,7 @@ services:
     ports:
       - "4567:4567"
     volumes:
+      # REQUIRED: The following bind mounts are required for general operation
       - ./bulk_imports:/artwork-uploader/bulk_imports:rw
       - ./config:/artwork-uploader/config:rw
       - ./logs:/artwork-uploader/logs:rw
@@ -14,7 +15,7 @@ services:
       # where local assets would potentially need to be saved. The host paths must be the 
       # actual paths at the host level, and the container path names are arbitrary, but they
       # will be used if path mappings need to be defined.
-      #
+      
       # If Plex is also running as a container, use the same container paths here to
       # avoid having to define path mappings
       - <HOST_PATH_TO_MEDIA_FOLDER_1>:/media/movies1:rw
@@ -23,10 +24,29 @@ services:
       - <HOST_PATH_TO_MEDIA_FOLDER_4>:/media/tv2:rw
       # Add as many bind mounts as root folders for media libraries you have in Plex
 
-      # OPTIONAL: Kometa settings (required for Kometa asset directory mode)
-      - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw # Optional, only if you save assets to your Kometa asset directory
+      # OPTIONAL: Kometa settings
+      - <HOST_PATH_TO_KOMETA_ASSET_DIRECTORY>:/assets:rw # Required to save assets to your Kometa asset directory
       - <HOST_TEMP_PATH>:/temp:rw # Optional, only for testing with a temp dir
+      - <HOST_PATH_TO_KOMETA_CONFIF_FILE>:/kometa_config:rw # Required for automatic Kometa updates when assets are downloaded or updated
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Required for automatic Kometa updates when assets are downloaded or updated
     environment:
       - TZ=Europe/London
       - RUNNING_IN_DOCKER=1
+      - DOCKER_HOST=tcp://socket-proxy:2375 # Optional, if using a socket proxy instead of mounting the docker socket directly
     restart: unless-stopped
+
+  # OPTIONAL: Only for Kometa auto-run (comment out or remove this entire section if not needed)
+  # If instead of mounting the socket proxy directly in the container
+  # you'd rather use a socket proxy, you can include one inside the container
+  # or use one you already have deployed (in which case you'll have to change the DOCKER_HOST
+  # environment variable with the appropriate URL). The socket proxy requires POST permission 
+  # to execute 'docker exec' commands and initiate the targeted Kometa runs
+  socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    container_name: socket-proxy
+    environment:
+      - CONTAINERS=1
+      - EXEC=1
+      - POST=1 # Required because docker exec sends HTTP POST requests to create/start the exec instance
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

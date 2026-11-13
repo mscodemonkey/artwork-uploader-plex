@@ -1,9 +1,11 @@
-import hashlib, json, re, validators
+import hashlib, json, re, validators, os, subprocess
 from utils.notifications import debug_me
 from models.options import Options
 from models.url_item import URLItem
-from pathlib import PureWindowsPath, PurePosixPath
+from pathlib import PureWindowsPath, PurePosixPath, Path
 from core.exceptions import InvalidUrl, InvalidFlag
+from core.constants import DOCKER_SOCKET_PATH
+from typing import Tuple
 
 # ---------------------- HELPER CLASSES ----------------------
 
@@ -310,3 +312,23 @@ def get_host_path(container_path: str) -> str:
         debug_me(f"Error reading /proc/self/mountinfo: {e}")
     return "(not defined)"
 
+def is_docker_socket_available() -> Tuple[bool, str]:
+    if not os.environ.get("DOCKER_HOST"):
+        socket_path = Path(DOCKER_SOCKET_PATH)
+        if not socket_path.exists():
+            return False, f"Docker socket ({DOCKER_SOCKET_PATH}) is not mounted on the container"
+
+    try:
+        res = subprocess.run(
+            ["docker", "version", "--format", "{{.Server.Version}}"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if res.returncode == 0:
+            return True, ""
+        return False, f"Cannot connect to docker daemon: {res.stderr.strip()}"
+    except subprocess.TimeoutExpired:
+        return False, f"Timed out while checking docker daemon connectivity"
+    except Exception as e:
+        return False, f"Error checking Docker availability: {e}"
