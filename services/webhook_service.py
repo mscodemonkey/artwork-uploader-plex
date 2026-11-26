@@ -14,8 +14,8 @@ from datetime import datetime, timezone
 from typing import FrozenSet, List, Optional, Tuple, Union
 
 from core import globals
-from core.constants import WEBHOOK_RETRY_DELAYS
-from core.enums import ScraperSource, RunType, RunTrigger, RunOutcome, WebhookSource, FileType
+from core.constants import WEBHOOK_RETRY_DELAYS, IMAGE_EXTENSIONS, KOMETA_OVERLAY_LABEL
+from core.enums import ScraperSource, RunType, RunTrigger, RunOutcome, WebhookSource, FileType, MediaType
 from core.exceptions import MovieNotFound, ShowNotFound
 from models.callbacks import ProcessingCallbacks
 from models.instance import Instance
@@ -52,10 +52,13 @@ class WebhookEvent:
     tmdb_id: Optional[int]
     tvdb_id: Optional[int]
     seasons: FrozenSet[int]
+    episodes: FrozenSet[Tuple[int, int]]
     source: str                    # "radarr" or "sonarr"
+    is_upgrade: bool = False
     media_folder: Optional[str] = None     # name of the movie's folder, when Radarr says
     media_file: Tuple[str, ...] = ()       # the imported file's path inside that folder
 
+    @property
     def label(self) -> str:
         # Remove the year from the title if the title contains it to avoid duplicating it
         clean_title = _clean_title(self.title)
@@ -107,7 +110,8 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
        Returns a WebhookEvent for an import ("Download") event, the string "test" for the
        connection Test button, or None for any other event type or malformed payload. Never
        raises, so an unexpected payload is acknowledged and ignored rather than erroring."""
-    _debug(f"Parsing webhook event with payload: {payload}")
+    _debug(f"Parsing webhook event with payload:")
+    _debug(payload)
 
     if not isinstance(payload, dict):
         return None
@@ -126,16 +130,23 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
             tmdb_id=_int_or_none(movie.get("tmdbId")),
             tvdb_id=None,
             seasons=frozenset(),
+            episodes=frozenset(),
             source=WebhookSource.RADARR.value,
             media_folder=media_folder,
             media_file=media_file
         )
     series = payload.get("series")
     if isinstance(series, dict) and series.get("title"):
-        episodes = payload.get("episodes") or []
+        _episodes = payload.get("episodes") or []
+        episodes = frozenset(
+            (episode["seasonNumber"], episode["episodeNumber"])
+            for episode in _episodes
+            if isinstance(episode, dict)
+            and isinstance(episode.get("seasonNumber"), int)
+            and isinstance(episode.get("episodeNumber"), int)
+        )
         seasons = frozenset(
-            episode["seasonNumber"] for episode in episodes
-            if isinstance(episode, dict) and isinstance(episode.get("seasonNumber"), int)
+            season for season, _ in episodes
         )
         return WebhookEvent(
             kind="tv",
@@ -144,6 +155,8 @@ def parse_event(payload: dict) -> Union[WebhookEvent, str, None]:
             tmdb_id=_int_or_none(series.get("tmdbId")),
             tvdb_id=_int_or_none(series.get("tvdbId")),
             seasons=seasons,
+            episodes=episodes,
+            is_upgrade=bool(payload.get("isUpgrade", False)),
             source=WebhookSource.SONARR.value
         )
     return None
@@ -162,7 +175,7 @@ class WebhookService:
         key = self._dedupe_key(event)
         with self._lock:
             if key in self._inflight:
-                _debug(f"Import for {event.label()} is already pending, ignoring the duplicate")
+                _debug(f"Import for {event.label} is already pending, ignoring the duplicate")
                 return
             self._inflight.add(key)
         # One history record covers the whole event, retries included, so the run starts
@@ -185,7 +198,7 @@ class WebhookService:
         # An edition in its own folder shares the plain release's TMDb ID, so the folder keeps
         # an import of each apart.
         identity = event.tmdb_id or event.tvdb_id or normalize_title(event.title)
-        return (event.kind, identity, event.seasons, event.media_folder)
+        return (event.kind, identity, event.seasons, event.episodes, event.media_folder)
 
     def _release(self, key) -> None:
         with self._lock:
@@ -200,6 +213,32 @@ class WebhookService:
         from processors.upload_processor import UploadProcessor
         outcome = RunOutcome.FAILED.value
         try:
+            # Kometa staged asset pipeline
+            if artwork is None and globals.config.save_to_kometa and globals.config.kometa_auto_run and event.kind == "tv":
+                globals.plex.connect()
+                # Check if there are staged Kometa assets to apply
+                asset_map, not_ready = self._resolve_staged_artwork(event)
+                if not asset_map and not_ready:
+                    if attempt < len(WEBHOOK_RETRY_DELAYS):
+                        delay = WEBHOOK_RETRY_DELAYS[attempt]
+                        _debug(f"{event.label} not in Plex yet, retrying in {delay}s")
+                        timer = threading.Timer(
+                            delay, self._attempt, args=(event, key, started_at, tally, attempt + 1, None, None)
+                        )
+                        timer.daemon = True
+                        timer.start()
+                        return
+                    _log(f"⚠️ Webhook • {event.label} | Imported episodes or seasons have not appeared in Plex, unable check for staged assets")
+                    self._release(key)
+                    return
+
+                if asset_map:
+                    _log(f"📥 Webhook • {event.label} | {event.source.title()} import: queueing for Kometa updates")
+                    self._release(key)
+                    globals.kometa_runner.set_instance(Instance(mode="web", broadcast=True))
+                    globals.kometa_runner.enqueue(asset_map)
+                    return
+
             from utils.notifications import log_to_file, resume_log_file
             if log_file:
                 # A retry runs on a fresh Timer thread. Keep the whole ladder in the file the
@@ -207,15 +246,18 @@ class WebhookService:
                 resume_log_file(log_file)
             else:
                 clean_title = _clean_title(event.title)
-                log_Label = f"webhook_{clean_title}_{event.year}" if event.year else f"webhook_{_clean_title(clean_title)}"
-                log_file = log_to_file(log_Label)
+                normalized_title = normalize_title(clean_title).replace(" ", "_")
+                log_label = f"webhook_{normalized_title}_{event.year}" if event.year else f"webhook_{normalized_title}"
+                log_file = log_to_file(log_label)
+
+            # Fallback to TPDb user artwork pipeline
             if artwork is None:
                 artwork = self._collect_artwork(event)
                 if not artwork:
-                    _log(f"📥 Webhook | No cached artwork for '{event.label()}' from the configured users")
+                    _log(f"📥 Webhook • {event.label} | No cached artwork from the configured users")
                     self._finish(event, key, started_at, tally, RunOutcome.SKIPPED.value)
                     return
-                _log(f"📥 Webhook | {event.source.title()} import: {event.label()}")
+                _log(f"📥 Webhook • {event.label} | {event.source.title()} import")
             globals.plex.connect()
             processor = UploadProcessor(globals.plex, tally)
             processor.set_options(Options())
@@ -245,10 +287,10 @@ class WebhookService:
                     pending.append(item)          # not in Plex yet, retry it
                 except Exception as error:
                     tally.failed(1)
-                    _log(f"❌ Webhook | {event.label()}: {error}")
+                    _log(f"❌ Webhook • {event.label} | {error}")
             if pending and attempt < len(WEBHOOK_RETRY_DELAYS):
                 delay = WEBHOOK_RETRY_DELAYS[attempt]
-                _debug(f"{event.label()} not in Plex yet, retrying in {delay}s")
+                _debug(f"{event.label} not in Plex yet, retrying in {delay}s")
                 timer = threading.Timer(
                     delay, self._attempt, args=(event, key, started_at, tally, attempt + 1, pending, log_file)
                 )
@@ -256,7 +298,7 @@ class WebhookService:
                 timer.start()
                 return                            # keep the in-flight key until the chain ends
             if pending:
-                _log(f"⚠️ Webhook | '{event.label()}' has not appeared in Plex, leaving it for the next scheduled run")
+                _log(f"⚠️ Webhook • {event.label} | Item has not appeared in Plex, leaving it for the next scheduled run")
                 # Artwork still pending when the ladder runs out never got applied, so it counts
                 # against the run the same way an upload that exhausted its retries does.
                 tally.failed(len(pending))
@@ -267,9 +309,120 @@ class WebhookService:
             else:
                 outcome = RunOutcome.FAILED.value
         except Exception as error:
-            _debug(f"Webhook apply failed for {event.label()}: {error}")
+            _debug(f"Webhook apply failed for {event.label}: {error}")
             outcome = RunOutcome.FAILED.value
         self._finish(event, key, started_at, tally, outcome)
+
+    def _resolve_staged_artwork(self, event: WebhookEvent) -> Tuple[Optional[dict], bool]:
+        """Check Plex and the Kometa asset directory for staged artwork matching `event`.
+           Returns (asset_map, not_ready):
+             - (None, True) when the show or target episode(s) have not landed in Plex yet.
+             - (asset_map, False) when staged assets exist and are ready for KometaRunner.
+             - ({}, False) when the item is in Plex but has no staged assets on disk."""
+        import os
+        from plexapi.exceptions import NotFound
+        from utils.utils import get_path_parts, normalize_path
+
+        if not event.tmdb_id:
+            _debug("Webhook payload did not contain a valid TMDb ID")
+            return None, False
+
+        base_path = "/assets" if globals.docker else globals.config.kometa_base
+        found_shows = globals.plex.get_item_from_tmdb_id(tmdb_id=event.tmdb_id, media_type=MediaType.TV_SHOW.value)
+        
+        if not found_shows:
+            # Show itself has not been scanned into Plex yet
+            return None, True
+
+        asset_map = {}
+        not_ready = False
+
+        def _has_staged_file(folder: str, match_str: str) -> bool:
+            files = os.listdir(folder)
+            return next((file for file in files if any(f"{match_str}{ext}" == file for ext in IMAGE_EXTENSIONS)), None)
+
+        def _has_overlay_label(plex_item) -> bool:
+            labels = [str(label) for label in plex_item.labels] if hasattr(plex_item, "labels") else []
+            return KOMETA_OVERLAY_LABEL in labels
+        
+        for library, show in found_shows.items():
+            if getattr(show, "locations", None):
+                show_path = normalize_path(show.locations[0])
+                asset_folder = get_path_parts(show_path)[-1]
+            else:
+                asset_folder = _clean_title(event.title)
+
+            asset_path = os.path.join(base_path, library, asset_folder)
+
+            _debug(f"Checking staged assets for {event.title} in '{library}': {asset_path}")
+            if not os.path.isdir(asset_path):
+                continue
+
+            library_entries = {}
+
+            for s_num, e_num in sorted(event.episodes):
+                season_prefix = f"Season{s_num:02}"
+                if e_num == 1 and not event.is_upgrade: # If it's episode 1 and it's new, it means the season is also new
+                    s_staged_file = _has_staged_file(asset_path, season_prefix)
+                    if s_staged_file:
+                        _debug(f"Found staged season cover: {s_staged_file}")
+                        try:
+                            _season = show.season(s_num)
+                        except NotFound:
+                            _debug(f"{event.title} Season {s_num} not found in library '{library}' yet")
+                            not_ready = True
+                            continue
+                        has_overlay = _has_overlay_label(_season)
+                        library_entries[_season.ratingKey] = {
+                            "title": event.title,
+                            "year": event.year,
+                            "media_type": MediaType.TV_SHOW.value,
+                            "updated_assets": [{
+                                "file_type": FileType.SEASON_COVER.value,
+                                "author": None,
+                                "season": s_num,
+                                "episode": "Cover",
+                                "status": "new",
+                                "overlay": has_overlay
+                            }]
+                        }
+                    else:
+                        _debug(f"There are no staged assets for {event.title} Season {s_num} for library '{library}'")
+
+                ep_prefix = f"S{s_num:02}E{e_num:02}"
+                e_staged_file = _has_staged_file(asset_path, ep_prefix)
+                if e_staged_file:
+                    _debug(f"Found staged episode title card: {e_staged_file}")
+                    try:
+                        _episode = show.episode(season=s_num, episode=e_num)
+                    except NotFound:
+                        _debug(f"{event.title} {ep_prefix} not found in library '{library}' yet")
+                        not_ready = True
+                        continue
+                    has_overlay = _has_overlay_label(_episode)
+                    if not event.is_upgrade or has_overlay:
+                        library_entries[_episode.ratingKey] = {
+                            "title": event.title,
+                            "year": event.year,
+                            "media_type": MediaType.TV_SHOW.value,
+                            "updated_assets": [{
+                                "file_type": FileType.TITLE_CARD.value,
+                                "author": None,
+                                "season": s_num,
+                                "episode": e_num,
+                                "status": "updated" if event.is_upgrade else "new",
+                                "overlay": has_overlay
+                            }]
+                        }
+                    else:
+                        _debug(f"Sonarr import is an upgrade and episode {ep_prefix} has no overlay, no need to reapply artwork")
+                else:
+                    _debug(f"There are no staged assets for {event.title} {ep_prefix} for library '{library}'")
+
+            if library_entries:
+                asset_map[library] = library_entries
+
+        return asset_map, not_ready
 
     def _finish(self, event: WebhookEvent, key, started_at: str,
                 tally: ProcessingCallbacks, outcome: str) -> None:
@@ -277,7 +430,7 @@ class WebhookService:
         try:
             RunHistory().add_run(
                 run_type=RunType.WEBHOOK.value,
-                label=event.label(),
+                label=event.label,
                 started_at=started_at,
                 ended_at=datetime.now(timezone.utc).isoformat(),
                 trigger=_TRIGGER_BY_SOURCE.get(event.source, event.source),
@@ -294,7 +447,7 @@ class WebhookService:
         except Exception as error:
             # A history write must never cost an in-flight key, which would deadlock every
             # future import of this title behind the dedupe guard.
-            _debug(f"Could not record the webhook run for {event.label()}: {error}")
+            _debug(f"Could not record the webhook run for {event.label}: {error}")
         self._release(key)
         if tally.updated_asset_map and globals.config.kometa_auto_run:
             _debug(f"Enqueueing {len(tally.updated_asset_map)} libraries for targeted Kometa update...")

@@ -42,7 +42,7 @@ services:
   # environment variable with the appropriate URL). The socket proxy requires POST permission 
   # to execute 'docker exec' commands and initiate the targeted Kometa runs
   socket-proxy:
-    image: lscr.io/linuxserver/socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:latest
     container_name: socket-proxy
     environment:
       - CONTAINERS=1
@@ -50,3 +50,4 @@ services:
       - POST=1 # Required because docker exec sends HTTP POST requests to create/start the exec instance
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped

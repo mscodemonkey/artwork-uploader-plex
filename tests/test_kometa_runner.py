@@ -1,8 +1,6 @@
 """Unit tests for the KometaRunner service and its helper parsing utilities."""
 
-import os
-import time
-from pathlib import Path
+import io
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -223,20 +221,23 @@ def test_run_kometa_process_executes_docker_command_and_logs_history(
     runner = KometaRunner()
     runner._kometa_libraries = ["TV Shows"]
 
-    mock_proc = MagicMock()
-    # Mock log lines matching the exact sequence KometaRunner expects:
-    mock_proc.stdout = [
-        "| TV Shows Library Operations |\n",
-        "Metadata: asset_directory updated VisionQuest S01E03's poster to [File]\n",
-        "| Applying Overlays for the TV Shows Library |\n",
-        "(1/2) VisionQuest S01E03\n",
-        "   Overlays Applied: Overlay File (1) 1080p-DV\n",
-        "(2/2) VisionQuest S01E09\n",
-        "   Overlays Applied: Overlay File (1) 1080p-DV-HDR\n",
-    ]
-    mock_proc.wait.return_value = None
-    mock_proc.returncode = 0
-    mock_popen.return_value = mock_proc
+    def _make_mock_proc(*args, **kwargs):
+        proc = MagicMock()
+        proc.stdout = io.StringIO(
+            "| TV Shows Library Operations |\n"
+            "Metadata: asset_directory updated VisionQuest S01E03's poster to [File]\n"
+            "| Applying Overlays for the TV Shows Library |\n"
+            "(1/2) VisionQuest S01E03\n"
+            "   Overlays Applied: Overlay File (1) 1080p-DV\n"
+            "(2/2) VisionQuest S01E09\n"
+            "   Overlays Applied: Overlay File (1) 1080p-DV-HDR\n"
+        )
+        proc.wait.return_value = None
+        proc.poll.return_value = 0
+        proc.returncode = 0
+        return proc
+
+    mock_popen.side_effect = _make_mock_proc
 
     mock_history_instance = MagicMock()
     mock_run_history_cls.return_value = mock_history_instance
@@ -258,7 +259,7 @@ def test_run_kometa_process_executes_docker_command_and_logs_history(
 
     assert "docker exec" in cmd_str
     assert "kometa" in cmd_str
-    assert "python kometa.py" in cmd_str
+    assert "python -u kometa.py" in cmd_str
     assert "KOMETA_RUN_LIBRARIES=TV Shows" in cmd_str
     assert "KOMETA_MODE=items(plex:418617)" in cmd_str
 

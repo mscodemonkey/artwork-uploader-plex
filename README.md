@@ -128,7 +128,7 @@ services:
   # environment variable with the appropriate URL). The socket proxy requires POST permission 
   # to execute 'docker exec' commands and initiate the targeted Kometa runs
   socket-proxy:
-    image: lscr.io/linuxserver/socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:latest
     container_name: socket-proxy
     environment:
       - CONTAINERS=1
@@ -136,6 +136,7 @@ services:
       - POST=1 # Required because docker exec sends HTTP POST requests to create/start the exec instance
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
 ```
 
 Then:
@@ -321,6 +322,8 @@ Turn on **Enable Sonarr/Radarr webhook**, set a **Webhook token**, and list the 
 
 On an import, the title is looked up in the cached index. If one of your configured users covers it, that single poster (plus season covers for the imported seasons on TV items) is applied through the same processing path as a normal scrape, so artwork labels, locked-artwork skips and Kometa asset mode all behave the same. Imports can reach the webhook before Plex has scanned the new file, so the apply retries for a few minutes, then leaves it to the next scheduled run. Ambiguous title matches (same-name remakes, for example) are skipped rather than guessed, and nothing is applied when no configured user has the title. Radarr says which file it imported, and the poster is applied to the Plex item holding that file. So an edition kept in its own folder (`Alien (1979) {edition-35mm Film Scan}` beside `Alien (1979)`) is never mistaken for the plain release, or the other way round. On an upgrade, the item holding the old file is left alone and the apply waits for Plex to scan the new one in. Paths are compared from the movie's folder down, so Radarr and Plex can mount the library at different roots. The endpoints return 404 while the webhook is off.
 
+The webhook can also be used to trigger automatic artwork updates for staged Kometa assets when a new episode is imported by Sonarr. See [Kometa Asset Directory](#kometa-asset-directory) for details. It requires enabling **Save to Kometa asset directory** and **Run Kometa on new or updated assets**.
+
 ## Local Assets
 
 Some users prefer to keep offline copies of their custom Plex artwork in order to have a backup for faster recovery in case of disaster. Artwork Uploader for Plex supports two distinct and mutually exclusive ways to save assets locally:
@@ -435,13 +438,15 @@ settings:
 
 </details>
 
-Turn on **Run Kometa on new or updated assets** if you'd rather not wait for the next Kometa scheduled run for your shiny new assets to be applied to your Plex server. With this setting, when a successful or partial run yields new or updated assets in your asset directory for one or more media items (movies, shows, seasons, episodes, collections), a custom Kometa config file targeting only the affected libraries will be crafted and Kometa will be invoked to run against only those media items that have received fresh artwork. This automatic Kometa run is supported across manual scrapes (both web and CLI) and bulk file operations, scheduled bulk file runs, ZIP uploads and webhook-triggered runs.
+Turn on **Run Kometa on new or updated assets** if you'd rather not wait for the next Kometa scheduled run for your shiny new assets to be applied to your Plex server. With this setting enabled, when a successful or partial run yields new or updated assets in your asset directory for one or more media items (movies, shows, seasons, episodes, collections), a custom Kometa config file targeting only the affected libraries will be crafted and Kometa will be invoked to run against only those media items that have received fresh artwork. This automatic Kometa run is supported across manual scrapes (both web and CLI) and bulk file operations, scheduled bulk file runs, ZIP uploads and webhook-triggered runs.
 
 This requires [Kometa 2.5.5](https://github.com/Kometa-Team/Kometa/releases/tag/v2.5.5) or above running as a Docker container in the same host system as Artwork Uploader. Kometa 2.5.5 adds support for targeted runs against specific Plex media items, including individual seasons or episodes. This avoids having to process entire libraries with potentially hundreds or thousands of seasons or episodes, which can take a long time, especially when using season or episode-level overlays. The targeted run will be crafted to update the artwork for affected media items alone, either directly (through a Kometa operations-only run) or with the necessary overlays baked in before applying (throuh a Kometa overlays-only run), completing in a matter of seconds.
 
 Artwork Uploader must have read/write access to the folder where Kometa's main `config.yml` file is stored, and where it will store the bespoke, optimized temporary Kometa configuration file. The path to this folder must be provided via the `kometa_config_path` variable in `config.json` (or configured via web UI). A `kometa_debounce` timer (default 10 seconds) defines how long Artwork Uploader will wait after a run yields new or updated assets and before invoking Kometa in case a subsequent run yields additional assets, in which case they will all be processed together in a single operation.
 
-Kometa asset directory mode supports asset staging. This allows Artwork Uploader to download assets for seasons or episodes not yet present in Plex, useful when a scheduled run happens before your automation has downloaded a new season or episode. This setting doesn't apply to the Specials season (Season 0).
+Kometa asset directory mode supports asset staging for TV shows. This allows Artwork Uploader to download assets for seasons or episodes not yet present in Plex, useful when a scheduled run happens before your automation has downloaded a new season or episode. This setting doesn't apply to the Specials season (Season 0). The show must already be in Plex for asset staging to work.
+
+You can also use the [Sonarr webhook](#automatic-artwork-for-new-imports-sonarrradarr-webhook) to automatically apply staged assets to new episodes when they're imported into Plex by Sonarr. You don't need to have TPDb users configured to use the Sonarr webhook for this purpose. When Artwork Uploader receives an import notification from Sonarr, it will check whether you have a staged asset for the newly imported episode(s) and will trigger a Kometa operations run to update their artwork on your Plex server without having to wait for the next scheduled Kometa run. If the import is an upgrade and the existing episode has an "Overlay" label in Plex, it will trigger a Kometa overlays run in case the overlay needs updating based on the new characteristics of the episode file (video/audio codec, resolution, runtime, etc.) If the newly imported item is the first episode of a new season, it will check whether there's a staged asset for the season and will apply that one as well. If no staged assets exist for the newly imported episode, Artwork Uploader will fall back to the TPDb users pipeline if any TPDb user assets are cached.
 
 Finally, if you're using the asset directory and are running Artwork Uploader as a Docker container, the app detects it (via the `RUNNING_IN_DOCKER` environment variable) and hardcodes the Kometa base directory to `/assets`, the temp directory to `/temp` and the Kometa config directory to `/kometa_config`. Map your real asset, temp and Kometa config folders to those paths in the container. Your real paths stay in `config.json`, so running the app outside the container still works too. **Run Kometa on new or updated assets** requires Artwork Uploader to be able to communicate with the Docker socket. This can be achieved by mounting it directly in the container or (more secure) through a Docker socket proxy. Check the [Docker compose example](#docker-recommended) for examples on how to configure both options. If the `kometa_base` path is not defined the option to enable Kometa asset directory will be disabled. Likewise, if the `kometa_config` path is not defined or Artwork Uploader can't communicate with the Docker socket the option to enabled Kometa auto-run will be disabled.
 
