@@ -13,7 +13,7 @@ from models.options import Options
 from utils.notifications import debug_me
 from utils.utils import get_path_parts
 from core.config import Config
-from plex.library_index import PlexLibraryIndex, normalize_title
+from plex.library_index import PlexLibraryIndex
 
 class PlexConnector:
 
@@ -333,3 +333,28 @@ class PlexConnector:
 
         debug_me(f"'{title} ({year})' not found in any library")
         return "unavailable", None, None, None
+
+    def get_item_from_tmdb_id(self, tmdb_id: int, media_type: str):
+        if not self.plex:
+            self.connect()
+        found_items = {}
+        libraries = self.tv_libraries if media_type == MediaType.TV_SHOW.value else self.movie_libraries if media_type == MediaType.MOVIE.value else None
+
+        if not libraries:
+            return {}
+        
+        for library in libraries:
+            item = None
+            try:
+                item = library.getGuid(f"tmdb://{tmdb_id}")
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                debug_me(f"Plex server timed out while searching for TMDb ID '{tmdb_id}' in {library.title}")
+                pass
+            except Exception as e:
+                # Continue checking other libraries if one fails
+                debug_me(f"Unable to find TMDb ID '{tmdb_id}' in '{library.title}': {e}")
+                pass
+            if item:
+                debug_me(f"Found TMDb ID '{tmdb_id}' in '{library.title}' as '{item.title}{f' ({item.year})' if item.year else ''}'")
+                found_items[library.title] = item
+        return found_items

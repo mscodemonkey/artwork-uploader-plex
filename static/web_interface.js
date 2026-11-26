@@ -2134,13 +2134,17 @@ function loadRunHistory() {
             const typeIcon = RUN_HISTORY_TYPE_ICONS[run.run_type] || "question-circle";
             const typeLabel = RUN_HISTORY_TYPE_LABELS[run.run_type] || "unknown";
             const logFileName = run.log_file
+            const escapeJsAttr = (str) => String(str ?? '')
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'")
+                .replace(/"/g, '&quot;');
 
             const cells = [
                 `<span title="${run.started_at}">${formatDateTime(run.started_at)}</span>`, // Started time
                 `<i class="bi bi-${typeIcon}" title="${typeLabel}"></i>`, // Type
                 run.html_label, // Label
                 `<i class="bi bi-${triggerIcon}" title="${triggerLabel}"></i>`, // Trigger
-                `<i class="bi bi-${outcome.icon} cursor-pointer inline-run-btn" style="cursor: pointer;" title="${outcome.text}" onclick="showLogsforRun('${logFileName}', '${run.label}')"></i>`, // Outcome
+                `<i class="bi bi-${outcome.icon} cursor-pointer inline-run-btn" style="cursor: pointer;" title="${outcome.text}" onclick="showLogsforRun('${escapeJsAttr(logFileName)}', '${escapeJsAttr(run.label)}')"></i>`, // Outcome
                 `<span class="text-monospace">${run.assets_processed}</span>`, // Processed assets
                 `<span class="text-monospace">${run.success_count}</span>`, // Updated assets
                 `<span class="text-monospace">${run.cached_count}</span>`, // Cached assets

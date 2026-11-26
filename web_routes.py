@@ -10,7 +10,7 @@ The routes are organized into:
 - Helper functions for file uploads and processing
 """
 
-import os, logging, flask.cli, sys, re, base64, hmac, shutil, tempfile, zipfile, subprocess, threading, uuid, requests
+import os, logging, flask.cli, sys, re, base64, hmac, shutil, tempfile, zipfile, subprocess, threading, uuid, requests, html
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from packaging import version
@@ -380,12 +380,14 @@ def setup_routes(web_app, config: Config):
         if globals.plex is None or not globals.plex.has_libraries():
             update_log(Instance(broadcast=True), "⛔ Webhook received but Plex libraries are not configured")
             return {"status": "plex not configured"}, 503
-        if not globals.config.webhook_tpdb_users:
+
+        if not (globals.config.save_to_kometa and globals.config.kometa_auto_run and event.kind == "tv") and not globals.config.webhook_tpdb_users:
             update_log(Instance(broadcast=True), "📥 Webhook received but no ThePosterDB users are configured (webhook_tpdb_users)")
             return {"status": "no users configured"}, 200
+
         update_log(Instance(broadcast=True), "📥 Webhook received and queued for processing")
         globals.webhook_service.enqueue(event)
-        return {"status": "queued"}, 200
+        return {"status": "accepted"}, 200
 
 
 def setup_socket_handlers(
@@ -685,6 +687,13 @@ def setup_socket_handlers(
 
     @globals.web_socket.on("load_run_history")
     def load_run_history(data):
+
+        def escape_js_attr(value) -> str:
+            """Escape a string for safe interpolation inside a single-quoted JS literal within a double-quoted HTML attribute."""
+            s = str(value or "")
+            s = s.replace("\\", "\\\\").replace("'", "\\'")
+            return html.escape(s, quote=True)
+
         """Load recent run history, optionally narrowed to one run type."""
         instance = Instance(data.get("instance_id"), "web", broadcast=True)
         run_type = data.get("run_type") or None
@@ -697,7 +706,7 @@ def setup_socket_handlers(
                 runs.append(run)
                 label = run.get("label", "")
                 timestamp = run.get("started_at", "")
-                onclick = f"""onclick="deleteRun('{timestamp}', '{label}')" """
+                onclick = f"""onclick="deleteRun('{timestamp}', '{escape_js_attr(label)}')" """
                 if label and "https" in label:
                     clean_url = label.replace("https://", "").strip()
                     parts = [p for p in clean_url.split("/") if p]

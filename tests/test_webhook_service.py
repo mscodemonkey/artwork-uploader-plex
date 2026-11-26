@@ -66,7 +66,7 @@ def test_parse_radarr_download():
 def test_parse_sonarr_download_multi_episode():
     event = parse_event({"eventType": "Download",
                          "series": {"title": "Severance", "year": 2022, "tvdbId": 371980, "tmdbId": 95396},
-                         "episodes": [{"seasonNumber": 1}, {"seasonNumber": 2}, {"seasonNumber": 0}]})
+                         "episodes": [{"seasonNumber": 1, "episodeNumber": 3}, {"seasonNumber": 2, "episodeNumber": 1}, {"seasonNumber": 0, "episodeNumber": 1}]})
     assert event.kind == "tv"
     assert event.tvdb_id == 371980 and event.tmdb_id == 95396
     assert event.seasons == frozenset({0, 1, 2})   # season 0 (Specials) is kept
@@ -171,17 +171,17 @@ def test_lookup_tombstoned_and_parenthetical(index):
 def test_dedupe_key():
     def series(seasons):
         return WebhookEvent(kind="tv", title="Show", year=2020, tmdb_id=42, tvdb_id=7,
-                            seasons=frozenset(seasons), source="sonarr")
+                            seasons=frozenset(seasons), episodes=frozenset(), source="sonarr")
     assert WebhookService._dedupe_key(series([1])) == WebhookService._dedupe_key(series([1]))
     assert WebhookService._dedupe_key(series([1])) != WebhookService._dedupe_key(series([2]))
     # falls back to normalized title when there is no id
     no_id = WebhookEvent(kind="movie", title="Léon", year=1994, tmdb_id=None, tvdb_id=None,
-                         seasons=frozenset(), source="radarr")
+                         seasons=frozenset(), episodes=frozenset(), source="radarr")
     assert WebhookService._dedupe_key(no_id)[1] == "leon"
     # an edition in its own folder shares the TMDb ID, and is a separate import
     def alien(folder):
         return WebhookEvent(kind="movie", title="Alien", year=1979, tmdb_id=348, tvdb_id=None,
-                            seasons=frozenset(), source="radarr", media_folder=folder)
+                            seasons=frozenset(), episodes=frozenset(), source="radarr", media_folder=folder)
     assert WebhookService._dedupe_key(alien("Alien (1979)")) != \
         WebhookService._dedupe_key(alien("Alien (1979) {edition-35mm Film Scan}"))
 
@@ -630,3 +630,289 @@ def test_a_guid_search_that_finds_nothing_still_checks_the_row_getguid_returned(
 
     assert len(edition_library.plain.uploaded) == 1
     assert edition_library.edition.uploaded == []
+
+# --------------------------------- Kometa pipeline ----------------------------------
+
+@pytest.mark.unit
+def test_staged_tv_episode_1_enqueues_season_and_title_card_to_kometa(monkeypatch, tmp_path, history):
+    """A new Episode 1 import with staged Season01 + S01E01 assets queues both directly to
+    KometaRunner, detects overlay labels, and skips the TPDb pipeline and webhook log file."""
+    import utils.notifications as notifications
+    from core import globals as app_globals
+
+    monkeypatch.setattr(notifications, "DEFAULT_LOG_PATH", str(tmp_path / "logs"))
+    app_globals.run_log.path = None
+
+    # Stage Season01.jpg and S01E01.jpg on disk
+    asset_dir = tmp_path / "TV Shows" / "Rivals (2024)"
+    asset_dir.mkdir(parents=True)
+    (asset_dir / "Season01.jpg").write_bytes(b"fake-season")
+    (asset_dir / "S01E01.jpg").write_bytes(b"fake-ep")
+
+    mock_season = MagicMock(ratingKey=101, labels=[])
+    mock_episode = MagicMock(ratingKey=102, labels=[webhook_service_module.KOMETA_OVERLAY_LABEL])
+    mock_show = MagicMock(locations=["/media/TV Shows/Rivals (2024)"])
+    mock_show.season.return_value = mock_season
+    mock_show.episode.return_value = mock_episode
+
+    mock_plex = MagicMock()
+    mock_plex.get_item_from_tmdb_id.return_value = {"TV Shows": mock_show}
+
+    mock_kometa = MagicMock()
+    monkeypatch.setattr(app_globals, "docker", False)
+    monkeypatch.setattr(
+        app_globals,
+        "config",
+        MagicMock(
+            save_to_kometa=True,
+            kometa_auto_run=True,
+            kometa_base=str(tmp_path),
+            webhook_tpdb_users=["jtarrio"],
+        ),
+    )
+    monkeypatch.setattr(app_globals, "plex", mock_plex)
+    monkeypatch.setattr(app_globals, "kometa_runner", mock_kometa)
+
+    event = webhook_service_module.WebhookEvent(
+        kind="tv",
+        title="Rivals (2024)",
+        year=2024,
+        tmdb_id=208921,
+        tvdb_id=429920,
+        seasons=frozenset({1}),
+        episodes=frozenset({(1, 1)}),
+        source="sonarr",
+        is_upgrade=False,
+    )
+
+    service = WebhookService()
+    service._attempt(event, ("tv", 208921), _now(), _tally())
+
+    # Enqueued directly to KometaRunner with both assets
+    mock_kometa.enqueue.assert_called_once()
+    asset_map = mock_kometa.enqueue.call_args[0][0]
+    assert "TV Shows" in asset_map
+    assert asset_map["TV Shows"][101]["updated_assets"][0]["file_type"] == "season_cover"
+    assert asset_map["TV Shows"][101]["updated_assets"][0]["overlay"] is False
+    assert asset_map["TV Shows"][102]["updated_assets"][0]["file_type"] == "title_card"
+    assert asset_map["TV Shows"][102]["updated_assets"][0]["overlay"] is True
+
+    # Did not create a webhook log file or a webhook RunHistory entry
+    assert notifications.current_log_file() is None
+    assert history.get_runs() == []
+
+
+@pytest.mark.unit
+def test_staged_tv_non_episode_1_ignores_season_cover(monkeypatch, tmp_path):
+    """Importing an episode other than Episode 1 only queues the episode title card even if a
+    staged SeasonXX cover exists on disk."""
+    from core import globals as app_globals
+
+    asset_dir = tmp_path / "TV Shows" / "Rivals (2024)"
+    asset_dir.mkdir(parents=True)
+    (asset_dir / "Season02.jpg").write_bytes(b"fake-season")
+    (asset_dir / "S02E06.jpg").write_bytes(b"fake-ep")
+
+    mock_episode = MagicMock(ratingKey=206, labels=[])
+    mock_show = MagicMock(locations=["/media/TV Shows/Rivals (2024)"])
+    mock_show.episode.return_value = mock_episode
+
+    mock_plex = MagicMock()
+    mock_plex.get_item_from_tmdb_id.return_value = {"TV Shows": mock_show}
+    mock_kometa = MagicMock()
+
+    monkeypatch.setattr(app_globals, "docker", False)
+    monkeypatch.setattr(
+        app_globals,
+        "config",
+        MagicMock(save_to_kometa=True, kometa_auto_run=True, kometa_base=str(tmp_path)),
+    )
+    monkeypatch.setattr(app_globals, "plex", mock_plex)
+    monkeypatch.setattr(app_globals, "kometa_runner", mock_kometa)
+
+    event = webhook_service_module.WebhookEvent(
+        kind="tv",
+        title="Rivals (2024)",
+        year=2024,
+        tmdb_id=208921,
+        tvdb_id=429920,
+        seasons=frozenset({2}),
+        episodes=frozenset({(2, 6)}),
+        source="sonarr",
+        is_upgrade=False,
+    )
+
+    WebhookService()._attempt(event, ("tv", 208921), _now(), _tally())
+
+    mock_show.season.assert_not_called()
+    mock_kometa.enqueue.assert_called_once()
+    asset_map = mock_kometa.enqueue.call_args[0][0]
+    assert list(asset_map["TV Shows"].keys()) == [206]
+
+
+@pytest.mark.unit
+def test_staged_tv_upgrade_only_queues_episodes_with_overlays(monkeypatch, tmp_path):
+    """On an upgrade import, season covers are skipped and episode title cards are only queued
+    when Plex already has the Kometa overlay label on that episode."""
+    from core import globals as app_globals
+
+    asset_dir = tmp_path / "TV Shows" / "Rivals (2024)"
+    asset_dir.mkdir(parents=True)
+    (asset_dir / "Season01.jpg").write_bytes(b"fake-season")
+    (asset_dir / "S01E01.jpg").write_bytes(b"fake-ep1")
+    (asset_dir / "S01E02.jpg").write_bytes(b"fake-ep2")
+
+    ep1_no_overlay = MagicMock(ratingKey=101, labels=[])
+    ep2_with_overlay = MagicMock(ratingKey=102, labels=[webhook_service_module.KOMETA_OVERLAY_LABEL])
+    mock_show = MagicMock(locations=["/media/TV Shows/Rivals (2024)"])
+    mock_show.episode.side_effect = lambda season, episode: ep1_no_overlay if episode == 1 else ep2_with_overlay
+
+    mock_plex = MagicMock()
+    mock_plex.get_item_from_tmdb_id.return_value = {"TV Shows": mock_show}
+    mock_kometa = MagicMock()
+
+    monkeypatch.setattr(app_globals, "docker", False)
+    monkeypatch.setattr(
+        app_globals,
+        "config",
+        MagicMock(save_to_kometa=True, kometa_auto_run=True, kometa_base=str(tmp_path)),
+    )
+    monkeypatch.setattr(app_globals, "plex", mock_plex)
+    monkeypatch.setattr(app_globals, "kometa_runner", mock_kometa)
+
+    event = webhook_service_module.WebhookEvent(
+        kind="tv",
+        title="Rivals (2024)",
+        year=2024,
+        tmdb_id=208921,
+        tvdb_id=429920,
+        seasons=frozenset({1}),
+        episodes=frozenset({(1, 1), (1, 2)}),
+        source="sonarr",
+        is_upgrade=True,
+    )
+
+    WebhookService()._attempt(event, ("tv", 208921), _now(), _tally())
+
+    mock_show.season.assert_not_called()
+    mock_kometa.enqueue.assert_called_once()
+    asset_map = mock_kometa.enqueue.call_args[0][0]
+    assert list(asset_map["TV Shows"].keys()) == [102]
+    assert asset_map["TV Shows"][102]["updated_assets"][0]["status"] == "updated"
+
+
+@pytest.mark.unit
+def test_staged_tv_episode_not_in_plex_yet_schedules_retry(monkeypatch, tmp_path):
+    """When staged assets exist on disk but Plex has not scanned the episode in yet, _attempt
+    schedules a retry via Timer and does not enqueue Kometa or open a webhook log file."""
+    from plexapi.exceptions import NotFound
+    import utils.notifications as notifications
+    from core import globals as app_globals
+
+    monkeypatch.setattr(notifications, "DEFAULT_LOG_PATH", str(tmp_path / "logs"))
+    app_globals.run_log.path = None
+
+    asset_dir = tmp_path / "TV Shows" / "Rivals (2024)"
+    asset_dir.mkdir(parents=True)
+    (asset_dir / "S02E06.jpg").write_bytes(b"fake-ep")
+
+    mock_show = MagicMock(locations=["/media/TV Shows/Rivals (2024)"])
+    mock_show.episode.side_effect = NotFound("Episode not scanned yet")
+
+    mock_plex = MagicMock()
+    mock_plex.get_item_from_tmdb_id.return_value = {"TV Shows": mock_show}
+    mock_kometa = MagicMock()
+
+    scheduled = {}
+
+    class _FakeTimer:
+        def __init__(self, interval, function, args=()):
+            scheduled["interval"] = interval
+            scheduled["args"] = args
+            self.daemon = False
+
+        def start(self):
+            scheduled["started"] = True
+
+    monkeypatch.setattr(webhook_service_module.threading, "Timer", _FakeTimer)
+    monkeypatch.setattr(app_globals, "docker", False)
+    monkeypatch.setattr(
+        app_globals,
+        "config",
+        MagicMock(save_to_kometa=True, kometa_auto_run=True, kometa_base=str(tmp_path)),
+    )
+    monkeypatch.setattr(app_globals, "plex", mock_plex)
+    monkeypatch.setattr(app_globals, "kometa_runner", mock_kometa)
+
+    event = webhook_service_module.WebhookEvent(
+        kind="tv",
+        title="Rivals (2024)",
+        year=2024,
+        tmdb_id=208921,
+        tvdb_id=429920,
+        seasons=frozenset({2}),
+        episodes=frozenset({(2, 6)}),
+        source="sonarr",
+        is_upgrade=False,
+    )
+
+    WebhookService()._attempt(event, ("tv", 208921), _now(), _tally())
+
+    assert scheduled.get("started") is True
+    assert scheduled["args"][4] == 1  # attempt incremented to 1
+    mock_kometa.enqueue.assert_not_called()
+    assert notifications.current_log_file() is None
+
+
+@pytest.mark.unit
+def test_no_staged_assets_falls_back_to_tpdb_pipeline(monkeypatch, tmp_path, history):
+    """When Kometa auto-run is enabled but no staged assets exist on disk for the imported
+    episode, _attempt falls through immediately to the TPDb user artwork pipeline."""
+    import utils.notifications as notifications
+    from core import globals as app_globals
+
+    monkeypatch.setattr(notifications, "DEFAULT_LOG_PATH", str(tmp_path / "logs"))
+    app_globals.run_log.path = None
+
+    # Folder exists, but contains no matching S02E11 file
+    asset_dir = tmp_path / "TV Shows" / "Rivals (2024)"
+    asset_dir.mkdir(parents=True)
+
+    mock_show = MagicMock(locations=["/media/TV Shows/Rivals (2024)"])
+    mock_plex = MagicMock()
+    mock_plex.get_item_from_tmdb_id.return_value = {"TV Shows": mock_show}
+    mock_kometa = MagicMock()
+
+    monkeypatch.setattr(app_globals, "docker", False)
+    monkeypatch.setattr(
+        app_globals,
+        "config",
+        MagicMock(
+            save_to_kometa=True,
+            kometa_auto_run=True,
+            kometa_base=str(tmp_path),
+            webhook_tpdb_users=[],
+        ),
+    )
+    monkeypatch.setattr(app_globals, "plex", mock_plex)
+    monkeypatch.setattr(app_globals, "kometa_runner", mock_kometa)
+
+    event = webhook_service_module.WebhookEvent(
+        kind="tv",
+        title="Rivals (2024)",
+        year=2024,
+        tmdb_id=208921,
+        tvdb_id=429920,
+        seasons=frozenset({2}),
+        episodes=frozenset({(2, 11)}),
+        source="sonarr",
+        is_upgrade=False,
+    )
+
+    WebhookService()._attempt(event, ("tv", 208921), _now(), _tally())
+
+    mock_kometa.enqueue.assert_not_called()
+    runs = history.get_runs()
+    assert len(runs) == 1
+    assert runs[0]["outcome"] == "skipped"
+    assert runs[0]["log_file"].startswith("20")

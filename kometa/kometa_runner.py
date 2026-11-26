@@ -11,9 +11,9 @@ from core.enums import FileType, MediaType, RunType, RunTrigger, RunOutcome
 from core.constants import DEFAULT_KOMETA_DEBOUNCE, DEFAULT_KOMETA_CONTAINER_NAME, DOCKER_KOMETA_CONFIG_PATH
 
 def match_key(library_map: Dict, title: str, season: int=None, episode: int=None) -> int:
-    matching_keys = [key for key in library_map if library_map[key]["title"] == title]
+    matching_keys = [key for key in library_map if title in library_map[key]["title"]]
     if not matching_keys:
-        matching_keys = [key for key in library_map if library_map[key].get("alt_title", None) == title]
+        matching_keys = [key for key in library_map if title in library_map[key].get("alt_title", None)]
     if season is not None and episode is not None:
         ratingKey = next((key for key in matching_keys if any(asset["season"] == season and asset["episode"] == episode for asset in library_map[key]["updated_assets"])), None)
     elif season is not None:
@@ -357,7 +357,13 @@ class KometaRunner:
         """
         args_operations = ""
         args_overlays = ""
-        overlay_assets = [FileType.MOVIE_POSTER.value, FileType.SHOW_COVER.value, FileType.POSTER.value, FileType.TITLE_CARD, FileType.SEASON_COVER]
+        overlay_assets = [
+            FileType.MOVIE_POSTER.value,
+            FileType.SHOW_COVER.value,
+            FileType.POSTER.value,
+            FileType.TITLE_CARD.value,
+            FileType.SEASON_COVER.value
+        ]
         items_operations = set()
         libs_operations = set()
         titles_operations = set()
@@ -406,6 +412,7 @@ class KometaRunner:
             
             cmd = [
                 "docker","exec",
+                "-e", "PYTHONUNBUFFERED=1",
                 "-e", f"KOMETA_CONFIG=config/{config_filename}",
                 "-e", f"KOMETA_OPERATIONS_ONLY=true",
                 "-e", f"KOMETA_OVERLAYS_ONLY=false",
@@ -415,8 +422,7 @@ class KometaRunner:
                 "-e", f"KOMETA_RUN_LIBRARIES={args_libs_ops}",
                 "-e", f"KOMETA_MODE=items({args_operations})",
                 self.container_name,
-                "python",
-                "kometa.py"
+                "python", "-u", "kometa.py"
             ]
 
             debug_me(f"Launching command: [{' '.join(cmd)}]")
@@ -432,95 +438,132 @@ class KometaRunner:
                     bufsize=1
                 )
 
-                # Stream output logs
-                current_library = ""
-                error_detail = None
+                idle_timeout = 60
+                timed_out = threading.Event()
+                watchdog = None
 
-                for line in process.stdout:
-                    stripped = line.strip()
-                    debug_me(stripped)
-                    error_detail = parse_error_line(stripped, self.container_name) or error_detail
+                def _reset_watchdog():
+                    nonlocal watchdog
+                    if watchdog is not None:
+                        watchdog.cancel()
+                    watchdog = threading.Timer(idle_timeout, _kill_on_timeout)
+                    watchdog.daemon = True
+                    watchdog.start()
 
-                    matched_library = match_library_name(line.strip()[1:-2])
-                    if matched_library and matched_library in libs_operations:
-                        current_library = matched_library
-                        this_library = batch_map[current_library]
+                def _kill_on_timeout():
+                    timed_out.set()
+                    debug_me(f"No output from Kometa for {idle_timeout}s, terminating hung process")
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
 
-                    match = parse_operations_log(line.strip())
-                    if match:
-                        title = match["title"]
-                        season = match.get("season", None)
-                        episode = match.get("episode", None)
+                _reset_watchdog()
 
-                        ratingKey = match_key(
-                            library_map=this_library,
-                            title=title,
-                            season=season,
-                            episode=episode
-                        )
+                try:
+                    # Stream output logs
+                    current_library = ""
+                    error_detail = None
 
-                        if not ratingKey:
-                            debug_me("Unable to match asset, skipping")
-                            continue
+                    for line in process.stdout:
+                        _reset_watchdog()
+                        stripped = line.strip()
+                        debug_me(stripped)
+                        error_detail = parse_error_line(stripped, self.container_name) or error_detail
 
-                        season_label = f" • Season {season:02}" if season is not None and season != 0 else f" • Specials" if season is not None else ""
-                        episode_label = f" • Episode {episode:02}" if episode else ""
+                        matched_library = match_library_name(line.strip()[1:-2])
+                        if matched_library and matched_library in libs_operations:
+                            current_library = matched_library
+                            this_library = batch_map[current_library]
 
-                        this_item = this_library[ratingKey]
-                        updated_assets = this_item["updated_assets"]
+                        match = parse_operations_log(line.strip())
+                        if match:
+                            title = match["title"]
+                            season = match.get("season", None)
+                            episode = match.get("episode", None)
 
-                        media_type = this_item["media_type"]
+                            ratingKey = match_key(
+                                library_map=this_library,
+                                title=title,
+                                season=season,
+                                episode=episode
+                            )
 
-                        matched_type = match["asset_type"]
-                        if matched_type == "poster":
-                            if media_type == MediaType.MOVIE.value:
-                                file_type = FileType.MOVIE_POSTER.value
-                                asset_type = "Movie poster"
-                            elif media_type == MediaType.TV_SHOW.value:
-                                file_type = FileType.SHOW_COVER.value
-                                asset_type = "Show cover"
-                            elif media_type == MediaType.COLLECTION.value:
-                                file_type = FileType.COLLECTION_POSTER.value
-                                asset_type = "Collection poster"
-                        elif matched_type == "background":
-                            file_type = FileType.BACKGROUND.value
-                            asset_type = f"{media_type} background"
-                        elif matched_type == "square_art":
-                            file_type = FileType.SQUARE_ART.value
-                            asset_type = f"{media_type} square art"
-                        elif matched_type == "season_cover":
-                            file_type = FileType.SEASON_COVER.value
-                            asset_type = "Season cover"
-                        elif matched_type == "title_card":
-                            file_type = FileType.TITLE_CARD.value
-                            asset_type = "Title card"
+                            if not ratingKey:
+                                debug_me("Unable to match ratingKey, skipping")
+                                continue
 
-                        updated_asset = match_asset(
-                            asset_list=updated_assets,
-                            file_type=file_type,
-                            season=season,
-                            episode=episode
-                        )
+                            season_label = f" • Season {season:02}" if season is not None and season != 0 else f" • Specials" if season is not None else ""
+                            episode_label = f" • Episode {episode:02}" if episode else ""
 
-                        if not updated_asset:
-                            debug_me("Unable to match asset, skipping")
-                            continue
+                            this_item = this_library[ratingKey]
+                            updated_assets = this_item["updated_assets"]
 
-                        author = updated_asset["author"]
+                            media_type = this_item["media_type"]
 
-                        title = this_item.get("alt_title", this_item["title"])
-                        year = this_item["year"]
-                        desc = f"{title}{f' ({year})' if year is not None else ''} • {author}{season_label}{episode_label}"
-                        
-                        if updated_asset.get("status", None) == "new":
-                            text = f"✅ {desc} | {asset_type} set by Kometa in {current_library}"
-                        else:
-                            text = f"♻️ {desc} | {asset_type} refreshed by Kometa in {current_library}"
-                        update_log(self._instance, text)
-                        refreshed_assets += 1
-                        
-                process.wait()
-                if process.returncode == 0:
+                            matched_type = match["asset_type"]
+                            if matched_type == "poster":
+                                if media_type == MediaType.MOVIE.value:
+                                    file_type = FileType.MOVIE_POSTER.value
+                                    asset_type = "Movie poster"
+                                elif media_type == MediaType.TV_SHOW.value:
+                                    file_type = FileType.SHOW_COVER.value
+                                    asset_type = "Show cover"
+                                elif media_type == MediaType.COLLECTION.value:
+                                    file_type = FileType.COLLECTION_POSTER.value
+                                    asset_type = "Collection poster"
+                            elif matched_type == "background":
+                                file_type = FileType.BACKGROUND.value
+                                asset_type = f"{media_type} background"
+                            elif matched_type == "square_art":
+                                file_type = FileType.SQUARE_ART.value
+                                asset_type = f"{media_type} square art"
+                            elif matched_type == "season_cover":
+                                file_type = FileType.SEASON_COVER.value
+                                asset_type = "Season cover"
+                            elif matched_type == "title_card":
+                                file_type = FileType.TITLE_CARD.value
+                                asset_type = "Title card"
+
+                            updated_asset = match_asset(
+                                asset_list=updated_assets,
+                                file_type=file_type,
+                                season=season,
+                                episode=episode
+                            )
+
+                            if not updated_asset:
+                                debug_me("Unable to match asset, skipping")
+                                continue
+
+                            author = updated_asset["author"]
+                            author_label = f" • {author}" if author is not None else ""
+                            title = this_item.get("alt_title", this_item["title"])
+                            year = this_item["year"]
+                            desc = f"{title}{f' ({year})' if year is not None else ''}{author_label}{season_label}{episode_label}"
+                            
+                            if updated_asset.get("status", None) == "new":
+                                text = f"✅ {desc} | {asset_type} set by Kometa in {current_library}"
+                            else:
+                                text = f"♻️ {desc} | {asset_type} refreshed by Kometa in {current_library}"
+                            update_log(self._instance, text)
+                            refreshed_assets += 1
+                            
+                    process.wait(timeout=30)
+
+                finally:
+                    watchdog.cancel()
+                    if process.stdout:
+                        process.stdout.close()
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
+
+                if timed_out.is_set():
+                    update_log(self._instance, f"❌️ No response from Kometa in {idle_timeout} seconds, operations run aborted")
+                    run_outcome = RunOutcome.FAILED.value
+
+                elif process.returncode == 0:
                     end_time = time.time()
                     process_time = elapsed_time(end_time - start_time)
                     debug_me(f"Targeted Kometa operations run completed successfully. {refreshed_assets} asset(s) refreshed in Plex in {process_time}.")
@@ -543,12 +586,11 @@ class KometaRunner:
                 update_log(self._instance, f"❌️ Unexpected error running Kometa container: {e}")
                 run_outcome = RunOutcome.FAILED.value
 
-            ended_at = datetime.now(timezone.utc).isoformat()
             RunHistory().add_run(
                 run_type=RunType.KOMETA.value,
                 label=run_label,
                 started_at=started_at,
-                ended_at=ended_at,
+                ended_at=datetime.now(timezone.utc).isoformat(),
                 trigger=RunTrigger.AUTO.value,
                 outcome=run_outcome,
                 assets_processed=refreshed_assets,
@@ -571,6 +613,7 @@ class KometaRunner:
 
             cmd = [
                 "docker","exec",
+                "-e", "PYTHONUNBUFFERED=1",
                 "-e", f"KOMETA_CONFIG=config/{config_filename}",
                 "-e", f"KOMETA_OVERLAYS_ONLY=true",
                 "-e", f"KOMETA_OPERATIONS_ONLY=false",
@@ -580,8 +623,7 @@ class KometaRunner:
                 "-e", f"KOMETA_RUN_LIBRARIES={args_libs_ovs}",
                 "-e", f"KOMETA_MODE=items({args_overlays})",
                 self.container_name,
-                "python",
-                "kometa.py"
+                "python", "-u", "kometa.py"
             ]
 
             debug_me(f"Launching command: [{' '.join(cmd)}]")
@@ -597,98 +639,135 @@ class KometaRunner:
                     bufsize=1
                 )
 
-                # Stream output logs
-                capture_next_line = False
-                current_library = ""
-                error_detail = None
+                idle_timeout = 60
+                timed_out = threading.Event()
+                watchdog = None
 
-                for line in process.stdout:
-                    stripped = line.strip()
-                    debug_me(stripped)
-                    error_detail = parse_error_line(stripped, self.container_name) or error_detail
-                    
-                    matched_library = match_library_name(line.strip())
-                    if matched_library and matched_library in libs_overlays:
-                        current_library = matched_library
-                        this_library = batch_map[current_library]
+                def _reset_watchdog():
+                    nonlocal watchdog
+                    if watchdog is not None:
+                        watchdog.cancel()
+                    watchdog = threading.Timer(idle_timeout, _kill_on_timeout)
+                    watchdog.daemon = True
+                    watchdog.start()
 
-                    matched_title = next((title for title in titles_overlays if title in line), None)
-                    if matched_title:
-                        season, episode = parse_overlays_log(line.strip(), matched_title)
+                def _kill_on_timeout():
+                    timed_out.set()
+                    debug_me(f"No output from Kometa for {idle_timeout} seconds, terminating hung process")
+                    try:
+                        process.kill()
+                    except OSError:
+                        pass
 
-                        season_label = f" • Season {season:02}" if season is not None and season != 0 else f" • Specials" if season is not None else ""
-                        episode_label = f" • Episode {episode:02}" if episode else ""
+                _reset_watchdog()
 
-                        capture_next_line = True
-                        captured_title = matched_title
-                        continue
+                try:
+                    # Stream output logs
+                    capture_next_line = False
+                    current_library = ""
+                    error_detail = None
 
-                    if capture_next_line:
-                        capture_next_line = False
-                        if "Overlays Applied" not in line:
-                            continue
-
-                        ratingKey = match_key(
-                            library_map=this_library,
-                            title=captured_title,
-                            season=season,
-                            episode=episode
-                        )
-                        if not ratingKey:
-                            debug_me("Unable identify ratingKey for asset, skipping")
-                            continue
-
-                        this_item = this_library[ratingKey]
-                        title = this_item.get("alt_title", this_item["title"])
-                        year = this_item["year"]
-                        media_type = this_item["media_type"]
-                        media_to_file_map = {
-                            MediaType.MOVIE.value: {
-                                "file_type": FileType.MOVIE_POSTER.value,
-                                "label": "Movie poster"
-                            },
-                            MediaType.TV_SHOW.value: {
-                                "file_type": FileType.SHOW_COVER.value,
-                                "label": "Show cover"
-                            }
-                        }
-
-                        if season and episode:
-                            file_type = FileType.TITLE_CARD.value
-                            asset_type = "Title card"
-                        elif season:
-                            file_type = FileType.SEASON_COVER.value
-                            asset_type = "Season cover"
-                        else:
-                            file_type = media_to_file_map[media_type]["file_type"]
-                            asset_type = media_to_file_map[media_type]["label"]
-
-                        updated_assets = this_item["updated_assets"]
-                        updated_asset = match_asset(
-                            asset_list=updated_assets,
-                            file_type=file_type,
-                            season=season,
-                            episode=episode
-                        )
-                        if not updated_asset:
-                            debug_me("Unable to match asset, skipping")
-                            continue
-
-                        author = updated_asset["author"]
-
-                        desc = f"{title}{f' ({year})' if year else ''}{f' • {author}' if author else ''}{season_label}{episode_label}"
+                    for line in process.stdout:
+                        _reset_watchdog()
+                        stripped = line.strip()
+                        debug_me(stripped)
+                        error_detail = parse_error_line(stripped, self.container_name) or error_detail
                         
-                        applied_overlays = parse_applied_overlays(line)
+                        matched_library = match_library_name(line.strip())
+                        if matched_library and matched_library in libs_overlays:
+                            current_library = matched_library
+                            this_library = batch_map[current_library]
 
-                        if updated_asset.get("status", None) == "new":
-                            update_log(self._instance, f"✅ {desc} | {asset_type} set and [{", ".join(applied_overlays)}] overlay{'s' if len(applied_overlays) > 1 else ''} applied in {current_library}")
-                        else:
-                            update_log(self._instance, f"♻️ {desc} | {asset_type} refreshed and [{", ".join(applied_overlays)}] overlay{'s' if len(applied_overlays) > 1 else ''} applied in {current_library}")
-                        refreshed_assets += 1
-                        overlays_applied += len(applied_overlays)
+                        matched_title = next((title for title in titles_overlays if title in line), None)
+                        if matched_title:
+                            season, episode = parse_overlays_log(line.strip(), matched_title)
 
-                process.wait()
-                if process.returncode == 0:
+                            season_label = f" • Season {season:02}" if season is not None and season != 0 else f" • Specials" if season is not None else ""
+                            episode_label = f" • Episode {episode:02}" if episode else ""
+
+                            capture_next_line = True
+                            captured_title = matched_title
+                            continue
+
+                        if capture_next_line:
+                            capture_next_line = False
+                            if "Overlays Applied" not in line:
+                                continue
+
+                            ratingKey = match_key(
+                                library_map=this_library,
+                                title=captured_title,
+                                season=season,
+                                episode=episode
+                            )
+                            if not ratingKey:
+                                debug_me("Unable to match ratingKey, skipping")
+                                continue
+
+                            this_item = this_library[ratingKey]
+                            media_type = this_item["media_type"]
+                            media_to_file_map = {
+                                MediaType.MOVIE.value: {
+                                    "file_type": FileType.MOVIE_POSTER.value,
+                                    "label": "Movie poster"
+                                },
+                                MediaType.TV_SHOW.value: {
+                                    "file_type": FileType.SHOW_COVER.value,
+                                    "label": "Show cover"
+                                }
+                            }
+
+                            if season and episode:
+                                file_type = FileType.TITLE_CARD.value
+                                asset_type = "Title card"
+                            elif season:
+                                file_type = FileType.SEASON_COVER.value
+                                asset_type = "Season cover"
+                            else:
+                                file_type = media_to_file_map[media_type]["file_type"]
+                                asset_type = media_to_file_map[media_type]["label"]
+
+                            updated_assets = this_item["updated_assets"]
+                            updated_asset = match_asset(
+                                asset_list=updated_assets,
+                                file_type=file_type,
+                                season=season,
+                                episode=episode
+                            )
+                            if not updated_asset:
+                                debug_me("Unable to match asset, skipping")
+                                continue
+
+                            author = updated_asset["author"]
+                            author_label = f" • {author}" if author is not None else ""
+                            title = this_item.get("alt_title", this_item["title"])
+                            year = this_item["year"]
+                            desc = f"{title}{f' ({year})' if year is not None else ''}{author_label}{season_label}{episode_label}"
+
+                            applied_overlays = parse_applied_overlays(line)
+
+                            if updated_asset.get("status", None) == "new":
+                                update_log(self._instance, f"✅ {desc} | {asset_type} set and [{", ".join(applied_overlays)}] overlay{'s' if len(applied_overlays) > 1 else ''} applied in {current_library}")
+                            else:
+                                update_log(self._instance, f"♻️ {desc} | {asset_type} refreshed and [{", ".join(applied_overlays)}] overlay{'s' if len(applied_overlays) > 1 else ''} applied in {current_library}")
+                            refreshed_assets += 1
+                            overlays_applied += len(applied_overlays)
+
+                    process.wait(timeout=30)
+
+                finally:
+                    watchdog.cancel()
+                    if process.stdout:
+                        process.stdout.close()
+                    if process.poll() is None:
+                        process.kill()
+                        process.wait()
+
+                if timed_out.is_set():
+                    update_log(self._instance, f"❌️ No response from Kometa in {idle_timeout} seconds, overlays run aborted")
+                    run_outcome = RunOutcome.FAILED.value
+
+                elif process.returncode == 0:
                     end_time = time.time()
                     process_time=elapsed_time(end_time - start_time)
                     debug_me(f"Targeted Kometa overlays run completed successfully. {refreshed_assets} assets refreshed and {overlays_applied} overlays applied in {process_time}.")
@@ -710,12 +789,11 @@ class KometaRunner:
                 update_log(self._instance, f"❌️ Unexpected error running Kometa container: {e}")
                 run_outcome = RunOutcome.FAILED.value
 
-            ended_at = datetime.now(timezone.utc).isoformat()
             RunHistory().add_run(
                 run_type=RunType.KOMETA.value,
                 label=run_label,
                 started_at=started_at,
-                ended_at=ended_at,
+                ended_at=datetime.now(timezone.utc).isoformat(),
                 trigger=RunTrigger.AUTO.value,
                 outcome=run_outcome,
                 assets_processed=refreshed_assets,

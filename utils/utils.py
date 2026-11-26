@@ -7,11 +7,6 @@ from core.exceptions import InvalidUrl, InvalidFlag
 from core.constants import DOCKER_SOCKET_PATH
 from typing import Tuple
 
-# ---------------------- HELPER CLASSES ----------------------
-
-
-
-
 # Calculate the MD5 of a string - used for artwork IDs stored in labels
 def calculate_md5(input_string):
     # Create an MD5 hash object
